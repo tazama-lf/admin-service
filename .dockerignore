@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+node_modules
+coverage
+template
+templates
+.vscode
+README.md

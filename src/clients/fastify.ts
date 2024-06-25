@@ -6,7 +6,9 @@ import Routes from '../router';
 import Ajv from 'ajv';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import messageSchemaPacs002 from '../schemas/reportSchema.json';
+import messageIDParamsSchema from '../schemas/paramsSchemas.json';
 
+const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
 const reportResponseSchema = { ...messageSchemaPacs002, $id: 'ReportResponseSchema' };
 const fastify = Fastify();
 
@@ -18,9 +20,11 @@ const ajv = new Ajv({
 });
 
 ajv.addSchema(reportResponseSchema);
+ajv.addSchema(paramsMessageSchema);
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   fastify.addSchema(reportResponseSchema);
+  fastify.addSchema(paramsMessageSchema);
   await fastify.register(fastifySwagger, {
     specification: {
       path: './build/swagger.yaml',
@@ -57,7 +61,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   });
   await fastify.register(fastifyCors, {
     origin: '*',
-    methods: ['POST','GET'],
+    methods: ['POST', 'GET'],
     allowedHeaders: '*',
   });
   fastify.register(Routes);

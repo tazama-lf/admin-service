@@ -3,18 +3,16 @@ import { loggerService } from '.';
 import { handleGetReportRequestByMsgId } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 
-
 export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
-    const request = req.query as { msgId: string };
-    const report = await handleGetReportRequestByMsgId(request.msgId);
-
+    const request = req.query as { msgid: string };
+    const data = await handleGetReportRequestByMsgId(request.msgid);
     const body = {
       message: 'Report was found',
-      data: report,
+      data,
     };
-    reply.status(200);
+    reply.status(data ? 200 : 204);
     reply.send(body);
   } catch (err) {
     const failMessage = `Failed to process execution request. \n${JSON.stringify(err, null, 4)}`;
@@ -25,8 +23,6 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
     loggerService.log('End - Handle report request');
   }
 };
-
-
 
 const handleHealthCheck = async (): Promise<{ status: string }> => {
   return {

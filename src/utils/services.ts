@@ -7,7 +7,6 @@ export class Singleton {
 
   public static async getDatabaseManager(databaseManagerConfig: any): Promise<typeof databaseManagerConfig> {
     if (!Singleton.dbManager) Singleton.dbManager = await CreateDatabaseManager(databaseManagerConfig);
-
     return Singleton.dbManager;
   }
 }

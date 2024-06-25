@@ -8,36 +8,13 @@ import initializeFastifyClient from './clients/fastify';
 import { configuration } from './config';
 import { Singleton } from './utils/services';
 
-const databaseManagerConfig = {
-  redisConfig: {
-    db: configuration.redis.db,
-    servers: configuration.redis.servers,
-    password: configuration.redis.password,
-    isCluster: configuration.redis.isCluster,
-  },
-  transactionHistory: {
-    certPath: configuration.transactionHistoryCertPath,
-    databaseName: configuration.transactionHistoryName,
-    user: configuration.transactionHistoryUser,
-    password: configuration.transactionHistoryPassword,
-    url: configuration.transactionHistoryURL,
-  },
-  pseudonyms: {
-    certPath: configuration.pseudonymsCertPath,
-    databaseName: configuration.graphDb,
-    user: configuration.pseudonymsUser,
-    password: configuration.pseudonymsPassword,
-    url: configuration.pseudonymsURL,
-  },
-};
-
 export const loggerService: LoggerService = new LoggerService(configuration.sidecarHost);
 export let server: IStartupService;
 
-let databaseManager: DatabaseManagerInstance<typeof databaseManagerConfig>;
+let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
 
 export const dbInit = async (): Promise<void> => {
-  databaseManager = await Singleton.getDatabaseManager(databaseManagerConfig);
+  databaseManager = await Singleton.getDatabaseManager(configuration.db);
   loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };
 
@@ -59,7 +36,8 @@ const connect = async (): Promise<void> => {
   }
 
   const fastify = await initializeFastifyClient();
-  fastify.listen({ port: configuration.port, host: '0.0.0.0' }, (err, address) => {
+  const { port, host } = configuration.service;
+  fastify.listen({ port, host }, (err, address) => {
     if (err) {
       loggerService.error(err);
       throw Error(`${err.message}`);

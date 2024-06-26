@@ -63,8 +63,8 @@ const config: Config.InitialOptions = {
     global: {
       branches: 0, //until elastic apm can be properly mocked
       functions: 95,
-      lines: 92,
-      statements: 92,
+      lines: 95,
+      statements: 95,
     },
   },
 

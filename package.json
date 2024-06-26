@@ -37,7 +37,7 @@
     "@fastify/response-validation": "^2.6.0",
     "@fastify/swagger": "^8.8.0",
     "@fastify/swagger-ui": "^3.0.0",
-    "@frmscoe/frms-coe-lib": "file:../frms-coe-lib/frmscoe-frms-coe-lib-4.0.0-rc.7.tgz",
+    "@frmscoe/frms-coe-lib": "^4.0.0-rc.8",
     "@frmscoe/frms-coe-startup-lib": "2.2.0-rc.2",
     "ajv": "^8.16.0",
     "arangojs": "^8.8.0",

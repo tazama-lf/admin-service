@@ -14,6 +14,8 @@ export let server: IStartupService;
 let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
 
 export const dbInit = async (): Promise<void> => {
+  const name = JSON.stringify(configuration.db);
+  loggerService.debug(name);
   databaseManager = await Singleton.getDatabaseManager(configuration.db);
   loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };

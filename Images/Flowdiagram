@@ -1,0 +1,38 @@
+sequenceDiagram
+    participant Client
+    participant LoggerService
+    participant APM
+    participant DatabaseManager
+
+    Client->>+LoggerService: log("Started handling get request by message id...")
+    LoggerService-->>Client: log
+
+    Client->>+AQL: format(msgid)
+    AQL-->>Client: messageid
+
+    Client->>+AQL: construct query
+    AQL-->>Client: queryString
+
+    Client->>+LoggerService: log("Requesting report by message id from database service")
+    LoggerService-->>Client: log
+
+    Client->>+APM: startSpan('db.query.transactions')
+    APM-->>Client: spanQueryTransactions
+
+    Client->>+DatabaseManager: query(queryString)
+    DatabaseManager-->>Client: report as Report[][]
+
+    Client->>+APM: endSpan(spanQueryTransactions)
+    APM-->>Client: span ended
+
+    Client->>+Unwrap: unwrap(report)
+    Unwrap-->>Client: unWrappedReport
+
+    Client->>LoggerService: log("Completed handling get report by message id")
+    LoggerService-->>Client: log
+
+    Client-->>Client: return unWrappedReport
+    Client->>LoggerService: log("Failed fetching report from database service with error message...", 'handleGetReportRequestByMsgId()')
+    LoggerService-->>Client: log
+
+    Client->>Client: throw new Error(errorMessage.message)

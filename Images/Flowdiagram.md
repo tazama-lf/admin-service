@@ -1,8 +1,9 @@
 ```mermaid
   flowchart TD
-  A([Start handleGetReportByMsgId]) -->|msgid| B[Start APM db.query.transactions]
+  A([Start handleGetReportByMsgId]) -->|msgid| B[[Start APM db.query.transactions]]
   B --> C[Get report from database]
-  C --> D{if error thrown?}
+  C --> V[["End APM db.query.transactions"]]
+  V --> D{if error thrown?}
   D -->|Yes| E{if report found?}
   E -->|Yes| G[set status code to 200]
   E -->|No| K[set status code to 204]

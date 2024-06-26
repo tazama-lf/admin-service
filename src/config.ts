@@ -15,6 +15,15 @@ export interface IConfig {
     port: number;
     host: string;
   };
+  db: {
+    transaction: {
+      password: string;
+      url: string;
+      user: string;
+      databaseName: string;
+      certPath: string;
+    },
+  };
 }
 
 export const configuration: IConfig = {
@@ -23,5 +32,14 @@ export const configuration: IConfig = {
   service: {
     port: parseInt(process.env.PORT!, 10) || 3000,
     host: process.env.HOST! || '127.0.0.1',
+  },
+  db: {
+    transaction: {
+      password: process.env.TRANSACTION_DATABASE_PASSWORD!,
+      url: process.env.TRANSACTION_DATABASE_URL!,
+      user: process.env.TRANSACTION_DATABASE_USER!,
+      databaseName: process.env.TRANSACTION_DATABASE!,
+      certPath: process.env.TRANSACTION_DATABASE_CERT_PATH!,
+    },
   },
 };

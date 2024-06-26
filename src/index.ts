@@ -2,7 +2,6 @@
 import initializeFastifyClient from './clients/fastify';
 import { configuration } from './config';
 
-
 const connect = async (): Promise<void> => {
   const fastify = await initializeFastifyClient();
   const { port, host } = configuration.service;
@@ -10,7 +9,6 @@ const connect = async (): Promise<void> => {
     if (err) {
       throw Error(`${err.message}`);
     }
-
   });
 };
 

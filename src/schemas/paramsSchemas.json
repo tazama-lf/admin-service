@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "msgid": {
+      "type": "string"
+    }
+  },
+  "required":["msgid"]
+}

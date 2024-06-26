@@ -57,15 +57,14 @@ This endpoint retrieves a report by the specified message ID (`msgid`). The mess
 #### Flow Diagram
 ```mermaid
 sequenceDiagram
-    participant Requester
-    participant Admin-service
-    participant ArangoDB
+    participant Client as Client<br>System
+    participant ADMIN as Admin-Service    
+    participant DB as ArangoDB
 
-    Requester->>+Admin-service: Request for report by msgid
-    Admin-service->>+ArangoDB: Get report Filter by msgid
-
-    ArangoDB->>+Admin-service: report if (found)
-    Admin-service-->>Requester: response with report if found
+Client ->> ADMIN: 1. Fetch evaluationResult
+ADMIN->> DB: 2. Fetch evaluationResult 
+DB->> ADMIN: 3. {evaluationResult} data
+ADMIN->> Client: 4. {evaluationResult} data
 ```
 
 #### URL

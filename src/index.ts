@@ -1,89 +1,38 @@
 // SPDX-License-Identifier: Apache-2.0
-import './apm';
-import { LoggerService, type DatabaseManagerInstance } from '@frmscoe/frms-coe-lib';
-import { StartupFactory, type IStartupService } from '@frmscoe/frms-coe-startup-lib';
-import cluster from 'cluster';
-import os from 'os';
 import initializeFastifyClient from './clients/fastify';
 import { configuration } from './config';
-import { Singleton } from './utils/services';
 
-export const loggerService: LoggerService = new LoggerService(configuration.sidecarHost);
-export let server: IStartupService;
-
-let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
-
-export const dbInit = async (): Promise<void> => {
-  const name = JSON.stringify(configuration.db);
-  loggerService.debug(name);
-  databaseManager = await Singleton.getDatabaseManager(configuration.db);
-  loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
-};
 
 const connect = async (): Promise<void> => {
-  let isConnected = false;
-  for (let retryCount = 0; retryCount < 10; retryCount++) {
-    loggerService.log('Connecting to nats server...');
-    if (!(await server.initProducer())) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    } else {
-      loggerService.log('Connected to nats');
-      isConnected = true;
-      break;
-    }
-  }
-
-  if (!isConnected) {
-    throw new Error('Unable to connect to nats after 10 retries');
-  }
-
   const fastify = await initializeFastifyClient();
   const { port, host } = configuration.service;
   fastify.listen({ port, host }, (err, address) => {
     if (err) {
-      loggerService.error(err);
+      console.error(err);
       throw Error(`${err.message}`);
     }
 
-    loggerService.log(`Fastify listening on ${address}`);
+    console.log(`Fastify listening on ${address}`);
   });
 };
 
-export const runServer = async (): Promise<void> => {
-  server = new StartupFactory();
-  if (configuration.env !== 'test') await connect();
-};
 
 process.on('uncaughtException', (err) => {
-  loggerService.error('process on uncaughtException error', err, 'index.ts');
+  console.error('process on uncaughtException error', err, 'index.ts');
 });
 
 process.on('unhandledRejection', (err) => {
-  loggerService.error(`process on unhandledRejection error: ${JSON.stringify(err) ?? '[NoMetaData]'}`);
+  console.error(`process on unhandledRejection error: ${JSON.stringify(err) ?? '[NoMetaData]'}`);
 });
 
-const numCPUs = os.cpus().length > configuration.maxCPU ? configuration.maxCPU + 1 : os.cpus().length + 1;
-
-if (cluster.isPrimary && configuration.maxCPU !== 1) {
-  for (let i = 1; i < numCPUs; i++) {
-    cluster.fork();
-  }
-
-  cluster.on('exit', (worker, code, signal) => {
-    cluster.fork();
-  });
-} else {
-  (async () => {
-    try {
-      if (process.env.NODE_ENV !== 'test') {
-        await dbInit();
-        await runServer();
-      }
-    } catch (err) {
-      loggerService.error(`Error while starting NATS server on Worker ${process.pid}`, err);
-      process.exit(1);
+(async () => {
+  try {
+    if (process.env.NODE_ENV !== 'test') {
+      await connect();
     }
-  })();
-}
+  } catch (err) {
+    process.exit(1);
+  }
+})();
 
-export { databaseManager };
+

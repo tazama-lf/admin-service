@@ -61,7 +61,7 @@ const config: Config.InitialOptions = {
   // An object that configures minimum threshold enforcement for coverage results
   coverageThreshold: {
     global: {
-      branches: 0, //until elastic apm can be properly mocked
+      branches: 95, //until elastic apm can be properly mocked
       functions: 95,
       lines: 95,
       statements: 95,
@@ -91,7 +91,7 @@ const config: Config.InitialOptions = {
 
   // An array of directory names to be searched recursively up from the requiring module's location
   // moduleDirectories: [
-  //   "node_modules"
+  //   "node_modles"
   // ],
 
   // An array of file extensions your modules use

@@ -2,7 +2,6 @@
 // config settings, env variables
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { type ManagerConfig } from '@frmscoe/frms-coe-lib';
 
 // Load .env file into process.env if it exists. This is convenient for running locally.
 dotenv.config({
@@ -11,29 +10,38 @@ dotenv.config({
 
 export interface IConfig {
   maxCPU: number;
+  env: string;
+  sidecarHost: string;
   service: {
     port: number;
     host: string;
   };
-  env: string;
   apm: {
     serviceName: string;
     secretToken: string;
     url: string;
     active: string;
   };
-  db: ManagerConfig;
+  db: {
+    transaction: {
+      password: string;
+      url: string;
+      user: string;
+      databaseName: string;
+      certPath: string;
+    },
+  };
   logger: {
     logstashHost: string;
     logstashPort: number;
     logstashLevel: string;
   };
-  sidecarHost: string;
-  producerStream: string;
 }
 
 export const configuration: IConfig = {
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
+  env: process.env.NODE_ENV!,
+  sidecarHost: process.env.SIDECAR_HOST!,
   service: {
     port: parseInt(process.env.PORT!, 10) || 3000,
     host: process.env.HOST! || '127.0.0.1',
@@ -45,35 +53,6 @@ export const configuration: IConfig = {
     active: process.env.APM_ACTIVE!,
   },
   db: {
-    redisConfig: {
-      db: parseInt(process.env.REDIS_DB!, 10) || 0,
-      servers: JSON.parse(process.env.REDIS_SERVERS! || '[{"hostname": "127.0.0.1", "port":6379}]'),
-      password: process.env.REDIS_AUTH!,
-      isCluster: process.env.REDIS_IS_CLUSTER === 'true',
-    },
-    networkMap: {
-      password: process.env.NETWORK_MAP_DATABASE_PASSWORD!,
-      url: process.env.NETWORK_MAP_DATABASE_URL!,
-      user: process.env.NETWORK_MAP_DATABASE_USER!,
-      databaseName: process.env.NETWORK_MAP_DATABASE!,
-      certPath: process.env.NETWORK_MAP_DATABASE_CERT_PATH!,
-    },
-    configuration: {
-      password: process.env.CONFIG_DATABASE_PASSWORD!,
-      url: process.env.CONFIG_DATABASE_URL!,
-      user: process.env.CONFIG_DATABASE_USER!,
-      databaseName: process.env.CONFIG_DATABASE!,
-      certPath: process.env.CONFIG_DATABASE_CERT_PATH!,
-      localCacheEnabled: process.env.CACHE_ENABLED === 'true',
-      localCacheTTL: parseInt(process.env.CACHE_TTL!, 10) || 3000,
-    },
-    transactionHistory: {
-      password: process.env.TRANSACTION_HISTORY_DATABASE_PASSWORD!,
-      url: process.env.TRANSACTION_HISTORY_DATABASE_URL!,
-      user: process.env.TRANSACTION_HISTORY_DATABASE_USER!,
-      databaseName: process.env.TRANSACTION_HISTORY_DATABASE!,
-      certPath: process.env.TRANSACTION_HISTORY_DATABASE_CERT_PATH!,
-    },
     transaction: {
       password: process.env.TRANSACTION_DATABASE_PASSWORD!,
       url: process.env.TRANSACTION_DATABASE_URL!,
@@ -82,12 +61,9 @@ export const configuration: IConfig = {
       certPath: process.env.TRANSACTION_DATABASE_CERT_PATH!,
     },
   },
-  env: process.env.NODE_ENV!,
   logger: {
     logstashHost: process.env.LOGSTASH_HOST!,
     logstashPort: parseInt(process.env.LOGSTASH_PORT ?? '0', 10),
     logstashLevel: process.env.LOGSTASH_LEVEL! || 'info',
   },
-  sidecarHost: process.env.SIDECAR_HOST!,
-  producerStream: process.env.PRODUCER_STREAM!,
 };

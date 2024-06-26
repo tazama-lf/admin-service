@@ -51,7 +51,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
 
   await fastify.register(fastifyCors, {
     origin: '*',
-    methods: ['POST', 'GET'],
+    methods: ['GET'],
     allowedHeaders: '*',
   });
 

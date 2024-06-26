@@ -11,8 +11,8 @@ export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Repo
     loggerService.log('Requesting report by message id from database service');
     const spanQueryTransactions = apm.startSpan('db.query.transactions');
     const report = (await databaseManager.getReportByMessageId('transactions', msgid)) as Report[][];
-    const unWrappedReport = unwrap<Report>(report);
     spanQueryTransactions?.end();
+    const unWrappedReport = unwrap<Report>(report);
 
     return unWrappedReport;
   } catch (error) {

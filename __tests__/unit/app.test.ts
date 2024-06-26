@@ -28,12 +28,14 @@ describe('App Controller & Logic Service', () => {
 
   describe('handleGetReportRequestByMsgId', () => {
     it('should handle happy path', async () => {
-      jest.spyOn(databaseManager, 'getReportByMessageId').mockImplementation(jest.fn());
+      jest.spyOn(databaseManager, 'getReportByMessageId').mockImplementation(() => {
+        return new Promise((resolve, reject) => {
+          resolve([[{ transactionID: 'exampleOfTransactionID' }]]);
+        });
+      });
 
-      const handleSpy = jest.spyOn(LogicService, 'handleGetReportRequestByMsgId');
-      await LogicService.handleGetReportRequestByMsgId('cabb-32c3-4ecf-944e-654855c80c38');
-      expect(handleSpy).toHaveBeenCalledTimes(1);
-      expect(handleSpy).toHaveReturned();
+      const report = await LogicService.handleGetReportRequestByMsgId('cabb-32c3-4ecf-944e-654855c80c38');
+      expect(report).toEqual({ transactionID: 'exampleOfTransactionID' });
     });
 
     it('should handle pacs.002, database error', async () => {

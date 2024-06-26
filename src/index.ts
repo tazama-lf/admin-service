@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import initializeFastifyClient from './clients/fastify';
 import { configuration } from './config';
-import { type DatabaseManagerInstance, CreateDatabaseManager } from '@frmscoe/frms-coe-lib';
+import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@frmscoe/frms-coe-lib';
+
+export const loggerService: LoggerService = new LoggerService(undefined);
 
 let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
 
 export const dbInit = async (): Promise<void> => {
   databaseManager =  await CreateDatabaseManager(configuration.db);
+  loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };
 
 const connect = async (): Promise<void> => {
@@ -16,6 +19,7 @@ const connect = async (): Promise<void> => {
     if (err) {
       throw Error(`${err.message}`);
     }
+    loggerService.log(`Fastify listening on ${address}`);
   });
 };
 
@@ -26,6 +30,7 @@ const connect = async (): Promise<void> => {
       await connect();
     }
   } catch (err) {
+    loggerService.error(`Error while starting server on Worker ${process.pid}`, err);
     process.exit(1);
   }
 })();

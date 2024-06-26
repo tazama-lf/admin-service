@@ -8,22 +8,11 @@ const connect = async (): Promise<void> => {
   const { port, host } = configuration.service;
   fastify.listen({ port, host }, (err, address) => {
     if (err) {
-      console.error(err);
       throw Error(`${err.message}`);
     }
 
-    console.log(`Fastify listening on ${address}`);
   });
 };
-
-
-process.on('uncaughtException', (err) => {
-  console.error('process on uncaughtException error', err, 'index.ts');
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error(`process on unhandledRejection error: ${JSON.stringify(err) ?? '[NoMetaData]'}`);
-});
 
 (async () => {
   try {

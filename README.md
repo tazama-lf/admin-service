@@ -54,6 +54,20 @@ Before you start using the Admin API, ensure that you have the following items:
 #### Description
 This endpoint retrieves a report by the specified message ID (`msgid`). The message ID is provided as a query parameter.
 
+#### Flow Diagram
+```mermaid
+sequenceDiagram
+    participant Requester
+    participant Admin-service
+    participant ArangoDB
+
+    Requester->>+Admin-service: Request for report by msgid
+    Admin-service->>+ArangoDB: Get report Filter by msgid
+
+    ArangoDB->>+Admin-service: report if (found)
+    Admin-service-->>Requester: response with report if found
+```
+
 #### URL
 ```
 /v1/admin/reports/getreportbymsgid

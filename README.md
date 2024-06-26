@@ -1,2 +1,1 @@
-# admin-service
-admin-service
+<!-- SPDX-License-Identifier: Apache-2.0 -->

@@ -8,7 +8,7 @@ export const loggerService: LoggerService = new LoggerService(undefined);
 let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
 
 export const dbInit = async (): Promise<void> => {
-  databaseManager =  await CreateDatabaseManager(configuration.db);
+  databaseManager = await CreateDatabaseManager(configuration.db);
   loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };
 
@@ -36,5 +36,3 @@ const connect = async (): Promise<void> => {
 })();
 
 export { databaseManager };
-
-

@@ -22,7 +22,7 @@ export interface IConfig {
       user: string;
       databaseName: string;
       certPath: string;
-    },
+    };
   };
 }
 

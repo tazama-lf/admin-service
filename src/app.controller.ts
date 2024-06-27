@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: Apache-2.0
 
 import { handleGetReportRequestByMsgId } from './logic.service';
@@ -24,7 +23,6 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
     loggerService.log('End - Handle report request');
   }
 };
-
 
 const handleHealthCheck = async (): Promise<{ status: string }> => {
   return {

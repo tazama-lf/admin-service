@@ -5,7 +5,6 @@ import { type Report } from './interface/report.interface';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
-
     loggerService.log(`Started handling get request by message id the message id is ${msgid}`);
 
     const report = (await databaseManager.getReportByMessageId('transactions', msgid)) as Report[][];
@@ -20,7 +19,7 @@ export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Repo
       'handleGetReportRequestByMsgId()',
     );
     throw new Error(errorMessage.message);
-  }finally {
+  } finally {
     loggerService.log('Completed handling get report by message id');
   }
 };

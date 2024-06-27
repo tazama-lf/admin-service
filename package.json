@@ -17,7 +17,8 @@
     "lint:eslint-no-inline": "eslint --no-inline-config \"**/*.ts\"",
     "lint:prettier": "prettier --check \"**/*.ts\"",
     "test": "jest --config=jest.config.ts --passWithNoTests --forceExit",
-    "test:watch": "jest --config=jest.config.ts --watch"
+    "test:watch": "jest --config=jest.config.ts --watch",
+    "prepare": "husky"
   },
   "keywords": [
     "actio",
@@ -54,7 +55,8 @@
     "prettier": "^3.3.1",
     "ts-jest": "^29.1.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "husky": "^9.0.11"
   },
   "lint-staged": {
     "*.{js,ts}": [

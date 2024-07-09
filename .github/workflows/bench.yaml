@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+
+name: Benchmark CI
+env:
+  GITHUB_TOKEN: ${{ secrets.GH_WRITE_TOKEN }}
+  REPO_NAME: 'performance-benchmark'
+  PROCCESSOR_REPO_NAME: ${{ github.event.repository.name }}
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repo
+        run: |
+          git clone https://user:$GITHUB_TOKEN@github.com/${{ github.repository_owner }}/${{ env.REPO_NAME }}
+          cd ${{ env.REPO_NAME }}
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      - name: Switch to temp branch
+        run: |
+          cd ${{ env.REPO_NAME }}
+          git checkout temp-holder
+          git pull
+          cat "${{ env.PROCCESSOR_REPO_NAME }}".csv >> "${{ env.PROCCESSOR_REPO_NAME }}".csv.tmp
+          git add "${{ env.PROCCESSOR_REPO_NAME }}".csv.tmp
+          git stash
+          git checkout main
+          git stash apply
+      - name: Write data
+        run: |
+          cd ${{ env.REPO_NAME }}
+          echo -n $'\n' >> "${{ env.PROCCESSOR_REPO_NAME }}".csv
+          cat "${{ env.PROCCESSOR_REPO_NAME }}".csv.tmp >> "${{ env.PROCCESSOR_REPO_NAME }}".csv
+          git reset "${{ env.PROCCESSOR_REPO_NAME }}".csv.tmp
+          git add "${{ env.PROCCESSOR_REPO_NAME }}".csv
+          git commit -m "#${{ github.event.number }} Pushed update of ${{ env.PROCCESSOR_REPO_NAME }}"
+      - name: push data
+        run: |
+          cd ${{ env.REPO_NAME }}
+          git push origin main

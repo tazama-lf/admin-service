@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# This GitHub Actions workflow is designed to close a milestone and trigger a release workflow.
+
+name: Milestone Workflow
+
+# This workflow can be manually triggered with a specified milestone ID.
+on:
+  workflow_dispatch:
+    inputs:
+      milestoneId:
+        description: 'Milestone ID'
+        required: true
+        default: '1'
+
+jobs:
+  close_milestone:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step to check out the repository code.
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      # Step to set up Node.js environment, required for running npm commands.
+      - name: Setup Node.js (.npmrc)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+          registry-url: https://npm.pkg.github.com/
+          # Scope is set to the user or organization that owns the workflow file.
+          scope: '@frmscoe'
+          
+      # Step to install npm dependencies using the `npm ci` command.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        
+      # Step to set up environment variables required for the script.
+      - name: Set up environment variables
+        run: |
+          # Set the GitHub token for authentication.
+          echo "ACCESS_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+          # Set the milestone number based on the workflow input.
+          echo "MILESTONE_NUMBER=${{ github.event.inputs.milestoneId }}" >> $GITHUB_ENV
+          # Set the base API URL for GitHub.
+          echo "API_URL=https://api.github.com" >> $GITHUB_ENV
+
+      # Step to close the specified milestone using GitHub API.
+      - name: Close Milestone
+        run: |
+          # Use the environment variables set up earlier to make the API call.
+          curl -X PATCH \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -d '{"state": "closed"}' \
+            $API_URL/repos/${{ github.repository }}/milestones/$MILESTONE_NUMBER
+        env:
+          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MILESTONE_NUMBER: ${{ github.event.inputs.milestoneId }}
+          API_URL: "https://api.github.com"
+            
+      # Step to trigger another workflow for releasing, passing the milestone number.
+      - name: Trigger Release Workflow
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: release
+          client-payload: '{"milestone_number": "${{ github.event.inputs.milestoneId }}"}'

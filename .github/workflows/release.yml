@@ -46,10 +46,15 @@ jobs:
           # Defaults to the user or organization that owns the workflow file
           scope: '@frmscoe'
           
-      #- name: Install dependencies
-      #  run: npm ci
-      #  env:
-      #    GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          
+      - name: Run Tests
+        run: npm test
+        env:
+          STARTUP_TYPE: 'nats'
         
       # Determine the release type (major, minor, patch) based on commit messages  
       - name: Determine Release Type

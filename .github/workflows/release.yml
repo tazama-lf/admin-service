@@ -153,7 +153,6 @@ jobs:
           LABEL_FEAT_BREAKING="feat!:"
           LABEL_DEPS="chore(deps):"
           LABEL_DEPS_DEV="chore(deps-dev):"
-          REPO_URL="https://github.com/${{ github.repository }}"
           # Get the last release tag
           LAST_RELEASE_TAG=$(git describe --abbrev=0 --tags)
           echo "Last Release Tag: $LAST_RELEASE_TAG"
@@ -172,7 +171,7 @@ jobs:
             local section_label="$2"
             local section_icon="$3"
             # Get the commit messages with the specified label between the last release and the current release
-            local commit_messages=$(git log --pretty=format:"- %s ([%H]($REPO_URL/commit/%H))" "$LAST_RELEASE_TAG..HEAD" --grep="$section_label" --no-merges --decorate --decorate-refs=refs/issues)
+            local commit_messages=$(git log --pretty=format:"- %s (Linked Issues: %C(yellow)%H%Creset)" "$LAST_RELEASE_TAG..HEAD" --grep="$section_label" --no-merges --decorate --decorate-refs=refs/issues)
             # If there are commit messages, append the section to the changelog file
             if [ -n "$commit_messages" ]; then
               # Remove duplicate commit messages
@@ -203,7 +202,7 @@ jobs:
           # Function to append non-labeled commits to the changelog file
           append_non_labeled_commits() {
             # Get the commit messages that do not match any conventional commit labels between the last release and the current release
-            local non_labeled_commit_messages=$(git log --pretty=format:"- %s ([%H]($REPO_URL/commit/%H))" "$LAST_RELEASE_TAG..HEAD" --invert-grep --grep="^fix:\|^feat:\|^enhancement:\|^docs:\|^refactor:\|^chore:\|^build:\|^ci:\|^perf:\|^style:\|^test:\|^BREAKING CHANGE:\|^feat!:\|^chore(deps):\|^chore(deps-dev):")
+            local non_labeled_commit_messages=$(git log --pretty=format:"- %s (Linked Issues: %C(yellow)%H%Creset)" "$LAST_RELEASE_TAG..HEAD" --invert-grep --grep="^fix:\|^feat:\|^enhancement:\|^docs:\|^refactor:\|^chore:\|^build:\|^ci:\|^perf:\|^style:\|^test:\|^BREAKING CHANGE:\|^feat!:\|^chore(deps):\|^chore(deps-dev):")
             # If there are non-labeled commit messages, append the section to the changelog file
             if [ -n "$non_labeled_commit_messages" ]; then
               # Remove duplicate commit messages

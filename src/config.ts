@@ -2,6 +2,7 @@
 // config settings, env variables
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { type ManagerConfig } from '@frmscoe/frms-coe-lib';
 
 // Load .env file into process.env if it exists. This is convenient for running locally.
 dotenv.config({
@@ -15,15 +16,7 @@ export interface IConfig {
     port: number;
     host: string;
   };
-  db: {
-    transaction: {
-      password: string;
-      url: string;
-      user: string;
-      databaseName: string;
-      certPath: string;
-    };
-  };
+  db: ManagerConfig;
 }
 
 export const configuration: IConfig = {
@@ -40,6 +33,19 @@ export const configuration: IConfig = {
       user: process.env.TRANSACTION_DATABASE_USER!,
       databaseName: process.env.TRANSACTION_DATABASE!,
       certPath: process.env.TRANSACTION_DATABASE_CERT_PATH!,
+    },
+    pseudonyms: {
+      url: process.env.PSEUDONYMS_DATABASE_URL!,
+      databaseName: process.env.PSEUDONYMS_DATABASE!,
+      user: process.env.PSEUDONYMS_DATABASE_USER!,
+      password: process.env.PSEUDONYMS_DATABASE_PASSWORD!,
+      certPath: process.env.PSEUDONYMS_DATABASE_CERT_PATH!,
+    },
+    redisConfig: {
+      db: parseInt(process.env.VALKEY_DB!, 10) || 0,
+      servers: JSON.parse(process.env.VALKEY_SERVERS! || '[{"hostname": "127.0.0.1", "port":6379}]'),
+      password: process.env.VALKEY_AUTH!,
+      isCluster: process.env.VALKEY_IS_CLUSTER === 'true',
     },
   },
 };

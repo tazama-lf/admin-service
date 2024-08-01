@@ -31,6 +31,26 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
 
     const nowDateTime = new Date().toISOString();
 
+    if (!condition?.incptnDtTm) {
+      condition.incptnDtTm = nowDateTime;
+    }
+
+    if (condition?.incptnDtTm < nowDateTime) {
+      throw Error('Error: due to Inception date is past the current time.');
+    }
+
+    if (condition.condTp === 'override' && !condition?.xprtnDtTm) {
+      throw Error('Error: expiration date need to be provided for all override conditions.');
+    }
+
+    if (condition.xprtnDtTm && condition?.xprtnDtTm < condition.incptnDtTm) {
+      throw Error('Error: expiration date, expiration date must be after inception date');
+    }
+
+    if (typeof condition.usr !== 'string') {
+      throw Error('Error: usr was not provided');
+    }
+
     const alreadyExistingCondition = (await databaseManager.getConditionsByEntity(condition.ntty)) as EntityCondition[];
 
     const { _id: condId } = (await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string };

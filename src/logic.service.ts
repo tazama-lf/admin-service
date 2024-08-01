@@ -2,7 +2,7 @@
 import { databaseManager, loggerService } from '.';
 import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
 import { type Report } from './interface/report.interface';
-import { type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { type ConditionEdge, type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -29,9 +29,11 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
   try {
     loggerService.log(`Started handling post request of entity condition executed by ${condition.usr}.`);
 
+    const nowDateTime = new Date().toISOString();
+
     const alreadyExistingCondition = (await databaseManager.getConditionsByEntity(condition.ntty)) as EntityCondition[];
 
-    const { _id: condId } = (await databaseManager.saveCondition({ ...condition, creDtTm: new Date().toISOString() })) as { _id: string };
+    const { _id: condId } = (await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string };
 
     const alreadyExistingEntity = (await databaseManager.getEntity(condition.ntty)) as Array<{ _id: string }>;
 
@@ -40,11 +42,10 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     if (!alreadyExistingEntity) {
       if (condition.forceCret) {
         const entityIdentifier = `${condition.ntty.Id + condition.ntty.SchmeNm.Prtry}`;
-        const nowDateTime = new Date().toISOString();
         try {
           entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })._id;
         } catch (err) {
-          throw Error((err as { message: string }).message);
+          throw Error('Error: while trying to save new entity: ' + (err as { message: string }).message);
         }
         loggerService.log('New entity was added after not being found while forceCret was set to true');
       } else {
@@ -74,6 +75,8 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
         break;
     }
 
+    await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });
+
     if (alreadyExistingCondition && alreadyExistingCondition.length > -1) {
       const message = `${alreadyExistingCondition.length} conditions already exist for the entity`;
       loggerService.warn(message);
@@ -89,7 +92,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     };
   } catch (error) {
     const errorMessage = error as { message: string };
-    loggerService.log(`Failed posting condition for entity with error message: ${errorMessage.message}`);
+    loggerService.log(`Error: posting condition for entity with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

@@ -1,0 +1,83 @@
+{
+  "description": "Entity condition json schema for fastify validation",
+  "type": "object",
+  "properties": {
+    "evtTp": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "pacs.008.01.10",
+          "pacs.002.01.11",
+          "pain.013.001.09",
+          "pain.001.001.11"
+        ]
+      }
+    },
+    "condTp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prsptv": {
+      "type": "string",
+      "minLength": 1
+    },
+    "incptnDtTm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "xprtnDtTm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "condRsn": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ntty": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schmeNm": {
+          "type": "object",
+          "properties": {
+            "prtry": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "prtry"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "schmeNm"
+      ]
+    },
+    "forceCret": {
+      "type": "boolean"
+    },
+    "usr": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "evtTp",
+    "condTp",
+    "prsptv",
+    "incptnDtTm",
+    "xprtnDtTm",
+    "condRsn",
+    "ntty",
+    "forceCret",
+    "usr"
+  ]
+}

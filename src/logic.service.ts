@@ -50,8 +50,8 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
       if (condition.forceCret) {
         const entityIdentifier = `${condition.ntty.id + condition.ntty.schmeNm.prtry}`;
         try {
-          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })._id;
-          entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })._id;
+          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
+          entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })?._id;
         } catch (err) {
           throw Error('Error: while trying to save new entity: ' + (err as { message: string }).message);
         }
@@ -60,12 +60,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
         throw Error('Error: entity was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      if (alreadyExistingEntity && alreadyExistingEntity.length > 1) {
-        const message = `${alreadyExistingEntity.length} entities were found with the matching id`;
-        loggerService.error(message);
-        throw Error(message);
-      }
-      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })._id;
+      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
     }
 
     switch (condition.prsptv) {

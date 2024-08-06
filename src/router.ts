@@ -7,7 +7,7 @@ async function Routes(fastify: FastifyInstance, options: unknown): Promise<void>
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
   fastify.get('/v1/admin/reports/getreportbymsgid', SetOptions(ReportRequestHandler, 'messageIDSchema'));
-  fastify.post('/v1/admin/event-flow-control/entity', POSTConditionHandler);
+  fastify.post('/v1/admin/event-flow-control/entity', SetOptions(POSTConditionHandler, 'entityConditionSchema', true));
 }
 
 export default Routes;

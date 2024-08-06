@@ -87,6 +87,64 @@ GET
 #### Headers
 No specific headers required apart from standard authentication headers if needed.
 
+### 2. `/v1/admin/event-flow-control/entity`
+
+#### Description
+This endpoint stores entity conditions and condition edges in ArangoDB as well as in an in-memory data storage system.
+
+#### Flow Diagram
+```mermaid
+sequenceDiagram
+  participant clientsystem as Client System
+  participant tmsapi as Admin API
+  participant cache as Cache
+  participant db as Database
+
+  clientsystem->>tmsapi: setCondition()
+  tmsapi->>db: setCondition()
+  db->>tmsapi: writeOK(recordId)
+  tmsapi->>cache: setCondition()
+  cache->>tmsapi: writeOK()
+  tmsapi->>clientsystem: writeOK(recordId)
+```
+
+#### URL
+```
+/v1/admin/event-flow-control/entity
+```
+
+#### Method
+```
+POST
+```
+
+#### Body
+
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `evtTp`   | Array | Yes      | Event types. |
+| `condTp`   | String | Yes      | Condition type. |
+| `prsptv`   | String | Yes      | Perspective of the condtion. |
+| `incptnDtTm`   | String | Yes      | Inception date. |
+| `xprtnDtTm`   | String | Yes      | Expiration date. |
+| `condRsn`   | String | Yes      | Reason code. |
+| `forceCret`   | Boolean | Yes      | Flag indicating if created the entity if it does not exist. |
+| `usr`   | String | Yes      | User that triggered the operation. |
+| `ntty`   | Object | Yes      | The entity object that the condition is governed by. |
+
+**ntty object type**
+```JSON
+{
+  "id": "string",
+  "schmeNm": {
+    "prtry": "string"
+  }
+}
+```
+
+#### Headers
+No specific headers required apart from standard authentication headers if needed.
+
 #### Request Example
 ```http
 GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
@@ -109,6 +167,40 @@ Host: localhost:3000
     ```json
     {
       "statusCode": 204,
+    }
+    ```
+
+- **Status 500 Internal Server Error:** For server-side errors.
+    ```json
+    {
+      "status": "error",
+      "message": "Internal server error occurred."
+    }
+    ```
+
+
+```http
+GET /v1/admin/event-flow-control/entity HTTP/1.1
+Host: localhost:3000
+```
+
+#### Response
+
+- **Status 400 Bad Request:** When `msgid` is missing or invalid.
+    ```json
+    {
+      "statusCode": 400,
+      "code": "FST_ERR_VALIDATION",
+      "error": "Bad Request",
+      "message": "bodu must have required property 'prsptv'"
+    }
+    ```
+
+- **Status 500 Not Found:** When expiration date is before inception date.
+    ```json
+    {
+      "statusCode": 500,
+      "message": "Error: Expiration date must be after inception date."
     }
     ```
 

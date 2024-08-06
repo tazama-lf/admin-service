@@ -2,10 +2,18 @@
 import { type RouteHandlerMethod } from 'fastify';
 import { type FastifySchema } from 'fastify/types/schema';
 
-const SetOptions = (handler: RouteHandlerMethod, paramSchemaName: string): { handler: RouteHandlerMethod; schema: FastifySchema } => {
+const SetOptions = (
+  handler: RouteHandlerMethod,
+  paramSchemaName: string,
+  bodySchema?: boolean,
+): { handler: RouteHandlerMethod; schema: FastifySchema } => {
+  let schema: FastifySchema = { querystring: { $ref: `${paramSchemaName}#` } };
+  if (bodySchema) {
+    schema = { body: { $ref: `${paramSchemaName}#` } };
+  }
   return {
     handler,
-    schema: { querystring: { $ref: `${paramSchemaName}#` } },
+    schema,
   };
 };
 

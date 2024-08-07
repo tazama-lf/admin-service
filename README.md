@@ -3,7 +3,7 @@
 
 ## Overview
 
-The **Admin service** is a Node.js-based API designed for administrative tasks, particularly focusing on report management. It leverages the **Fastify** framework to provide a high-performance and low-overhead API interface. This document provides an in-depth look at the API, including setup requirements, a detailed overview of the application, and specific route documentation.
+The **Admin Service** is a Node.js-based API designed for administrative tasks, with a particular focus on report and condition management. It utilizes the Fastify framework to deliver a high-performance and low-overhead API interface. This document offers an in-depth examination of the API, covering setup requirements, a comprehensive overview of the application, and detailed route documentation.
 
 ## Pre-requisites
 
@@ -122,15 +122,20 @@ POST
 
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
-| `evtTp`   | Array | Yes      | Event types. |
+| `evtTp`   | Array | Yes      | Event types |
 | `condTp`   | String | Yes      | Condition type. |
 | `prsptv`   | String | Yes      | Perspective of the condition. |
 | `incptnDtTm`   | String | Yes      | Inception date. |
 | `xprtnDtTm`   | String | Yes      | Expiration date. |
 | `condRsn`   | String | Yes      | Reason code. |
-| `forceCret`   | Boolean | Yes      | Flag indicating if created the entity if it does not exist. |
+| `forceCret`   | Boolean | Yes      | Flag indicating whether the entity should be created if it does not exist. |
 | `usr`   | String | Yes      | User that triggered the operation. |
 | `ntty`   | Object | Yes      | The entity object that the condition is governed by. |
+
+Possible values for some fields mention in the table above
+1. **evtTp**  : [`'pacs.008.01.10'`,`'pacs.002.01.11'`,`'pain.001.001.11'`,`'pain.013.001.09'`]
+2. **condTp** : `non-overridable-block` or `override` or `overridable-block`
+3. **prsptv** : `both` or `creditor` or `debtor`
 
 **ntty object type**
 ```JSON
@@ -148,7 +153,6 @@ No specific headers required apart from standard authentication headers if neede
 #### Request Example
 ```http
 GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
-Host: localhost:3000
 ```
 
 #### Response
@@ -180,8 +184,7 @@ Host: localhost:3000
 
 
 ```http
-GET /v1/admin/event-flow-control/entity HTTP/1.1
-Host: localhost:3000
+POST /v1/admin/event-flow-control/entity HTTP/1.1
 ```
 
 #### Response
@@ -192,7 +195,7 @@ Host: localhost:3000
       "statusCode": 400,
       "code": "FST_ERR_VALIDATION",
       "error": "Bad Request",
-      "message": "bodu must have required property 'prsptv'"
+      "message": "body must have required property 'prsptv'"
     }
     ```
 

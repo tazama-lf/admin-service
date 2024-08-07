@@ -124,7 +124,7 @@ POST
 |-----------|--------|----------|---------------------------------|
 | `evtTp`   | Array | Yes      | Event types. |
 | `condTp`   | String | Yes      | Condition type. |
-| `prsptv`   | String | Yes      | Perspective of the condtion. |
+| `prsptv`   | String | Yes      | Perspective of the condition. |
 | `incptnDtTm`   | String | Yes      | Inception date. |
 | `xprtnDtTm`   | String | Yes      | Expiration date. |
 | `condRsn`   | String | Yes      | Reason code. |
@@ -186,7 +186,7 @@ Host: localhost:3000
 
 #### Response
 
-- **Status 400 Bad Request:** When `msgid` is missing or invalid.
+- **Status 400 Bad Request:** When `prsptv` is missing or invalid.
     ```json
     {
       "statusCode": 400,

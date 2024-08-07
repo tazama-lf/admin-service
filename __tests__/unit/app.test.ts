@@ -191,6 +191,23 @@ describe('handlePostConditionEntity', () => {
     });
   });
 
+  it('should handle error post request for a unknown perspective', async () => {
+    // Arrange
+    const conditionDebtor = { ...sampleCondition, prsptv: 'unknown' };
+    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
+    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
+    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
+    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
+
+    // Act
+    try {
+      await handlePostConditionEntity(conditionDebtor);
+    } catch (error) {
+      console.log(error);
+      expect(`${error}`).toEqual('Error: Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
+    }
+  });
+
   it('should handle a successful post request for a creditor perspective', async () => {
     // Arrange
     const nowDateTime = new Date().toISOString();

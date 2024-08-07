@@ -97,7 +97,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     }
 
     return {
-      message: 'New condtions was saved successfully.',
+      message: 'New condtion was saved successfully.',
       condition,
     };
   } catch (error) {

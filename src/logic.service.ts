@@ -3,7 +3,7 @@ import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
 import { type ConditionEdge, type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 import { databaseManager, loggerService } from '.';
 import { type Report } from './interface/report.interface';
-import ConditionValidation from './utils/condition-validation';
+import checkConditionValidity from './utils/condition-validation';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -32,7 +32,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
 
     const nowDateTime = new Date().toISOString();
 
-    ConditionValidation(condition);
+    checkConditionValidity(condition);
 
     let condId = '';
     const condEntityId: string = condition.ntty.id;
@@ -76,6 +76,8 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
       case 'creditor':
         await databaseManager.saveGovernedAsCreditorByEdge(condId, entityId, condition);
         break;
+      default:
+        throw Error('Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
     }
 
     await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });

@@ -1,6 +1,6 @@
 import { type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
-const ConditionValidation = (condition: EntityCondition): boolean => {
+const checkConditionValidity = (condition: EntityCondition): void => {
   const nowDateTime = new Date().toISOString();
 
   if (!condition?.incptnDtTm) {
@@ -22,8 +22,6 @@ const ConditionValidation = (condition: EntityCondition): boolean => {
   if (typeof condition.usr !== 'string') {
     throw Error('Error: User was not provided');
   }
-
-  return false;
 };
 
-export default ConditionValidation;
+export default checkConditionValidity;

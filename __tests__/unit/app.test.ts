@@ -4,6 +4,7 @@ import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
 import { handleGetReportRequestByMsgId, handlePostConditionEntity, handlePostConditionAccount } from '../../src/logic.service';
 import { EntityCondition, AccountCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
+
 // Mock the module
 jest.mock('../../src/', () => ({
   databaseManager: {
@@ -230,6 +231,7 @@ describe('handlePostConditionEntity', () => {
         creDtTm: nowDateTime,
       }),
     );
+
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',

@@ -25,8 +25,10 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
+
 export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle saving entity condition request');
+
   try {
     const condition = req.body as EntityCondition;
     const data = await handlePostConditionEntity(condition);

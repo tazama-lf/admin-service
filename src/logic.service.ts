@@ -86,7 +86,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     } else {
       condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
     }
-
+    
     await saveConditionEdges(condition.prsptv, condId, entityId, condition);
 
     await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });

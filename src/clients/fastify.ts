@@ -24,6 +24,7 @@ ajv.addSchema(paramsMessageSchema);
 ajv.addSchema(entityConditionMessageSchema);
 ajv.addSchema(accountConditionMessageSchema);
 
+
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
     prefix: '/swagger',
@@ -31,6 +32,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   fastify.addSchema(paramsMessageSchema);
   fastify.addSchema(entityConditionMessageSchema);
   fastify.addSchema(accountConditionMessageSchema);
+
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/documentation',
     uiConfig: {

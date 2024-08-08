@@ -200,18 +200,18 @@ Possible values for some fields mention in the table above
 **acct object for :** `URL 2`
 ```JSON
 {
-        "id": "string",
-        "schmeNm": {
-            "prtry": "string"
-        },
-        "agt": {
-            "finInstnId": {
-                "clrSysMmbId": {
-                    "mmbId": "string"
-                }
-            }
-        }
+  "id": "string",
+  "schmeNm": {
+      "prtry": "string"
+  },
+  "agt": {
+    "finInstnId": {
+      "clrSysMmbId": {
+        "mmbId": "string"
+      }
     }
+  }
+}
 ```
 
 #### Headers

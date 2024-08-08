@@ -120,10 +120,12 @@ GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
     ```
 
 
-### 2. `/v1/admin/event-flow-control/entity`
+### 2. 
+##### a. `/v1/admin/event-flow-control/entity`
+##### b. `/v1/admin/event-flow-control/account`
 
 #### Description
-This endpoint stores entity conditions and condition edges in ArangoDB as well as in an in-memory data storage system.
+Both endpoints are responsible for storing conditions related to their specific accounts or entities and are expected to store condition edges within the in-memory system.
 
 #### Flow Diagram
 ```mermaid
@@ -213,39 +215,7 @@ Possible values for some fields mention in the table above
 ```
 
 #### Headers
-No specific headers required apart from standard authentication headers if needed.
-
-### Request Example
-```http
-GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
-```
-
-#### Response
-
-- **Status 400 Bad Request:** When `msgid` is missing or invalid.
-    ```json
-    {
-      "statusCode": 400,
-      "code": "FST_ERR_VALIDATION",
-      "error": "Bad Request",
-      "message": "querystring must have required property 'msgid'"
-    }
-    ```
-
-- **Status 204 Not Found:** When no report is found for the given `msgid`.
-    ```json
-    {
-      "statusCode": 204,
-    }
-    ```
-
-- **Status 500 Internal Server Error:** For server-side errors.
-    ```json
-    {
-      "status": "error",
-      "message": "Internal server error occurred."
-    }
-    ```
+No specific headers required for both endpoints.
 
 
 ```http

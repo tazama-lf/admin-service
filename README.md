@@ -125,7 +125,7 @@ POST
 ```
 POST
 ```
-**The 2 endpoints are sharing all of the properties excluding ntty or acct these are specific to each endpoint they indicate the condition is govered by who.**
+**Both endpoints share all properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
 #### Body
 
 | Parameter | Type   | Required | Description                     |

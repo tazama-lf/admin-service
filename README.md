@@ -87,6 +87,39 @@ GET
 #### Headers
 No specific headers required apart from standard authentication headers if needed.
 
+### Request Example
+```http
+GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
+```
+
+#### Response
+
+- **Status 400 Bad Request:** When `msgid` is missing or invalid.
+    ```json
+    {
+      "statusCode": 400,
+      "code": "FST_ERR_VALIDATION",
+      "error": "Bad Request",
+      "message": "querystring must have required property 'msgid'"
+    }
+    ```
+
+- **Status 204 Not Found:** When no report is found for the given `msgid`.
+    ```json
+    {
+      "statusCode": 204,
+    }
+    ```
+
+- **Status 500 Internal Server Error:** For server-side errors.
+    ```json
+    {
+      "status": "error",
+      "message": "Internal server error occurred."
+    }
+    ```
+
+
 ### 2. `/v1/admin/event-flow-control/entity`
 
 #### Description
@@ -182,7 +215,7 @@ Possible values for some fields mention in the table above
 #### Headers
 No specific headers required apart from standard authentication headers if needed.
 
-#### Request Example
+### Request Example
 ```http
 GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
 ```
@@ -231,11 +264,11 @@ POST /v1/admin/event-flow-control/entity HTTP/1.1
     }
     ```
 
-- **Status 500 Not Found:** When expiration date is before inception date.
+- **Status 500 Not Found:** When account was not found in the database and forceCret was set to false
     ```json
     {
       "statusCode": 500,
-      "message": "Error: Expiration date must be after inception date."
+      "message": "Error: account was not found and we could not create one because forceCret is set to false"
     }
     ```
 
@@ -253,13 +286,13 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
 
 #### Response
 
-- **Status 400 Bad Request:** When `prsptv` is missing or invalid.
+- **Status 400 Bad Request:** When `condTp` is missing or invalid.
     ```json
     {
       "statusCode": 400,
       "code": "FST_ERR_VALIDATION",
       "error": "Bad Request",
-      "message": "body must have required property 'prsptv'"
+      "message": "body must have required property 'condTp'"
     }
     ```
 

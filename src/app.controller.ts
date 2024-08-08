@@ -26,7 +26,7 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
 };
 
 export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle report request');
+  loggerService.log('Start - Handle saving entity condition request');
   try {
     const condition = req.body as EntityCondition;
     const data = await handlePostConditionEntity(condition);
@@ -37,12 +37,12 @@ export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: Fas
     reply.status(500);
     reply.send(err);
   } finally {
-    loggerService.log('End - Handle report request');
+    loggerService.log('End - Handle saving entity condition request');
   }
 };
 
 export const POSTConditionHandlerAccount = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle report request');
+  loggerService.log('Start - Handle saving account condition request');
   try {
     const condition = req.body as AccountCondition;
     const data = await handlePostConditionAccount(condition);
@@ -53,7 +53,7 @@ export const POSTConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
     reply.status(500);
     reply.send(err);
   } finally {
-    loggerService.log('End - Handle report request');
+    loggerService.log('End - Handle saving account condition request');
   }
 };
 

@@ -3,7 +3,7 @@
 
 ## Overview
 
-The **Admin service** is a Node.js-based API designed for administrative tasks, particularly focusing on report management. It leverages the **Fastify** framework to provide a high-performance and low-overhead API interface. This document provides an in-depth look at the API, including setup requirements, a detailed overview of the application, and specific route documentation.
+The **Admin Service** is a Node.js-based API designed for administrative tasks, with a particular focus on report and condition management. It utilizes the Fastify framework to deliver a high-performance and low-overhead API interface. This document offers an in-depth examination of the API, covering setup requirements, a comprehensive overview of the application, and detailed route documentation.
 
 ## Pre-requisites
 
@@ -87,10 +87,72 @@ GET
 #### Headers
 No specific headers required apart from standard authentication headers if needed.
 
+### 2. `/v1/admin/event-flow-control/entity`
+
+#### Description
+This endpoint stores entity conditions and condition edges in ArangoDB as well as in an in-memory data storage system.
+
+#### Flow Diagram
+```mermaid
+sequenceDiagram
+  participant clientsystem as Client System
+  participant tmsapi as Admin API
+  participant cache as Cache
+  participant db as Database
+
+  clientsystem->>tmsapi: setCondition()
+  tmsapi->>db: setCondition()
+  db->>tmsapi: writeOK(recordId)
+  tmsapi->>cache: setCondition()
+  cache->>tmsapi: writeOK()
+  tmsapi->>clientsystem: writeOK(recordId)
+```
+
+#### URL
+```
+/v1/admin/event-flow-control/entity
+```
+
+#### Method
+```
+POST
+```
+
+#### Body
+
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `evtTp`   | Array | Yes      | Event types |
+| `condTp`   | String | Yes      | Condition type. |
+| `prsptv`   | String | Yes      | Perspective of the condition. |
+| `incptnDtTm`   | String | Yes      | Inception date. |
+| `xprtnDtTm`   | String | Yes      | Expiration date. |
+| `condRsn`   | String | Yes      | Reason code. |
+| `forceCret`   | Boolean | Yes      | Flag indicating whether the entity should be created if it does not exist. |
+| `usr`   | String | Yes      | User that triggered the operation. |
+| `ntty`   | Object | Yes      | The entity object that the condition is governed by. |
+
+Possible values for some fields mention in the table above
+1. **evtTp**  : [`'pacs.008.01.10'`,`'pacs.002.01.11'`,`'pain.001.001.11'`,`'pain.013.001.09'`]
+2. **condTp** : `non-overridable-block` or `override` or `overridable-block`
+3. **prsptv** : `both` or `creditor` or `debtor`
+
+**ntty object type**
+```JSON
+{
+  "id": "string",
+  "schmeNm": {
+    "prtry": "string"
+  }
+}
+```
+
+#### Headers
+No specific headers required apart from standard authentication headers if needed.
+
 #### Request Example
 ```http
 GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
-Host: localhost:3000
 ```
 
 #### Response
@@ -109,6 +171,39 @@ Host: localhost:3000
     ```json
     {
       "statusCode": 204,
+    }
+    ```
+
+- **Status 500 Internal Server Error:** For server-side errors.
+    ```json
+    {
+      "status": "error",
+      "message": "Internal server error occurred."
+    }
+    ```
+
+
+```http
+POST /v1/admin/event-flow-control/entity HTTP/1.1
+```
+
+#### Response
+
+- **Status 400 Bad Request:** When `prsptv` is missing or invalid.
+    ```json
+    {
+      "statusCode": 400,
+      "code": "FST_ERR_VALIDATION",
+      "error": "Bad Request",
+      "message": "body must have required property 'prsptv'"
+    }
+    ```
+
+- **Status 500 Not Found:** When expiration date is before inception date.
+    ```json
+    {
+      "statusCode": 500,
+      "message": "Error: Expiration date must be after inception date."
     }
     ```
 

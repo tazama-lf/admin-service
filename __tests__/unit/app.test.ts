@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { databaseManager, loggerService } from '../../src/';
 import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
-import { handleGetReportRequestByMsgId, handlePostConditionEntity } from '../../src/logic.service';
+import { handleGetConditionsForEntity, handleGetReportRequestByMsgId, handlePostConditionEntity } from '../../src/logic.service';
 import { EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
 // Mock the module
@@ -17,6 +17,8 @@ jest.mock('../../src/', () => ({
     addOneGetCount: jest.fn(),
   },
   loggerService: {
+    trace: jest.fn(),
+    debug: jest.fn(),
     log: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
@@ -280,5 +282,43 @@ describe('handlePostConditionEntity', () => {
     expect(loggerService.log).toHaveBeenCalledWith(
       'Error: posting condition for entity with error message: Error: while trying to save new entity: Database error',
     );
+  });
+});
+
+describe('getConditionForEntity', () => {
+  const sampleCondition: EntityCondition = {
+    evtTp: ['pacs.008.01.10', 'pacs.002.01.11'],
+    condTp: 'overridable-block',
+    prsptv: 'both',
+    incptnDtTm: '2024-08-07T24:00:00.999Z',
+    xprtnDtTm: '2024-08-08T24:00:00.999Z',
+    condRsn: 'R001',
+    ntty: {
+      id: '+27733161225',
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
+    },
+    forceCret: true,
+    usr: 'bob',
+    creDtTm: fixedDate,
+  };
+  beforeEach(() => {
+    jest.clearAllMocks(); // Clear mocks before each test
+
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve([[sampleCondition]]);
+    });
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
+  });
+
+  it('should get conditions for entity', async () => {
+    (unwrap as jest.Mock).mockReturnValue(sampleCondition);
+
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+
+    // Assert
+    expect(result).toEqual(sampleCondition);
   });
 });

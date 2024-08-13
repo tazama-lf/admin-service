@@ -9,6 +9,9 @@ dotenv.config({
   path: path.resolve(__dirname, '../.env'),
 });
 
+// Just we don't want everything, just what we are configuring, add more fields accordingly
+export type AppDatabaseServices = Pick<ManagerConfig, 'redisConfig' | 'pseudonyms' | 'transaction'>;
+
 export interface IConfig {
   maxCPU: number;
   env: string;
@@ -16,7 +19,7 @@ export interface IConfig {
     port: number;
     host: string;
   };
-  db: ManagerConfig;
+  db: Required<AppDatabaseServices>;
 }
 
 export const configuration: IConfig = {

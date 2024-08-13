@@ -4,6 +4,7 @@ import { type ConditionEdge, type EntityCondition } from '@frmscoe/frms-coe-lib/
 import { databaseManager, loggerService } from '.';
 import { type Report } from './interface/report.interface';
 import checkConditionValidity from './utils/condition-validation';
+import { type GetEntityConditions } from './interface/query';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -104,5 +105,18 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     const errorMessage = error as { message: string };
     loggerService.log(`Error: posting condition for entity with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityCondition | undefined> => {
+  const fnName = 'getConditionsForEntity';
+  try {
+    loggerService.trace('successfully parsed parameters', fnName, params.id);
+    const report = (await databaseManager.getConditionsByEntity(params.id, params.proprietary)) as EntityCondition[][];
+    loggerService.log('called database', fnName, params.id);
+    return unwrap<EntityCondition>(report);
+  } catch (error) {
+  } finally {
+    loggerService.trace('Completed handling get report by message id');
   }
 };

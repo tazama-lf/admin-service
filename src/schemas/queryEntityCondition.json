@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "proprietary": {
+      "type": "string"
+    },
+    "syncCacne": {
+      "type": "boolean"
+    }
+  },
+  "required":["id", "proprietary", "syncCacne"]
+}

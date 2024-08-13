@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { handleGetReportRequestByMsgId, handlePostConditionEntity } from './logic.service';
+import { handleGetConditionsForEntity, handleGetReportRequestByMsgId, handlePostConditionEntity } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
 import { type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { type GetEntityConditions } from './interface/query';
 
-export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
     const request = req.query as { msgid: string };
@@ -25,7 +26,7 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-export const POSTConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const postConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
     const condition = req.body as EntityCondition;
@@ -41,10 +42,25 @@ export const POSTConditionHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-const handleHealthCheck = async (): Promise<{ status: string }> => {
+export const handleHealthCheck = async (): Promise<{ status: string }> => {
   return {
     status: 'UP',
   };
 };
 
-export { handleHealthCheck };
+export const getConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.trace('getting conditions for an entity');
+  try {
+    const data = await handleGetConditionsForEntity(req.query as GetEntityConditions);
+    if (data) {
+      reply.status(200);
+      reply.send(data);
+    } else {
+      reply.status(404);
+    }
+  } catch (err) {
+    reply.status(500);
+  } finally {
+    loggerService.trace('End - get condition for an entity');
+  }
+};

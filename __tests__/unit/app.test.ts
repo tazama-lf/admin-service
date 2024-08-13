@@ -119,15 +119,32 @@ describe('handlePostConditionEntity', () => {
   };
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
+
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve(
+        [[]], // No existing entity
+      );
+    });
+
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve([[]]);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve({ _id: 'cond123' });
+    });
+
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
+      return Promise.resolve({ _id: 'entity456' });
+    });
+
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   it('should handle a successful post request for a new entity', async () => {
-    // Arrange
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
+      return Promise.resolve({ _id: 'entity456' });
+    });
 
     // Act
     const result = await handlePostConditionEntity(sampleCondition);
@@ -146,11 +163,11 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a case where the entity already exists', async () => {
     // Arrange
-
     const existingEntityId = 'entity456';
-    databaseManager.getEntity.mockResolvedValue([[{ _id: existingEntityId }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve([[{ _id: existingEntityId }]]);
+    });
+
     (unwrap as jest.Mock).mockReturnValue({ _id: existingEntityId });
 
     // Act
@@ -169,10 +186,6 @@ describe('handlePostConditionEntity', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionDebtor = { ...sampleCondition, prsptv: 'debtor' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     const result = await handlePostConditionEntity(conditionDebtor);
@@ -194,10 +207,6 @@ describe('handlePostConditionEntity', () => {
   it('should handle error post request for a unknown perspective', async () => {
     // Arrange
     const conditionDebtor = { ...sampleCondition, prsptv: 'unknown' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     try {
@@ -212,10 +221,6 @@ describe('handlePostConditionEntity', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleCondition, prsptv: 'creditor' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     const result = await handlePostConditionEntity(conditionCreditor);
@@ -237,7 +242,6 @@ describe('handlePostConditionEntity', () => {
   it('should throw an error if entity is not found and forceCret is false', async () => {
     // Arrange
     const conditionWithoutForceCret = { ...sampleCondition, forceCret: false };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
 
     // Act & Assert
     await expect(handlePostConditionEntity(conditionWithoutForceCret)).rejects.toThrow(
@@ -248,10 +252,10 @@ describe('handlePostConditionEntity', () => {
   it('should log a warning if conditions already exist for the entity', async () => {
     // Arrange
     const existingConditions = [[{ condition: 'cond1' }, { condition: 'cond2' }]];
-    databaseManager.getEntity.mockResolvedValue([[{ _id: 'entity456' }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByEntity.mockResolvedValue(existingConditions);
 
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve(existingConditions);
+    });
     // Act
     const result = await handlePostConditionEntity(sampleCondition);
 
@@ -266,8 +270,10 @@ describe('handlePostConditionEntity', () => {
   it('should log and throw an error when database save fails', async () => {
     // Arrange
     const error = new Error('Database error');
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockRejectedValue(error);
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.reject(error);
+    });
 
     // Act & Assert
     await expect(handlePostConditionEntity(sampleCondition)).rejects.toThrow('Database error');

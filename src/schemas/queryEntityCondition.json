@@ -7,9 +7,10 @@
     "proprietary": {
       "type": "string"
     },
-    "syncCacne": {
-      "type": "boolean"
+    "syncCache": {
+      "type": "string",
+      "enum": ["no", "all", "active"]
     }
   },
-  "required":["id", "proprietary", "syncCacne"]
+  "required":["id", "proprietary", "syncCache"]
 }

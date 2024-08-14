@@ -10,7 +10,7 @@ import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
-const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityCondition' };
+const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
 const bodyMessageSchema = { ...entityCondtionBodySchema, $id: 'entityConditionSchema' };
 const fastify = Fastify();
 const ajv = new Ajv({
@@ -21,6 +21,7 @@ const ajv = new Ajv({
 });
 
 ajv.addSchema(paramsMessageSchema);
+ajv.addSchema(queryEntityConditionSchema);
 ajv.addSchema(bodyMessageSchema);
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {

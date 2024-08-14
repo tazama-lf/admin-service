@@ -15,6 +15,7 @@ export type AppDatabaseServices = Pick<ManagerConfig, 'redisConfig' | 'pseudonym
 export interface IConfig {
   maxCPU: number;
   env: string;
+  activeConditionsOnly: boolean;
   service: {
     port: number;
     host: string;
@@ -25,6 +26,7 @@ export interface IConfig {
 export const configuration: IConfig = {
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
   env: process.env.NODE_ENV!,
+  activeConditionsOnly: process.env.ACTIVE_CONDITIONS_ONLY === 'true',
   service: {
     port: parseInt(process.env.PORT!, 10) || 3000,
     host: process.env.HOST! || '127.0.0.1',

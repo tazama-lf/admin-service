@@ -5,6 +5,7 @@ import { databaseManager, loggerService } from '.';
 import { type Report } from './interface/report.interface';
 import checkConditionValidity from './utils/condition-validation';
 import { type GetEntityConditions } from './interface/query';
+import { configuration } from './config';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -108,15 +109,40 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
   }
 };
 
-export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityCondition | undefined> => {
+export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityCondition[] | undefined> => {
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
     const report = (await databaseManager.getConditionsByEntity(params.id, params.proprietary)) as EntityCondition[][];
     loggerService.log('called database', fnName, params.id);
-    return unwrap<EntityCondition>(report);
+    if (!report.length || !report[0].length) {
+      return; // no conditions
+    }
+    const conditions = report[0];
+    if (!params.syncCache || params.syncCache === 'no') {
+      loggerService.trace('no syncCache option specified');
+      return conditions;
+    }
+    // updating cache
+    loggerService.trace('syncCache specified, updating cache');
+
+    let cacheConditions = conditions;
+    if (configuration.activeConditionsOnly) {
+      loggerService.trace('pruning for active conditions', fnName);
+      cacheConditions = cacheConditions.filter((condition) => {
+        if (condition.xprtnDtTm) {
+          const now = new Date();
+          const dt = new Date(condition.xprtnDtTm);
+          return now > dt;
+        } else {
+          return true; //condition has no expiry
+        }
+      });
+    }
+    await databaseManager.set('admin-service-entity-conditions', JSON.stringify(cacheConditions), 1000);
+
+    return conditions;
   } catch (error) {
-  } finally {
-    loggerService.trace('Completed handling get report by message id');
+    loggerService.error(error as Error);
   }
 };

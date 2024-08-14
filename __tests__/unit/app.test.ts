@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { databaseManager, loggerService } from '../../src/';
 import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
+import { configuration } from '../../src/config';
 import { handleGetConditionsForEntity, handleGetReportRequestByMsgId, handlePostConditionEntity } from '../../src/logic.service';
 import { EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
@@ -12,9 +13,13 @@ jest.mock('../../src/', () => ({
     getEntity: jest.fn(),
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
+    set: jest.fn(),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
     addOneGetCount: jest.fn(),
+  },
+  configuration: {
+    activeConditionsOnly: true,
   },
   loggerService: {
     trace: jest.fn(),
@@ -311,14 +316,36 @@ describe('getConditionForEntity', () => {
     });
 
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
   });
 
   it('should get conditions for entity', async () => {
-    (unwrap as jest.Mock).mockReturnValue(sampleCondition);
-
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
-
     // Assert
-    expect(result).toEqual(sampleCondition);
+    expect(result).toEqual([sampleCondition]);
+  });
+
+  it('should get no conditions for entity', async () => {
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve([]);
+    });
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+    // Assert
+    expect(result).toEqual(undefined);
+  });
+
+  it('should get conditions for entity and update cache', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'active' });
+    // Assert
+    expect(result).toEqual([sampleCondition]);
+  });
+
+  it('should prune active conditions for cache', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'all' });
+    // Assert
+    expect(result).toEqual([sampleCondition]);
   });
 });

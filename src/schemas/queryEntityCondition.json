@@ -12,5 +12,5 @@
       "enum": ["no", "all", "active"]
     }
   },
-  "required":["id", "proprietary", "syncCache"]
+  "required":["id", "proprietary"]
 }

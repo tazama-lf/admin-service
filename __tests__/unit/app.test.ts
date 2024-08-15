@@ -348,4 +348,25 @@ describe('getConditionForEntity', () => {
     // Assert
     expect(result).toEqual([sampleCondition]);
   });
+
+  it('should prune active conditions for cache (using env)', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'default' });
+    // Assert
+    expect(result).toEqual([sampleCondition]);
+  });
+
+  it('should skip caching', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+    // Assert
+    expect(result).toEqual([sampleCondition]);
+  });
+
+  it('should throw an error', async () => {
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.reject(new Error('something bad happened'));
+    });
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+
+    expect(result).toBe(undefined);
+  });
 });

@@ -6,6 +6,7 @@ import { type Report } from './interface/report.interface';
 import checkConditionValidity from './utils/condition-validation';
 import { type GetEntityConditions } from './interface/query';
 import { configuration } from './config';
+import { filterConditions } from './utils/filter-active-conditions';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -111,6 +112,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
 
 export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityCondition[] | undefined> => {
   const fnName = 'getConditionsForEntity';
+  const cacheKey = 'admin-service-entity-conditions';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
     const report = (await databaseManager.getConditionsByEntity(params.id, params.proprietary)) as EntityCondition[][];
@@ -119,28 +121,31 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
       return; // no conditions
     }
     const conditions = report[0];
-    if (!params.syncCache || params.syncCache === 'no') {
-      loggerService.trace('no syncCache option specified');
-      return conditions;
-    }
-    // updating cache
-    loggerService.trace('syncCache specified, updating cache');
 
-    let cacheConditions = conditions;
-    if (configuration.activeConditionsOnly) {
-      loggerService.trace('pruning for active conditions', fnName);
-      cacheConditions = cacheConditions.filter((condition) => {
-        if (condition.xprtnDtTm) {
-          const now = new Date();
-          const dt = new Date(condition.xprtnDtTm);
-          return now > dt;
+    switch (params.syncCache) {
+      case 'all':
+        loggerService.trace('syncCache=all option specified');
+        await databaseManager.set(cacheKey, JSON.stringify(conditions), 1000);
+        break;
+      case 'active':
+        loggerService.trace('syncCache=active option specified');
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(conditions)), 1000);
+        break;
+      case 'default':
+        // use env
+        loggerService.trace('syncCache=default option specified');
+        if (configuration.activeConditionsOnly) {
+          loggerService.trace('using env to update active conditions only');
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(conditions)), 1000);
         } else {
-          return true; //condition has no expiry
+          loggerService.trace('using env to update all conditions');
+          await databaseManager.set(cacheKey, JSON.stringify(conditions), 1000);
         }
-      });
+        break;
+      default:
+        loggerService.trace('syncCache=no/default option specified');
+        break;
     }
-    await databaseManager.set('admin-service-entity-conditions', JSON.stringify(cacheConditions), 1000);
-
     return conditions;
   } catch (error) {
     loggerService.error(error as Error);

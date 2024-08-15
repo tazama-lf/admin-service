@@ -9,7 +9,7 @@
     },
     "syncCache": {
       "type": "string",
-      "enum": ["no", "all", "active"]
+      "enum": ["no", "all", "active", "default"]
     }
   },
   "required":["id", "proprietary"]

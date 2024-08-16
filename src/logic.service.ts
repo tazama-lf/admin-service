@@ -7,6 +7,10 @@ import checkConditionValidity from './utils/condition-validation';
 import { type GetEntityConditions } from './interface/query';
 import { configuration } from './config';
 import { filterConditions } from './utils/filter-active-conditions';
+import { aql } from '@frmscoe/frms-coe-lib';
+import { type RawEntityConditionResponse } from './interface/entity-condition/response-raw';
+import { type EntityConditionResponse } from './interface/entity-condition/response-parsed';
+import { parseEntityCondition } from './utils/parser/parse-entity-condition';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -110,43 +114,83 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
   }
 };
 
-export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityCondition[] | undefined> => {
+export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityConditionResponse | undefined> => {
   const fnName = 'getConditionsForEntity';
-  const cacheKey = 'admin-service-entity-conditions';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const report = (await databaseManager.getConditionsByEntity(params.id, params.proprietary)) as EntityCondition[][];
+    const cacheKey = `entityCond-${params.id}-${params.proprietary}`;
+
+    const filterAql = aql`
+      LET fromVertex = DOCUMENT(edge._from)
+      LET toVertex = DOCUMENT(edge._to)
+      FILTER toVertex.ntty.id == ${params.id}
+      AND toVertex.ntty.schmeNm.prtry == ${params.proprietary}
+      AND (edge.xprtnDtTm > DATE_NOW()
+        OR edge.xprtnDtTm == null)`;
+
+    // Using bind parameters
+    const report = (await (
+      await databaseManager._pseudonymsDb.query(aql`
+      LET gov_cred = (
+          FOR edge IN governed_as_creditor_by
+          ${filterAql}
+          RETURN {
+              edge: edge,
+              entity: fromVertex,
+              condition: toVertex
+          }
+      )
+      
+      LET gov_debtor = (
+          FOR edge IN governed_as_debtor_by
+          ${filterAql}
+          RETURN {
+              edge: edge,
+              entity: fromVertex,
+              condition: toVertex
+          }
+      )
+  
+      RETURN {
+          "governed_as_creditor_by": gov_cred,
+          "governed_as_debtor_by": gov_debtor
+      }
+  `)
+    )?.batches.all()) as RawEntityConditionResponse[][];
+
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
       return; // no conditions
     }
-    const conditions = report[0];
+
+    const retVal = parseEntityCondition(report[0]);
 
     switch (params.syncCache) {
       case 'all':
-        loggerService.trace('syncCache=all option specified');
-        await databaseManager.set(cacheKey, JSON.stringify(conditions), 1000);
+        loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
         break;
       case 'active':
-        loggerService.trace('syncCache=active option specified');
-        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(conditions)), 1000);
+        loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
         break;
       case 'default':
         // use env
-        loggerService.trace('syncCache=default option specified');
+        loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
         if (configuration.activeConditionsOnly) {
-          loggerService.trace('using env to update active conditions only');
-          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(conditions)), 1000);
+          loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
         } else {
-          loggerService.trace('using env to update all conditions');
-          await databaseManager.set(cacheKey, JSON.stringify(conditions), 1000);
+          loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
         }
         break;
       default:
         loggerService.trace('syncCache=no/default option specified');
         break;
     }
-    return conditions;
+
+    return parseEntityCondition(report[0]);
   } catch (error) {
     loggerService.error(error as Error);
   }

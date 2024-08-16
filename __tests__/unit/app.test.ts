@@ -1,15 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 import { databaseManager, loggerService } from '../../src/';
 import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
-import { configuration } from '../../src/config';
 import { handleGetConditionsForEntity, handleGetReportRequestByMsgId, handlePostConditionEntity } from '../../src/logic.service';
 import { EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { BatchedArrayCursor } from 'arangojs/cursor';
 
+jest.mock('@frmscoe/frms-coe-lib', () => {
+  const original = jest.requireActual('@frmscoe/frms-coe-lib');
+
+  return {
+    ...original,
+    aql: jest.fn().mockImplementation((templateLiteral) => {
+      // Return a mock query object or a string representation of the query
+      return {
+        query: templateLiteral,
+      };
+    }),
+  };
+});
 // Mock the module
 jest.mock('../../src/', () => ({
   databaseManager: {
     getReportByMessageId: jest.fn(), // Ensure the mock function is typed correctly
     getConditionsByEntity: jest.fn(),
+    getConditionsByEntityGraph: jest.fn(),
     getEntity: jest.fn(),
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
@@ -308,11 +322,128 @@ describe('getConditionForEntity', () => {
     usr: 'bob',
     creDtTm: fixedDate,
   };
+  const entityResponse = {
+    ntty: {
+      id: '+27733161225',
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
+    },
+    conditions: [
+      {
+        condId: '13480',
+        condTp: 'overridable-block',
+        incptnDtTm: '2024-08-16T24:00:00.999Z',
+        xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        condRsn: 'R001',
+        usr: 'bob',
+        creDtTm: '2024-08-16T08:04:37.701Z',
+        prsptvs: [
+          {
+            prsptv: 'governed_as_creditor_by',
+            evtTp: ['pacs.008.01.10'],
+            incptnDtTm: '2024-08-16T24:00:00.999Z',
+            xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          },
+          {
+            prsptv: 'governed_as_debtor_by',
+            evtTp: ['pacs.008.01.10'],
+            incptnDtTm: '2024-08-16T24:00:00.999Z',
+            xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          },
+        ],
+      },
+    ],
+  };
+  const rawResponse = {
+    governed_as_creditor_by: [
+      {
+        edge: {
+          _key: '13480+27733161225MSISDN',
+          _id: 'governed_as_creditor_by/13480+27733161225MSISDN',
+          _from: 'entities/+27733161225MSISDN',
+          _to: 'conditions/13480',
+          _rev: '_iTm1jLS---',
+          evtTp: ['pacs.008.01.10'],
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        },
+        entity: {
+          _key: '+27733161225MSISDN',
+          _id: 'entities/+27733161225MSISDN',
+          _rev: '_iTm1jLG---',
+          Id: '+27733161225MSISDN',
+          CreDtTm: '2024-08-16T08:04:37.701Z',
+        },
+        condition: {
+          _key: '13480',
+          _id: 'conditions/13480',
+          _rev: '_iTm1jK6---',
+          evtTp: ['pacs.008.01.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733161225',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-16T08:04:37.701Z',
+        },
+      },
+    ],
+    governed_as_debtor_by: [
+      {
+        edge: {
+          _key: '13480+27733161225MSISDN',
+          _id: 'governed_as_debtor_by/13480+27733161225MSISDN',
+          _from: 'entities/+27733161225MSISDN',
+          _to: 'conditions/13480',
+          _rev: '_iTm1jLW---',
+          evtTp: ['pacs.008.01.10'],
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        },
+        entity: {
+          _key: '+27733161225MSISDN',
+          _id: 'entities/+27733161225MSISDN',
+          _rev: '_iTm1jLG---',
+          Id: '+27733161225MSISDN',
+          CreDtTm: '2024-08-16T08:04:37.701Z',
+        },
+        condition: {
+          _key: '13480',
+          _id: 'conditions/13480',
+          _rev: '_iTm1jK6---',
+          evtTp: ['pacs.008.01.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733161225',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-16T08:04:37.701Z',
+        },
+      },
+    ],
+  };
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
 
-    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
-      return Promise.resolve([[sampleCondition]]);
+    jest.spyOn(databaseManager, 'getConditionsByEntityGraph').mockImplementation(() => {
+      return Promise.resolve([[rawResponse]]);
     });
 
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
@@ -325,11 +456,11 @@ describe('getConditionForEntity', () => {
   it('should get conditions for entity', async () => {
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
     // Assert
-    expect(result).toEqual([sampleCondition]);
+    expect(result).toEqual(entityResponse);
   });
 
   it('should get no conditions for entity', async () => {
-    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+    jest.spyOn(databaseManager, 'getConditionsByEntityGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
@@ -340,29 +471,29 @@ describe('getConditionForEntity', () => {
   it('should get conditions for entity and update cache', async () => {
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'active' });
     // Assert
-    expect(result).toEqual([sampleCondition]);
+    expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache', async () => {
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'all' });
     // Assert
-    expect(result).toEqual([sampleCondition]);
+    expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'default' });
     // Assert
-    expect(result).toEqual([sampleCondition]);
+    expect(result).toEqual(entityResponse);
   });
 
   it('should skip caching', async () => {
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
     // Assert
-    expect(result).toEqual([sampleCondition]);
+    expect(result).toEqual(entityResponse);
   });
 
   it('should throw an error', async () => {
-    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+    jest.spyOn(databaseManager, 'getConditionsByEntityGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
     const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });

@@ -51,7 +51,7 @@ export const handleHealthCheck = async (): Promise<{ status: string }> => {
 export const getConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');
   try {
-    const data = await handleGetConditionsForEntity(req.query as GetEntityConditions);
+    const data = await handleGetConditionsForEntity(req.body as GetEntityConditions);
     if (data) {
       reply.status(200);
       reply.send(data);

@@ -1,4 +1,4 @@
-import { type RawEntityConditionResponse } from '../../interface/entity-condition/response-raw';
+import { type RawEntityConditionResponse } from '@frmscoe/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import type { ConditionDetails, EntityConditionResponse } from '../../interface/entity-condition/response-parsed';
 
 export const parseEntityCondition = (input: RawEntityConditionResponse[]): EntityConditionResponse => {

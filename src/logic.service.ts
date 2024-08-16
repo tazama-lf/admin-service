@@ -7,10 +7,9 @@ import checkConditionValidity from './utils/condition-validation';
 import { type GetEntityConditions } from './interface/query';
 import { configuration } from './config';
 import { filterConditions } from './utils/filter-active-conditions';
-import { aql } from '@frmscoe/frms-coe-lib';
-import { type RawEntityConditionResponse } from './interface/entity-condition/response-raw';
 import { type EntityConditionResponse } from './interface/entity-condition/response-parsed';
 import { parseEntityCondition } from './utils/parser/parse-entity-condition';
+import { type RawEntityConditionResponse } from '@frmscoe/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   try {
@@ -120,43 +119,7 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
     loggerService.trace('successfully parsed parameters', fnName, params.id);
     const cacheKey = `entityCond-${params.id}-${params.proprietary}`;
 
-    const filterAql = aql`
-      LET fromVertex = DOCUMENT(edge._from)
-      LET toVertex = DOCUMENT(edge._to)
-      FILTER toVertex.ntty.id == ${params.id}
-      AND toVertex.ntty.schmeNm.prtry == ${params.proprietary}
-      AND (edge.xprtnDtTm > DATE_NOW()
-        OR edge.xprtnDtTm == null)`;
-
-    // Using bind parameters
-    const report = (await (
-      await databaseManager._pseudonymsDb.query(aql`
-      LET gov_cred = (
-          FOR edge IN governed_as_creditor_by
-          ${filterAql}
-          RETURN {
-              edge: edge,
-              entity: fromVertex,
-              condition: toVertex
-          }
-      )
-      
-      LET gov_debtor = (
-          FOR edge IN governed_as_debtor_by
-          ${filterAql}
-          RETURN {
-              edge: edge,
-              entity: fromVertex,
-              condition: toVertex
-          }
-      )
-  
-      RETURN {
-          "governed_as_creditor_by": gov_cred,
-          "governed_as_debtor_by": gov_debtor
-      }
-  `)
-    )?.batches.all()) as RawEntityConditionResponse[][];
+    const report = (await databaseManager.getConditionsByEntityGraph(params.id, params.proprietary)) as RawEntityConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {

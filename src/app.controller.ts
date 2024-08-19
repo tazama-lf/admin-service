@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { handleGetReportRequestByMsgId, handlePostConditionEntity } from './logic.service';
+import { handleGetReportRequestByMsgId, handlePostConditionAccount, handlePostConditionEntity } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
-import { type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { type AccountCondition, type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
 
 export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -25,8 +25,10 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-export const POSTConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle report request');
+
+export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle saving entity condition request');
+
   try {
     const condition = req.body as EntityCondition;
     const data = await handlePostConditionEntity(condition);
@@ -37,7 +39,23 @@ export const POSTConditionHandler = async (req: FastifyRequest, reply: FastifyRe
     reply.status(500);
     reply.send(err);
   } finally {
-    loggerService.log('End - Handle report request');
+    loggerService.log('End - Handle saving entity condition request');
+  }
+};
+
+export const POSTConditionHandlerAccount = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle saving account condition request');
+  try {
+    const condition = req.body as AccountCondition;
+    const data = await handlePostConditionAccount(condition);
+
+    reply.status(200);
+    reply.send(data);
+  } catch (err) {
+    reply.status(500);
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle saving account condition request');
   }
 };
 

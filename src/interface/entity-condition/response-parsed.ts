@@ -1,6 +1,5 @@
-import { type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { type Condition } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/Condition';
-import type { Edge, Entity } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import type { Acct, Edge, Entity, Ntty } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { type MetaData } from '@tazama-lf/frms-coe-lib/lib/interfaces/metaData';
 
 export interface Entry {
@@ -17,6 +16,8 @@ export interface ConditionDetails extends Pick<Condition, 'incptnDtTm' | 'xprtnD
   prsptvs: Array<Pick<Condition, 'prsptv' | 'evtTp' | 'incptnDtTm' | 'xprtnDtTm'>>;
 }
 
-export interface EntityConditionResponse extends EntityCondition {
+export interface ConditionResponse {
+  ntty: Ntty;
+  acct: Acct;
   conditions: ConditionDetails[];
 }

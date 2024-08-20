@@ -85,3 +85,23 @@ export const getConditionHandler = async (req: FastifyRequest, reply: FastifyRep
     loggerService.trace('End - get condition for an entity');
   }
 };
+
+export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle report request');
+  try {
+    const request = req.body as { msgid: string };
+    const data = await handleGetReportRequestByMsgId(request.msgid);
+    const body = {
+      message: 'Report was found',
+      data,
+    };
+    reply.status(data ? 200 : 204);
+    reply.send(body);
+  } catch (err) {
+    const failMessage = `Failed to process execution request. \n${JSON.stringify(err, null, 4)}`;
+    reply.status(500);
+    reply.send(failMessage);
+  } finally {
+    loggerService.log('End - Handle report request');
+  }
+};

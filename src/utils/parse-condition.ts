@@ -1,10 +1,9 @@
 import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
-import type { ConditionDetails, EntityConditionResponse } from '../../interface/entity-condition/response-parsed';
+import type { ConditionDetails, ConditionResponse } from '../interface/entity-condition/response-parsed';
 
-export const parseEntityCondition = (input: RawConditionResponse[]): EntityConditionResponse => {
+export const parseCondition = (input: RawConditionResponse[]): ConditionResponse => {
   // Initialize the result object
-  const result: Partial<EntityConditionResponse> = {
-    ntty: undefined,
+  const result: Partial<ConditionResponse> = {
     conditions: [],
   };
 
@@ -51,13 +50,15 @@ export const parseEntityCondition = (input: RawConditionResponse[]): EntityCondi
         }
       });
 
-      // Set the ntty field if not already set
+      // Set the ntty or acct field if not already set
       if (!result.ntty) {
         const firstItem = input[0];
         if (firstItem[fieldName].length) {
           const cond = firstItem[fieldName][0].condition;
           if ('ntty' in cond) {
             result.ntty = cond.ntty;
+          } else if ('acct' in cond) {
+            result.acct = cond.acct;
           }
         }
       }
@@ -65,5 +66,5 @@ export const parseEntityCondition = (input: RawConditionResponse[]): EntityCondi
   });
   // Convert conditionsById to an array
   result.conditions = Object.values(conditionsById);
-  return result as EntityConditionResponse;
+  return result as ConditionResponse;
 };

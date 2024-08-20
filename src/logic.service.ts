@@ -140,21 +140,21 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
     switch (params.syncCache) {
       case 'all':
         loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
-        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
+        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
         break;
       case 'active':
         loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
-        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
         break;
       case 'default':
         // use env
         loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
         if (configuration.activeConditionsOnly) {
           loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
-          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
         } else {
           loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
-          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
+          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
         }
         break;
       default:

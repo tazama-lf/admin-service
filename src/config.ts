@@ -21,9 +21,11 @@ export interface IConfig {
     host: string;
   };
   db: Required<AppDatabaseServices>;
+  cacheTTL: number;
 }
 
 export const configuration: IConfig = {
+  cacheTTL: parseInt(process.env.MAX_CPU!, 10) || 0,
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
   env: process.env.NODE_ENV!,
   activeConditionsOnly: process.env.ACTIVE_CONDITIONS_ONLY === 'true',

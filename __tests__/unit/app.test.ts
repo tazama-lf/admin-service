@@ -129,7 +129,7 @@ describe('handleGetReportRequestByMsgId', () => {
 
 describe('handlePostConditionEntity', () => {
   const sampleCondition: EntityCondition = {
-    evtTp: ['pacs.008.01.10', 'pacs.002.01.11'],
+    evtTp: ['pacs.008.001.10', 'pacs.002.001.12'],
     condTp: 'overridable-block',
     prsptv: 'both',
     incptnDtTm: '2024-08-07T24:00:00.999Z',
@@ -317,7 +317,7 @@ describe('handlePostConditionEntity', () => {
 
 describe('getConditionForEntity', () => {
   const sampleCondition: EntityCondition = {
-    evtTp: ['pacs.008.01.10', 'pacs.002.01.11'],
+    evtTp: ['pacs.008.001.10', 'pacs.002.001.12'],
     condTp: 'overridable-block',
     prsptv: 'both',
     incptnDtTm: '2024-08-07T24:00:00.999Z',
@@ -352,13 +352,13 @@ describe('getConditionForEntity', () => {
         prsptvs: [
           {
             prsptv: 'governed_as_creditor_by',
-            evtTp: ['pacs.008.01.10'],
+            evtTp: ['pacs.008.001.10'],
             incptnDtTm: '2024-08-16T24:00:00.999Z',
             xprtnDtTm: '2024-08-17T24:00:00.999Z',
           },
           {
             prsptv: 'governed_as_debtor_by',
-            evtTp: ['pacs.008.01.10'],
+            evtTp: ['pacs.008.001.10'],
             incptnDtTm: '2024-08-16T24:00:00.999Z',
             xprtnDtTm: '2024-08-17T24:00:00.999Z',
           },
@@ -375,7 +375,7 @@ describe('getConditionForEntity', () => {
           _from: 'entities/+27733161225MSISDN',
           _to: 'conditions/13480',
           _rev: '_iTm1jLS---',
-          evtTp: ['pacs.008.01.10'],
+          evtTp: ['pacs.008.001.10'],
           incptnDtTm: '2024-08-16T24:00:00.999Z',
           xprtnDtTm: '2024-08-17T24:00:00.999Z',
         },
@@ -390,7 +390,7 @@ describe('getConditionForEntity', () => {
           _key: '13480',
           _id: 'conditions/13480',
           _rev: '_iTm1jK6---',
-          evtTp: ['pacs.008.01.10'],
+          evtTp: ['pacs.008.001.10'],
           condTp: 'overridable-block',
           prsptv: 'both',
           incptnDtTm: '2024-08-16T24:00:00.999Z',
@@ -416,7 +416,7 @@ describe('getConditionForEntity', () => {
           _from: 'entities/+27733161225MSISDN',
           _to: 'conditions/13480',
           _rev: '_iTm1jLW---',
-          evtTp: ['pacs.008.01.10'],
+          evtTp: ['pacs.008.001.10'],
           incptnDtTm: '2024-08-16T24:00:00.999Z',
           xprtnDtTm: '2024-08-17T24:00:00.999Z',
         },
@@ -431,7 +431,7 @@ describe('getConditionForEntity', () => {
           _key: '13480',
           _id: 'conditions/13480',
           _rev: '_iTm1jK6---',
-          evtTp: ['pacs.008.01.10'],
+          evtTp: ['pacs.008.001.10'],
           condTp: 'overridable-block',
           prsptv: 'both',
           incptnDtTm: '2024-08-16T24:00:00.999Z',
@@ -515,7 +515,7 @@ describe('getConditionForEntity', () => {
 
 describe('handlePostConditionAccount', () => {
   const sampleCondition: AccountCondition = {
-    evtTp: ['pacs.008.01.10', 'pacs.002.01.11'],
+    evtTp: ['pacs.008.001.10', 'pacs.002.001.12'],
     condTp: 'non-overridable-block',
     prsptv: 'both',
     incptnDtTm: '2024-09-01T24:00:00.999Z',

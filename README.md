@@ -160,7 +160,16 @@ POST
 ```
 POST
 ```
-**Both endpoints share all properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
+
+#### URL 3
+```
+/v1/admin/event-flow-control/entity/getcondition
+```
+#### Method 3
+```
+POST
+```
+**Some endpoints share properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
 #### Body
 
 | Parameter | Type   | Required | Description                     |
@@ -181,6 +190,12 @@ POST
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `acct`   | Object | Yes      | The account object that the condition is governed by. |
+#### URL 3
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `id`   | String | Yes      | Entity ID. |
+| `proprietary`   | String | Yes      | `schmnm` proprietary value |
+| `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 
 Possible values for some fields mention in the table above
 1. **evtTp**  : [`'pacs.008.01.10'`,`'pacs.002.01.11'`,`'pain.001.001.11'`,`'pain.013.001.09'`]

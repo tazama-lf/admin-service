@@ -198,7 +198,7 @@ POST
 | `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 
 Possible values for some fields mention in the table above
-1. **evtTp**  : [`'pacs.008.01.10'`,`'pacs.002.01.11'`,`'pain.001.001.11'`,`'pain.013.001.09'`]
+1. **evtTp**  : [`'pacs.008.001.10'`,`'pacs.002.001.12'`,`'pain.001.001.11'`,`'pain.013.001.09'`]
 2. **condTp** : `non-overridable-block` or `override` or `overridable-block`
 3. **prsptv** : `both` or `creditor` or `debtor`
 

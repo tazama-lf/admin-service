@@ -1,7 +1,7 @@
-import { type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
-import { type Condition } from '@frmscoe/frms-coe-lib/lib/interfaces/event-flow/Condition';
-import type { Edge, Entity } from '@frmscoe/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
-import { type MetaData } from '@frmscoe/frms-coe-lib/lib/interfaces/metaData';
+import { type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { type Condition } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/Condition';
+import type { Edge, Entity } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import { type MetaData } from '@tazama-lf/frms-coe-lib/lib/interfaces/metaData';
 
 export interface Entry {
   edge: Edge;

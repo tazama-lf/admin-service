@@ -2,7 +2,7 @@
 // config settings, env variables
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { type ManagerConfig } from '@frmscoe/frms-coe-lib';
+import { type ManagerConfig } from '@tazama-lf/frms-coe-lib';
 
 // Load .env file into process.env if it exists. This is convenient for running locally.
 dotenv.config({

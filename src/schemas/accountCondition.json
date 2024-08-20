@@ -1,5 +1,5 @@
 {
-  "description": "Entity condition json schema for fastify validation",
+  "description": "Account condition json schema for fastify validation",
   "type": "object",
   "properties": {
     "evtTp": {
@@ -36,7 +36,7 @@
       "type": "string",
       "minLength": 1
     },
-    "ntty": {
+    "acct": {
       "type": "object",
       "properties": {
         "id": {
@@ -54,11 +54,40 @@
           "required": [
             "prtry"
           ]
+        },
+        "agt": {
+          "type": "object",
+          "properties": {
+            "finInstnId": {
+              "type": "object",
+              "properties": {
+                "clrSysMmbId": {
+                  "type": "object",
+                  "properties": {
+                    "mmbId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "mmbId"
+                  ]
+                }
+              },
+              "required": [
+                "clrSysMmbId"
+              ]
+            }
+          },
+          "required": [
+            "finInstnId"
+          ]
         }
       },
       "required": [
         "id",
-        "schmeNm"
+        "schmeNm",
+        "agt"
       ]
     },
     "forceCret": {
@@ -75,7 +104,7 @@
     "prsptv",
     "xprtnDtTm",
     "condRsn",
-    "ntty",
+    "acct",
     "forceCret",
     "usr"
   ]

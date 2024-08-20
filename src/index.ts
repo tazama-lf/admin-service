@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, configuration } from './config';
-import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@frmscoe/frms-coe-lib';
+import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@tazama-lf/frms-coe-lib';
 
 export const loggerService: LoggerService = new LoggerService(undefined);
 

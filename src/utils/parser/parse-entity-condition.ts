@@ -1,7 +1,7 @@
-import { type RawEntityConditionResponse } from '@frmscoe/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import type { ConditionDetails, EntityConditionResponse } from '../../interface/entity-condition/response-parsed';
 
-export const parseEntityCondition = (input: RawEntityConditionResponse[]): EntityConditionResponse => {
+export const parseEntityCondition = (input: RawConditionResponse[]): EntityConditionResponse => {
   // Initialize the result object
   const result: Partial<EntityConditionResponse> = {
     ntty: undefined,
@@ -14,7 +14,7 @@ export const parseEntityCondition = (input: RawEntityConditionResponse[]): Entit
   input.forEach((item) => {
     const fields = ['governed_as_creditor_by', 'governed_as_debtor_by'];
     fields.forEach((key) => {
-      const fieldName = key as keyof RawEntityConditionResponse;
+      const fieldName = key as keyof RawConditionResponse;
       item[fieldName].forEach(({ condition }) => {
         const condId = condition._key;
 
@@ -55,7 +55,10 @@ export const parseEntityCondition = (input: RawEntityConditionResponse[]): Entit
       if (!result.ntty) {
         const firstItem = input[0];
         if (firstItem[fieldName].length) {
-          result.ntty = firstItem[fieldName][0].condition.ntty;
+          const cond = firstItem[fieldName][0].condition;
+          if ('ntty' in cond) {
+            result.ntty = cond.ntty;
+          }
         }
       }
     });

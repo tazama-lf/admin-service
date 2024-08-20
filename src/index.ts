@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import initializeFastifyClient from './clients/fastify';
-import { configuration } from './config';
-import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@frmscoe/frms-coe-lib';
+import { type AppDatabaseServices, configuration } from './config';
+import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@tazama-lf/frms-coe-lib';
 
 export const loggerService: LoggerService = new LoggerService(undefined);
 
-let databaseManager: DatabaseManagerInstance<typeof configuration.db>;
+// using the 'Required' utility type so autocompletion kicks in only the services we want
+let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
 
 export const dbInit = async (): Promise<void> => {
   databaseManager = await CreateDatabaseManager(configuration.db);
+
   loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };
 

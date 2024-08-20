@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import Ajv from 'ajv';
 import messageIDParamsSchema from '../schemas/paramsSchemas.json';
+import queryEntityCondition from '../schemas/queryEntityCondition.json';
 import entityConditionBodySchema from '../schemas/entityCondition.json';
 import accountConditionBodySchema from '../schemas/accountCondition.json';
 import Routes from '../router';
@@ -10,6 +11,7 @@ import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
+const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
 const entityConditionMessageSchema = { ...entityConditionBodySchema, $id: 'entityConditionSchema' };
 const accountConditionMessageSchema = { ...accountConditionBodySchema, $id: 'accountConditionSchema' };
 const fastify = Fastify();
@@ -21,15 +23,16 @@ const ajv = new Ajv({
 });
 
 ajv.addSchema(paramsMessageSchema);
+ajv.addSchema(queryEntityConditionSchema);
 ajv.addSchema(entityConditionMessageSchema);
 ajv.addSchema(accountConditionMessageSchema);
-
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
     prefix: '/swagger',
   });
   fastify.addSchema(paramsMessageSchema);
+  fastify.addSchema(queryEntityConditionSchema);
   fastify.addSchema(entityConditionMessageSchema);
   fastify.addSchema(accountConditionMessageSchema);
 

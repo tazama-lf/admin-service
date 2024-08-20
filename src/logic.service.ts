@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
-import { type AccountCondition, type ConditionEdge, type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
+import { type AccountCondition, type ConditionEdge, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { databaseManager, loggerService } from '.';
 import { type Report } from './interface/report.interface';
 import checkConditionValidity from './utils/condition-validation';
+import { type GetEntityConditions } from './interface/query';
+import { configuration } from './config';
+import { filterConditions } from './utils/filter-active-conditions';
+import { type EntityConditionResponse } from './interface/entity-condition/response-parsed';
+import { parseEntityCondition } from './utils/parser/parse-entity-condition';
+import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -86,7 +92,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     } else {
       condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
     }
-    
+
     await saveConditionEdges(condition.prsptv, condId, entityId, condition);
 
     await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });
@@ -116,6 +122,51 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
   }
 };
 
+export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityConditionResponse | undefined> => {
+  const fnName = 'getConditionsForEntity';
+  try {
+    loggerService.trace('successfully parsed parameters', fnName, params.id);
+    const cacheKey = `entityCond-${params.id}-${params.proprietary}`;
+
+    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.proprietary)) as RawConditionResponse[][];
+
+    loggerService.log('called database', fnName, params.id);
+    if (!report.length || !report[0].length) {
+      return; // no conditions
+    }
+
+    const retVal = parseEntityCondition(report[0]);
+
+    switch (params.syncCache) {
+      case 'all':
+        loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
+        break;
+      case 'active':
+        loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
+        break;
+      case 'default':
+        // use env
+        loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
+        if (configuration.activeConditionsOnly) {
+          loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
+        } else {
+          loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
+        }
+        break;
+      default:
+        loggerService.trace('syncCache=no/default option specified');
+        break;
+    }
+
+    return parseEntityCondition(report[0]);
+  } catch (error) {
+    loggerService.error(error as Error);
+  }
+};
 export const handlePostConditionAccount = async (condition: AccountCondition): Promise<AccountCondition[] | Record<string, unknown>> => {
   try {
     loggerService.log(`Started handling post request of account condition executed by ${condition.usr}.`);
@@ -181,7 +232,7 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
     };
   } catch (error) {
     const errorMessage = error as { message: string };
-    loggerService.log(`Error: posting condition for account with error message: ${errorMessage.message}`);
+    loggerService.error(`Error: posting condition for account with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

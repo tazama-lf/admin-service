@@ -2,26 +2,33 @@
 // config settings, env variables
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { type ManagerConfig } from '@frmscoe/frms-coe-lib';
+import { type ManagerConfig } from '@tazama-lf/frms-coe-lib';
 
 // Load .env file into process.env if it exists. This is convenient for running locally.
 dotenv.config({
   path: path.resolve(__dirname, '../.env'),
 });
 
+// Just we don't want everything, just what we are configuring, add more fields accordingly
+export type AppDatabaseServices = Pick<ManagerConfig, 'redisConfig' | 'pseudonyms' | 'transaction'>;
+
 export interface IConfig {
   maxCPU: number;
   env: string;
+  activeConditionsOnly: boolean;
   service: {
     port: number;
     host: string;
   };
-  db: ManagerConfig;
+  db: Required<AppDatabaseServices>;
+  cacheTTL: number;
 }
 
 export const configuration: IConfig = {
+  cacheTTL: parseInt(process.env.MAX_CPU!, 10) || 0,
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
   env: process.env.NODE_ENV!,
+  activeConditionsOnly: process.env.ACTIVE_CONDITIONS_ONLY === 'true',
   service: {
     port: parseInt(process.env.PORT!, 10) || 3000,
     host: process.env.HOST! || '127.0.0.1',

@@ -1,26 +1,50 @@
 // SPDX-License-Identifier: Apache-2.0
 import { databaseManager, loggerService } from '../../src/';
-import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
-import { handleGetReportRequestByMsgId, handlePostConditionEntity, handlePostConditionAccount } from '../../src/logic.service';
-import { EntityCondition, AccountCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
+import {
+  handleGetConditionsForEntity,
+  handleGetReportRequestByMsgId,
+  handlePostConditionAccount,
+  handlePostConditionEntity,
+} from '../../src/logic.service';
+import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
+jest.mock('@tazama-lf/frms-coe-lib', () => {
+  const original = jest.requireActual('@tazama-lf/frms-coe-lib');
 
+  return {
+    ...original,
+    aql: jest.fn().mockImplementation((templateLiteral) => {
+      // Return a mock query object or a string representation of the query
+      return {
+        query: templateLiteral,
+      };
+    }),
+  };
+});
 // Mock the module
 jest.mock('../../src/', () => ({
   databaseManager: {
     getReportByMessageId: jest.fn(), // Ensure the mock function is typed correctly
     getConditionsByEntity: jest.fn(),
+    getEntityConditionsByGraph: jest.fn(),
     getConditionsByAccount: jest.fn(),
     getEntity: jest.fn(),
     getAccount: jest.fn(),
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
+    set: jest.fn(),
     saveAccount: jest.fn(),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
     addOneGetCount: jest.fn(),
   },
+  configuration: {
+    activeConditionsOnly: true,
+  },
   loggerService: {
+    trace: jest.fn(),
+    debug: jest.fn(),
     log: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
@@ -29,7 +53,7 @@ jest.mock('../../src/', () => ({
 
 const fixedDate = '2024-08-06T10:00:00.000Z';
 
-jest.mock('@frmscoe/frms-coe-lib/lib/helpers/unwrap', () => ({
+jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/unwrap', () => ({
   unwrap: jest.fn(),
 }));
 
@@ -123,15 +147,32 @@ describe('handlePostConditionEntity', () => {
   };
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
+
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve(
+        [[]], // No existing entity
+      );
+    });
+
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve([[]]);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve({ _id: 'cond123' });
+    });
+
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
+      return Promise.resolve({ _id: 'entity456' });
+    });
+
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   it('should handle a successful post request for a new entity', async () => {
-    // Arrange
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
+      return Promise.resolve({ _id: 'entity456' });
+    });
 
     // Act
     const result = await handlePostConditionEntity(sampleCondition);
@@ -150,11 +191,11 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a case where the entity already exists', async () => {
     // Arrange
-
     const existingEntityId = 'entity456';
-    databaseManager.getEntity.mockResolvedValue([[{ _id: existingEntityId }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve([[{ _id: existingEntityId }]]);
+    });
+
     (unwrap as jest.Mock).mockReturnValue({ _id: existingEntityId });
 
     // Act
@@ -173,10 +214,6 @@ describe('handlePostConditionEntity', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionDebtor = { ...sampleCondition, prsptv: 'debtor' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     const result = await handlePostConditionEntity(conditionDebtor);
@@ -198,10 +235,6 @@ describe('handlePostConditionEntity', () => {
   it('should handle error post request for a unknown perspective', async () => {
     // Arrange
     const conditionDebtor = { ...sampleCondition, prsptv: 'unknown' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'entity456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     try {
@@ -216,11 +249,10 @@ describe('handlePostConditionEntity', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleCondition, prsptv: 'creditor' };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveEntity.mockResolvedValue({ _id: 'account456' });
-    databaseManager.getConditionsByEntity.mockResolvedValue([[]]); // No existing conditions
 
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
+      return Promise.resolve({ _id: 'account456' });
+    });
     // Act
     const result = await handlePostConditionEntity(conditionCreditor);
 
@@ -242,7 +274,6 @@ describe('handlePostConditionEntity', () => {
   it('should throw an error if entity is not found and forceCret is false', async () => {
     // Arrange
     const conditionWithoutForceCret = { ...sampleCondition, forceCret: false };
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
 
     // Act & Assert
     await expect(handlePostConditionEntity(conditionWithoutForceCret)).rejects.toThrow(
@@ -253,10 +284,10 @@ describe('handlePostConditionEntity', () => {
   it('should log a warning if conditions already exist for the entity', async () => {
     // Arrange
     const existingConditions = [[{ condition: 'cond1' }, { condition: 'cond2' }]];
-    databaseManager.getEntity.mockResolvedValue([[{ _id: 'entity456' }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByEntity.mockResolvedValue(existingConditions);
 
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve(existingConditions);
+    });
     // Act
     const result = await handlePostConditionEntity(sampleCondition);
 
@@ -271,14 +302,214 @@ describe('handlePostConditionEntity', () => {
   it('should log and throw an error when database save fails', async () => {
     // Arrange
     const error = new Error('Database error');
-    databaseManager.getEntity.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockRejectedValue(error);
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.reject(error);
+    });
 
     // Act & Assert
     await expect(handlePostConditionEntity(sampleCondition)).rejects.toThrow('Database error');
     expect(loggerService.log).toHaveBeenCalledWith(
       'Error: posting condition for entity with error message: Error: while trying to save new entity: Database error',
     );
+  });
+});
+
+describe('getConditionForEntity', () => {
+  const sampleCondition: EntityCondition = {
+    evtTp: ['pacs.008.01.10', 'pacs.002.01.11'],
+    condTp: 'overridable-block',
+    prsptv: 'both',
+    incptnDtTm: '2024-08-07T24:00:00.999Z',
+    xprtnDtTm: '2024-08-08T24:00:00.999Z',
+    condRsn: 'R001',
+    ntty: {
+      id: '+27733161225',
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
+    },
+    forceCret: true,
+    usr: 'bob',
+    creDtTm: fixedDate,
+  };
+  const entityResponse = {
+    ntty: {
+      id: '+27733161225',
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
+    },
+    conditions: [
+      {
+        condId: '13480',
+        condTp: 'overridable-block',
+        incptnDtTm: '2024-08-16T24:00:00.999Z',
+        xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        condRsn: 'R001',
+        usr: 'bob',
+        creDtTm: '2024-08-16T08:04:37.701Z',
+        prsptvs: [
+          {
+            prsptv: 'governed_as_creditor_by',
+            evtTp: ['pacs.008.01.10'],
+            incptnDtTm: '2024-08-16T24:00:00.999Z',
+            xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          },
+          {
+            prsptv: 'governed_as_debtor_by',
+            evtTp: ['pacs.008.01.10'],
+            incptnDtTm: '2024-08-16T24:00:00.999Z',
+            xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          },
+        ],
+      },
+    ],
+  };
+  const rawResponse = {
+    governed_as_creditor_by: [
+      {
+        edge: {
+          _key: '13480+27733161225MSISDN',
+          _id: 'governed_as_creditor_by/13480+27733161225MSISDN',
+          _from: 'entities/+27733161225MSISDN',
+          _to: 'conditions/13480',
+          _rev: '_iTm1jLS---',
+          evtTp: ['pacs.008.01.10'],
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        },
+        entity: {
+          _key: '+27733161225MSISDN',
+          _id: 'entities/+27733161225MSISDN',
+          _rev: '_iTm1jLG---',
+          Id: '+27733161225MSISDN',
+          CreDtTm: '2024-08-16T08:04:37.701Z',
+        },
+        condition: {
+          _key: '13480',
+          _id: 'conditions/13480',
+          _rev: '_iTm1jK6---',
+          evtTp: ['pacs.008.01.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733161225',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-16T08:04:37.701Z',
+        },
+      },
+    ],
+    governed_as_debtor_by: [
+      {
+        edge: {
+          _key: '13480+27733161225MSISDN',
+          _id: 'governed_as_debtor_by/13480+27733161225MSISDN',
+          _from: 'entities/+27733161225MSISDN',
+          _to: 'conditions/13480',
+          _rev: '_iTm1jLW---',
+          evtTp: ['pacs.008.01.10'],
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+        },
+        entity: {
+          _key: '+27733161225MSISDN',
+          _id: 'entities/+27733161225MSISDN',
+          _rev: '_iTm1jLG---',
+          Id: '+27733161225MSISDN',
+          CreDtTm: '2024-08-16T08:04:37.701Z',
+        },
+        condition: {
+          _key: '13480',
+          _id: 'conditions/13480',
+          _rev: '_iTm1jK6---',
+          evtTp: ['pacs.008.01.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-08-16T24:00:00.999Z',
+          xprtnDtTm: '2024-08-17T24:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733161225',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-16T08:04:37.701Z',
+        },
+      },
+    ],
+  };
+  beforeEach(() => {
+    jest.clearAllMocks(); // Clear mocks before each test
+
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
+      return Promise.resolve([[rawResponse]]);
+    });
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it('should get conditions for entity', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
+  it('should get no conditions for entity', async () => {
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
+      return Promise.resolve([]);
+    });
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+    // Assert
+    expect(result).toEqual(undefined);
+  });
+
+  it('should get conditions for entity and update cache', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'active' });
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
+  it('should prune active conditions for cache', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'all' });
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
+  it('should prune active conditions for cache (using env)', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'default' });
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
+  it('should skip caching', async () => {
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
+  it('should throw an error', async () => {
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
+      return Promise.reject(new Error('something bad happened'));
+    });
+    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+
+    expect(result).toBe(undefined);
   });
 });
 
@@ -310,15 +541,33 @@ describe('handlePostConditionAccount', () => {
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
+
+    jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
+      return Promise.resolve(
+        [[]], // No existing account
+      );
+    });
+
+    jest.spyOn(databaseManager, 'getConditionsByEntity').mockImplementation(() => {
+      return Promise.resolve([[]]);
+    });
+
+    jest.spyOn(databaseManager, 'getConditionsByAccount').mockImplementation(() => {
+      return Promise.resolve([[]]);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve({ _id: 'cond123' });
+    });
+
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation(() => {
+      return Promise.resolve({ _id: 'account456' });
+    });
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   it('should handle a successful post request for a new account', async () => {
-    // Arrange
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveAccount.mockResolvedValue({ _id: 'account456' });
-    databaseManager.getConditionsByAccount.mockResolvedValue([[]]); // No existing conditions
-
     // Act
     const result = await handlePostConditionAccount(sampleCondition);
 
@@ -342,9 +591,11 @@ describe('handlePostConditionAccount', () => {
     // Arrange
 
     const existingAccountId = 'account456';
-    databaseManager.getAccount.mockResolvedValue([[{ _id: existingAccountId }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByAccount.mockResolvedValue([[]]); // No existing conditions
+    jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
+      return Promise.resolve(
+        [[{ _id: existingAccountId }]], // No existing account
+      );
+    });
     (unwrap as jest.Mock).mockReturnValue({ _id: existingAccountId });
 
     // Act
@@ -363,10 +614,6 @@ describe('handlePostConditionAccount', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionDebtor = { ...sampleCondition, prsptv: 'debtor' };
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveAccount.mockResolvedValue({ _id: 'account456' });
-    databaseManager.getConditionsByAccount.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     const result = await handlePostConditionAccount(conditionDebtor);
@@ -388,10 +635,6 @@ describe('handlePostConditionAccount', () => {
   it('should handle error post request for a unknown perspective', async () => {
     // Arrange
     const conditionDebtor = { ...sampleCondition, prsptv: 'unknown' };
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveAccount.mockResolvedValue({ _id: 'account456' });
-    databaseManager.getConditionsByAccount.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     try {
@@ -406,10 +649,6 @@ describe('handlePostConditionAccount', () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleCondition, prsptv: 'creditor' };
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.saveAccount.mockResolvedValue({ _id: 'account456' });
-    databaseManager.getConditionsByAccount.mockResolvedValue([[]]); // No existing conditions
 
     // Act
     const result = await handlePostConditionAccount(conditionCreditor);
@@ -431,7 +670,6 @@ describe('handlePostConditionAccount', () => {
   it('should throw an error if account is not found and forceCret is false', async () => {
     // Arrange
     const conditionWithoutForceCret = { ...sampleCondition, forceCret: false };
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
 
     // Act & Assert
     await expect(handlePostConditionAccount(conditionWithoutForceCret)).rejects.toThrow(
@@ -442,9 +680,9 @@ describe('handlePostConditionAccount', () => {
   it('should log a warning if conditions already exist for the account', async () => {
     // Arrange
     const existingConditions = [[{ condition: 'cond1' }, { condition: 'cond2' }]];
-    databaseManager.getAccount.mockResolvedValue([[{ _id: 'account456' }]]);
-    databaseManager.saveCondition.mockResolvedValue({ _id: 'cond123' });
-    databaseManager.getConditionsByAccount.mockResolvedValue(existingConditions);
+    jest.spyOn(databaseManager, 'getConditionsByAccount').mockImplementation(() => {
+      return Promise.resolve(existingConditions);
+    });
 
     // Act
     const result = await handlePostConditionAccount(sampleCondition);
@@ -460,13 +698,12 @@ describe('handlePostConditionAccount', () => {
   it('should log and throw an error when database save fails', async () => {
     // Arrange
     const error = new Error('Database error');
-    databaseManager.getAccount.mockResolvedValue([[]]); // No existing entity
-    databaseManager.saveCondition.mockRejectedValue(error);
+    jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
+      return Promise.reject(error);
+    });
 
     // Act & Assert
     await expect(handlePostConditionAccount(sampleCondition)).rejects.toThrow('Database error');
-    expect(loggerService.log).toHaveBeenCalledWith(
-      'Error: posting condition for account with error message: Error: while trying to save new account: Database error',
-    );
+    expect(loggerService.error).toHaveBeenCalledWith('Error: posting condition for account with error message: Database error');
   });
 });

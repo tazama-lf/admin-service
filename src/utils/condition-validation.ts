@@ -1,4 +1,4 @@
-import { type EntityCondition, type AccountCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { type EntityCondition, type AccountCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {
   const nowDateTime = new Date().toISOString();

@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { handleGetReportRequestByMsgId, handlePostConditionAccount, handlePostConditionEntity } from './logic.service';
+import {
+  handleGetConditionsForEntity,
+  handleGetReportRequestByMsgId,
+  handlePostConditionEntity,
+  handlePostConditionAccount,
+} from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
-import { type AccountCondition, type EntityCondition } from '@frmscoe/frms-coe-lib/lib/interfaces';
+import { type GetEntityConditions } from './interface/query';
+import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
-export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
     const request = req.query as { msgid: string };
@@ -25,10 +31,8 @@ export const ReportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-
-export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle saving entity condition request');
-
+export const postConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle report request');
   try {
     const condition = req.body as EntityCondition;
     const data = await handlePostConditionEntity(condition);
@@ -43,7 +47,7 @@ export const POSTConditionHandlerEntity = async (req: FastifyRequest, reply: Fas
   }
 };
 
-export const POSTConditionHandlerAccount = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const postConditionHandlerAccount = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle saving account condition request');
   try {
     const condition = req.body as AccountCondition;
@@ -59,10 +63,25 @@ export const POSTConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
   }
 };
 
-const handleHealthCheck = async (): Promise<{ status: string }> => {
+export const handleHealthCheck = async (): Promise<{ status: string }> => {
   return {
     status: 'UP',
   };
 };
 
-export { handleHealthCheck };
+export const getConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.trace('getting conditions for an entity');
+  try {
+    const data = await handleGetConditionsForEntity(req.body as GetEntityConditions);
+    if (data) {
+      reply.status(200);
+      reply.send(data);
+    } else {
+      reply.status(404);
+    }
+  } catch (err) {
+    reply.status(500);
+  } finally {
+    loggerService.trace('End - get condition for an entity');
+  }
+};

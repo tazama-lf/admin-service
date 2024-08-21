@@ -163,11 +163,11 @@ POST
 
 #### URL 3
 ```
-/v1/admin/event-flow-control/entity/getcondition
+/v1/admin/event-flow-control/entity/getconditions
 ```
 #### Method 3
 ```
-POST
+GET
 ```
 **Some endpoints share properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
 #### Body
@@ -194,7 +194,7 @@ POST
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity ID. |
-| `proprietary`   | String | Yes      | `schmnm` proprietary value |
+| `schmeNm`   | String | Yes      | Scheme name of the entity |
 | `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 
 Possible values for some fields mention in the table above

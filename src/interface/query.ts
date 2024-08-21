@@ -1,5 +1,5 @@
 export interface GetEntityConditions {
   id: string;
-  proprietary: string;
+  schmeNm: string;
   syncCache?: string;
 }

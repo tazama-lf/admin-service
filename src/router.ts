@@ -17,9 +17,9 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/v1/admin/event-flow-control/entity/getconditions', SetOptionsParams(getConditionHandler, 'queryEntityConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/entity', SetOptionsBody(postConditionHandlerEntity, 'entityConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/account', SetOptionsBody(postConditionHandlerAccount, 'accountConditionSchema'));
-  fastify.post(
-    '/v1/admin/event-flow-control/account/getcondition',
-    SetOptionsBody(getAccountConditionsHandler, 'queryAccountConditionSchema'),
+  fastify.get(
+    '/v1/admin/event-flow-control/account/getconditions',
+    SetOptionsParams(getAccountConditionsHandler, 'queryAccountConditionSchema'),
   );
 }
 

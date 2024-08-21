@@ -91,7 +91,7 @@ export const getConditionHandler = async (req: FastifyRequest, reply: FastifyRep
 export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
-    const data = await handleGetConditionsForAccount(req.body as GetAccountConditions);
+    const data = await handleGetConditionsForAccount(req.query as GetAccountConditions);
     if (data) {
       reply.status(200);
       reply.send(data);

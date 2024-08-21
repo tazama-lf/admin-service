@@ -127,9 +127,9 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `entityCond-${params.id}-${params.proprietary}`;
+    const cacheKey = `entityCond-${params.id}-${params.schmeNm}`;
 
-    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.proprietary)) as RawConditionResponse[][];
+    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {

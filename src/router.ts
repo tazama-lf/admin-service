@@ -18,7 +18,7 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/v1/admin/event-flow-control/entity', SetOptionsBody(postConditionHandlerEntity, 'entityConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/account', SetOptionsBody(postConditionHandlerAccount, 'accountConditionSchema'));
   fastify.post(
-    '/v1/admin/event-flow-control/entity/getaccount',
+    '/v1/admin/event-flow-control/account/getcondition',
     SetOptionsBody(getAccountConditionsHandler, 'queryAccountConditionSchema'),
   );
 }

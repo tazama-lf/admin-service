@@ -5,11 +5,13 @@ import {
   handleGetReportRequestByMsgId,
   handlePostConditionEntity,
   handlePostConditionAccount,
+  handleGetConditionsForAccount,
 } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
 import { type GetEntityConditions } from './interface/query';
 import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { type GetAccountConditions } from './interface/queryAccountCondition';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -89,14 +91,13 @@ export const getConditionHandler = async (req: FastifyRequest, reply: FastifyRep
 export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
-    const request = req.body as { msgid: string };
-    const data = await handleGetReportRequestByMsgId(request.msgid);
-    const body = {
-      message: 'Report was found',
-      data,
-    };
-    reply.status(data ? 200 : 204);
-    reply.send(body);
+    const data = await handleGetConditionsForAccount(req.body as GetAccountConditions);
+    if (data) {
+      reply.status(200);
+      reply.send(data);
+    } else {
+      reply.status(404);
+    }
   } catch (err) {
     const failMessage = `Failed to process execution request. \n${JSON.stringify(err, null, 4)}`;
     reply.status(500);

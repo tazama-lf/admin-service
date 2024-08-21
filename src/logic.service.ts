@@ -244,7 +244,7 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
     loggerService.trace('successfully parsed parameters', fnName, params.id);
     const cacheKey = `acctCond-${params.id}-${params.schmeNm}`;
 
-    const report = (await databaseManager.getConditionsByGraph(params.id, params.schmeNm, { agt: params.agt })) as RawConditionResponse[][];
+    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -256,21 +256,21 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
     switch (params.syncCache) {
       case 'all':
         loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
-        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
+        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
         break;
       case 'active':
         loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
-        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
         break;
       case 'default':
         // use env
         loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
         if (configuration.activeConditionsOnly) {
           loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
-          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), 1000);
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
         } else {
           loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
-          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), 1000);
+          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
         }
         break;
       default:

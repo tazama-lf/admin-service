@@ -465,7 +465,7 @@ describe('getConditionForEntity', () => {
   });
 
   it('should get conditions for entity', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'no' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -474,31 +474,31 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'no' });
     // Assert
     expect(result).toEqual(undefined);
   });
 
   it('should get conditions for entity and update cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'active' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'active' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'all' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'all' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '', syncCache: 'default' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'default' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should skip caching', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -507,7 +507,7 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
-    const result = await handleGetConditionsForEntity({ id: '', proprietary: '' });
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '' });
 
     expect(result).toBe(undefined);
   });

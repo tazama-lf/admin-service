@@ -7,9 +7,10 @@ import checkConditionValidity from './utils/condition-validation';
 import { type GetEntityConditions } from './interface/query';
 import { configuration } from './config';
 import { filterConditions } from './utils/filter-active-conditions';
-import { type EntityConditionResponse } from './interface/entity-condition/response-parsed';
-import { parseEntityCondition } from './utils/parser/parse-entity-condition';
+import { type ConditionResponse } from './interface/entity-condition/response-parsed';
+import { parseCondition } from './utils/parse-condition';
 import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import { type GetAccountConditions } from './interface/queryAccountCondition';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -122,7 +123,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
   }
 };
 
-export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityConditionResponse | undefined> => {
+export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<ConditionResponse | undefined> => {
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
@@ -135,7 +136,7 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
       return; // no conditions
     }
 
-    const retVal = parseEntityCondition(report[0]);
+    const retVal = parseCondition(report[0]);
 
     switch (params.syncCache) {
       case 'all':
@@ -162,7 +163,7 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
         break;
     }
 
-    return parseEntityCondition(report[0]);
+    return parseCondition(report[0]);
   } catch (error) {
     loggerService.error(error as Error);
   }
@@ -234,5 +235,51 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
     const errorMessage = error as { message: string };
     loggerService.error(`Error: posting condition for account with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetConditionsForAccount = async (params: GetAccountConditions): Promise<ConditionResponse | undefined> => {
+  const fnName = 'getConditionsForAccount';
+  try {
+    loggerService.trace('successfully parsed parameters', fnName, params.id);
+    const cacheKey = `acctCond-${params.id}-${params.schmeNm}`;
+
+    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
+
+    loggerService.log('called database', fnName, params.id);
+    if (!report.length || !report[0].length) {
+      return; // no conditions
+    }
+
+    const retVal = parseCondition(report[0]);
+
+    switch (params.syncCache) {
+      case 'all':
+        loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
+        break;
+      case 'active':
+        loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
+        await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
+        break;
+      case 'default':
+        // use env
+        loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
+        if (configuration.activeConditionsOnly) {
+          loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(filterConditions(retVal.conditions)), configuration.cacheTTL);
+        } else {
+          loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
+          await databaseManager.set(cacheKey, JSON.stringify(retVal.conditions), configuration.cacheTTL);
+        }
+        break;
+      default:
+        loggerService.trace('syncCache=no/default option specified');
+        break;
+    }
+
+    return retVal;
+  } catch (error) {
+    loggerService.error(error as Error);
   }
 };

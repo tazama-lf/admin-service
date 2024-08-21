@@ -4,6 +4,7 @@ import messageIDParamsSchema from '../schemas/paramsSchemas.json';
 import queryEntityCondition from '../schemas/queryEntityCondition.json';
 import entityConditionBodySchema from '../schemas/entityCondition.json';
 import accountConditionBodySchema from '../schemas/accountCondition.json';
+import queryAccountCondition from '../schemas/queryAccountCondition.json';
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
@@ -11,6 +12,7 @@ import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
+const queryAccountConditionSchema = { ...queryAccountCondition, $id: 'queryAccountConditionSchema' };
 const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
 const entityConditionMessageSchema = { ...entityConditionBodySchema, $id: 'entityConditionSchema' };
 const accountConditionMessageSchema = { ...accountConditionBodySchema, $id: 'accountConditionSchema' };
@@ -22,6 +24,7 @@ const ajv = new Ajv({
   strictTuples: false,
 });
 
+ajv.addSchema(queryAccountConditionSchema);
 ajv.addSchema(paramsMessageSchema);
 ajv.addSchema(queryEntityConditionSchema);
 ajv.addSchema(entityConditionMessageSchema);
@@ -35,6 +38,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   fastify.addSchema(queryEntityConditionSchema);
   fastify.addSchema(entityConditionMessageSchema);
   fastify.addSchema(accountConditionMessageSchema);
+  fastify.addSchema(queryAccountConditionSchema);
 
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/documentation',

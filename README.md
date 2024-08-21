@@ -169,6 +169,14 @@ POST
 ```
 GET
 ```
+#### URL 4
+```
+/v1/admin/event-flow-control/account/getcondition
+```
+#### Method 4
+```
+GET
+```
 **Some endpoints share properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
 #### Body
 
@@ -193,8 +201,15 @@ GET
 #### URL 3
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
+| `id`   | String | Yes      | Entity identifier |
+| `schmeNm`   | String | Yes      |  Scheme name of the entity |
+| `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
+#### URL 4
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity ID. |
-| `schmeNm`   | String | Yes      | Scheme name of the entity |
+| `schmeNm`   | String | Yes      | Scheme name of the account |
+| `agt`   | String | Yes      | proprietary agent identifier |
 | `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 
 > [!IMPORTANT]  

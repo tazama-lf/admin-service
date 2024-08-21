@@ -1,0 +1,19 @@
+{
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "schmeNm": {
+        "type": "string"
+      },
+      "agt": {
+        "type": "string"
+      },
+      "syncCache": {
+        "type": "string",
+        "enum": ["no", "all", "active", "default"]
+      }
+    },
+    "required":["id", "schmeNm", "agt"]
+  }

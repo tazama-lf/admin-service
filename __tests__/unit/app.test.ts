@@ -2,6 +2,7 @@
 import { databaseManager, loggerService } from '../../src/';
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import {
+  handleGetConditionsForAccount,
   handleGetConditionsForEntity,
   handleGetReportRequestByMsgId,
   handlePostConditionAccount,
@@ -28,6 +29,7 @@ jest.mock('../../src/', () => ({
     getReportByMessageId: jest.fn(), // Ensure the mock function is typed correctly
     getConditionsByEntity: jest.fn(),
     getEntityConditionsByGraph: jest.fn(),
+    getAccountConditionsByGraph: jest.fn(),
     getConditionsByAccount: jest.fn(),
     getEntity: jest.fn(),
     getAccount: jest.fn(),
@@ -379,7 +381,7 @@ describe('getConditionForEntity', () => {
           incptnDtTm: '2024-08-16T24:00:00.999Z',
           xprtnDtTm: '2024-08-17T24:00:00.999Z',
         },
-        entity: {
+        result: {
           _key: '+27733161225MSISDN',
           _id: 'entities/+27733161225MSISDN',
           _rev: '_iTm1jLG---',
@@ -420,7 +422,7 @@ describe('getConditionForEntity', () => {
           incptnDtTm: '2024-08-16T24:00:00.999Z',
           xprtnDtTm: '2024-08-17T24:00:00.999Z',
         },
-        entity: {
+        result: {
           _key: '+27733161225MSISDN',
           _id: 'entities/+27733161225MSISDN',
           _rev: '_iTm1jLG---',
@@ -705,5 +707,228 @@ describe('handlePostConditionAccount', () => {
     // Act & Assert
     await expect(handlePostConditionAccount(sampleCondition)).rejects.toThrow('Database error');
     expect(loggerService.error).toHaveBeenCalledWith('Error: posting condition for account with error message: Database error');
+  });
+});
+
+describe('getConditionForAccount', () => {
+  const sampleCondition: AccountCondition = {
+    evtTp: ['pacs.008.001.10', 'pacs.002.001.12'],
+    condTp: 'overridable-block',
+    prsptv: 'both',
+    incptnDtTm: '2024-08-07T24:00:00.999Z',
+    xprtnDtTm: '2024-08-08T24:00:00.999Z',
+    condRsn: 'R001',
+    acct: {
+      id: '+27733161225',
+      agt: {
+        finInstnId: {
+          clrSysMmbId: {
+            mmbId: 'a',
+          },
+        },
+      },
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
+    },
+    forceCret: true,
+    usr: 'bob',
+    creDtTm: fixedDate,
+  };
+  const accountResponse = {
+    acct: {
+      id: '1010101010',
+      agt: {
+        finInstnId: {
+          clrSysMmbId: {
+            mmbId: 'dfsp001',
+          },
+        },
+      },
+      schmeNm: {
+        prtry: 'Mxx',
+      },
+    },
+    conditions: [
+      {
+        condId: '2110',
+        xprtnDtTm: '2024-09-03T24:00:00.999Z',
+        condTp: 'non-overridable-block',
+        creDtTm: '2024-08-20T10:12:44.538Z',
+        incptnDtTm: '2024-09-01T24:00:00.999Z',
+        condRsn: 'R001',
+        usr: 'bob',
+        prsptvs: [
+          {
+            prsptv: 'governed_as_creditor_by',
+            evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+            incptnDtTm: '2024-09-01T24:00:00.999Z',
+            xprtnDtTm: '2024-09-03T24:00:00.999Z',
+          },
+          {
+            prsptv: 'governed_as_debtor_by',
+            evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+            incptnDtTm: '2024-09-01T24:00:00.999Z',
+            xprtnDtTm: '2024-09-03T24:00:00.999Z',
+          },
+        ],
+      },
+    ],
+  };
+  const rawResponse = {
+    governed_as_creditor_by: [
+      {
+        edge: {
+          _key: '21101010101010Mxxdfsp001',
+          _id: 'governed_as_creditor_by/21101010101010Mxxdfsp001',
+          _from: 'accounts/1010101010Mxxdfsp001',
+          _to: 'conditions/2110',
+          _rev: '_iU7ER2a---',
+          evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+          incptnDtTm: '2024-09-01T24:00:00.999Z',
+          xprtnDtTm: '2024-09-03T24:00:00.999Z',
+        },
+        result: {
+          _key: '1010101010Mxxdfsp001',
+          _id: 'accounts/1010101010Mxxdfsp001',
+          _rev: '_iU7ER2G---',
+        },
+        condition: {
+          _key: '2110',
+          _id: 'conditions/2110',
+          _rev: '_iU7ER2----',
+          evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+          condTp: 'non-overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-01T24:00:00.999Z',
+          xprtnDtTm: '2024-09-03T24:00:00.999Z',
+          condRsn: 'R001',
+          acct: {
+            id: '1010101010',
+            schmeNm: {
+              prtry: 'Mxx',
+            },
+            agt: {
+              finInstnId: {
+                clrSysMmbId: {
+                  mmbId: 'dfsp001',
+                },
+              },
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-20T10:12:44.538Z',
+        },
+      },
+    ],
+    governed_as_debtor_by: [
+      {
+        edge: {
+          _key: '21101010101010Mxxdfsp001',
+          _id: 'governed_as_debtor_by/21101010101010Mxxdfsp001',
+          _from: 'accounts/1010101010Mxxdfsp001',
+          _to: 'conditions/2110',
+          _rev: '_iU7ER2e---',
+          evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+          incptnDtTm: '2024-09-01T24:00:00.999Z',
+          xprtnDtTm: '2024-09-03T24:00:00.999Z',
+        },
+        result: {
+          _key: '1010101010Mxxdfsp001',
+          _id: 'accounts/1010101010Mxxdfsp001',
+          _rev: '_iU7ER2G---',
+        },
+        condition: {
+          _key: '2110',
+          _id: 'conditions/2110',
+          _rev: '_iU7ER2----',
+          evtTp: ['pacs.008.001.10', 'pacs.002.01.11'],
+          condTp: 'non-overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-01T24:00:00.999Z',
+          xprtnDtTm: '2024-09-03T24:00:00.999Z',
+          condRsn: 'R001',
+          acct: {
+            id: '1010101010',
+            schmeNm: {
+              prtry: 'Mxx',
+            },
+            agt: {
+              finInstnId: {
+                clrSysMmbId: {
+                  mmbId: 'dfsp001',
+                },
+              },
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-08-20T10:12:44.538Z',
+        },
+      },
+    ],
+  };
+  beforeEach(() => {
+    jest.clearAllMocks(); // Clear mocks before each test
+
+    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
+      return Promise.resolve([[rawResponse]]);
+    });
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it('should get conditions for account', async () => {
+    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmeNm: 'Mxx', agt: 'dfsp001' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should get no conditions for account', async () => {
+    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
+      return Promise.resolve([]);
+    });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmeNm: 'Mxx', agt: 'dfsp001' });
+
+    // Assert
+    expect(result).toEqual(undefined);
+  });
+
+  it('should get conditions for account and update cache', async () => {
+    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmeNm: 'Mxx', agt: 'dfsp001' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should prune active conditions for cache', async () => {
+    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmeNm: 'Mxx', agt: 'dfsp001' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should prune active conditions for cache (using env)', async () => {
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'default' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should skip caching', async () => {
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'no' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should throw an error', async () => {
+    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
+      return Promise.reject(new Error('something bad happened'));
+    });
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'no' });
+
+    expect(result).toBe(undefined);
   });
 });

@@ -17,19 +17,35 @@ const saveConditionEdges = async (
   conditionId: string,
   entityAccntId: string,
   condition: ConditionEdge,
+  memberType: 'entity' | 'account',
 ): Promise<void> => {
   switch (perspective) {
     case 'both':
-      await Promise.all([
-        databaseManager.saveGovernedAsCreditorByEdge(conditionId, entityAccntId, condition),
-        databaseManager.saveGovernedAsDebtorByEdge(conditionId, entityAccntId, condition),
-      ]);
+      if (memberType === 'entity') {
+        await Promise.all([
+          databaseManager.saveGovernedAsCreditorByEdge(conditionId, entityAccntId, condition),
+          databaseManager.saveGovernedAsDebtorByEdge(conditionId, entityAccntId, condition),
+        ]);
+      } else {
+        await Promise.all([
+          databaseManager.saveGovernedAsCreditorAccountByEdge(conditionId, entityAccntId, condition),
+          databaseManager.saveGovernedAsDebtorAccountByEdge(conditionId, entityAccntId, condition),
+        ]);
+      }
       break;
     case 'debtor':
-      await databaseManager.saveGovernedAsDebtorByEdge(conditionId, entityAccntId, condition);
+      if (memberType === 'entity') {
+        await databaseManager.saveGovernedAsDebtorByEdge(conditionId, entityAccntId, condition);
+      } else {
+        await databaseManager.saveGovernedAsDebtorAccountByEdge(conditionId, entityAccntId, condition);
+      }
       break;
     case 'creditor':
-      await databaseManager.saveGovernedAsCreditorByEdge(conditionId, entityAccntId, condition);
+      if (memberType === 'entity') {
+        await databaseManager.saveGovernedAsCreditorByEdge(conditionId, entityAccntId, condition);
+      } else {
+        await databaseManager.saveGovernedAsCreditorAccountByEdge(conditionId, entityAccntId, condition);
+      }
       break;
     default:
       throw Error('Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
@@ -94,7 +110,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
       condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
     }
 
-    await saveConditionEdges(condition.prsptv, condId, entityId, condition);
+    await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity');
 
     await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });
 
@@ -209,7 +225,7 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
       condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
     }
 
-    await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge);
+    await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account');
 
     await databaseManager.addOneGetCount(accountId, { conditionEdge: condition as ConditionEdge });
 

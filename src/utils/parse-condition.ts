@@ -1,5 +1,5 @@
+import type { ConditionResponse, ConditionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
-import type { ConditionDetails, ConditionResponse } from '../interface/entity-condition/response-parsed';
 
 export const parseCondition = (input: RawConditionResponse[]): ConditionResponse => {
   // Initialize the result object

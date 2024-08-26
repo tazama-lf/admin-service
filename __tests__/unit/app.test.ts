@@ -39,6 +39,8 @@ jest.mock('../../src/', () => ({
     saveAccount: jest.fn(),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
+    saveGovernedAsCreditorAccountByEdge: jest.fn(),
+    saveGovernedAsDebtorAccountByEdge: jest.fn(),
     addOneGetCount: jest.fn(),
   },
   configuration: {
@@ -581,8 +583,8 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveAccount).toHaveBeenCalledWith(
       `${sampleCondition.acct.id + sampleCondition.acct.schmeNm.prtry + sampleCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
     );
-    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
-    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
+    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
+    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       condition: sampleCondition,
@@ -604,8 +606,8 @@ describe('handlePostConditionAccount', () => {
     const result = await handlePostConditionAccount(sampleCondition);
 
     // Assert
-    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
-    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
+    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
+    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       condition: sampleCondition,
@@ -627,7 +629,7 @@ describe('handlePostConditionAccount', () => {
         creDtTm: nowDateTime,
       }),
     );
-    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
+    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       condition: conditionDebtor,
@@ -662,7 +664,7 @@ describe('handlePostConditionAccount', () => {
         creDtTm: nowDateTime,
       }),
     );
-    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
+    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       condition: conditionCreditor,

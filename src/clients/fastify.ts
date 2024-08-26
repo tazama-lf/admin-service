@@ -5,6 +5,8 @@ import queryEntityCondition from '../schemas/queryEntityCondition.json';
 import entityConditionBodySchema from '../schemas/entityCondition.json';
 import accountConditionBodySchema from '../schemas/accountCondition.json';
 import queryAccountCondition from '../schemas/queryAccountCondition.json';
+import expireAccountCondition from '../schemas/expireConditionAccount.json';
+import expireEntityCondition from '../schemas/expireConditionEntity.json';
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
@@ -16,6 +18,9 @@ const queryAccountConditionSchema = { ...queryAccountCondition, $id: 'queryAccou
 const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
 const entityConditionMessageSchema = { ...entityConditionBodySchema, $id: 'entityConditionSchema' };
 const accountConditionMessageSchema = { ...accountConditionBodySchema, $id: 'accountConditionSchema' };
+const expireEntityConditionSchema = { ...expireEntityCondition, $id: 'expireEntityConditionSchema' };
+const expireAccountConditionSchema = { ...expireAccountCondition, $id: 'expireAccountConditionSchema' };
+
 const fastify = Fastify();
 const ajv = new Ajv({
   removeAdditional: 'all',
@@ -29,6 +34,8 @@ ajv.addSchema(paramsMessageSchema);
 ajv.addSchema(queryEntityConditionSchema);
 ajv.addSchema(entityConditionMessageSchema);
 ajv.addSchema(accountConditionMessageSchema);
+ajv.addSchema(expireAccountConditionSchema);
+ajv.addSchema(expireEntityConditionSchema);
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
@@ -39,6 +46,8 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   fastify.addSchema(entityConditionMessageSchema);
   fastify.addSchema(accountConditionMessageSchema);
   fastify.addSchema(queryAccountConditionSchema);
+  fastify.addSchema(expireAccountConditionSchema);
+  fastify.addSchema(expireEntityConditionSchema);
 
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/documentation',

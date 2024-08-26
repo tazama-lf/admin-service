@@ -1,0 +1,58 @@
+{
+    "type": "object",
+    "properties": {
+      "condId": {
+        "type": "string",
+        "description": "Condition ID"
+      },
+      "acct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Account ID"
+          },
+          "schmeNm": {
+            "type": "object",
+            "properties": {
+              "prtry": {
+                "type": "string",
+                "description": "Scheme Name"
+              }
+            },
+            "required": ["prtry"]
+          },
+          "agt": {
+            "type": "object",
+            "properties": {
+              "finInstnId": {
+                "type": "object",
+                "properties": {
+                  "clrSysMmbId": {
+                    "type": "object",
+                    "properties": {
+                      "mmbId": {
+                        "type": "string",
+                        "description": "Member ID"
+                      }
+                    },
+                    "required": ["mmbId"]
+                  }
+                },
+                "required": ["clrSysMmbId"]
+              }
+            },
+            "required": ["finInstnId"]
+          }
+        },
+        "required": ["id", "schmeNm", "agt"]
+      },
+      "xprtnDtTm": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Expiration Date and Time"
+      }
+    },
+    "required": ["condId", "acct", "xprtnDtTm"]
+  }
+  

@@ -4,7 +4,7 @@ import { type AccountCondition, type ConditionEdge, type EntityCondition } from 
 import { databaseManager, loggerService } from '.';
 import { type Report } from './interface/report.interface';
 import checkConditionValidity from './utils/condition-validation';
-import { type GetEntityConditions } from './interface/query';
+import { type GetEntityConditions } from './interface/queryEntityCondition';
 import { configuration } from './config';
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseCondition } from './utils/parse-condition';

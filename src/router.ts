@@ -7,6 +7,8 @@ import {
   handleHealthCheck,
   getConditionHandler,
   getAccountConditionsHandler,
+  putExpireEntityCondition,
+  putExpireAccountCondition,
 } from './app.controller';
 import { SetOptionsBody, SetOptionsParams } from './utils/schema-utils';
 
@@ -20,6 +22,14 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.get(
     '/v1/admin/event-flow-control/account/getconditions',
     SetOptionsParams(getAccountConditionsHandler, 'queryAccountConditionSchema'),
+  );
+  fastify.put(
+    '/v1/admin/event-flow-control/condition/expireconditionbyaccount',
+    SetOptionsBody(putExpireEntityCondition, 'expireEntityConditionSchema'),
+  );
+  fastify.put(
+    '/v1/admin/event-flow-control/condition/expireconditionbyentity',
+    SetOptionsBody(putExpireAccountCondition, 'expireAccountConditionSchema'),
   );
 }
 

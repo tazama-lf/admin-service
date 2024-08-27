@@ -128,13 +128,13 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
       loggerService.warn(message);
       return {
         message,
-        condition: alreadyExistingCondition[0],
+        conditions: alreadyExistingCondition[0],
       };
     }
 
     return {
       message: 'New condition was saved successfully.',
-      condition,
+      conditions: [condition],
     };
   } catch (error) {
     const errorMessage = error as { message: string };
@@ -244,13 +244,13 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
       loggerService.warn(message);
       return {
         message,
-        condition: alreadyExistingCondition[0],
+        conditions: alreadyExistingCondition[0],
       };
     }
 
     return {
       message: 'New condition was saved successfully.',
-      condition,
+      conditions: [condition],
     };
   } catch (error) {
     const errorMessage = error as { message: string };

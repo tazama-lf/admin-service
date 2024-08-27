@@ -189,7 +189,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [sampleCondition],
+      conditions: [sampleCondition],
     });
   });
 
@@ -210,7 +210,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [sampleCondition],
+      conditions: [sampleCondition],
     });
   });
 
@@ -232,7 +232,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [conditionDebtor],
+      conditions: [conditionDebtor],
     });
   });
 
@@ -271,7 +271,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [conditionCreditor],
+      conditions: [conditionCreditor],
     });
   });
 
@@ -299,7 +299,7 @@ describe('handlePostConditionEntity', () => {
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the entity');
     expect(result).toEqual({
       message: '2 conditions already exist for the entity',
-      condition: existingConditions[0],
+      conditions: existingConditions[0],
     });
   });
 
@@ -587,7 +587,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [sampleCondition],
+      conditions: [sampleCondition],
     });
   });
 
@@ -610,7 +610,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [sampleCondition],
+      conditions: [sampleCondition],
     });
   });
 
@@ -632,7 +632,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [conditionDebtor],
+      conditions: [conditionDebtor],
     });
   });
 
@@ -667,7 +667,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: [conditionCreditor],
+      conditions: [conditionCreditor],
     });
   });
 
@@ -695,7 +695,7 @@ describe('handlePostConditionAccount', () => {
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the account');
     expect(result).toEqual({
       message: '2 conditions already exist for the account',
-      condition: existingConditions[0],
+      conditions: existingConditions[0],
     });
   });
 

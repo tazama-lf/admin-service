@@ -149,7 +149,7 @@ sequenceDiagram
 ```
 #### Method 1
 ```
-POST
+POST, GET
 ```
 
 #### URL 2
@@ -158,25 +158,9 @@ POST
 ```
 #### Method 2
 ```
-POST
+POST, GET
 ```
 
-#### URL 3
-```
-/v1/admin/event-flow-control/entity/getconditions
-```
-#### Method 3
-```
-GET
-```
-#### URL 4
-```
-/v1/admin/event-flow-control/account/getcondition
-```
-#### Method 4
-```
-GET
-```
 **Some endpoints share properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
 #### Body
 

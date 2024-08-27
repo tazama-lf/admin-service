@@ -189,7 +189,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: sampleCondition,
+      condition: [sampleCondition],
     });
   });
 
@@ -210,7 +210,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: sampleCondition,
+      condition: [sampleCondition],
     });
   });
 
@@ -232,7 +232,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: conditionDebtor,
+      condition: [conditionDebtor],
     });
   });
 
@@ -271,7 +271,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: conditionCreditor,
+      condition: [conditionCreditor],
     });
   });
 
@@ -587,7 +587,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: sampleCondition,
+      condition: [sampleCondition],
     });
   });
 
@@ -610,7 +610,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: sampleCondition,
+      condition: [sampleCondition],
     });
   });
 
@@ -632,7 +632,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: conditionDebtor,
+      condition: [conditionDebtor],
     });
   });
 
@@ -667,7 +667,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      condition: conditionCreditor,
+      condition: [conditionCreditor],
     });
   });
 

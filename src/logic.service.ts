@@ -134,7 +134,7 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
 
     return {
       message: 'New condition was saved successfully.',
-      condition,
+      condition: [condition],
     };
   } catch (error) {
     const errorMessage = error as { message: string };
@@ -250,7 +250,7 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
 
     return {
       message: 'New condition was saved successfully.',
-      condition,
+      condition: [condition],
     };
   } catch (error) {
     const errorMessage = error as { message: string };

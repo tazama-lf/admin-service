@@ -22,6 +22,20 @@ const checkConditionValidity = (condition: EntityCondition | AccountCondition): 
   if (typeof condition.usr !== 'string') {
     throw Error('Error: User was not provided');
   }
+
+  if (condition?.xprtnDtTm) {
+    const expirationDate = new Date(condition.xprtnDtTm);
+    if (isNaN(expirationDate.getTime())) {
+      throw Error('Error: Expiration date provided was invalid.');
+    }
+  }
+
+  if (condition?.incptnDtTm) {
+    const inceptionnDate = new Date(condition.incptnDtTm);
+    if (isNaN(inceptionnDate.getTime())) {
+      throw Error('Error: Inception date provided was invalid.');
+    }
+  }
 };
 
 export default checkConditionValidity;

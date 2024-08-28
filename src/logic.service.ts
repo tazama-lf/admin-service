@@ -77,7 +77,9 @@ export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Repo
   }
 };
 
-export const handlePostConditionEntity = async (condition: EntityCondition): Promise<EntityCondition[] | Record<string, unknown>> => {
+export const handlePostConditionEntity = async (
+  condition: EntityCondition,
+): Promise<{ message: string; result: EntityConditionResponse }> => {
   try {
     loggerService.log(`Started handling post request of entity condition executed by ${condition.usr}.`);
 
@@ -88,11 +90,6 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
     let condId = '';
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
-
-    const alreadyExistingCondition = (await databaseManager.getConditionsByEntity(
-      condEntityId,
-      condSchemeProprietary,
-    )) as EntityCondition[][];
 
     const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary)) as Array<Array<{ _id: string }>>;
     let entityId = unwrap<{ _id: string }>(alreadyExistingEntity)?._id;
@@ -116,25 +113,26 @@ export const handlePostConditionEntity = async (condition: EntityCondition): Pro
 
     await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity');
 
-    await databaseManager.addOneGetCount(entityId, { conditionEdge: condition as ConditionEdge });
+    const report = (await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary)) as RawConditionResponse[][];
 
-    if (
-      alreadyExistingCondition &&
-      alreadyExistingCondition[0] &&
-      alreadyExistingCondition[0][0] &&
-      alreadyExistingCondition[0].length > 0
-    ) {
-      const message = `${alreadyExistingCondition[0].length} conditions already exist for the entity`;
+    const retVal = parseConditionEntity(report[0]);
+
+    const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
+
+    await updateCache(entityId, activeConditionsOnly);
+
+    if (retVal.conditions && retVal.conditions.length > 1) {
+      const message = `${retVal.conditions.length - 1} conditions already exist for the entity`;
       loggerService.warn(message);
       return {
         message,
-        conditions: alreadyExistingCondition[0],
+        result: activeConditionsOnly,
       };
     }
 
     return {
       message: 'New condition was saved successfully.',
-      conditions: [condition],
+      result: activeConditionsOnly,
     };
   } catch (error) {
     const errorMessage = error as { message: string };
@@ -147,7 +145,7 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `entityCond-${params.id}-${params.schmeNm}`;
+    const cacheKey = `entities/${params.id}${params.schmeNm}`;
 
     const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
 
@@ -189,7 +187,10 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
     loggerService.error(error as Error);
   }
 };
-export const handlePostConditionAccount = async (condition: AccountCondition): Promise<AccountCondition[] | Record<string, unknown>> => {
+
+export const handlePostConditionAccount = async (
+  condition: AccountCondition,
+): Promise<{ message: string; result: AccountConditionResponse }> => {
   try {
     loggerService.log(`Started handling post request of account condition executed by ${condition.usr}.`);
 
@@ -201,12 +202,6 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
     const condAccounntId: string = condition.acct.id;
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
-
-    const alreadyExistingCondition = (await databaseManager.getConditionsByAccount(
-      condAccounntId,
-      condSchemeProprietary,
-      condMemberid,
-    )) as AccountCondition[][];
 
     const alreadyExistingAccount = (await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid)) as Array<
       Array<{ _id: string }>
@@ -232,25 +227,32 @@ export const handlePostConditionAccount = async (condition: AccountCondition): P
 
     await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account');
 
-    await databaseManager.addOneGetCount(accountId, { conditionEdge: condition as ConditionEdge });
+    const report = (await databaseManager.getAccountConditionsByGraph(
+      condAccounntId,
+      condSchemeProprietary,
+      condMemberid,
+    )) as RawConditionResponse[][];
 
-    if (
-      alreadyExistingCondition &&
-      alreadyExistingCondition[0] &&
-      alreadyExistingCondition[0][0] &&
-      alreadyExistingCondition[0].length > 0
-    ) {
-      const message = `${alreadyExistingCondition[0].length} conditions already exist for the account`;
+    const retVal = parseConditionAccount(report[0]);
+
+    const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
+
+    await updateCache(accountId, activeConditionsOnly);
+
+    if (retVal && retVal.conditions.length > 1) {
+      const message = `${retVal.conditions.length - 1} conditions already exist for the account`;
       loggerService.warn(message);
+      loggerService.trace('using env to update active conditions only', 'cache update', accountId);
+
       return {
         message,
-        conditions: alreadyExistingCondition[0],
+        result: activeConditionsOnly,
       };
     }
 
     return {
       message: 'New condition was saved successfully.',
-      conditions: [condition],
+      result: activeConditionsOnly,
     };
   } catch (error) {
     const errorMessage = error as { message: string };
@@ -263,7 +265,7 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
   const fnName = 'getConditionsForAccount';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `acctCond-${params.id}-${params.schmeNm}`;
+    const cacheKey = `accounts/${params.id}${params.schmeNm}${params.agt}`;
 
     const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
 

@@ -5,7 +5,7 @@ import { configuration } from '../config';
 
 export const updateCache = async (key: string, payload: AccountConditionResponse | EntityConditionResponse): Promise<void> => {
   const buf = createConditionsBuffer(payload);
-  if (!buf) {
+  if (!buf?.byteLength) {
     loggerService.error('payload cannot be serialised into buffer', 'cache', key);
   } else {
     await databaseManager.set(key, buf, configuration.cacheTTL);

@@ -16,6 +16,7 @@ import {
   sampleAccountCondition,
   sampleEntityCondition,
 } from './test.data';
+import { configuration } from '../../src/config';
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
   const original = jest.requireActual('@tazama-lf/frms-coe-lib');
@@ -338,6 +339,14 @@ describe('getConditionForEntity', () => {
     expect(result).toEqual(entityResponse);
   });
 
+  it('should sync active condition by using default and environment variable', async () => {
+    configuration.activeConditionsOnly = true;
+    const result = await handleGetConditionsForEntity({ id: '', schmeNm: '', syncCache: 'default' });
+    configuration.activeConditionsOnly = false;
+    // Assert
+    expect(result).toEqual(entityResponse);
+  });
+
   it('should throw an error', async () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
@@ -530,6 +539,16 @@ describe('handlePostConditionAccount', () => {
     });
   });
 
+  it('should handle handle thrown errors when trying to saveConditions', async () => {
+    const error = new Error('Database error');
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.reject(error);
+    });
+
+    // Assert
+    await expect(handlePostConditionAccount(sampleAccountCondition)).rejects.toThrow('Database error');
+  });
+
   it('should log and throw an error when database save fails', async () => {
     // Arrange
     const error = new Error('Database error');
@@ -594,6 +613,26 @@ describe('getConditionForAccount', () => {
 
   it('should skip caching', async () => {
     const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'no' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should sync all cache', async () => {
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'all' });
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should sync active cache by using environment variable', async () => {
+    configuration.activeConditionsOnly = true;
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'default' });
+    configuration.activeConditionsOnly = false;
+    // Assert
+    expect(result).toEqual(accountResponse);
+  });
+
+  it('should sync active cache only', async () => {
+    const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'active' });
     // Assert
     expect(result).toEqual(accountResponse);
   });

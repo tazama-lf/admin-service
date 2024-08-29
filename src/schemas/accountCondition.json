@@ -27,7 +27,12 @@
     },
     "prsptv": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "enum": [
+        "creditor",
+        "debtor",
+        "both"
+      ]
     },
     "incptnDtTm": {
       "type": "string",

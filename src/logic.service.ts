@@ -57,14 +57,13 @@ const saveConditionEdges = async (
 };
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
+  let unWrappedReport;
   try {
     loggerService.log(`Started handling get request by message id the message id is ${msgid}`);
 
     const report = (await databaseManager.getReportByMessageId('transactions', msgid)) as Report[][];
 
-    const unWrappedReport = unwrap<Report>(report);
-
-    return unWrappedReport;
+    unWrappedReport = unwrap<Report>(report);
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(
@@ -75,6 +74,7 @@ export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Repo
   } finally {
     loggerService.log('Completed handling get report by message id');
   }
+  return unWrappedReport;
 };
 
 export const handlePostConditionEntity = async (

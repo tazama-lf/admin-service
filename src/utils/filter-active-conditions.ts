@@ -6,7 +6,7 @@ export const filterConditions = (conditions: ConditionDetails[]): ConditionDetai
   return conditions.filter((condition) => {
     if (condition.xprtnDtTm) {
       const dt = new Date(condition.xprtnDtTm);
-      return now > dt;
+      return now < dt;
     } else {
       return true; //condition has no expiry
     }

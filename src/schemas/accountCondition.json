@@ -18,7 +18,12 @@
     },
     "condTp": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "enum": [
+        "overridable-block",
+        "non-overridable-block",
+        "override"
+      ]
     },
     "prsptv": {
       "type": "string",
@@ -102,7 +107,6 @@
     "evtTp",
     "condTp",
     "prsptv",
-    "xprtnDtTm",
     "condRsn",
     "acct",
     "forceCret",

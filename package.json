@@ -16,7 +16,7 @@
     "lint:eslint-unused": "eslint --report-unused-disable-directives \"**/*.ts\"",
     "lint:eslint-no-inline": "eslint --no-inline-config \"**/*.ts\"",
     "lint:prettier": "prettier --check \"**/*.ts\"",
-    "test": "set ACTIVE_CONDITIONS_ONLY=true jest --config=jest.config.ts --passWithNoTests --forceExit",
+    "test": "set ACTIVE_CONDITIONS_ONLY=true &&jest --config=jest.config.ts --passWithNoTests --forceExit",
     "test:watch": "jest --config=jest.config.ts --watch",
     "prepare": "husky"
   },

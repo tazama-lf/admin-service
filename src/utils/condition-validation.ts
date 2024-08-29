@@ -7,6 +7,10 @@ const checkConditionValidity = (condition: EntityCondition | AccountCondition): 
     condition.incptnDtTm = nowDateTime;
   }
 
+  if (condition.evtTp.length > 1 && condition.evtTp.includes('all')) {
+    throw Error('Error: event type "evtTp" can not specify the value "all" as well as specific event types');
+  }
+
   if (condition?.incptnDtTm < nowDateTime) {
     throw Error('Error: Inception date cannot be past the current time.');
   }

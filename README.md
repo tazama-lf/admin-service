@@ -200,7 +200,7 @@ POST, GET
 > Ensure your query parameters are encoded as some properties can contain special characters. An `id` of `+12344567890` would need to be encoded as `+` is a special character.
 
 Possible values for some fields mention in the table above
-1. **evtTp**  : [`'pacs.008.001.10'`,`'pacs.002.001.12'`,`'pain.001.001.11'`,`'pain.013.001.09'`]
+1. **evtTp**  : [`'pacs.008.001.10'`,`'pacs.002.001.12'`,`'pain.001.001.11'`,`'pain.013.001.09'` or `'all'`]
 2. **condTp** : `non-overridable-block` or `override` or `overridable-block`
 3. **prsptv** : `both` or `creditor` or `debtor`
 

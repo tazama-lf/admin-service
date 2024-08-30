@@ -12,17 +12,28 @@
           "pacs.008.001.10",
           "pacs.002.001.12",
           "pain.013.001.09",
-          "pain.001.001.11"
+          "pain.001.001.11",
+          "all"
         ]
       }
     },
     "condTp": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "enum": [
+        "overridable-block",
+        "non-overridable-block",
+        "override"
+      ]
     },
     "prsptv": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "enum": [
+        "creditor",
+        "debtor",
+        "both"
+      ]
     },
     "incptnDtTm": {
       "type": "string",
@@ -102,7 +113,6 @@
     "evtTp",
     "condTp",
     "prsptv",
-    "xprtnDtTm",
     "condRsn",
     "acct",
     "forceCret",

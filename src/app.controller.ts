@@ -6,6 +6,7 @@ import {
   handlePostConditionEntity,
   handlePostConditionAccount,
   handleGetConditionsForAccount,
+  handleUpdateExpiryDateForConditionsOfAccount,
 } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
@@ -104,5 +105,24 @@ export const getAccountConditionsHandler = async (req: FastifyRequest, reply: Fa
     reply.send(failMessage);
   } finally {
     loggerService.log('End - Handle report request');
+  }
+};
+
+export const updateConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition request');
+  try {
+    if ((req?.query as GetAccountConditions).agt) {
+      const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(
+        req.query as GetAccountConditions,
+        (req.body as { xprtnDtTm: string }).xprtnDtTm,
+      );
+      reply.status(code);
+      if (code !== 200) throw Error(message);
+      reply.send(message);
+    }
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition request');
   }
 };

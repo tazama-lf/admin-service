@@ -369,3 +369,62 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   return { code: 200, message: '' };
 };
+
+export const handleUpdateExpiryDateForConditionsOfEntity = async (
+  params: GetEntityConditions,
+  xprtnDtTm: string,
+): Promise<{ code: number; message: string }> => {
+  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+
+  if (!report.length || !report[0].length || !report[0][0]) {
+    return { code: 404, message: 'No records were found in the database using the provided data.' };
+  }
+
+  const resultByEdge = report[0][0];
+
+  if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
+    return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
+  }
+
+  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+
+  if (
+    !creditorByEdge.filter((eachDocument) => eachDocument.condition._id).length &&
+    !debtorByEdge.filter((eachDocument) => eachDocument.condition._id).length
+  ) {
+    return { code: 404, message: 'Condition does not exist in the database.' };
+  }
+
+  if (
+    !creditorByEdge.filter((eachDocument) => eachDocument.result._id).length &&
+    !debtorByEdge.filter((eachDocument) => eachDocument.result._id).length
+  ) {
+    return { code: 404, message: 'Entity does not exist in the database.' };
+  }
+
+  if (
+    creditorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length ||
+    debtorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length
+  ) {
+    return {
+      code: 405,
+      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
+    };
+  }
+
+  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, xprtnDtTm);
+
+  if (params.condid) await databaseManager.updateCondition(params.condid, xprtnDtTm);
+
+  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+
+  const retVal = parseConditionAccount(updatedReport[0]);
+
+  const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
+  const cacheKey = `entities/${params.id}${params.schmeNm}`;
+
+  await updateCache(cacheKey, activeConditionsOnly);
+
+  return { code: 200, message: '' };
+};

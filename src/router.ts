@@ -7,6 +7,7 @@ import {
   postConditionHandlerAccount,
   postConditionHandlerEntity,
   reportRequestHandler,
+  updateConditionExpiryDateHandler,
 } from './app.controller';
 import { SetOptionsBody, SetOptionsParams } from './utils/schema-utils';
 
@@ -18,6 +19,7 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/v1/admin/event-flow-control/account', SetOptionsParams(getAccountConditionsHandler, 'queryAccountConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/entity', SetOptionsBody(postConditionHandlerEntity, 'entityConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/account', SetOptionsBody(postConditionHandlerAccount, 'accountConditionSchema'));
+  fastify.put('/v1/admin/event-flow-control/account', updateConditionExpiryDateHandler);
 }
 
 export default Routes;

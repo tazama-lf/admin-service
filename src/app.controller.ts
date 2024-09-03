@@ -7,6 +7,7 @@ import {
   handlePostConditionAccount,
   handleGetConditionsForAccount,
   handleUpdateExpiryDateForConditionsOfAccount,
+  handleUpdateExpiryDateForConditionsOfEntity,
 } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
@@ -108,18 +109,31 @@ export const getAccountConditionsHandler = async (req: FastifyRequest, reply: Fa
   }
 };
 
-export const updateConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const updateAccountConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update condition request');
+  const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
   try {
-    if ((req?.query as GetAccountConditions).agt) {
-      const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(
-        req.query as GetAccountConditions,
-        (req.body as { xprtnDtTm: string }).xprtnDtTm,
-      );
-      reply.status(code);
-      if (code !== 200) throw Error(message);
-      reply.send(message);
-    }
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as GetAccountConditions, expiryDate);
+
+    reply.status(code);
+    if (code !== 200) throw Error(message);
+    reply.send(message);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition request');
+  }
+};
+
+export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition request');
+  const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
+  try {
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as GetAccountConditions, expiryDate);
+
+    reply.status(code);
+    if (code !== 200) throw Error(message);
+    reply.send(message);
   } catch (err) {
     reply.send(err);
   } finally {

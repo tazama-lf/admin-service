@@ -11,7 +11,7 @@ import { configuration } from './config';
 import { type GetEntityConditions } from './interface/query';
 import { type GetAccountConditions } from './interface/queryAccountCondition';
 import { type Report } from './interface/report.interface';
-import checkConditionValidity from './utils/condition-validation';
+import checkConditionValidity, { validateExpiryTimeDate } from './utils/condition-validation';
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
@@ -145,9 +145,9 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `entities/${params.id}${params.schmeNm}`;
+    const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -192,7 +192,9 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
   params: GetEntityConditions,
   xprtnDtTm: string,
 ): Promise<{ code: number; message: string }> => {
-  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+  xprtnDtTm = validateExpiryTimeDate(xprtnDtTm);
+
+  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
   if (!report.length || !report[0].length || !report[0][0]) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
@@ -235,12 +237,12 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   if (params.condid) await databaseManager.updateCondition(params.condid, xprtnDtTm);
 
-  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
   const retVal = parseConditionAccount(updatedReport[0]);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
-  const cacheKey = `entities/${params.id}${params.schmeNm}`;
+  const cacheKey = `entities/${params.id}${params.schmenm}`;
 
   await updateCache(cacheKey, activeConditionsOnly);
 
@@ -324,9 +326,9 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
   const fnName = 'getConditionsForAccount';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `accounts/${params.id}${params.schmeNm}${params.agt}`;
+    const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
+    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -370,7 +372,9 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
   params: GetAccountConditions,
   xprtnDtTm: string,
 ): Promise<{ code: number; message: string }> => {
-  const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
+  xprtnDtTm = validateExpiryTimeDate(xprtnDtTm);
+
+  const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
 
   if (!report.length || !report[0].length || !report[0][0]) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
@@ -415,14 +419,14 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   const updatedReport = (await databaseManager.getAccountConditionsByGraph(
     params.id,
-    params.schmeNm,
+    params.schmenm,
     params.agt,
   )) as RawConditionResponse[][];
 
   const retVal = parseConditionAccount(updatedReport[0]);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
-  const cacheKey = `accounts/${params.id}${params.schmeNm}${params.agt}`;
+  const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
   await updateCache(cacheKey, activeConditionsOnly);
 

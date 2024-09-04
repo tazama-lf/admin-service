@@ -25,3 +25,16 @@ export const SetOptionsParams = (
     schema,
   };
 };
+
+export const SetOptionsBodyAndParams = (
+  handler: RouteHandlerMethod,
+  bodySchemaName: string,
+  paramSchemaName: string,
+): { handler: RouteHandlerMethod; schema: FastifySchema } => {
+  const schema: FastifySchema = { querystring: { $ref: `${paramSchemaName}#` }, body: { $ref: `${bodySchemaName}#` } };
+
+  return {
+    handler,
+    schema,
+  };
+};

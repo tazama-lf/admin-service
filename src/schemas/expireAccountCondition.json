@@ -7,10 +7,12 @@
     "schmenm": {
       "type": "string"
     },
-    "syncCache": {
-      "type": "string",
-      "enum": ["no", "all", "active", "default"]
+    "agt": {
+      "type": "string"
+    },
+    "condid": {
+      "type": "string"
     }
   },
-  "required":["id", "schmenm"]
+  "required":["id", "schmenm", "agt", "condid"]
 }

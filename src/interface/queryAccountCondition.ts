@@ -1,6 +1,6 @@
 export interface GetAccountConditions {
   id: string;
-  schmeNm: string;
+  schmenm: string;
   agt: string;
   syncCache?: string;
   condid?: string;

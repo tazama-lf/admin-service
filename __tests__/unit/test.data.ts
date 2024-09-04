@@ -2,7 +2,8 @@ import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/i
 
 export const fixedDate = '2024-08-06T10:00:00.000Z';
 export const incptnDtTm = '2024-08-07T10:00:00.000Z';
-export const xprtnDtTm = '2024-08-08T10:00:00.000Z';
+let Ximedate = '2024-08-08T10:00:00.000Z';
+export const xprtnDtTm = Ximedate || undefined;
 
 export const rawResponseEntity = {
   governed_as_creditor_by: [
@@ -275,6 +276,7 @@ export const sampleEntityCondition: EntityCondition = {
   forceCret: true,
   usr: 'bob',
   creDtTm: fixedDate,
+  condId: '2110',
 };
 
 export const sampleAccountCondition: AccountCondition = {
@@ -300,4 +302,5 @@ export const sampleAccountCondition: AccountCondition = {
   forceCret: true,
   usr: 'bob',
   creDtTm: fixedDate,
+  condId: '2110',
 };

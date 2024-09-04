@@ -6,6 +6,8 @@ import {
   handleGetConditionsForEntity,
   handlePostConditionAccount,
   handlePostConditionEntity,
+  handleUpdateExpiryDateForConditionsOfAccount,
+  handleUpdateExpiryDateForConditionsOfEntity,
 } from '../../src/logic.service';
 import {
   accountResponse,
@@ -45,6 +47,9 @@ jest.mock('../../src/', () => ({
     saveGovernedAsCreditorAccountByEdge: jest.fn(),
     saveGovernedAsDebtorAccountByEdge: jest.fn(),
     addOneGetCount: jest.fn(),
+    updateExpiryDateOfAccountEdges: jest.fn(),
+    updateExpiryDateOfEntityEdges: jest.fn(),
+    updateCondition: jest.fn(),
   },
   configuration: {
     activeConditionsOnly: true,
@@ -644,5 +649,195 @@ describe('getConditionForAccount', () => {
     const result = await handleGetConditionsForAccount({ id: '', schmeNm: '', agt: '', syncCache: 'no' });
 
     expect(result).toBe(undefined);
+  });
+});
+
+describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
+  const params = { id: '2110', schmeNm: 'scheme', agt: 'agent', condid: '2110' };
+  const xprtnDtTm = '2024-09-03T12:00:00Z';
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return 404 if no records found in the database', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should return 404 if no active conditions exist for the account', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
+      [{ governed_as_creditor_by: [], governed_as_debtor_by: [] }],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Active conditions do not exist for this particular account in the database.',
+    });
+  });
+
+  it('should return 404 if condition does not exist in the database', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
+      [{ governed_as_creditor_by: [{ condition: { _key: '' } }], governed_as_debtor_by: [{ condition: { _key: '' } }] }],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Condition does not exist in the database.',
+    });
+  });
+
+  it('should return 404 if account does not exist in the database', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
+      [
+        {
+          governed_as_creditor_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
+          governed_as_debtor_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
+        },
+      ],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Account does not exist in the database.',
+    });
+  });
+
+  it('should return 405 if condition already contains an expiration date', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[rawResponseAccount]]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 405,
+      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.000Z',
+    });
+  });
+
+  it('should update expiry date and cache when conditions are met', async () => {
+    const copyOfAccountRawResponse = rawResponseAccount;
+    delete copyOfAccountRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
+    delete copyOfAccountRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfAccountRawResponse]]);
+    (databaseManager.updateExpiryDateOfAccountEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+
+    expect(databaseManager.updateExpiryDateOfAccountEdges).toHaveBeenCalledWith(
+      '21101010101010Mxxdfsp001',
+      '21101010101010Mxxdfsp001',
+      xprtnDtTm,
+    );
+    expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
+  });
+});
+
+describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
+  const params = { id: '2110', schmeNm: 'scheme', condid: '2110' };
+  const xprtnDtTm = '2024-09-03T12:00:00Z';
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return 404 if no records found in the database', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should return 404 if no active conditions exist for the entity', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
+      [{ governed_as_creditor_by: [], governed_as_debtor_by: [] }],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Active conditions do not exist for this particular entity in the database.',
+    });
+  });
+
+  it('should return 404 if condition does not exist in the database', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
+      [{ governed_as_creditor_by: [{ condition: { _key: '' } }], governed_as_debtor_by: [{ condition: { _key: '' } }] }],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Condition does not exist in the database.',
+    });
+  });
+
+  it('should return 404 if entity does not exist in the database', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
+      [
+        {
+          governed_as_creditor_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
+          governed_as_debtor_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
+        },
+      ],
+    ]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'Entity does not exist in the database.',
+    });
+  });
+
+  it('should return 405 if condition already contains an expiration date', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([[rawResponseEntity]]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(result).toEqual({
+      code: 405,
+      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.000Z',
+    });
+  });
+
+  it('should update expiry date and cache when conditions are met', async () => {
+    const copyOfEntityRawResponse = rawResponseEntity;
+    delete copyOfEntityRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
+    delete copyOfEntityRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfEntityRawResponse]]);
+    (databaseManager.updateExpiryDateOfEntityEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+
+    expect(databaseManager.updateExpiryDateOfEntityEdges).toHaveBeenCalledWith(
+      '2110+27733161225MSISDN',
+      '2110+27733161225MSISDN',
+      xprtnDtTm,
+    );
+    expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
   });
 });

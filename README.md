@@ -125,7 +125,10 @@ GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
 ##### b. `/v1/admin/event-flow-control/account`
 
 #### Description
-Both endpoints are responsible for storing conditions related to their specific accounts or entities and are expected to store condition edges within the in-memory system.
+
+Both endpoints are responsible for storing conditions related to their specific accounts or entities. They are expected to store condition edges within the in-memory system and have different methods assigned to each endpoint: GET, POST, and PUT.
+
+GET endpoints are used to retrieve data already stored by a POST request. You can use the SyncCache parameter to either sync active conditions or not. PUT endpoints are responsible for updating the expiry date of a specified condition.
 
 #### Flow Diagram
 ```mermaid
@@ -147,23 +150,23 @@ sequenceDiagram
 ```
 /v1/admin/event-flow-control/entity
 ```
-#### Method 1
+#### Methods FOR URL 1
 ```
-POST, GET
+POST, GET, PUT
 ```
 
 #### URL 2
 ```
 /v1/admin/event-flow-control/account
 ```
-#### Method 2
+#### Methods FOR URL 2
 ```
-POST, GET
+POST, GET, PUT
 ```
 
 **Some endpoints share properties except for ntty and acct. These properties are specific to each endpoint and indicate the governing condition**
-#### Body
-
+#### Body 
+#### URL 1, 2 POST METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `evtTp`   | Array | Yes      | Event types |
@@ -174,27 +177,48 @@ POST, GET
 | `condRsn`   | String | Yes      | Reason code. |
 | `forceCret`   | Boolean | Yes      | Flag indicating whether the entity should be created if it does not exist. |
 | `usr`   | String | Yes      | User that triggered the operation. |
-#### URL 1
+#### URL 1 POST METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `ntty`   | Object | Yes      | The entity object that the condition is governed by. |
-#### URL 2
+#### URL 2 POST METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `acct`   | Object | Yes      | The account object that the condition is governed by. |
-#### URL 3
+#### URL 1 GET METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity identifier |
 | `schmeNm`   | String | Yes      |  Scheme name of the entity |
 | `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
-#### URL 4
+#### URL 2 GET METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity ID. |
 | `schmeNm`   | String | Yes      | Scheme name of the account |
 | `agt`   | String | Yes      | proprietary agent identifier |
 | `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
+#### URL 1 PUT METHOD
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `id`   | String | Yes      | Entity identifier |
+| `schmeNm`   | String | Yes      |  Scheme name of the entity |
+| `condId`   | String | Yes      | Condition identifier  |
+#### Body data
+| Body | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `xprtnDtTm`   | String | No      | New timedate of the condition |
+#### URL 2 PUT METHOD
+| Parameter | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `id`   | String | Yes      | Entity ID. |
+| `schmeNm`   | String | Yes      | Scheme name of the account |
+| `agt`   | String | Yes      | proprietary agent identifier |
+| `condId`   | String | Yes      | Condition identifier  |
+#### Body data
+| Body | Type   | Required | Description                     |
+|-----------|--------|----------|---------------------------------|
+| `xprtnDtTm`   | String | No      | New timedate of the condition |
 
 > [!IMPORTANT]  
 > Ensure your query parameters are encoded as some properties can contain special characters. An `id` of `+12344567890` would need to be encoded as `+` is a special character.

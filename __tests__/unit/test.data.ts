@@ -37,7 +37,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmeNm: {
+          schmenm: {
             prtry: 'MSISDN',
           },
         },
@@ -78,7 +78,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmeNm: {
+          schmenm: {
             prtry: 'MSISDN',
           },
         },
@@ -120,7 +120,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmeNm: {
+          schmenm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -166,7 +166,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmeNm: {
+          schmenm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -195,7 +195,7 @@ export const accountResponse = {
         },
       },
     },
-    schmeNm: {
+    schmenm: {
       prtry: 'Mxx',
     },
   },
@@ -229,7 +229,7 @@ export const accountResponse = {
 export const entityResponse = {
   ntty: {
     id: '+27733161225',
-    schmeNm: {
+    schmenm: {
       prtry: 'MSISDN',
     },
   },

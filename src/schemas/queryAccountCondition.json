@@ -10,7 +10,7 @@
       "agt": {
         "type": "string"
       },
-      "syncCache": {
+      "synccache": {
         "type": "string",
         "enum": ["no", "all", "active", "default"]
       }

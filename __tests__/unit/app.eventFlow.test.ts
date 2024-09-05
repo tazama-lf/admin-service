@@ -307,7 +307,7 @@ describe('getConditionForEntity', () => {
   });
 
   it('should get conditions for entity', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -316,25 +316,25 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
     // Assert
     expect(result).toEqual(undefined);
   });
 
   it('should get conditions for entity and update cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'active' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'active' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'all' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'all' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'default' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' });
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -347,7 +347,7 @@ describe('getConditionForEntity', () => {
 
   it('should sync active condition by using default and environment variable', async () => {
     configuration.activeConditionsOnly = true;
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', syncCache: 'default' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' });
     configuration.activeConditionsOnly = false;
     // Assert
     expect(result).toEqual(entityResponse);
@@ -584,7 +584,7 @@ describe('getConditionForAccount', () => {
   });
 
   it('should get conditions for account', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
@@ -593,52 +593,52 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
-    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
 
     // Assert
     expect(result).toEqual(undefined);
   });
 
   it('should get conditions for account and update cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should prune active conditions for cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', syncCache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '007', syncCache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '007', synccache: 'default' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should skip caching', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '008', syncCache: 'no' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '008', synccache: 'no' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync all cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '009', syncCache: 'all' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '009', synccache: 'all' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache by using environment variable', async () => {
     configuration.activeConditionsOnly = true;
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', syncCache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'default' });
     configuration.activeConditionsOnly = false;
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache only', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', syncCache: 'active' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'active' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
@@ -647,7 +647,7 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', syncCache: 'no' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', synccache: 'no' });
 
     expect(result).toBe(undefined);
   });

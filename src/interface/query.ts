@@ -1,7 +1,7 @@
 export interface ConditionRequest {
   id: string;
   schmenm: string;
-  syncCache?: string;
+  synccache?: string;
   condid?: string;
   agt?: string;
 }

@@ -189,20 +189,20 @@ POST, GET, PUT
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity identifier |
-| `schmeNm`   | String | Yes      |  Scheme name of the entity |
-| `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
+| `schmenm`   | String | Yes      |  Scheme name of the entity |
+| `synccache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 #### URL 2 GET METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity ID. |
-| `schmeNm`   | String | Yes      | Scheme name of the account |
+| `schmenm`   | String | Yes      | Scheme name of the account |
 | `agt`   | String | Yes      | proprietary agent identifier |
-| `syncCache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
+| `synccache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
 #### URL 1 PUT METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity identifier |
-| `schmeNm`   | String | Yes      |  Scheme name of the entity |
+| `schmenm`   | String | Yes      |  Scheme name of the entity |
 | `condId`   | String | Yes      | Condition identifier  |
 #### Body data
 | Body | Type   | Required | Description                     |
@@ -212,7 +212,7 @@ POST, GET, PUT
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
 | `id`   | String | Yes      | Entity ID. |
-| `schmeNm`   | String | Yes      | Scheme name of the account |
+| `schmenm`   | String | Yes      | Scheme name of the account |
 | `agt`   | String | Yes      | proprietary agent identifier |
 | `condId`   | String | Yes      | Condition identifier  |
 #### Body data

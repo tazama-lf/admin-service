@@ -10,7 +10,7 @@ import { databaseManager, loggerService } from '.';
 import { configuration } from './config';
 import { type ConditionRequest } from './interface/query';
 import { type Report } from './interface/report.interface';
-import checkConditionValidity, { hasDateExpired, isDateValid } from './utils/condition-validation';
+import { checkConditionValidity, validateAndParseExpirationDate } from './utils/condition-validation';
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
@@ -189,18 +189,13 @@ export const handleGetConditionsForEntity = async (params: ConditionRequest): Pr
 
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
   params: ConditionRequest,
-  xprtnDtTm: string,
+  xprtnDtTm?: string,
 ): Promise<{ code: number; message: string }> => {
-  if (!xprtnDtTm) {
-    xprtnDtTm = new Date().toISOString();
-  } else {
-    if (hasDateExpired(new Date(xprtnDtTm))) {
-      return { code: 400, message: 'Expiration time date provided was before the current time date.' };
-    }
+  const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
 
-    if (!isDateValid(xprtnDtTm)) {
-      return { code: 400, message: 'Expiration time date provided was invalid.' };
-    }
+  if (!expireDateResult.isValid) {
+    loggerService.error(expireDateResult.message);
+    return { code: 400, message: expireDateResult.message };
   }
 
   const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
@@ -219,22 +214,19 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
   const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
 
   if (
-    !creditorByEdge.filter((eachDocument) => eachDocument.condition._id).length &&
-    !debtorByEdge.filter((eachDocument) => eachDocument.condition._id).length
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (
-    !creditorByEdge.filter((eachDocument) => eachDocument.result._id).length &&
-    !debtorByEdge.filter((eachDocument) => eachDocument.result._id).length
-  ) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
     return { code: 404, message: 'Entity does not exist in the database.' };
   }
 
   if (
-    creditorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length ||
-    debtorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
   ) {
     return {
       code: 405,
@@ -242,9 +234,9 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, xprtnDtTm);
+  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
 
-  if (params.condid) await databaseManager.updateCondition(params.condid, xprtnDtTm);
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
 
   const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
@@ -382,18 +374,13 @@ export const handleGetConditionsForAccount = async (params: ConditionRequest): P
 
 export const handleUpdateExpiryDateForConditionsOfAccount = async (
   params: ConditionRequest,
-  xprtnDtTm: string,
+  xprtnDtTm?: string,
 ): Promise<{ code: number; message: string }> => {
-  if (!xprtnDtTm) {
-    xprtnDtTm = new Date().toISOString();
-  } else {
-    if (hasDateExpired(new Date(xprtnDtTm))) {
-      return { code: 400, message: 'Expiration time date provided was before the current time date.' };
-    }
+  const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
 
-    if (!isDateValid(xprtnDtTm)) {
-      return { code: 400, message: 'Expiration time date provided was invalid.' };
-    }
+  if (!expireDateResult.isValid) {
+    loggerService.error(expireDateResult.message);
+    return { code: 400, message: expireDateResult.message };
   }
 
   let report: RawConditionResponse[][] = [[]];
@@ -435,9 +422,9 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, xprtnDtTm);
+  await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
 
-  if (params.condid) await databaseManager.updateCondition(params.condid, xprtnDtTm);
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {

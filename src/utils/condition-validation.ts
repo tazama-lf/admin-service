@@ -1,6 +1,6 @@
 import { type EntityCondition, type AccountCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
-const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {
+export const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {
   const nowDateTime = new Date().toISOString();
 
   if (!condition?.incptnDtTm) {
@@ -42,14 +42,40 @@ const checkConditionValidity = (condition: EntityCondition | AccountCondition): 
   }
 };
 
-export const isDateValid = (dateStr: string): boolean => {
-  const date = new Date(dateStr);
-  return !isNaN(date.getTime());
-};
+interface DateValidationResult {
+  isValid: boolean;
+  dateStr: string;
+  message: string;
+}
 
-export const hasDateExpired = (date: Date): boolean => {
+const hasDateExpired = (date: Date): boolean => {
   const now = new Date();
   return date < now;
 };
 
-export default checkConditionValidity;
+const parseDate = (dateStr: string): string | undefined => {
+  return isDateValid(dateStr) ? new Date(dateStr).toISOString() : undefined;
+};
+
+const isDateValid = (dateStr: string): boolean => {
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime());
+};
+
+export const validateAndParseExpirationDate = (dateStr?: string): DateValidationResult => {
+  if (!dateStr) {
+    return { isValid: true, dateStr: new Date().toISOString(), message: 'Expiration time date was not provided' };
+  }
+
+  const parsedDate = parseDate(dateStr);
+
+  if (!parsedDate) {
+    return { isValid: false, dateStr: new Date().toISOString(), message: 'Expiration time date provided was invalid.' };
+  }
+
+  if (hasDateExpired(new Date(parsedDate))) {
+    return { isValid: false, dateStr: parsedDate, message: 'Expiration time date provided was before the current time date.' };
+  }
+
+  return { isValid: true, dateStr: parsedDate, message: 'Validated' };
+};

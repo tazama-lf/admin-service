@@ -109,7 +109,7 @@ export const getAccountConditionsHandler = async (req: FastifyRequest, reply: Fa
 
 export const updateAccountConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update condition request');
-  const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
+  const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, expiryDate);
 
@@ -125,7 +125,7 @@ export const updateAccountConditionExpiryDateHandler = async (req: FastifyReques
 
 export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update condition request');
-  const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
+  const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, expiryDate);
 

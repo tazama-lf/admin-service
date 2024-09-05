@@ -1,8 +1,8 @@
 import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
-export const fixedDate = '2024-08-06T10:00:00.000Z';
-export const incptnDtTm = '2024-08-07T10:00:00.000Z';
-let Ximedate = '2024-08-08T10:00:00.000Z';
+export const fixedDate = '2024-08-06T10:00:00.999Z';
+export const incptnDtTm = '2024-08-07T10:00:00.999Z';
+let Ximedate = '2024-08-08T10:00:00.999Z';
 export const xprtnDtTm = Ximedate || undefined;
 
 export const rawResponseEntity = {

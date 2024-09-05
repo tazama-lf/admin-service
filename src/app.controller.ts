@@ -13,7 +13,6 @@ import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
 import { type ConditionRequest } from './interface/query';
 import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {

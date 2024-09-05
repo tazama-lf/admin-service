@@ -5,6 +5,9 @@ import queryEntityCondition from '../schemas/queryEntityCondition.json';
 import entityConditionBodySchema from '../schemas/entityCondition.json';
 import accountConditionBodySchema from '../schemas/accountCondition.json';
 import queryAccountCondition from '../schemas/queryAccountCondition.json';
+import expireAccountConditionSchema from '../schemas/expireAccountCondition.json';
+import expireEntityConditionSchema from '../schemas/expireEntityCondition.json';
+import expireDateTimeSchema from '../schemas/expireDateTime.json';
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
@@ -16,6 +19,10 @@ const queryAccountConditionSchema = { ...queryAccountCondition, $id: 'queryAccou
 const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
 const entityConditionMessageSchema = { ...entityConditionBodySchema, $id: 'entityConditionSchema' };
 const accountConditionMessageSchema = { ...accountConditionBodySchema, $id: 'accountConditionSchema' };
+const expireAccountCondition = { ...expireAccountConditionSchema, $id: 'expireAccountConditionSchema' };
+const expireEntityCondition = { ...expireEntityConditionSchema, $id: 'expireEntityConditionSchema' };
+const expireDateTime = { ...expireDateTimeSchema, $id: 'expireDateTimeSchema' };
+
 const fastify = Fastify();
 const ajv = new Ajv({
   removeAdditional: 'all',
@@ -29,6 +36,9 @@ ajv.addSchema(paramsMessageSchema);
 ajv.addSchema(queryEntityConditionSchema);
 ajv.addSchema(entityConditionMessageSchema);
 ajv.addSchema(accountConditionMessageSchema);
+ajv.addSchema(expireAccountCondition);
+ajv.addSchema(expireEntityCondition);
+ajv.addSchema(expireDateTime);
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
@@ -39,6 +49,9 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   fastify.addSchema(entityConditionMessageSchema);
   fastify.addSchema(accountConditionMessageSchema);
   fastify.addSchema(queryAccountConditionSchema);
+  fastify.addSchema(expireAccountCondition);
+  fastify.addSchema(expireEntityCondition);
+  fastify.addSchema(expireDateTime);
 
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/documentation',

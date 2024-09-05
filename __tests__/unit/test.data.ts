@@ -1,8 +1,9 @@
 import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
-export const fixedDate = '2024-08-06T10:00:00.000Z';
-export const incptnDtTm = '2024-08-07T10:00:00.000Z';
-export const xprtnDtTm = '2024-08-08T10:00:00.000Z';
+export const fixedDate = '2024-08-06T10:00:00.999Z';
+export const incptnDtTm = '2024-08-07T10:00:00.999Z';
+let Ximedate = '2024-08-08T10:00:00.999Z';
+export const xprtnDtTm = Ximedate || undefined;
 
 export const rawResponseEntity = {
   governed_as_creditor_by: [
@@ -36,7 +37,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmeNm: {
+          schmenm: {
             prtry: 'MSISDN',
           },
         },
@@ -77,7 +78,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmeNm: {
+          schmenm: {
             prtry: 'MSISDN',
           },
         },
@@ -119,7 +120,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmeNm: {
+          schmenm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -165,7 +166,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmeNm: {
+          schmenm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -194,7 +195,7 @@ export const accountResponse = {
         },
       },
     },
-    schmeNm: {
+    schmenm: {
       prtry: 'Mxx',
     },
   },
@@ -228,7 +229,7 @@ export const accountResponse = {
 export const entityResponse = {
   ntty: {
     id: '+27733161225',
-    schmeNm: {
+    schmenm: {
       prtry: 'MSISDN',
     },
   },
@@ -275,6 +276,7 @@ export const sampleEntityCondition: EntityCondition = {
   forceCret: true,
   usr: 'bob',
   creDtTm: fixedDate,
+  condId: '2110',
 };
 
 export const sampleAccountCondition: AccountCondition = {
@@ -300,4 +302,5 @@ export const sampleAccountCondition: AccountCondition = {
   forceCret: true,
   usr: 'bob',
   creDtTm: fixedDate,
+  condId: '2110',
 };

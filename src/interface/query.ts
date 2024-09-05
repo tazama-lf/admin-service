@@ -1,5 +1,7 @@
-export interface GetEntityConditions {
+export interface ConditionRequest {
   id: string;
-  schmeNm: string;
+  schmenm: string;
   syncCache?: string;
+  condid?: string;
+  agt?: string;
 }

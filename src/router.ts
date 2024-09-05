@@ -7,8 +7,10 @@ import {
   postConditionHandlerAccount,
   postConditionHandlerEntity,
   reportRequestHandler,
+  updateAccountConditionExpiryDateHandler,
+  updateEntityConditionExpiryDateHandler,
 } from './app.controller';
-import { SetOptionsBody, SetOptionsParams } from './utils/schema-utils';
+import { SetOptionsBody, SetOptionsParams, SetOptionsBodyAndParams } from './utils/schema-utils';
 
 async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', handleHealthCheck);
@@ -18,6 +20,14 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/v1/admin/event-flow-control/account', SetOptionsParams(getAccountConditionsHandler, 'queryAccountConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/entity', SetOptionsBody(postConditionHandlerEntity, 'entityConditionSchema'));
   fastify.post('/v1/admin/event-flow-control/account', SetOptionsBody(postConditionHandlerAccount, 'accountConditionSchema'));
+  fastify.put(
+    '/v1/admin/event-flow-control/entity',
+    SetOptionsBodyAndParams(updateEntityConditionExpiryDateHandler, 'expireDateTimeSchema', 'expireEntityConditionSchema'),
+  );
+  fastify.put(
+    '/v1/admin/event-flow-control/account',
+    SetOptionsBodyAndParams(updateAccountConditionExpiryDateHandler, 'expireDateTimeSchema', 'expireAccountConditionSchema'),
+  );
 }
 
 export default Routes;

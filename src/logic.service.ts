@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { type AccountCondition, type ConditionEdge, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { databaseManager, loggerService } from '.';
-import { type Report } from './interface/report.interface';
-import checkConditionValidity from './utils/condition-validation';
-import { type GetEntityConditions } from './interface/query';
-import { configuration } from './config';
-import { filterConditions } from './utils/filter-active-conditions';
-import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
-import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import {
   type AccountConditionResponse,
   type EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import { type GetAccountConditions } from './interface/queryAccountCondition';
+import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import { databaseManager, loggerService } from '.';
+import { configuration } from './config';
+import { type ConditionRequest } from './interface/query';
+import { type Report } from './interface/report.interface';
+import { checkConditionValidity, validateAndParseExpirationDate } from './utils/condition-validation';
+import { filterConditions } from './utils/filter-active-conditions';
+import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
 
 const saveConditionEdges = async (
@@ -141,13 +140,13 @@ export const handlePostConditionEntity = async (
   }
 };
 
-export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityConditionResponse | undefined> => {
+export const handleGetConditionsForEntity = async (params: ConditionRequest): Promise<EntityConditionResponse | undefined> => {
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `entities/${params.id}${params.schmeNm}`;
+    const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmeNm)) as RawConditionResponse[][];
+    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -186,6 +185,69 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
   } catch (error) {
     loggerService.error(error as Error);
   }
+};
+
+export const handleUpdateExpiryDateForConditionsOfEntity = async (
+  params: ConditionRequest,
+  xprtnDtTm?: string,
+): Promise<{ code: number; message: string }> => {
+  const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
+
+  if (!expireDateResult.isValid) {
+    loggerService.error(expireDateResult.message);
+    return { code: 400, message: expireDateResult.message };
+  }
+
+  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+
+  if (!report.length || !report[0].length || !report[0][0]) {
+    return { code: 404, message: 'No records were found in the database using the provided data.' };
+  }
+
+  const resultByEdge = report[0][0];
+
+  if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
+    return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
+  }
+
+  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+
+  if (
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
+  ) {
+    return { code: 404, message: 'Condition does not exist in the database.' };
+  }
+
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
+    return { code: 404, message: 'Entity does not exist in the database.' };
+  }
+
+  if (
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
+  ) {
+    return {
+      code: 405,
+      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
+    };
+  }
+
+  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+
+  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+
+  const retVal = parseConditionAccount(updatedReport[0]);
+
+  const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
+  const cacheKey = `entities/${params.id}${params.schmenm}`;
+
+  await updateCache(cacheKey, activeConditionsOnly);
+
+  return { code: 200, message: '' };
 };
 
 export const handlePostConditionAccount = async (
@@ -261,13 +323,16 @@ export const handlePostConditionAccount = async (
   }
 };
 
-export const handleGetConditionsForAccount = async (params: GetAccountConditions): Promise<AccountConditionResponse | undefined> => {
+export const handleGetConditionsForAccount = async (params: ConditionRequest): Promise<AccountConditionResponse | undefined> => {
   const fnName = 'getConditionsForAccount';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `accounts/${params.id}${params.schmeNm}${params.agt}`;
+    const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmeNm, params.agt)) as RawConditionResponse[][];
+    let report: RawConditionResponse[][] = [[]];
+    if (params.agt) {
+      report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    }
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -305,4 +370,72 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
   } catch (error) {
     loggerService.error(error as Error);
   }
+};
+
+export const handleUpdateExpiryDateForConditionsOfAccount = async (
+  params: ConditionRequest,
+  xprtnDtTm?: string,
+): Promise<{ code: number; message: string }> => {
+  const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
+
+  if (!expireDateResult.isValid) {
+    loggerService.error(expireDateResult.message);
+    return { code: 400, message: expireDateResult.message };
+  }
+
+  let report: RawConditionResponse[][] = [[]];
+  if (params.agt) {
+    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+  }
+
+  if (!report.length || !report[0].length || !report[0][0]) {
+    return { code: 404, message: 'No records were found in the database using the provided data.' };
+  }
+
+  const resultByEdge = report[0][0];
+
+  if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
+    return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
+  }
+
+  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+
+  if (
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
+  ) {
+    return { code: 404, message: 'Condition does not exist in the database.' };
+  }
+
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
+    return { code: 404, message: 'Account does not exist in the database.' };
+  }
+
+  if (
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
+  ) {
+    return {
+      code: 405,
+      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
+    };
+  }
+
+  await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+
+  let updatedReport: RawConditionResponse[][] = [[]];
+  if (params.agt) {
+    updatedReport = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+  }
+  const retVal = parseConditionAccount(updatedReport[0]);
+
+  const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
+  const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
+
+  await updateCache(cacheKey, activeConditionsOnly);
+
+  return { code: 200, message: '' };
 };

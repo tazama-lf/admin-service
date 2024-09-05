@@ -155,7 +155,7 @@ export const handleGetConditionsForEntity = async (params: ConditionRequest): Pr
 
     const retVal = parseConditionEntity(report[0]);
 
-    switch (params.syncCache) {
+    switch (params.synccache) {
       case 'all':
         loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
         await updateCache(cacheKey, retVal);
@@ -341,7 +341,7 @@ export const handleGetConditionsForAccount = async (params: ConditionRequest): P
 
     const retVal = parseConditionAccount(report[0]);
 
-    switch (params.syncCache) {
+    switch (params.synccache) {
       case 'all':
         loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
         await updateCache(cacheKey, retVal);

@@ -25,7 +25,7 @@ export interface IConfig {
 }
 
 export const configuration: IConfig = {
-  cacheTTL: parseInt(process.env.CACHE_TTL!, 10) || 0,
+  cacheTTL: parseInt(process.env.CACHE_TTL!, 10) || 1000,
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
   env: process.env.NODE_ENV!,
   activeConditionsOnly: process.env.ACTIVE_CONDITIONS_ONLY === 'true',

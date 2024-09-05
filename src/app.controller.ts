@@ -11,9 +11,8 @@ import {
 } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
-import { type GetEntityConditions } from './interface/query';
+import { type ConditionRequest } from './interface/query';
 import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { type GetAccountConditions } from './interface/queryAccountCondition';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -76,7 +75,7 @@ export const handleHealthCheck = async (): Promise<{ status: string }> => {
 export const getConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');
   try {
-    const data = await handleGetConditionsForEntity(req.query as GetEntityConditions);
+    const data = await handleGetConditionsForEntity(req.query as ConditionRequest);
     if (data) {
       reply.status(200);
       reply.send(data);
@@ -93,7 +92,7 @@ export const getConditionHandler = async (req: FastifyRequest, reply: FastifyRep
 export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
-    const data = await handleGetConditionsForAccount(req.query as GetAccountConditions);
+    const data = await handleGetConditionsForAccount(req.query as ConditionRequest);
     if (data) {
       reply.status(200);
       reply.send(data);
@@ -113,7 +112,7 @@ export const updateAccountConditionExpiryDateHandler = async (req: FastifyReques
   loggerService.log('Start - Handle update condition request');
   const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
   try {
-    const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as GetAccountConditions, expiryDate);
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, expiryDate);
 
     reply.status(code);
     if (code !== 200) throw Error(message);
@@ -129,7 +128,7 @@ export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest
   loggerService.log('Start - Handle update condition request');
   const expiryDate = (req.body as { xprtnDtTm: string }).xprtnDtTm;
   try {
-    const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as GetAccountConditions, expiryDate);
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, expiryDate);
 
     reply.status(code);
     if (code !== 200) throw Error(message);

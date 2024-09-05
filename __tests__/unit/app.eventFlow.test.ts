@@ -612,33 +612,33 @@ describe('getConditionForAccount', () => {
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '007', syncCache: 'default' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should skip caching', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'no' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '008', syncCache: 'no' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync all cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'all' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '009', syncCache: 'all' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache by using environment variable', async () => {
     configuration.activeConditionsOnly = true;
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', syncCache: 'default' });
     configuration.activeConditionsOnly = false;
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache only', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'active' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', syncCache: 'active' });
     // Assert
     expect(result).toEqual(accountResponse);
   });
@@ -647,7 +647,7 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '', syncCache: 'no' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', syncCache: 'no' });
 
     expect(result).toBe(undefined);
   });
@@ -655,10 +655,10 @@ describe('getConditionForAccount', () => {
 
 describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
   const params = { id: '2110', schmenm: 'scheme', agt: 'agent', condid: '2110' };
-  const xprtnDtTm = '2024-09-05T12:00:00Z';
+  const xprtnDtTm = '2024-10-05T23:00:00.999Z';
 
   beforeEach(() => {
-    jest.spyOn(Date, 'now').mockImplementation(() => 1725440869690);
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   afterEach(() => {
@@ -673,6 +673,39 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     expect(result).toEqual({
       code: 404,
       message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is not provided', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, '');
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with a date that is older than current time date', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, '2024-07-06T10:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was before the current time date.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with invalid date', async () => {
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, '2024-07-06T50:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was invalid.',
     });
   });
 
@@ -727,7 +760,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
     expect(result).toEqual({
       code: 405,
-      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.000Z',
+      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.999Z',
     });
   });
 
@@ -754,10 +787,10 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
 describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   const params = { id: '2110', schmenm: 'scheme', condid: '2110' };
-  const xprtnDtTm = '2024-09-05T12:00:00Z';
+  const xprtnDtTm = '2024-09-08T10:00:00.999Z';
 
   beforeEach(() => {
-    jest.spyOn(Date, 'now').mockImplementation(() => 1725440869690);
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   afterEach(() => {
@@ -772,6 +805,61 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     expect(result).toEqual({
       code: 404,
       message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is not provided', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '');
+
+    expect(result).toEqual({
+      code: 404,
+      message: 'No records were found in the database using the provided data.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with a date that is older than current time date', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '2024-07-06T10:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was before the current time date.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with invalid date', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '2024-07-06T50:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was invalid.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with a date that is older than current time date', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '2024-07-06T10:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was before the current time date.',
+    });
+  });
+
+  it('should handle when xprtnDtTm is provided but with invalid date', async () => {
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '2024-07-06T50:00:00.999Z');
+
+    expect(result).toEqual({
+      code: 400,
+      message: 'Expiration time date provided was invalid.',
     });
   });
 
@@ -826,7 +914,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
     expect(result).toEqual({
       code: 405,
-      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.000Z',
+      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.999Z',
     });
   });
 

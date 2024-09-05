@@ -8,10 +8,9 @@ import {
 import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { databaseManager, loggerService } from '.';
 import { configuration } from './config';
-import { type GetEntityConditions } from './interface/query';
-import { type GetAccountConditions } from './interface/queryAccountCondition';
+import { type ConditionRequest } from './interface/query';
 import { type Report } from './interface/report.interface';
-import checkConditionValidity, { validateExpiryTimeDate } from './utils/condition-validation';
+import checkConditionValidity, { hasDateExpired, isDateValid } from './utils/condition-validation';
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
@@ -141,7 +140,7 @@ export const handlePostConditionEntity = async (
   }
 };
 
-export const handleGetConditionsForEntity = async (params: GetEntityConditions): Promise<EntityConditionResponse | undefined> => {
+export const handleGetConditionsForEntity = async (params: ConditionRequest): Promise<EntityConditionResponse | undefined> => {
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
@@ -189,10 +188,20 @@ export const handleGetConditionsForEntity = async (params: GetEntityConditions):
 };
 
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
-  params: GetEntityConditions,
+  params: ConditionRequest,
   xprtnDtTm: string,
 ): Promise<{ code: number; message: string }> => {
-  xprtnDtTm = validateExpiryTimeDate(xprtnDtTm);
+  if (!xprtnDtTm) {
+    xprtnDtTm = new Date().toISOString();
+  } else {
+    if (hasDateExpired(new Date(xprtnDtTm))) {
+      return { code: 400, message: 'Expiration time date provided was before the current time date.' };
+    }
+
+    if (!isDateValid(xprtnDtTm)) {
+      return { code: 400, message: 'Expiration time date provided was invalid.' };
+    }
+  }
 
   const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
@@ -322,13 +331,16 @@ export const handlePostConditionAccount = async (
   }
 };
 
-export const handleGetConditionsForAccount = async (params: GetAccountConditions): Promise<AccountConditionResponse | undefined> => {
+export const handleGetConditionsForAccount = async (params: ConditionRequest): Promise<AccountConditionResponse | undefined> => {
   const fnName = 'getConditionsForAccount';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
     const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-    const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    let report: RawConditionResponse[][] = [[]];
+    if (params.agt) {
+      report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    }
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
@@ -369,12 +381,25 @@ export const handleGetConditionsForAccount = async (params: GetAccountConditions
 };
 
 export const handleUpdateExpiryDateForConditionsOfAccount = async (
-  params: GetAccountConditions,
+  params: ConditionRequest,
   xprtnDtTm: string,
 ): Promise<{ code: number; message: string }> => {
-  xprtnDtTm = validateExpiryTimeDate(xprtnDtTm);
+  if (!xprtnDtTm) {
+    xprtnDtTm = new Date().toISOString();
+  } else {
+    if (hasDateExpired(new Date(xprtnDtTm))) {
+      return { code: 400, message: 'Expiration time date provided was before the current time date.' };
+    }
 
-  const report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    if (!isDateValid(xprtnDtTm)) {
+      return { code: 400, message: 'Expiration time date provided was invalid.' };
+    }
+  }
+
+  let report: RawConditionResponse[][] = [[]];
+  if (params.agt) {
+    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+  }
 
   if (!report.length || !report[0].length || !report[0][0]) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
@@ -390,22 +415,19 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
   const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
 
   if (
-    !creditorByEdge.filter((eachDocument) => eachDocument.condition._id).length &&
-    !debtorByEdge.filter((eachDocument) => eachDocument.condition._id).length
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (
-    !creditorByEdge.filter((eachDocument) => eachDocument.result._id).length &&
-    !debtorByEdge.filter((eachDocument) => eachDocument.result._id).length
-  ) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
     return { code: 404, message: 'Account does not exist in the database.' };
   }
 
   if (
-    creditorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length ||
-    debtorByEdge.filter((eachDocument) => eachDocument.condition.xprtnDtTm).length
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
   ) {
     return {
       code: 405,
@@ -417,12 +439,10 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   if (params.condid) await databaseManager.updateCondition(params.condid, xprtnDtTm);
 
-  const updatedReport = (await databaseManager.getAccountConditionsByGraph(
-    params.id,
-    params.schmenm,
-    params.agt,
-  )) as RawConditionResponse[][];
-
+  let updatedReport: RawConditionResponse[][] = [[]];
+  if (params.agt) {
+    updatedReport = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+  }
   const retVal = parseConditionAccount(updatedReport[0]);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };

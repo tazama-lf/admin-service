@@ -42,21 +42,14 @@ const checkConditionValidity = (condition: EntityCondition | AccountCondition): 
   }
 };
 
-export const validateExpiryTimeDate = (xprtnDtTm: string): string => {
-  if (xprtnDtTm) {
-    const expirationDate = new Date(xprtnDtTm);
-    if (isNaN(expirationDate.getTime())) {
-      throw Error('Error: Expiration date provided was invalid.');
-    }
-    if (expirationDate.getTime() < Date.now()) {
-      throw Error('Error: Expiration date must be after current time and date');
-    }
-  }
+export const isDateValid = (dateStr: string): boolean => {
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime());
+};
 
-  if (!xprtnDtTm) {
-    return new Date().toISOString();
-  }
-  return xprtnDtTm;
+export const hasDateExpired = (date: Date): boolean => {
+  const now = new Date();
+  return date < now;
 };
 
 export default checkConditionValidity;

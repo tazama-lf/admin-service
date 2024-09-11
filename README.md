@@ -322,4 +322,13 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
       "message": "Internal server error occurred."
     }
     ```
+    
+### Refreshing cache
 
+```http
+PUT /v1/admin/event-flow-control/cache HTTP/1.1
+```
+
+#### Response
+
+- **Status 204 No Content:** Cache has been updated

@@ -6,6 +6,7 @@ import {
   handleGetConditionsForEntity,
   handlePostConditionAccount,
   handlePostConditionEntity,
+  handleRefreshCache,
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from '../../src/logic.service';
@@ -38,6 +39,7 @@ jest.mock('../../src/', () => ({
     getEntityConditionsByGraph: jest.fn(),
     getAccountConditionsByGraph: jest.fn(),
     getEntity: jest.fn(),
+    getConditions: jest.fn(),
     getAccount: jest.fn(),
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
@@ -893,5 +895,97 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm);
 
     expect(result).toEqual({ code: 200, message: '' });
+  });
+});
+
+describe('handleCacheUpdate', () => {
+  const params = { id: '2110', schmenm: 'scheme', condid: '2110' };
+  const xprtnDtTm = '2025-09-08T10:00:00.999Z';
+
+  beforeEach(() => {
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(xprtnDtTm);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should cache conditions', async () => {
+    (databaseManager.getConditions as jest.Mock).mockResolvedValue([
+      [
+        {
+          _key: 'a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+          _id: 'conditions/a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+          _rev: '_ibU2C8y---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'non-overridable-block',
+          prsptv: 'creditor',
+          incptnDtTm: '2024-09-10T00:00:00.000Z',
+          condRsn: 'R001',
+          acct: {
+            id: '1010111011',
+            schmeNm: {
+              prtry: 'Mxx',
+            },
+            agt: {
+              finInstnId: {
+                clrSysMmbId: {
+                  mmbId: 'dfsp028',
+                },
+              },
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-09T07:38:16.421Z',
+          condId: 'a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+        },
+        {
+          _key: 'c859d422-d67f-454e-aae2-5011b0b16af2',
+          _id: 'conditions/c859d422-d67f-454e-aae2-5011b0b16af2',
+          _rev: '_ibU2KsK---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-17T21:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733861223',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-09T07:38:24.349Z',
+          condId: 'c859d422-d67f-454e-aae2-5011b0b16af2',
+        },
+        {
+          _key: '62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+          _id: 'conditions/62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+          _rev: '_ibqTs2y---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-17T21:00:00.999Z',
+          xprtnDtTm: '2024-10-10T21:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733861223',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-10T08:38:40.265Z',
+          condId: '62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+        },
+      ],
+    ]);
+
+    const result = await handleRefreshCache(true, 12);
+
+    expect(result).toBeUndefined();
   });
 });

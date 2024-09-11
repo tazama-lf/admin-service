@@ -5,7 +5,7 @@ import {
   type AccountConditionResponse,
   type EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import { type Acct, type Ntty, type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { databaseManager, loggerService } from '.';
 import { configuration } from './config';
 import { type ConditionRequest } from './interface/query';
@@ -14,6 +14,7 @@ import { checkConditionValidity, validateAndParseExpirationDate } from './utils/
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
+import { createCacheConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -319,6 +320,118 @@ export const handlePostConditionAccount = async (
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error: posting condition for account with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Promise<void> => {
+  try {
+    const data = (await databaseManager.getConditionsByGraph(activeOnly)) as RawConditionResponse[][];
+    if (!data.length || !data[0].length) {
+      return; // no conditions
+    }
+
+    const items = new Map<Ntty | Acct, RawConditionResponse[]>();
+    // need a list of entity conditions and account conditions
+    const response = data[0][0];
+
+    for (const creditorAccountConditions of response.governed_as_creditor_account_by) {
+      if ('acct' in creditorAccountConditions.condition) {
+        const acct = creditorAccountConditions.condition.acct;
+        const value = items.get(acct);
+        const resp: RawConditionResponse = {
+          governed_as_creditor_account_by: response.governed_as_creditor_account_by,
+          governed_as_creditor_by: [],
+          governed_as_debtor_account_by: [],
+          governed_as_debtor_by: [],
+        };
+        if (value) {
+          value.push(resp);
+        } else {
+          items.set(acct, [resp]);
+        }
+      }
+    }
+
+    for (const creditorAccountConditions of response.governed_as_debtor_account_by) {
+      if ('acct' in creditorAccountConditions.condition) {
+        const acct = creditorAccountConditions.condition.acct;
+        const value = items.get(acct);
+        const resp: RawConditionResponse = {
+          governed_as_creditor_account_by: [],
+          governed_as_creditor_by: [],
+          governed_as_debtor_account_by: response.governed_as_debtor_account_by,
+          governed_as_debtor_by: [],
+        };
+        if (value) {
+          value.push(resp);
+        } else {
+          items.set(acct, [resp]);
+        }
+      }
+    }
+
+    for (const creditorAccountConditions of response.governed_as_creditor_by) {
+      if ('ntty' in creditorAccountConditions.condition) {
+        const ntty = creditorAccountConditions.condition.ntty;
+        const value = items.get(ntty);
+        const resp: RawConditionResponse = {
+          governed_as_creditor_account_by: [],
+          governed_as_creditor_by: response.governed_as_creditor_by,
+          governed_as_debtor_account_by: [],
+          governed_as_debtor_by: [],
+        };
+        if (value) {
+          value.push(resp);
+        } else {
+          items.set(ntty, [resp]);
+        }
+      }
+    }
+
+    for (const creditorAccountConditions of response.governed_as_debtor_by) {
+      if ('ntty' in creditorAccountConditions.condition) {
+        const ntty = creditorAccountConditions.condition.ntty;
+        const value = items.get(ntty);
+        const resp: RawConditionResponse = {
+          governed_as_creditor_account_by: [],
+          governed_as_creditor_by: [],
+          governed_as_debtor_account_by: [],
+          governed_as_debtor_by: response.governed_as_debtor_by,
+        };
+        if (value) {
+          value.push(resp);
+        } else {
+          items.set(ntty, [resp]);
+        }
+      }
+    }
+    interface Res {
+      acc: AccountConditionResponse[];
+      entity: EntityConditionResponse[];
+    }
+    const conditions: Res = { acc: [], entity: [] };
+
+    for (const [key, value] of items.entries()) {
+      if ('agt' in key) {
+        conditions.acc.push(parseConditionAccount(value));
+      } else {
+        conditions.entity.push(parseConditionEntity(value));
+      }
+    }
+
+    const entity = parseConditionEntity(data[0]);
+    const account = parseConditionAccount(data[0]);
+    const buf = createCacheConditionsBuffer({ account, entity });
+
+    if (buf) {
+      await databaseManager.set(`conditions:expired=${activeOnly}`, buf, ttl);
+    }
+
+    loggerService.log('received');
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`refreshing cache: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

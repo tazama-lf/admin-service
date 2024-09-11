@@ -8,11 +8,13 @@ import {
   handleGetConditionsForAccount,
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
+  handleRefreshCache,
 } from './logic.service';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { loggerService } from '.';
 import { type ConditionRequest } from './interface/query';
 import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { configuration } from './config';
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
@@ -62,6 +64,21 @@ export const postConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
     reply.send(err);
   } finally {
     loggerService.log('End - Handle saving account condition request');
+  }
+};
+
+export const putRefreshCache = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle cache refresh');
+  try {
+    const ttl = configuration.cacheTTL;
+    const activeOnly = configuration.activeConditionsOnly;
+    await handleRefreshCache(activeOnly, ttl);
+    reply.status(204);
+  } catch (err) {
+    reply.status(500);
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle cache refresh');
   }
 };
 

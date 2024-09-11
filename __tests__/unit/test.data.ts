@@ -37,7 +37,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -78,7 +78,7 @@ export const rawResponseEntity = {
         condRsn: 'R001',
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -91,7 +91,7 @@ export const rawResponseEntity = {
 };
 
 export const rawResponseAccount = {
-  governed_as_creditor_by: [
+  governed_as_creditor_account_by: [
     {
       edge: {
         _key: '21101010101010Mxxdfsp001',
@@ -120,7 +120,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmenm: {
+          schmeNm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -137,7 +137,7 @@ export const rawResponseAccount = {
       },
     },
   ],
-  governed_as_debtor_by: [
+  governed_as_debtor_account_by: [
     {
       edge: {
         _key: '21101010101010Mxxdfsp001',
@@ -166,7 +166,7 @@ export const rawResponseAccount = {
         condRsn: 'R001',
         acct: {
           id: '1010101010',
-          schmenm: {
+          schmeNm: {
             prtry: 'Mxx',
           },
           agt: {
@@ -195,7 +195,7 @@ export const accountResponse = {
         },
       },
     },
-    schmenm: {
+    schmeNm: {
       prtry: 'Mxx',
     },
   },
@@ -210,13 +210,13 @@ export const accountResponse = {
       usr: 'bob',
       prsptvs: [
         {
-          prsptv: 'governed_as_creditor_by',
+          prsptv: 'governed_as_creditor_account_by',
           evtTp: ['pacs.008.001.10'],
           incptnDtTm,
           xprtnDtTm,
         },
         {
-          prsptv: 'governed_as_debtor_by',
+          prsptv: 'governed_as_debtor_account_by',
           evtTp: ['pacs.008.001.10'],
           incptnDtTm,
           xprtnDtTm,
@@ -229,7 +229,7 @@ export const accountResponse = {
 export const entityResponse = {
   ntty: {
     id: '+27733161225',
-    schmenm: {
+    schmeNm: {
       prtry: 'MSISDN',
     },
   },
@@ -287,7 +287,7 @@ export const sampleAccountCondition: AccountCondition = {
   xprtnDtTm,
   condRsn: 'R001',
   acct: {
-    id: '1010101012',
+    id: '1010101010',
     schmeNm: {
       prtry: 'Mxx',
     },

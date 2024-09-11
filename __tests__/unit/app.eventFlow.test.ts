@@ -120,7 +120,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], ntty: { id: '+27733161225', schmenm: { prtry: 'MSISDN' } } },
+      result: { conditions: [], ntty: { id: '+27733161225', schmeNm: { prtry: 'MSISDN' } } },
     });
   });
 
@@ -145,7 +145,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -175,7 +175,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -222,7 +222,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -282,7 +282,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -376,7 +376,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
-      return Promise.resolve([[rawResponseEntity]]);
+      return Promise.resolve([[rawResponseAccount]]);
     });
 
     jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
@@ -406,7 +406,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -429,7 +429,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -451,7 +451,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -488,6 +488,7 @@ describe('handlePostConditionAccount', () => {
       message: 'New condition was saved successfully.',
       result: {
         conditions: [],
+        acct: sampleAccountCondition.acct,
       },
     });
   });
@@ -506,13 +507,13 @@ describe('handlePostConditionAccount', () => {
     // Arrange
     const copyofRawResponseAccount = JSON.parse(JSON.stringify(rawResponseAccount));
 
-    copyofRawResponseAccount.governed_as_creditor_by.push({
-      ...copyofRawResponseAccount.governed_as_debtor_by[0],
-      condition: { ...copyofRawResponseAccount.governed_as_debtor_by[0].condition, _key: '1324' },
+    copyofRawResponseAccount.governed_as_creditor_account_by.push({
+      ...copyofRawResponseAccount.governed_as_debtor_account_by[0],
+      condition: { ...copyofRawResponseAccount.governed_as_debtor_account_by[0].condition, _key: '1324' },
     });
-    copyofRawResponseAccount.governed_as_debtor_by.push({
-      ...copyofRawResponseAccount.governed_as_debtor_by[0],
-      condition: { ...copyofRawResponseAccount.governed_as_debtor_by[0].condition, _key: '6324' },
+    copyofRawResponseAccount.governed_as_debtor_account_by.push({
+      ...copyofRawResponseAccount.governed_as_debtor_account_by[0],
+      condition: { ...copyofRawResponseAccount.governed_as_debtor_account_by[0].condition, _key: '6324' },
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementationOnce(() => {
@@ -536,7 +537,7 @@ describe('handlePostConditionAccount', () => {
             },
           },
           id: '1010101010',
-          schmenm: {
+          schmeNm: {
             prtry: 'Mxx',
           },
         },
@@ -700,7 +701,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if no active conditions exist for the account', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [], governed_as_debtor_by: [] }],
+      [{ governed_as_creditor_account_by: [], governed_as_debtor_account_by: [] }],
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -713,7 +714,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if condition does not exist in the database', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [{ condition: { _key: '' } }], governed_as_debtor_by: [{ condition: { _key: '' } }] }],
+      [{ governed_as_creditor_account_by: [{ condition: { _key: '' } }], governed_as_debtor_account_by: [{ condition: { _key: '' } }] }],
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -728,8 +729,8 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
       [
         {
-          governed_as_creditor_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
-          governed_as_debtor_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
+          governed_as_creditor_account_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
+          governed_as_debtor_account_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
         },
       ],
     ]);
@@ -755,8 +756,8 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should update expiry date and cache when conditions are met', async () => {
     const copyOfAccountRawResponse = rawResponseAccount;
-    delete copyOfAccountRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
-    delete copyOfAccountRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
+    delete copyOfAccountRawResponse.governed_as_creditor_account_by[0].condition.xprtnDtTm;
+    delete copyOfAccountRawResponse.governed_as_debtor_account_by[0].condition.xprtnDtTm;
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfAccountRawResponse]]);
     (databaseManager.updateExpiryDateOfAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');

@@ -6,6 +6,7 @@ import {
   handleGetConditionsForEntity,
   handlePostConditionAccount,
   handlePostConditionEntity,
+  handleRefreshCache,
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from '../../src/logic.service';
@@ -38,6 +39,7 @@ jest.mock('../../src/', () => ({
     getEntityConditionsByGraph: jest.fn(),
     getAccountConditionsByGraph: jest.fn(),
     getEntity: jest.fn(),
+    getConditions: jest.fn(),
     getAccount: jest.fn(),
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
@@ -120,7 +122,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], ntty: { id: '+27733161225', schmenm: { prtry: 'MSISDN' } } },
+      result: { conditions: [], ntty: { id: '+27733161225', schmeNm: { prtry: 'MSISDN' } } },
     });
   });
 
@@ -145,7 +147,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -175,7 +177,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -222,7 +224,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -282,7 +284,7 @@ describe('handlePostConditionEntity', () => {
         conditions: [],
         ntty: {
           id: '+27733161225',
-          schmenm: {
+          schmeNm: {
             prtry: 'MSISDN',
           },
         },
@@ -376,7 +378,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
-      return Promise.resolve([[rawResponseEntity]]);
+      return Promise.resolve([[rawResponseAccount]]);
     });
 
     jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
@@ -406,7 +408,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -429,7 +431,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -451,7 +453,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [] },
+      result: { conditions: [], acct: sampleAccountCondition.acct },
     });
   });
 
@@ -488,6 +490,7 @@ describe('handlePostConditionAccount', () => {
       message: 'New condition was saved successfully.',
       result: {
         conditions: [],
+        acct: sampleAccountCondition.acct,
       },
     });
   });
@@ -506,13 +509,13 @@ describe('handlePostConditionAccount', () => {
     // Arrange
     const copyofRawResponseAccount = JSON.parse(JSON.stringify(rawResponseAccount));
 
-    copyofRawResponseAccount.governed_as_creditor_by.push({
-      ...copyofRawResponseAccount.governed_as_debtor_by[0],
-      condition: { ...copyofRawResponseAccount.governed_as_debtor_by[0].condition, _key: '1324' },
+    copyofRawResponseAccount.governed_as_creditor_account_by.push({
+      ...copyofRawResponseAccount.governed_as_debtor_account_by[0],
+      condition: { ...copyofRawResponseAccount.governed_as_debtor_account_by[0].condition, _key: '1324' },
     });
-    copyofRawResponseAccount.governed_as_debtor_by.push({
-      ...copyofRawResponseAccount.governed_as_debtor_by[0],
-      condition: { ...copyofRawResponseAccount.governed_as_debtor_by[0].condition, _key: '6324' },
+    copyofRawResponseAccount.governed_as_debtor_account_by.push({
+      ...copyofRawResponseAccount.governed_as_debtor_account_by[0],
+      condition: { ...copyofRawResponseAccount.governed_as_debtor_account_by[0].condition, _key: '6324' },
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementationOnce(() => {
@@ -536,7 +539,7 @@ describe('handlePostConditionAccount', () => {
             },
           },
           id: '1010101010',
-          schmenm: {
+          schmeNm: {
             prtry: 'Mxx',
           },
         },
@@ -700,7 +703,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if no active conditions exist for the account', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [], governed_as_debtor_by: [] }],
+      [{ governed_as_creditor_account_by: [], governed_as_debtor_account_by: [] }],
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -713,7 +716,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if condition does not exist in the database', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [{ condition: { _key: '' } }], governed_as_debtor_by: [{ condition: { _key: '' } }] }],
+      [{ governed_as_creditor_account_by: [{ condition: { _key: '' } }], governed_as_debtor_account_by: [{ condition: { _key: '' } }] }],
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -728,8 +731,8 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
       [
         {
-          governed_as_creditor_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
-          governed_as_debtor_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
+          governed_as_creditor_account_by: [{ condition: { _key: '2110', _id: 'test1' }, result: {} }],
+          governed_as_debtor_account_by: [{ condition: { _key: '2110', _id: 'test2' }, result: {} }],
         },
       ],
     ]);
@@ -755,8 +758,8 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should update expiry date and cache when conditions are met', async () => {
     const copyOfAccountRawResponse = rawResponseAccount;
-    delete copyOfAccountRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
-    delete copyOfAccountRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
+    delete copyOfAccountRawResponse.governed_as_creditor_account_by[0].condition.xprtnDtTm;
+    delete copyOfAccountRawResponse.governed_as_debtor_account_by[0].condition.xprtnDtTm;
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfAccountRawResponse]]);
     (databaseManager.updateExpiryDateOfAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
@@ -892,5 +895,97 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm);
 
     expect(result).toEqual({ code: 200, message: '' });
+  });
+});
+
+describe('handleCacheUpdate', () => {
+  const params = { id: '2110', schmenm: 'scheme', condid: '2110' };
+  const xprtnDtTm = '2025-09-08T10:00:00.999Z';
+
+  beforeEach(() => {
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(xprtnDtTm);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should cache conditions', async () => {
+    (databaseManager.getConditions as jest.Mock).mockResolvedValue([
+      [
+        {
+          _key: 'a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+          _id: 'conditions/a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+          _rev: '_ibU2C8y---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'non-overridable-block',
+          prsptv: 'creditor',
+          incptnDtTm: '2024-09-10T00:00:00.000Z',
+          condRsn: 'R001',
+          acct: {
+            id: '1010111011',
+            schmeNm: {
+              prtry: 'Mxx',
+            },
+            agt: {
+              finInstnId: {
+                clrSysMmbId: {
+                  mmbId: 'dfsp028',
+                },
+              },
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-09T07:38:16.421Z',
+          condId: 'a66e78a0-2508-4fca-aac3-3207d8d2f88b',
+        },
+        {
+          _key: 'c859d422-d67f-454e-aae2-5011b0b16af2',
+          _id: 'conditions/c859d422-d67f-454e-aae2-5011b0b16af2',
+          _rev: '_ibU2KsK---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-17T21:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733861223',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-09T07:38:24.349Z',
+          condId: 'c859d422-d67f-454e-aae2-5011b0b16af2',
+        },
+        {
+          _key: '62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+          _id: 'conditions/62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+          _rev: '_ibqTs2y---',
+          evtTp: ['pacs.008.001.10'],
+          condTp: 'overridable-block',
+          prsptv: 'both',
+          incptnDtTm: '2024-09-17T21:00:00.999Z',
+          xprtnDtTm: '2024-10-10T21:00:00.999Z',
+          condRsn: 'R001',
+          ntty: {
+            id: '+27733861223',
+            schmeNm: {
+              prtry: 'MSISDN',
+            },
+          },
+          forceCret: true,
+          usr: 'bob',
+          creDtTm: '2024-09-10T08:38:40.265Z',
+          condId: '62b21fc0-5f4f-4f49-9cb0-c69e0123b3ec',
+        },
+      ],
+    ]);
+
+    const result = await handleRefreshCache(true, 12);
+
+    expect(result).toBeUndefined();
   });
 });

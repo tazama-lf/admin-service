@@ -48,7 +48,7 @@ export const parseConditionAccount = (input: RawConditionResponse[]): AccountCon
   const conditionsById: Record<string, ConditionDetails> = {};
   // Process input
   input.forEach((item) => {
-    const fields = ['governed_as_creditor_by', 'governed_as_debtor_by'];
+    const fields = ['governed_as_creditor_account_by', 'governed_as_debtor_account_by'];
     fields.forEach((key) => {
       const fieldName = key as keyof RawConditionResponse;
 

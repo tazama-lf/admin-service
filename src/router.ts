@@ -6,6 +6,7 @@ import {
   handleHealthCheck,
   postConditionHandlerAccount,
   postConditionHandlerEntity,
+  putRefreshCache,
   reportRequestHandler,
   updateAccountConditionExpiryDateHandler,
   updateEntityConditionExpiryDateHandler,
@@ -28,6 +29,7 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
     '/v1/admin/event-flow-control/account',
     SetOptionsBodyAndParams(updateAccountConditionExpiryDateHandler, 'expireDateTimeSchema', 'expireAccountConditionSchema'),
   );
+  fastify.put('/v1/admin/event-flow-control/cache', putRefreshCache);
 }
 
 export default Routes;

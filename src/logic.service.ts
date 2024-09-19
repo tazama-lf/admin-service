@@ -14,6 +14,7 @@ import { checkConditionValidity, validateAndParseExpirationDate } from './utils/
 import { filterConditions } from './utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
 import { updateCache } from './utils/update-cache';
+import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -240,7 +241,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
-  const retVal = parseConditionAccount(updatedReport[0]);
+  const retVal = parseConditionEntity(updatedReport[0]);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
   const cacheKey = `entities/${params.id}${params.schmenm}`;
@@ -323,6 +324,28 @@ export const handlePostConditionAccount = async (
   }
 };
 
+export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Promise<void> => {
+  try {
+    const data = (await databaseManager.getConditions(activeOnly)) as Array<Array<EntityCondition | AccountCondition>>;
+    if (!data.length || !data[0].length) {
+      return; // no conditions
+    }
+
+    const buf = createSimpleConditionsBuffer(data[0]);
+
+    if (buf) {
+      await databaseManager.set(`conditions:expired=${activeOnly}`, buf, ttl);
+      loggerService.log('cache updated');
+    } else {
+      loggerService.error('could not encode data to cache');
+    }
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`refreshing cache: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
 export const handleGetConditionsForAccount = async (params: ConditionRequest): Promise<AccountConditionResponse | undefined> => {
   const fnName = 'getConditionsForAccount';
   try {
@@ -394,12 +417,12 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   const resultByEdge = report[0][0];
 
-  if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
+  if (!resultByEdge.governed_as_creditor_account_by.length && !resultByEdge.governed_as_debtor_account_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
   }
 
-  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
-  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const creditorByEdge = resultByEdge.governed_as_creditor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
 
   if (
     !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&

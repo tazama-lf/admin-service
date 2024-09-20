@@ -22,6 +22,7 @@ export interface IConfig {
   };
   db: Required<AppDatabaseServices>;
   cacheTTL: number;
+  authentication: boolean;
 }
 
 export const configuration: IConfig = {
@@ -29,6 +30,7 @@ export const configuration: IConfig = {
   maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
   env: process.env.NODE_ENV!,
   activeConditionsOnly: process.env.ACTIVE_CONDITIONS_ONLY === 'true',
+  authentication: process.env.AUTHENTICATED === 'true',
   service: {
     port: parseInt(process.env.PORT!, 10) || 3000,
     host: process.env.HOST! || '127.0.0.1',

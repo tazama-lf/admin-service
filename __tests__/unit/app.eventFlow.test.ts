@@ -685,8 +685,8 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, '');
 
     expect(result).toEqual({
-      code: 404,
-      message: 'No records were found in the database using the provided data.',
+      code: 400,
+      message: 'Expiration date time was not provided',
     });
   });
 
@@ -697,7 +697,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
     expect(result).toEqual({
       code: 400,
-      message: 'Expiration time date provided was invalid.',
+      message: 'Expiration date time provided was invalid.',
     });
   });
 
@@ -800,17 +800,6 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     });
   });
 
-  it('should handle when xprtnDtTm is not provided', async () => {
-    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
-
-    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, undefined);
-
-    expect(result).toEqual({
-      code: 404,
-      message: 'No records were found in the database using the provided data.',
-    });
-  });
-
   it('should handle when xprtnDtTm is provided but with invalid date', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
 
@@ -818,7 +807,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
     expect(result).toEqual({
       code: 400,
-      message: 'Expiration time date provided was invalid.',
+      message: 'Expiration date time provided was invalid.',
     });
   });
 

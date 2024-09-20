@@ -194,7 +194,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 ): Promise<{ code: number; message: string }> => {
   const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
 
-  if (!expireDateResult.isValid) {
+  if (!expireDateResult.dateStr) {
     loggerService.error(expireDateResult.message);
     return { code: 400, message: expireDateResult.message };
   }
@@ -401,7 +401,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 ): Promise<{ code: number; message: string }> => {
   const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
 
-  if (!expireDateResult.isValid) {
+  if (!expireDateResult.dateStr) {
     loggerService.error(expireDateResult.message);
     return { code: 400, message: expireDateResult.message };
   }

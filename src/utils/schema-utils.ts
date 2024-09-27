@@ -1,39 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
-import { type RouteHandlerMethod } from 'fastify';
+import { type FastifyReply, type FastifyRequest, type RouteHandlerMethod } from 'fastify';
 import { type FastifySchema } from 'fastify/types/schema';
+import { loggerService } from '..';
+import { configuration } from '../config';
+import { tokenHandler } from '../auth/authHandler';
 
-export const SetOptionsBody = (
-  handler: RouteHandlerMethod,
-  bodySchemaName: string,
-): { handler: RouteHandlerMethod; schema: FastifySchema } => {
-  const schema: FastifySchema = { body: { $ref: `${bodySchemaName}#` } };
-
-  return {
-    handler,
-    schema,
-  };
-};
-
-export const SetOptionsParams = (
-  handler: RouteHandlerMethod,
-  paramSchemaName: string,
-): { handler: RouteHandlerMethod; schema: FastifySchema } => {
-  const schema: FastifySchema = { querystring: { $ref: `${paramSchemaName}#` } };
-
-  return {
-    handler,
-    schema,
-  };
-};
+type preHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 
 export const SetOptionsBodyAndParams = (
   handler: RouteHandlerMethod,
-  bodySchemaName: string,
-  paramSchemaName: string,
-): { handler: RouteHandlerMethod; schema: FastifySchema } => {
-  const schema: FastifySchema = { querystring: { $ref: `${paramSchemaName}#` }, body: { $ref: `${bodySchemaName}#` } };
+  claim: string,
+  bodySchemaName?: string,
+  paramSchemaName?: string,
+): { preHandler?: preHandler; handler: RouteHandlerMethod; schema: FastifySchema } => {
+  loggerService.debug(`Authentication is ${configuration.authentication ? 'ENABLED' : 'DISABLED'} for ${handler.name}`);
+  const preHandler = configuration.authentication ? tokenHandler(claim) : undefined;
+  const querystring = paramSchemaName ? { querystring: { $ref: `${paramSchemaName}#` } } : undefined;
+  const body = bodySchemaName ? { body: { $ref: `${bodySchemaName}#` } } : undefined;
+  const schema: FastifySchema = { ...querystring, ...body };
 
   return {
+    preHandler,
     handler,
     schema,
   };

@@ -3,20 +3,31 @@ import { type EntityCondition, type AccountCondition } from '@tazama-lf/frms-coe
 export const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {
   const nowDateTime = new Date().toISOString();
 
-  if (!condition?.incptnDtTm) {
-    condition.incptnDtTm = nowDateTime;
+  const incptnDtTm = isDateValid(condition.incptnDtTm);
+  if (!incptnDtTm) {
+    throw Error(`Error: the provided incptnDtTm: '${condition.incptnDtTm}' is invalid`);
   }
+  condition.incptnDtTm = incptnDtTm.toISOString();
 
   if (condition.evtTp.length > 1 && condition.evtTp.includes('all')) {
     throw Error('Error: event type "evtTp" can not specify the value "all" as well as specific event types');
   }
 
   if (condition?.incptnDtTm < nowDateTime) {
-    throw Error('Error: Inception date cannot be past the current time.');
+    throw Error('Error: Inception date cannot be in the past');
   }
 
-  if (condition.condTp === 'override' && !condition?.xprtnDtTm) {
-    throw Error('Error: Expiration date needs to be provided for override conditions.');
+  if (condition.condTp === 'override') {
+    if (condition.xprtnDtTm) {
+      const xprtnDtTm = isDateValid(condition.xprtnDtTm);
+      if (!xprtnDtTm) {
+        throw Error(`Error: the provided xprtnDtTm: '${condition.xprtnDtTm}' is invalid`);
+      } else {
+        condition.xprtnDtTm = xprtnDtTm.toISOString();
+      }
+    } else {
+      throw Error('Error: Expiration date needs to be provided for override conditions.');
+    }
   }
 
   if (condition.xprtnDtTm && condition?.xprtnDtTm < condition.incptnDtTm) {
@@ -33,13 +44,6 @@ export const checkConditionValidity = (condition: EntityCondition | AccountCondi
       throw Error('Error: Expiration date provided was invalid.');
     }
   }
-
-  if (condition?.incptnDtTm) {
-    const inceptionnDate = new Date(condition.incptnDtTm);
-    if (isNaN(inceptionnDate.getTime())) {
-      throw Error('Error: Inception date provided was invalid.');
-    }
-  }
 };
 
 interface DateValidationResult {
@@ -54,12 +58,16 @@ const hasDateExpired = (date: Date): boolean => {
 };
 
 const parseDate = (dateStr: string): string | undefined => {
-  return isDateValid(dateStr) ? new Date(dateStr).toISOString() : undefined;
+  const date = isDateValid(dateStr);
+
+  return date ? date.toISOString() : undefined;
 };
 
-const isDateValid = (dateStr: string): boolean => {
+const isDateValid = (dateStr: string): Date | undefined => {
   const date = new Date(dateStr);
-  return !isNaN(date.getTime());
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
 };
 
 export const validateAndParseExpirationDate = (dateStr?: string): DateValidationResult => {

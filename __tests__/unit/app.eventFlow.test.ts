@@ -306,6 +306,10 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'set').mockImplementation(() => {
       return Promise.resolve(undefined);
     });
+
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve([[{ _id: 'entity456' }]]);
+    });
   });
 
   it('should get conditions for entity', async () => {
@@ -320,7 +324,16 @@ describe('getConditionForEntity', () => {
     });
     const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
     // Assert
-    expect(result).toEqual(undefined);
+    expect(result).toEqual({ code: 404 });
+  });
+
+  it('should get no entity was found', async () => {
+    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
+      return Promise.resolve([]);
+    });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
+    // Assert
+    expect(result).toEqual({ result: 'Entity does not exist in the database', code: 404 });
   });
 
   it('should get conditions for entity and update cache', async () => {
@@ -359,9 +372,11 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '' });
-
-    expect(result).toBe(undefined);
+    try {
+      await handleGetConditionsForEntity({ id: '', schmenm: '' });
+    } catch (err) {
+      expect(String(err)).toBe('Error: something bad happened');
+    }
   });
 });
 
@@ -575,6 +590,10 @@ describe('getConditionForAccount', () => {
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
 
+    jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
+      return Promise.resolve([[{ _id: 'account456' }]]);
+    });
+
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([[rawResponseAccount]]);
     });
@@ -599,7 +618,16 @@ describe('getConditionForAccount', () => {
     const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
 
     // Assert
-    expect(result).toEqual(undefined);
+    expect(result).toEqual({ code: 404 });
+  });
+
+  it('should get no account was found', async () => {
+    jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
+      return Promise.resolve([]);
+    });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    // Assert
+    expect(result).toEqual({ result: 'Account does not exist in the database', code: 404 });
   });
 
   it('should get conditions for account and update cache', async () => {
@@ -650,9 +678,11 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.reject(new Error('something bad happened'));
     });
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', synccache: 'no' });
-
-    expect(result).toBe(undefined);
+    try {
+      await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', synccache: 'no' });
+    } catch (error) {
+      expect(String(error)).toEqual(`Error: something bad happened`);
+    }
   });
 });
 
@@ -986,6 +1016,6 @@ describe('handleCacheUpdate', () => {
 
     const result = await handleRefreshCache(true, 12);
 
-    expect(result).toBeUndefined();
+    expect(result).toBe(undefined);
   });
 });

@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { type FastifyReply, type FastifyRequest } from 'fastify';
+import { loggerService } from '.';
+import { configuration } from './config';
+import { type ConditionRequest } from './interface/query';
 import {
-  handleGetConditionsForEntity,
-  handleGetReportRequestByMsgId,
-  handlePostConditionEntity,
-  handlePostConditionAccount,
   handleGetConditionsForAccount,
+  handleGetConditionsForEntity,
+  handlePostConditionAccount,
+  handlePostConditionEntity,
+  handleRefreshCache,
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
-  handleRefreshCache,
-} from './logic.service';
-import { type FastifyRequest, type FastifyReply } from 'fastify';
-import { loggerService } from '.';
-import { type ConditionRequest } from './interface/query';
-import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { configuration } from './config';
+} from './services/event-flow.logic.service';
+import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {

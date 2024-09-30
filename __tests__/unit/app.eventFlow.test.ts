@@ -9,7 +9,7 @@ import {
   handleRefreshCache,
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
-} from '../../src/logic.service';
+} from '../../src/services/event-flow.logic.service';
 import {
   accountResponse,
   entityResponse,

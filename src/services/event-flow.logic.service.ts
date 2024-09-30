@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { type AccountCondition, type ConditionEdge, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import {
@@ -6,19 +7,17 @@ import {
   type EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import {
-  type Entity,
   type Account,
+  type Entity,
   type RawConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
-import { databaseManager, loggerService } from '.';
-import { configuration } from './config';
-import { type ConditionRequest } from './interface/query';
-import { type Report } from './interface/report.interface';
-import { checkConditionValidity, validateAndParseExpirationDate } from './utils/condition-validation';
-import { filterConditions } from './utils/filter-active-conditions';
-import { parseConditionAccount, parseConditionEntity } from './utils/parse-condition';
-import { updateCache } from './utils/update-cache';
-import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
+import { databaseManager, loggerService } from '..';
+import { configuration } from '../config';
+import { type ConditionRequest } from '../interface/query';
+import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
+import { filterConditions } from '../utils/filter-active-conditions';
+import { parseConditionAccount, parseConditionEntity } from '../utils/parse-condition';
+import { updateCache } from '../utils/update-cache';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -58,27 +57,6 @@ const saveConditionEdges = async (
     default:
       throw Error('Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
   }
-};
-
-export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
-  let unWrappedReport;
-  try {
-    loggerService.log(`Started handling get request by message id the message id is ${msgid}`);
-
-    const report = (await databaseManager.getReportByMessageId('transactions', msgid)) as Report[][];
-
-    unWrappedReport = unwrap<Report>(report);
-  } catch (error) {
-    const errorMessage = error as { message: string };
-    loggerService.log(
-      `Failed fetching report from database service with error message: ${errorMessage.message}`,
-      'handleGetReportRequestByMsgId()',
-    );
-    throw new Error(errorMessage.message);
-  } finally {
-    loggerService.log('Completed handling get report by message id');
-  }
-  return unWrappedReport;
 };
 
 export const handlePostConditionEntity = async (

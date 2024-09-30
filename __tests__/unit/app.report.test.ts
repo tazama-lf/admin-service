@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { databaseManager, loggerService } from '../../src';
-import { handleGetReportRequestByMsgId } from '../../src/logic.service';
+import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.service';
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
   const original = jest.requireActual('@tazama-lf/frms-coe-lib');

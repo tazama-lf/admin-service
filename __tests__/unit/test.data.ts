@@ -186,78 +186,84 @@ export const rawResponseAccount = {
 };
 
 export const accountResponse = {
-  acct: {
-    id: '1010101010',
-    agt: {
-      finInstnId: {
-        clrSysMmbId: {
-          mmbId: 'dfsp001',
+  code: 200,
+  result: {
+    acct: {
+      id: '1010101010',
+      agt: {
+        finInstnId: {
+          clrSysMmbId: {
+            mmbId: 'dfsp001',
+          },
         },
       },
+      schmeNm: {
+        prtry: 'Mxx',
+      },
     },
-    schmeNm: {
-      prtry: 'Mxx',
-    },
+    conditions: [
+      {
+        condId: '2110',
+        xprtnDtTm,
+        condTp: 'overridable-block',
+        creDtTm: fixedDate,
+        incptnDtTm,
+        condRsn: 'R001',
+        usr: 'bob',
+        prsptvs: [
+          {
+            prsptv: 'governed_as_creditor_account_by',
+            evtTp: ['pacs.008.001.10'],
+            incptnDtTm,
+            xprtnDtTm,
+          },
+          {
+            prsptv: 'governed_as_debtor_account_by',
+            evtTp: ['pacs.008.001.10'],
+            incptnDtTm,
+            xprtnDtTm,
+          },
+        ],
+      },
+    ],
   },
-  conditions: [
-    {
-      condId: '2110',
-      xprtnDtTm,
-      condTp: 'overridable-block',
-      creDtTm: fixedDate,
-      incptnDtTm,
-      condRsn: 'R001',
-      usr: 'bob',
-      prsptvs: [
-        {
-          prsptv: 'governed_as_creditor_account_by',
-          evtTp: ['pacs.008.001.10'],
-          incptnDtTm,
-          xprtnDtTm,
-        },
-        {
-          prsptv: 'governed_as_debtor_account_by',
-          evtTp: ['pacs.008.001.10'],
-          incptnDtTm,
-          xprtnDtTm,
-        },
-      ],
-    },
-  ],
 };
 
 export const entityResponse = {
-  ntty: {
-    id: '+27733161225',
-    schmeNm: {
-      prtry: 'MSISDN',
+  code: 200,
+  result: {
+    ntty: {
+      id: '+27733161225',
+      schmeNm: {
+        prtry: 'MSISDN',
+      },
     },
+    conditions: [
+      {
+        condId: '2110',
+        condTp: 'overridable-block',
+        incptnDtTm,
+        xprtnDtTm,
+        condRsn: 'R001',
+        usr: 'bob',
+        creDtTm: fixedDate,
+        prsptvs: [
+          {
+            prsptv: 'governed_as_creditor_by',
+            evtTp: ['pacs.008.001.10'],
+            incptnDtTm,
+            xprtnDtTm,
+          },
+          {
+            prsptv: 'governed_as_debtor_by',
+            evtTp: ['pacs.008.001.10'],
+            incptnDtTm,
+            xprtnDtTm,
+          },
+        ],
+      },
+    ],
   },
-  conditions: [
-    {
-      condId: '2110',
-      condTp: 'overridable-block',
-      incptnDtTm,
-      xprtnDtTm,
-      condRsn: 'R001',
-      usr: 'bob',
-      creDtTm: fixedDate,
-      prsptvs: [
-        {
-          prsptv: 'governed_as_creditor_by',
-          evtTp: ['pacs.008.001.10'],
-          incptnDtTm,
-          xprtnDtTm,
-        },
-        {
-          prsptv: 'governed_as_debtor_by',
-          evtTp: ['pacs.008.001.10'],
-          incptnDtTm,
-          xprtnDtTm,
-        },
-      ],
-    },
-  ],
 };
 
 export const sampleEntityCondition: EntityCondition = {

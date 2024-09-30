@@ -36,7 +36,7 @@ export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
 };
 
 export const postConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle report request');
+  loggerService.log('Start - Handle saving entity condition  request');
   try {
     const condition = req.body as EntityCondition;
     const data = await handlePostConditionEntity(condition);
@@ -88,16 +88,13 @@ export const handleHealthCheck = async (): Promise<{ status: string }> => {
   };
 };
 
-export const getConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const getEntityConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');
   try {
-    const data = await handleGetConditionsForEntity(req.query as ConditionRequest);
-    if (data) {
-      reply.status(200);
-      reply.send(data);
-    } else {
-      reply.status(404);
-    }
+    const { code, result } = await handleGetConditionsForEntity(req.query as ConditionRequest);
+
+    reply.status(code);
+    reply.send(result);
   } catch (err) {
     reply.status(500);
   } finally {
@@ -106,26 +103,22 @@ export const getConditionHandler = async (req: FastifyRequest, reply: FastifyRep
 };
 
 export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle report request');
+  loggerService.log('Start - Handle get account condition request');
   try {
-    const data = await handleGetConditionsForAccount(req.query as ConditionRequest);
-    if (data) {
-      reply.status(200);
-      reply.send(data);
-    } else {
-      reply.status(404);
-    }
+    const { code, result } = await handleGetConditionsForAccount(req.query as ConditionRequest);
+
+    reply.status(code);
+    reply.send(result);
   } catch (err) {
-    const failMessage = `Failed to process execution request. \n${JSON.stringify(err, null, 4)}`;
     reply.status(500);
-    reply.send(failMessage);
+    reply.send(err);
   } finally {
-    loggerService.log('End - Handle report request');
+    loggerService.log('End - Handle get account condition request');
   }
 };
 
 export const updateAccountConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle update condition request');
+  loggerService.log('Start - Handle update condition for account request');
   const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, expiryDate);
@@ -136,12 +129,12 @@ export const updateAccountConditionExpiryDateHandler = async (req: FastifyReques
   } catch (err) {
     reply.send(err);
   } finally {
-    loggerService.log('End - Handle update condition request');
+    loggerService.log('End - Handle update condition for account request');
   }
 };
 
 export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle update condition request');
+  loggerService.log('Start - Handle update condition for entity request');
   const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, expiryDate);
@@ -152,6 +145,6 @@ export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest
   } catch (err) {
     reply.send(err);
   } finally {
-    loggerService.log('End - Handle update condition request');
+    loggerService.log('End - Handle update condition for entity request');
   }
 };

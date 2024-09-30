@@ -2,7 +2,7 @@
 import { type FastifyInstance } from 'fastify';
 import {
   getAccountConditionsHandler,
-  getConditionHandler,
+  getEntityConditionHandler,
   handleHealthCheck,
   postConditionHandlerAccount,
   postConditionHandlerEntity,
@@ -33,7 +33,7 @@ async function Routes(fastify: FastifyInstance): Promise<void> {
   );
   fastify.get(
     '/v1/admin/event-flow-control/entity',
-    SetOptionsBodyAndParams(getConditionHandler, routePrivilege.getEntity, undefined, 'queryEntityConditionSchema'),
+    SetOptionsBodyAndParams(getEntityConditionHandler, routePrivilege.getEntity, undefined, 'queryEntityConditionSchema'),
   );
   fastify.get(
     '/v1/admin/event-flow-control/account',

@@ -149,60 +149,56 @@ export const handleGetConditionsForEntity = async (
   params: ConditionRequest,
 ): Promise<{ code: number; result?: string | EntityConditionResponse }> => {
   const fnName = 'getConditionsForEntity';
-  try {
-    loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
 
-    if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
-      return { result: 'Entity does not exist in the database', code: 404 };
-    }
+  loggerService.trace('successfully parsed parameters', fnName, params.id);
+  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
 
-    const cacheKey = `entities/${params.id}${params.schmenm}`;
-
-    const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
-
-    loggerService.log('called database', fnName, params.id);
-    if (!report.length || !report[0].length) {
-      return { code: 404 };
-    }
-
-    const retVal = parseConditionEntity(report[0]);
-
-    if (!retVal.conditions.length) {
-      return { code: 204 };
-    }
-
-    switch (params.synccache) {
-      case 'all':
-        loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
-        await updateCache(cacheKey, retVal);
-        break;
-      case 'active':
-        loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
-        await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
-
-        break;
-      case 'default':
-        // use env
-        loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
-        if (configuration.activeConditionsOnly) {
-          loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
-          await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
-        } else {
-          loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
-          await updateCache(cacheKey, retVal);
-        }
-        break;
-      default:
-        loggerService.trace('syncCache=no/default option specified');
-        break;
-    }
-
-    return { code: 200, result: retVal };
-  } catch (error) {
-    loggerService.error(error as Error);
-    throw error as Error;
+  if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+    return { result: 'Entity does not exist in the database', code: 404 };
   }
+
+  const cacheKey = `entities/${params.id}${params.schmenm}`;
+
+  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+
+  loggerService.log('called database', fnName, params.id);
+  if (!report.length || !report[0].length) {
+    return { code: 404 };
+  }
+
+  const retVal = parseConditionEntity(report[0]);
+
+  if (!retVal.conditions.length) {
+    return { code: 204 };
+  }
+
+  switch (params.synccache) {
+    case 'all':
+      loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
+      await updateCache(cacheKey, retVal);
+      break;
+    case 'active':
+      loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
+      await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
+
+      break;
+    case 'default':
+      // use env
+      loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
+      if (configuration.activeConditionsOnly) {
+        loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
+        await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
+      } else {
+        loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
+        await updateCache(cacheKey, retVal);
+      }
+      break;
+    default:
+      loggerService.trace('syncCache=no/default option specified');
+      break;
+  }
+
+  return { code: 200, result: retVal };
 };
 
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
@@ -367,62 +363,58 @@ export const handleGetConditionsForAccount = async (
   params: ConditionRequest,
 ): Promise<{ code: number; result?: string | AccountConditionResponse }> => {
   const fnName = 'getConditionsForAccount';
-  try {
-    loggerService.trace('successfully parsed parameters', fnName, params.id);
-    const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-    let report: RawConditionResponse[][] = [[]];
-    if (params.agt) {
-      const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
+  loggerService.trace('successfully parsed parameters', fnName, params.id);
+  const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-      if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
-        return { result: 'Account does not exist in the database', code: 404 };
-      }
+  let report: RawConditionResponse[][] = [[]];
+  if (params.agt) {
+    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
 
-      report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+      return { result: 'Account does not exist in the database', code: 404 };
     }
 
-    loggerService.log('called database', fnName, params.id);
-    if (!report.length || !report[0].length) {
-      return { code: 404 };
-    }
-
-    const retVal = parseConditionAccount(report[0]);
-
-    if (!retVal.conditions.length) {
-      return { code: 204 };
-    }
-
-    switch (params.synccache) {
-      case 'all':
-        loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
-        await updateCache(cacheKey, retVal);
-        break;
-      case 'active':
-        loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
-        await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
-        break;
-      case 'default':
-        // use env
-        loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
-        if (configuration.activeConditionsOnly) {
-          loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
-          await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
-        } else {
-          loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
-          await updateCache(cacheKey, retVal);
-        }
-        break;
-      default:
-        loggerService.trace('syncCache=no/default option specified');
-        break;
-    }
-
-    return { result: retVal, code: 200 };
-  } catch (error) {
-    loggerService.error(error as Error);
-    throw error as Error;
+    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
   }
+
+  loggerService.log('called database', fnName, params.id);
+  if (!report.length || !report[0].length) {
+    return { code: 404 };
+  }
+
+  const retVal = parseConditionAccount(report[0]);
+
+  if (!retVal.conditions.length) {
+    return { code: 204 };
+  }
+
+  switch (params.synccache) {
+    case 'all':
+      loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
+      await updateCache(cacheKey, retVal);
+      break;
+    case 'active':
+      loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
+      await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
+      break;
+    case 'default':
+      // use env
+      loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
+      if (configuration.activeConditionsOnly) {
+        loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
+        await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
+      } else {
+        loggerService.trace('using env to update all conditions', 'cache update', cacheKey);
+        await updateCache(cacheKey, retVal);
+      }
+      break;
+    default:
+      loggerService.trace('syncCache=no/default option specified');
+      break;
+  }
+
+  return { result: retVal, code: 200 };
 };
 
 export const handleUpdateExpiryDateForConditionsOfAccount = async (

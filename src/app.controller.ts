@@ -96,7 +96,9 @@ export const getEntityConditionHandler = async (req: FastifyRequest, reply: Fast
     reply.status(code);
     reply.send(result);
   } catch (err) {
+    loggerService.error(err as Error);
     reply.status(500);
+    reply.send(err);
   } finally {
     loggerService.trace('End - get condition for an entity');
   }
@@ -110,6 +112,7 @@ export const getAccountConditionsHandler = async (req: FastifyRequest, reply: Fa
     reply.status(code);
     reply.send(result);
   } catch (err) {
+    loggerService.error(err as Error);
     reply.status(500);
     reply.send(err);
   } finally {

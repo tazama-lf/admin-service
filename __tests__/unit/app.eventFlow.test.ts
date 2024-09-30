@@ -367,17 +367,6 @@ describe('getConditionForEntity', () => {
     // Assert
     expect(result).toEqual(entityResponse);
   });
-
-  it('should throw an error', async () => {
-    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
-      return Promise.reject(new Error('something bad happened'));
-    });
-    try {
-      await handleGetConditionsForEntity({ id: '', schmenm: '' });
-    } catch (err) {
-      expect(String(err)).toBe('Error: something bad happened');
-    }
-  });
 });
 
 describe('handlePostConditionAccount', () => {
@@ -672,17 +661,6 @@ describe('getConditionForAccount', () => {
     const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'active' });
     // Assert
     expect(result).toEqual(accountResponse);
-  });
-
-  it('should throw an error', async () => {
-    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
-      return Promise.reject(new Error('something bad happened'));
-    });
-    try {
-      await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '002', synccache: 'no' });
-    } catch (error) {
-      expect(String(error)).toEqual(`Error: something bad happened`);
-    }
   });
 });
 

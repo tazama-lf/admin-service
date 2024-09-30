@@ -5,7 +5,11 @@ import {
   type AccountConditionResponse,
   type EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import {
+  type Entity,
+  type Account,
+  type RawConditionResponse,
+} from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { databaseManager, loggerService } from '.';
 import { configuration } from './config';
 import { type ConditionRequest } from './interface/query';
@@ -141,20 +145,32 @@ export const handlePostConditionEntity = async (
   }
 };
 
-export const handleGetConditionsForEntity = async (params: ConditionRequest): Promise<EntityConditionResponse | undefined> => {
+export const handleGetConditionsForEntity = async (
+  params: ConditionRequest,
+): Promise<{ code: number; result?: string | EntityConditionResponse }> => {
   const fnName = 'getConditionsForEntity';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
+    const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
+
+    if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+      return { result: 'Entity does not exist in the database', code: 404 };
+    }
+
     const cacheKey = `entities/${params.id}${params.schmenm}`;
 
     const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
-      return; // no conditions
+      return { code: 404 };
     }
 
     const retVal = parseConditionEntity(report[0]);
+
+    if (!retVal.conditions.length) {
+      return { code: 204 };
+    }
 
     switch (params.synccache) {
       case 'all':
@@ -182,9 +198,10 @@ export const handleGetConditionsForEntity = async (params: ConditionRequest): Pr
         break;
     }
 
-    return retVal;
+    return { code: 200, result: retVal };
   } catch (error) {
     loggerService.error(error as Error);
+    throw error as Error;
   }
 };
 
@@ -346,7 +363,9 @@ export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Prom
   }
 };
 
-export const handleGetConditionsForAccount = async (params: ConditionRequest): Promise<AccountConditionResponse | undefined> => {
+export const handleGetConditionsForAccount = async (
+  params: ConditionRequest,
+): Promise<{ code: number; result?: string | AccountConditionResponse }> => {
   const fnName = 'getConditionsForAccount';
   try {
     loggerService.trace('successfully parsed parameters', fnName, params.id);
@@ -354,15 +373,25 @@ export const handleGetConditionsForAccount = async (params: ConditionRequest): P
 
     let report: RawConditionResponse[][] = [[]];
     if (params.agt) {
+      const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
+
+      if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+        return { result: 'Account does not exist in the database', code: 404 };
+      }
+
       report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
     }
 
     loggerService.log('called database', fnName, params.id);
     if (!report.length || !report[0].length) {
-      return; // no conditions
+      return { code: 404 };
     }
 
     const retVal = parseConditionAccount(report[0]);
+
+    if (!retVal.conditions.length) {
+      return { code: 204 };
+    }
 
     switch (params.synccache) {
       case 'all':
@@ -389,9 +418,10 @@ export const handleGetConditionsForAccount = async (params: ConditionRequest): P
         break;
     }
 
-    return retVal;
+    return { result: retVal, code: 200 };
   } catch (error) {
     loggerService.error(error as Error);
+    throw error as Error;
   }
 };
 

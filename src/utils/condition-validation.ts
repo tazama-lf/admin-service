@@ -1,48 +1,48 @@
 import { type EntityCondition, type AccountCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 export const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {
-  const nowDateTime = new Date().toISOString();
+  const nowDateTime = new Date();
+
+  if (!condition.incptnDtTm) {
+    condition.incptnDtTm = nowDateTime.toISOString();
+  }
 
   const incptnDtTm = isDateValid(condition.incptnDtTm);
-  if (!incptnDtTm) {
+
+  if (new Date(condition?.incptnDtTm) < nowDateTime) {
+    throw Error('Error: Inception date cannot be before current date/time');
+  }
+
+  if (!incptnDtTm || condition?.incptnDtTm !== incptnDtTm.toISOString()) {
     throw Error(`Error: the provided incptnDtTm: '${condition.incptnDtTm}' is invalid`);
   }
+
   condition.incptnDtTm = incptnDtTm.toISOString();
 
   if (condition.evtTp.length > 1 && condition.evtTp.includes('all')) {
     throw Error('Error: event type "evtTp" can not specify the value "all" as well as specific event types');
   }
 
-  if (condition?.incptnDtTm < nowDateTime) {
-    throw Error('Error: Inception date cannot be in the past');
-  }
-
   if (condition.condTp === 'override') {
-    if (condition.xprtnDtTm) {
-      const xprtnDtTm = isDateValid(condition.xprtnDtTm);
-      if (!xprtnDtTm) {
-        throw Error(`Error: the provided xprtnDtTm: '${condition.xprtnDtTm}' is invalid`);
-      } else {
-        condition.xprtnDtTm = xprtnDtTm.toISOString();
-      }
-    } else {
+    if (!condition.xprtnDtTm) {
       throw Error('Error: Expiration date needs to be provided for override conditions.');
     }
   }
 
-  if (condition.xprtnDtTm && condition?.xprtnDtTm < condition.incptnDtTm) {
+  if (condition?.xprtnDtTm) {
+    const xprtnDtTm = isDateValid(condition.xprtnDtTm);
+    if (!xprtnDtTm || condition?.xprtnDtTm !== xprtnDtTm.toISOString()) {
+      throw Error(`Error: the provided xprtnDtTm: '${condition.xprtnDtTm}' is invalid`);
+    }
+    condition.xprtnDtTm = xprtnDtTm.toISOString();
+  }
+
+  if (condition.xprtnDtTm && condition.xprtnDtTm < condition.incptnDtTm) {
     throw Error('Error: Expiration date must be after inception date.');
   }
 
   if (typeof condition.usr !== 'string') {
     throw Error('Error: User was not provided');
-  }
-
-  if (condition?.xprtnDtTm) {
-    const expirationDate = new Date(condition.xprtnDtTm);
-    if (isNaN(expirationDate.getTime())) {
-      throw Error('Error: Expiration date provided was invalid.');
-    }
   }
 };
 
@@ -59,7 +59,6 @@ const hasDateExpired = (date: Date): boolean => {
 
 const parseDate = (dateStr: string): string | undefined => {
   const date = isDateValid(dateStr);
-
   return date ? date.toISOString() : undefined;
 };
 

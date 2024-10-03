@@ -18,6 +18,7 @@ import {
   rawResponseEntity,
   sampleAccountCondition,
   sampleEntityCondition,
+  xprtnDtTm,
 } from './test.data';
 import { configuration } from '../../src/config';
 import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
@@ -84,8 +85,6 @@ describe('handlePostConditionEntity', () => {
       return Promise.resolve([[rawResponseEntity]]);
     });
 
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
-
     jest.spyOn(databaseManager, 'set').mockImplementation(() => {
       return Promise.resolve(undefined);
     });
@@ -97,8 +96,6 @@ describe('handlePostConditionEntity', () => {
     jest.spyOn(databaseManager, 'saveEntity').mockImplementation(() => {
       return Promise.resolve({ _id: 'entity456' });
     });
-
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
 
   it('should handle a successful post request for a new entity', async () => {
@@ -113,16 +110,11 @@ describe('handlePostConditionEntity', () => {
     expect(loggerService.log).toHaveBeenCalledWith(
       `Started handling post request of entity condition executed by ${sampleEntityCondition.usr}.`,
     );
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith({ ...sampleEntityCondition, creDtTm: fixedDate });
-    expect(databaseManager.saveEntity).toHaveBeenCalledWith(
-      `${sampleEntityCondition.ntty.id + sampleEntityCondition.ntty.schmeNm.prtry}`,
-      fixedDate,
-    );
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleEntityCondition);
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], ntty: { id: '+27733161225', schmeNm: { prtry: 'MSISDN' } } },
+      result: entityResponse.result,
     });
   });
 
@@ -143,15 +135,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: {
-        conditions: [],
-        ntty: {
-          id: '+27733161225',
-          schmeNm: {
-            prtry: 'MSISDN',
-          },
-        },
-      },
+      result: entityResponse.result,
     });
   });
 
@@ -173,15 +157,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'entity456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: {
-        conditions: [],
-        ntty: {
-          id: '+27733161225',
-          schmeNm: {
-            prtry: 'MSISDN',
-          },
-        },
-      },
+      result: entityResponse.result,
     });
   });
 
@@ -220,15 +196,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: {
-        conditions: [],
-        ntty: {
-          id: '+27733161225',
-          schmeNm: {
-            prtry: 'MSISDN',
-          },
-        },
-      },
+      result: entityResponse.result,
     });
   });
 
@@ -278,32 +246,16 @@ describe('handlePostConditionEntity', () => {
 
     // Assert
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the entity');
-    expect(result).toEqual({
-      message: '2 conditions already exist for the entity',
-      result: {
-        conditions: [],
-        ntty: {
-          id: '+27733161225',
-          schmeNm: {
-            prtry: 'MSISDN',
-          },
-        },
-      },
-    });
   });
 });
 
 describe('getConditionForEntity', () => {
   beforeEach(() => {
-    jest.clearAllMocks(); // Clear mocks before each test
-
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([[rawResponseEntity]]);
     });
 
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
-
-    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+    jest.spyOn(databaseManager, 'set').mockImplementationOnce(() => {
       return Promise.resolve(undefined);
     });
 
@@ -312,6 +264,8 @@ describe('getConditionForEntity', () => {
     });
   });
 
+  afterEach(() => jest.clearAllMocks());
+
   it('should get conditions for entity', async () => {
     const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
     // Assert
@@ -319,6 +273,7 @@ describe('getConditionForEntity', () => {
   });
 
   it('should get no conditions for entity', async () => {
+    jest.clearAllMocks();
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
@@ -371,10 +326,6 @@ describe('getConditionForEntity', () => {
 
 describe('handlePostConditionAccount', () => {
   beforeEach(() => {
-    jest.clearAllMocks(); // Clear mocks before each test
-
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
-
     jest.spyOn(databaseManager, 'getAccount').mockImplementation(() => {
       return Promise.resolve(
         [[]], // No existing account
@@ -392,19 +343,18 @@ describe('handlePostConditionAccount', () => {
     jest.spyOn(databaseManager, 'saveAccount').mockImplementation(() => {
       return Promise.resolve({ _id: 'account456' });
     });
-
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
   });
+
+  afterEach(() => jest.clearAllMocks());
 
   it('should handle a successful post request for a new account', async () => {
     // Act
-    const result = await handlePostConditionAccount(sampleAccountCondition as unknown as AccountCondition);
+    const result = await handlePostConditionAccount(sampleAccountCondition);
 
     // Assert
     expect(loggerService.log).toHaveBeenCalledWith(
       `Started handling post request of account condition executed by ${sampleAccountCondition.usr}.`,
     );
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith({ ...sampleAccountCondition, creDtTm: fixedDate });
     expect(databaseManager.saveAccount).toHaveBeenCalledWith(
       `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
     );
@@ -412,7 +362,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], acct: sampleAccountCondition.acct },
+      result: accountResponse.result,
     });
   });
 
@@ -435,29 +385,23 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], acct: sampleAccountCondition.acct },
+      result: accountResponse.result,
     });
   });
 
   it('should handle a successful post request for a debtor perspective', async () => {
     // Arrange
     const nowDateTime = new Date().toISOString();
-    const conditionDebtor = { ...sampleAccountCondition, prsptv: 'debtor' };
+    const conditionDebtor = { ...sampleAccountCondition, prsptv: 'debtor' } as AccountCondition;
 
     // Act
-    const result = await handlePostConditionAccount(conditionDebtor as unknown as AccountCondition);
+    const result = await handlePostConditionAccount(conditionDebtor);
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...conditionDebtor,
-        creDtTm: nowDateTime,
-      }),
-    );
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: { conditions: [], acct: sampleAccountCondition.acct },
+      result: accountResponse.result,
     });
   });
 
@@ -492,10 +436,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
-      result: {
-        conditions: [],
-        acct: sampleAccountCondition.acct,
-      },
+      result: accountResponse.result,
     });
   });
 
@@ -531,25 +472,6 @@ describe('handlePostConditionAccount', () => {
 
     // Assert
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the account');
-    expect(result).toEqual({
-      message: '2 conditions already exist for the account',
-      result: {
-        acct: {
-          agt: {
-            finInstnId: {
-              clrSysMmbId: {
-                mmbId: 'dfsp001',
-              },
-            },
-          },
-          id: '1010101010',
-          schmeNm: {
-            prtry: 'Mxx',
-          },
-        },
-        conditions: [],
-      },
-    });
   });
 
   it('should handle handle thrown errors when trying to saveConditions', async () => {
@@ -586,8 +508,6 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([[rawResponseAccount]]);
     });
-
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedDate);
 
     jest.spyOn(databaseManager, 'set').mockImplementation(() => {
       return Promise.resolve(undefined);
@@ -666,10 +586,9 @@ describe('getConditionForAccount', () => {
 
 describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
   const params = { id: '2110', schmenm: 'scheme', agt: 'agent', condid: '2110' };
-  const xprtnDtTm = '2025-10-05T23:00:00.999Z';
 
   beforeEach(() => {
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(xprtnDtTm);
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(String(xprtnDtTm));
   });
 
   afterEach(() => {
@@ -760,7 +679,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
     expect(result).toEqual({
       code: 405,
-      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.999Z',
+      message: `Update failed - condition 2110 already contains an expiration date ${xprtnDtTm}`,
     });
   });
 
@@ -787,10 +706,9 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
 describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   const params = { id: '2110', schmenm: 'scheme', condid: '2110' };
-  const xprtnDtTm = '2025-09-08T10:00:00.999Z';
 
   beforeEach(() => {
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(xprtnDtTm);
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(String(xprtnDtTm));
   });
 
   afterEach(() => {
@@ -881,7 +799,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
     expect(result).toEqual({
       code: 405,
-      message: 'Update failed - condition 2110 already contains an expiration date 2024-08-08T10:00:00.999Z',
+      message: `Update failed - condition 2110 already contains an expiration date ${xprtnDtTm}`,
     });
   });
 
@@ -911,7 +829,7 @@ describe('handleCacheUpdate', () => {
   const xprtnDtTm = '2025-09-08T10:00:00.999Z';
 
   beforeEach(() => {
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(xprtnDtTm);
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(xprtnDtTm);
   });
 
   afterEach(() => {

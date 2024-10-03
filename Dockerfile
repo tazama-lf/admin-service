@@ -36,13 +36,6 @@ COPY package.json ./
 # Turn down the verbosity to default level.
 ENV NPM_CONFIG_LOGLEVEL warn
 
-ENV mode="http"
-ENV upstream_url="http://127.0.0.1:3000"
-ENV exec_timeout="10s"
-ENV write_timeout="15s"
-ENV read_timeout="15s"
-ENV prefix_logs="false"
-
 # Service Based variables
 ENV FUNCTION_NAME=admin-service
 ENV NODE_ENV=production
@@ -73,8 +66,4 @@ ENV CERT_PATH_PUBLIC=
 ENV CACHE_TTL=1000
 ENV ACTIVE_CONDITIONS_ONLY=false
 
-HEALTHCHECK --interval=60s CMD [ -e /tmp/.lock ] || exit 1
-EXPOSE 4222
-
-# Execute watchdog command
 CMD ["build/index.js"]

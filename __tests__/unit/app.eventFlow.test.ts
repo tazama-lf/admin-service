@@ -34,6 +34,23 @@ jest.mock('@tazama-lf/frms-coe-lib', () => {
     }),
   };
 });
+
+jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/env', () => ({
+  validateProcessorConfig: jest.fn().mockReturnValue({
+    functionName: 'test-ed',
+    nodeEnv: 'test',
+  }),
+  validateEnvVar: jest.fn().mockReturnValue(''),
+  validateDatabaseConfig: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/env/database.config', () => ({
+  Database: {
+    CONFIGURATION: 'MOCK_DB',
+    TRANSACTION: 'MOCK_DB',
+  },
+}));
+
 // Mock the module
 jest.mock('../../src/', () => ({
   databaseManager: {

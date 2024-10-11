@@ -48,6 +48,8 @@ export const configuration: IConfig = {
       servers: JSON.parse(validateEnvVar<string>('VALKEY_SERVERS', 'string', true) || '[{"hostname": "127.0.0.1", "port":6379}]'),
       password: validateEnvVar<string>('VALKEY_AUTH', 'string'),
       isCluster: validateEnvVar('VALKEY_IS_CLUSTER', 'boolean'),
+      distributedCacheEnabled: validateEnvVar('DISTRIBUTED_CACHE_ENABLED', 'boolean', true),
+      distributedCacheTTL: validateEnvVar('DISTRIBUTED_CACHETTL', 'number', true),
     },
   },
 };

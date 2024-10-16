@@ -1,23 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
+import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
 import initializeFastifyClient from './clients/fastify';
-import { type AppDatabaseServices, configuration } from './config';
-import { type DatabaseManagerInstance, CreateDatabaseManager, LoggerService } from '@tazama-lf/frms-coe-lib';
+import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
+import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
+import { Database } from '@tazama-lf/frms-coe-lib/lib/config/database.config';
+import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
 
-export const loggerService: LoggerService = new LoggerService(undefined);
+export const loggerService: LoggerService = new LoggerService(processorConfig);
 
 // using the 'Required' utility type so autocompletion kicks in only the services we want
 let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
+let configuration: Configuration;
 
 export const dbInit = async (): Promise<void> => {
-  databaseManager = await CreateDatabaseManager(configuration.db);
+  const { db, config } = await CreateStorageManager(
+    [Database.PSEUDONYMS, Database.EVALUATION, Cache.DISTRIBUTED],
+    processorConfig.nodeEnv === 'production',
+  );
 
+  databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  configuration = { ...config, ...processorConfig };
   loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
 };
 
 const connect = async (): Promise<void> => {
   const fastify = await initializeFastifyClient();
-  const { port, host } = configuration.service;
-  fastify.listen({ port, host }, (err, address) => {
+  fastify.listen({ port: processorConfig.PORT }, (err, address) => {
     if (err) {
       throw Error(`${err.message}`);
     }
@@ -37,4 +45,4 @@ const connect = async (): Promise<void> => {
   }
 })();
 
-export { databaseManager };
+export { databaseManager, configuration };

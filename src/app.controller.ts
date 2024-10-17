@@ -2,8 +2,7 @@
 
 import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { loggerService } from '.';
-import { configuration } from './config';
+import { loggerService, configuration } from '.';
 import { type ConditionRequest } from './interface/query';
 import {
   handleGetConditionsForAccount,
@@ -70,8 +69,8 @@ export const postConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
 export const putRefreshCache = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle cache refresh');
   try {
-    const ttl = configuration.cacheTTL;
-    const activeOnly = configuration.activeConditionsOnly;
+    const ttl = configuration.redisConfig.distributedCacheTTL!;
+    const activeOnly = configuration.ACTIVE_CONDITIONS_ONLY;
     await handleRefreshCache(activeOnly, ttl);
     reply.status(204);
   } catch (err) {

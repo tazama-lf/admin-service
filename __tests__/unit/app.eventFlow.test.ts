@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
-import { databaseManager, loggerService } from '../../src';
+import { configuration, databaseManager, loggerService } from '../../src';
 import {
   handleGetConditionsForAccount,
   handleGetConditionsForEntity,
@@ -20,7 +20,6 @@ import {
   sampleEntityCondition,
   xprtnDtTm,
 } from './test.data';
-import { configuration } from '../../src/config';
 import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
@@ -34,22 +33,6 @@ jest.mock('@tazama-lf/frms-coe-lib', () => {
     }),
   };
 });
-
-jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/env', () => ({
-  validateProcessorConfig: jest.fn().mockReturnValue({
-    functionName: 'test-ed',
-    nodeEnv: 'test',
-  }),
-  validateEnvVar: jest.fn().mockReturnValue(''),
-  validateDatabaseConfig: jest.fn().mockReturnValue({}),
-}));
-
-jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/env/database.config', () => ({
-  Database: {
-    CONFIGURATION: 'MOCK_DB',
-    TRANSACTION: 'MOCK_DB',
-  },
-}));
 
 // Mock the module
 jest.mock('../../src/', () => ({
@@ -333,9 +316,9 @@ describe('getConditionForEntity', () => {
   });
 
   it('should sync active condition by using default and environment variable', async () => {
-    configuration.activeConditionsOnly = true;
+    configuration.ACTIVE_CONDITIONS_ONLY = true;
     const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' });
-    configuration.activeConditionsOnly = false;
+    configuration.ACTIVE_CONDITIONS_ONLY = false;
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -587,9 +570,9 @@ describe('getConditionForAccount', () => {
   });
 
   it('should sync active cache by using environment variable', async () => {
-    configuration.activeConditionsOnly = true;
+    configuration.ACTIVE_CONDITIONS_ONLY = true;
     const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'default' });
-    configuration.activeConditionsOnly = false;
+    configuration.ACTIVE_CONDITIONS_ONLY = false;
     // Assert
     expect(result).toEqual(accountResponse);
   });

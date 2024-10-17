@@ -11,8 +11,7 @@ import {
   type Entity,
   type RawConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
-import { databaseManager, loggerService } from '..';
-import { configuration } from '../config';
+import { configuration, databaseManager, loggerService } from '..';
 import { type ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
@@ -163,7 +162,7 @@ export const handleGetConditionsForEntity = async (
     case 'default':
       // use env
       loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
-      if (configuration.activeConditionsOnly) {
+      if (configuration.ACTIVE_CONDITIONS_ONLY) {
         loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
         await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
       } else {
@@ -379,7 +378,7 @@ export const handleGetConditionsForAccount = async (
     case 'default':
       // use env
       loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
-      if (configuration.activeConditionsOnly) {
+      if (configuration.ACTIVE_CONDITIONS_ONLY) {
         loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
         await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
       } else {

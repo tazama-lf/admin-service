@@ -25,7 +25,7 @@ export const dbInit = async (): Promise<void> => {
 
 const connect = async (): Promise<void> => {
   const fastify = await initializeFastifyClient();
-  fastify.listen({ port: processorConfig.PORT }, (err, address) => {
+  fastify.listen({ port: processorConfig.PORT, host: '0.0.0.0' }, (err, address) => {
     if (err) {
       throw Error(`${err.message}`);
     }

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schmenm": {
+      "type": "string"
+    },
+    "synccache": {
+      "type": "string",
+      "enum": ["no", "all", "active", "default"]
+    }
+  },
+  "required":["id", "schmenm"]
+}

@@ -186,12 +186,10 @@ describe('handlePostConditionEntity', () => {
     const result = await handlePostConditionEntity(conditionCreditor as unknown as EntityCondition);
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...conditionCreditor,
-        creDtTm: nowDateTime,
-      }),
-    );
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith({
+      ...conditionCreditor,
+      creDtTm: nowDateTime,
+    });
 
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'account456', conditionCreditor);
     expect(result).toEqual({

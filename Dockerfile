@@ -36,27 +36,37 @@ COPY package.json ./
 # Turn down the verbosity to default level.
 ENV NPM_CONFIG_LOGLEVEL warn
 
-ENV mode="http"
-ENV upstream_url="http://127.0.0.1:3000"
-ENV exec_timeout="10s"
-ENV write_timeout="15s"
-ENV read_timeout="15s"
-ENV prefix_logs="false"
-
 # Service Based variables
 ENV FUNCTION_NAME=admin-service
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV MAX_CPU=1
 
 # Database
-ENV TRANSACTION_DATABASE_CERT_PATH='/usr/local/share/ca-certificates/ca-certificates.crt'
-ENV TRANSACTION_DATABASE_URL=tcp://0.0.0.0:8529
-ENV TRANSACTION_DATABASE_USER=root
-ENV TRANSACTION_DATABASE_PASSWORD=
-ENV TRANSACTION_DATABASE=evaluationResults
+ENV EVALUATION_DATABASE_CERT_PATH='/usr/local/share/ca-certificates/ca-certificates.crt'
+ENV EVALUATION_DATABASE_URL=tcp://0.0.0.0:8529
+ENV EVALUATION_DATABASE_USER=root
+ENV EVALUATION_DATABASE_PASSWORD=
+ENV EVALUATION_DATABASE=evaluationResults
 
-HEALTHCHECK --interval=60s CMD [ -e /tmp/.lock ] || exit 1
-EXPOSE 4222
+ENV PSEUDONYMS_DATABASE_CERT_PATH='/usr/local/share/ca-certificates/ca-certificates.crt'
+ENV PSEUDONYMS_DATABASE_URL=tcp://0.0.0.0:8529
+ENV PSEUDONYMS_DATABASE_USER=root
+ENV PSEUDONYMS_DATABASE_PASSWORD=
+ENV PSEUDONYMS_DATABASE=pseudonyms
 
-# Execute watchdog command
+# REDIS
+ENV REDIS_DATABASE=0
+ENV REDIS_AUTH=
+ENV REDIS_SERVERS=
+ENV REDIS_IS_CLUSTER=
+ENV DISTRIBUTED_CACHETTL=300
+ENV DISTRIBUTED_CACHE_ENABLED=true
+
+# Auth
+ENV AUTHENTICATED=false
+ENV CERT_PATH_PUBLIC=
+
+ENV ACTIVE_CONDITIONS_ONLY=false
+
 CMD ["build/index.js"]

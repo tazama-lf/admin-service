@@ -76,7 +76,7 @@ export const validateAndParseExpirationDate = (dateStr?: string): DateValidation
 
   const parsedDate = parseDate(dateStr);
 
-  if (!parsedDate) {
+  if (!parsedDate || parsedDate !== dateStr) {
     return { isValid: false, dateStr: new Date().toISOString(), message: 'Expiration time date provided was invalid.' };
   }
 

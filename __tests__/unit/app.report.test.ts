@@ -54,7 +54,7 @@ describe('handleGetReportRequestByMsgId', () => {
     const msgid = 'test-msg-id';
     const result = await handleGetReportRequestByMsgId(msgid);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith('transactions', msgid);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
     expect(unwrap).toHaveBeenCalledWith([mockReport]);
     expect(result).toBe(mockReport);
     expect(loggerService.log).toHaveBeenCalledWith(`Started handling get request by message id the message id is ${msgid}`);
@@ -68,7 +68,7 @@ describe('handleGetReportRequestByMsgId', () => {
     const msgid = 'test-msg-id';
     await expect(handleGetReportRequestByMsgId(msgid)).rejects.toThrow(errorMessage);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith('transactions', msgid);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
     expect(loggerService.log).toHaveBeenCalledWith(
       `Failed fetching report from database service with error message: ${errorMessage}`,
       'handleGetReportRequestByMsgId()',

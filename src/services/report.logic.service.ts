@@ -8,7 +8,7 @@ export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Repo
   try {
     loggerService.log(`Started handling get request by message id the message id is ${msgid}`);
 
-    const report = (await databaseManager.getReportByMessageId('transactions', msgid)) as Report[][];
+    const report = (await databaseManager.getReportByMessageId(msgid)) as Report[][];
 
     unWrappedReport = unwrap<Report>(report);
   } catch (error) {

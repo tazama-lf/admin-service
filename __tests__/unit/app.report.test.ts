@@ -1,19 +1,38 @@
 // SPDX-License-Identifier: Apache-2.0
-import { databaseManager, loggerService } from '../../src/';
-import { unwrap } from '@frmscoe/frms-coe-lib/lib/helpers/unwrap';
-import { handleGetReportRequestByMsgId } from '../../src/logic.service';
+import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
+import { databaseManager, loggerService } from '../../src';
+import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.service';
 
+jest.mock('@tazama-lf/frms-coe-lib', () => {
+  const original = jest.requireActual('@tazama-lf/frms-coe-lib');
+
+  return {
+    ...original,
+    aql: jest.fn().mockImplementation((templateLiteral) => {
+      return {
+        query: templateLiteral,
+      };
+    }),
+  };
+});
 // Mock the module
 jest.mock('../../src/', () => ({
   databaseManager: {
-    getReportByMessageId: jest.fn(), // Ensure the mock function is typed correctly
+    getReportByMessageId: jest.fn(),
+  },
+  configuration: {
+    activeConditionsOnly: true,
   },
   loggerService: {
+    trace: jest.fn(),
+    debug: jest.fn(),
     log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
   },
 }));
 
-jest.mock('@frmscoe/frms-coe-lib/lib/helpers/unwrap', () => ({
+jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/unwrap', () => ({
   unwrap: jest.fn(),
 }));
 
@@ -29,14 +48,14 @@ describe('handleGetReportRequestByMsgId', () => {
       },
     ];
     // Ensure getReportByMessageId is typed as a Jest mock function
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
     (unwrap as jest.Mock).mockReturnValue(mockReport);
 
     const msgid = 'test-msg-id';
     const result = await handleGetReportRequestByMsgId(msgid);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith('transactions', msgid);
-    expect(unwrap).toHaveBeenCalledWith(mockReport);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
+    expect(unwrap).toHaveBeenCalledWith([mockReport]);
     expect(result).toBe(mockReport);
     expect(loggerService.log).toHaveBeenCalledWith(`Started handling get request by message id the message id is ${msgid}`);
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
@@ -49,7 +68,7 @@ describe('handleGetReportRequestByMsgId', () => {
     const msgid = 'test-msg-id';
     await expect(handleGetReportRequestByMsgId(msgid)).rejects.toThrow(errorMessage);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith('transactions', msgid);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
     expect(loggerService.log).toHaveBeenCalledWith(
       `Failed fetching report from database service with error message: ${errorMessage}`,
       'handleGetReportRequestByMsgId()',

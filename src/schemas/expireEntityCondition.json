@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schmenm": {
+      "type": "string"
+    },
+    "condid": {
+      "type": "string"
+    }
+  },
+  "required":["id", "schmenm", "condid"]
+}

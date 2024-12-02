@@ -13,28 +13,32 @@
 # and parameters, see https://github.com/anchore/sbom-action. For more
 # information about the Anchore SBOM tool, Syft, see
 # https://github.com/anchore/syft
+
+# Please do not attempt to edit this flow without the direct consent from the DevOps team. This file is managed centrally.
+
 name: Anchore Syft SBOM scan
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "dev", "main" ]
+    branches: [ "main" ]
 
 permissions:
   contents: write
 
 jobs:
   Anchore-Build-Scan:
+    if: github.actor != 'dependabot[bot]' && github.actor != 'dependabot-preview[bot]'
     permissions:
       contents: write # required to upload to the Dependency submission API
     runs-on: ubuntu-latest
     steps:
     - name: Checkout the code
       uses: actions/checkout@v4
-    - name: Scan the src directory and upload dependency results
-      uses: anchore/sbom-action@v0
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag localbuild/testimage:latest
+    - name: Scan the image and upload dependency results
+      uses: anchore/sbom-action@bb716408e75840bbb01e839347cd213767269d4a
       with:
-        path: ./src/
-        artifact-name: src.spdx.json
+        image: "localbuild/testimage:latest"
+        artifact-name: image.spdx.json
         dependency-snapshot: true
-

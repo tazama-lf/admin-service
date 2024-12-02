@@ -2,44 +2,42 @@
 // config settings, env variables
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { type ManagerConfig } from '@tazama-lf/frms-coe-lib';
+import { type AdditionalConfig, type ProcessorConfig, validateProcessorConfig } from '@tazama-lf/frms-coe-lib/lib/config/processor.config';
 
 // Load .env file into process.env if it exists. This is convenient for running locally.
 dotenv.config({
   path: path.resolve(__dirname, '../.env'),
 });
 
+// Just we don't want everything, just what we are configuring, add more fields accordingly
+export type AppDatabaseServices = Required<Pick<ManagerConfig, 'redisConfig' | 'pseudonyms' | 'transaction'>>;
+
+export type Configuration = ProcessorConfig & AppDatabaseServices & IConfig;
+
 export interface IConfig {
-  maxCPU: number;
-  env: string;
-  service: {
-    port: number;
-    host: string;
-  };
-  db: {
-    transaction: {
-      password: string;
-      url: string;
-      user: string;
-      databaseName: string;
-      certPath: string;
-    };
-  };
+  ACTIVE_CONDITIONS_ONLY: boolean;
+  PORT: number;
+  AUTHENTICATED: boolean;
 }
 
-export const configuration: IConfig = {
-  maxCPU: parseInt(process.env.MAX_CPU!, 10) || 1,
-  env: process.env.NODE_ENV!,
-  service: {
-    port: parseInt(process.env.PORT!, 10) || 3000,
-    host: process.env.HOST! || '127.0.0.1',
+const additionalEnvironmentVariables: AdditionalConfig[] = [
+  {
+    name: 'ACTIVE_CONDITIONS_ONLY',
+    type: 'boolean',
+    optional: false,
   },
-  db: {
-    transaction: {
-      password: process.env.TRANSACTION_DATABASE_PASSWORD!,
-      url: process.env.TRANSACTION_DATABASE_URL!,
-      user: process.env.TRANSACTION_DATABASE_USER!,
-      databaseName: process.env.TRANSACTION_DATABASE!,
-      certPath: process.env.TRANSACTION_DATABASE_CERT_PATH!,
-    },
+  {
+    name: 'PORT',
+    type: 'number',
+    optional: false,
   },
-};
+  {
+    name: 'AUTHENTICATED',
+    type: 'boolean',
+    optional: false,
+  },
+];
+
+const processorConfig = validateProcessorConfig(additionalEnvironmentVariables) as Configuration;
+export { processorConfig };

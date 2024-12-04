@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-service-rel-1-0-0
+  namespace: processor
+  labels:
+    app: admin-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-service
+  template:
+    metadata:
+      name: admin-service-rel-1-0-0
+      labels:
+        app: admin-service
+      annotations:
+        prometheus.io.scrape: 'false'
+    spec:
+      containers:
+        - name: admin-service-rel-1-0-0
+          image: example.io/admin-service-rel-1-0-0:1.0.0
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 3000
+          resources: {}
+          imagePullPolicy: Always
+        - name: admin-service-sidecar-rel-1-0-0
+          image: example.io/sidecar-rel-1-0-0:1.0.0
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 5000
+          resources: {}
+          imagePullPolicy: Always
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      imagePullSecrets:
+        - name: frmpullsecret
+      schedulerName: default-scheduler
+      enableServiceLinks: false
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600

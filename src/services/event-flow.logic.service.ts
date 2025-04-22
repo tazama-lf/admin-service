@@ -136,7 +136,11 @@ export const handleGetConditionsForEntity = async (
 
   const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const report = (await databaseManager.getEntityConditionsByGraph(
+    params.id,
+    params.schmenm,
+    !params.retrieveactiveonly,
+  )) as RawConditionResponse[][];
 
   loggerService.log('called database', fnName, params.id);
   if (!report.length || !report[0].length) {
@@ -352,7 +356,12 @@ export const handleGetConditionsForAccount = async (
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
-    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    report = (await databaseManager.getAccountConditionsByGraph(
+      params.id,
+      params.schmenm,
+      params.agt,
+      !params.retrieveactiveonly,
+    )) as RawConditionResponse[][];
   }
 
   loggerService.log('called database', fnName, params.id);
@@ -366,6 +375,12 @@ export const handleGetConditionsForAccount = async (
     return { code: 204 };
   }
 
+  // Updating cache based on the synccache parameter
+  // all - update all conditions
+  // active - update only active conditions
+  // default - use env variable ACTIVE_CONDITIONS_ONLY
+  // no - do not update cache
+  // default - use env variable ACTIVE_CONDITIONS_ONLY
   switch (params.synccache) {
     case 'all':
       loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);

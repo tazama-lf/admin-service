@@ -7,10 +7,13 @@
     "schmenm": {
       "type": "string"
     },
+    "retrieveactiveonly": {
+      "type": "boolean"
+    },
     "synccache": {
       "type": "string",
       "enum": ["no", "all", "active", "default"]
     }
   },
-  "required":["id", "schmenm"]
+  "required": ["id", "schmenm"]
 }

@@ -4,4 +4,5 @@ export interface ConditionRequest {
   synccache?: string;
   condid?: string;
   agt?: string;
+  retrieveactiveonly?: boolean;
 }

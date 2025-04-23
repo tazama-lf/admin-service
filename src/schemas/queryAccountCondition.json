@@ -10,6 +10,9 @@
       "agt": {
         "type": "string"
       },
+      "retrieveactiveonly": {
+        "type": "boolean"
+      },
       "synccache": {
         "type": "string",
         "enum": ["no", "all", "active", "default"]

@@ -139,7 +139,7 @@ export const handleGetConditionsForEntity = async (
   const report = (await databaseManager.getEntityConditionsByGraph(
     params.id,
     params.schmenm,
-    !params.retrieveactiveonly,
+    params.activeonly !== 'yes',
   )) as RawConditionResponse[][];
 
   loggerService.log('called database', fnName, params.id);
@@ -360,7 +360,7 @@ export const handleGetConditionsForAccount = async (
       params.id,
       params.schmenm,
       params.agt,
-      !params.retrieveactiveonly,
+      params.activeonly !== 'yes',
     )) as RawConditionResponse[][];
   }
 

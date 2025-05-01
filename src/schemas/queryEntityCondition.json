@@ -7,8 +7,9 @@
     "schmenm": {
       "type": "string"
     },
-    "retrieveactiveonly": {
-      "type": "boolean"
+    "activeonly": {
+      "type": "string",
+      "enum": ["no", "yes"]
     },
     "synccache": {
       "type": "string",

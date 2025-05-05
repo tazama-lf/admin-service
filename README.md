@@ -191,7 +191,7 @@ POST, GET, PUT
 | `id`   | String | Yes      | Entity identifier |
 | `schmenm`   | String | Yes      |  Scheme name of the entity |
 | `synccache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
-| `retrieveactiveonly`   | Boolean | No      | Specify if request should return all conditions or active ones only  |
+| `activeonly`   | String | No      | Accepts `yes`, or `no`  |
 #### URL 2 GET METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|
@@ -199,7 +199,7 @@ POST, GET, PUT
 | `schmenm`   | String | Yes      | Scheme name of the account |
 | `agt`   | String | Yes      | proprietary agent identifier |
 | `synccache`   | String | No      | Accepts `all`, `active`, `default` or `no`  |
-| `retrieveactiveonly`   | Boolean | No      | Specify if request should return all conditions or active ones only  |
+| `activeonly`   | String | No      | Accepts `yes` or `no`  |
 #### URL 1 PUT METHOD
 | Parameter | Type   | Required | Description                     |
 |-----------|--------|----------|---------------------------------|

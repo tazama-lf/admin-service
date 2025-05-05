@@ -36,7 +36,7 @@
     "@fastify/swagger": "^8.8.0",
     "@fastify/swagger-ui": "^3.0.0",
     "@tazama-lf/auth-lib": "^0.0.9",
-    "@tazama-lf/frms-coe-lib": "^5.0.1-rc.0",
+    "@tazama-lf/frms-coe-lib": "^5.0.1-rc.1",
     "ajv": "^8.16.0",
     "dotenv": "^16.0.3",
     "fastify": "^4.27.0",

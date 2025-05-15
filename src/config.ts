@@ -19,6 +19,7 @@ export interface IConfig {
   ACTIVE_CONDITIONS_ONLY: boolean;
   PORT: number;
   AUTHENTICATED: boolean;
+  CORS_POLICY?: 'demo' | 'prod';
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -36,6 +37,11 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
     name: 'AUTHENTICATED',
     type: 'boolean',
     optional: false,
+  },
+  {
+    name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
   },
 ];
 

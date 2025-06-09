@@ -233,7 +233,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
 
-  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true)) as RawConditionResponse[][];
 
   const retVal = parseConditionEntity(updatedReport[0]);
 
@@ -465,7 +465,12 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    updatedReport = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    updatedReport = (await databaseManager.getAccountConditionsByGraph(
+      params.id,
+      params.schmenm,
+      params.agt,
+      true,
+    )) as RawConditionResponse[][];
   }
   const retVal = parseConditionAccount(updatedReport[0]);
 

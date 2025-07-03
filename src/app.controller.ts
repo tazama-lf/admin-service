@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { type AccountCondition, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
+import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { loggerService, configuration } from '.';
-import { type ConditionRequest } from './interface/query';
+import type { ConditionRequest } from './interface/query';
 import {
   handleGetConditionsForAccount,
   handleGetConditionsForEntity,
@@ -81,11 +81,9 @@ export const putRefreshCache = async (req: FastifyRequest, reply: FastifyReply):
   }
 };
 
-export const handleHealthCheck = async (): Promise<{ status: string }> => {
-  return {
+export const handleHealthCheck = (): { status: string } => ({
     status: 'UP',
-  };
-};
+  });
 
 export const getEntityConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');

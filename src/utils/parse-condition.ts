@@ -3,7 +3,7 @@ import type {
   AccountConditionResponse,
   EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import { type RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 
 export const parseConditionEntity = (input: RawConditionResponse[]): EntityConditionResponse => {
   // Initialize the result object

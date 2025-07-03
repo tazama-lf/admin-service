@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { type FastifyReply, type FastifyRequest, type RouteHandlerMethod } from 'fastify';
-import { type FastifySchema } from 'fastify/types/schema';
+import type { FastifyReply, FastifyRequest, RouteHandlerMethod } from 'fastify';
+import type { FastifySchema } from 'fastify/types/schema';
 import { configuration, loggerService } from '..';
 import { tokenHandler } from '../auth/authHandler';
 

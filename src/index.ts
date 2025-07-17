@@ -5,6 +5,7 @@ import { type AppDatabaseServices, type Configuration, processorConfig } from '.
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
 import { Database } from '@tazama-lf/frms-coe-lib/lib/config/database.config';
 import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
+import * as util from 'node:util';
 
 export const loggerService: LoggerService = new LoggerService(processorConfig);
 
@@ -20,7 +21,7 @@ export const dbInit = async (): Promise<void> => {
 
   databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
   configuration = { ...config, ...processorConfig };
-  loggerService.log(JSON.stringify(databaseManager.isReadyCheck()));
+  loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };
 
 const connect = async (): Promise<void> => {
@@ -40,7 +41,7 @@ const connect = async (): Promise<void> => {
       await connect();
     }
   } catch (err) {
-    loggerService.error(`Error while starting server on Worker ${process.pid}`, err);
+    loggerService.error(`Error while starting server on Worker ${process.pid}`, util.inspect(err));
     process.exit(1);
   }
 })();

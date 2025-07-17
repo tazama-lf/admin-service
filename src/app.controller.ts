@@ -2,7 +2,8 @@
 
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { loggerService, configuration } from '.';
+import * as util from 'node:util';
+import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import {
   handleGetConditionsForAccount,
@@ -14,6 +15,7 @@ import {
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
@@ -26,7 +28,7 @@ export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
     reply.status(data ? 200 : 204);
     reply.send(body);
   } catch (err) {
-    const failMessage = `Failed to process execution request. \n${JSON.stringify(err, null, 4)}`;
+    const failMessage = `Failed to process execution request. \n${util.inspect(err)}`;
     reply.status(500);
     reply.send(failMessage);
   } finally {
@@ -82,8 +84,8 @@ export const putRefreshCache = async (req: FastifyRequest, reply: FastifyReply):
 };
 
 export const handleHealthCheck = (): { status: string } => ({
-    status: 'UP',
-  });
+  status: 'UP',
+});
 
 export const getEntityConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');

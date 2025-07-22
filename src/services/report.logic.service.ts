@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { databaseManager, loggerService } from '..';
-import { type Report } from '../interface/report.interface';
+import type { Report } from '../interface/report.interface';
 
 export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Report | undefined> => {
   let unWrappedReport;

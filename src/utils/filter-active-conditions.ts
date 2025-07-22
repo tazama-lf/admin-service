@@ -1,4 +1,4 @@
-import { type ConditionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
+import type { ConditionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 
 export const filterConditions = (conditions: ConditionDetails[]): ConditionDetails[] => {
   // Could move this in the filter, but we would then be comparing with different values per iteration

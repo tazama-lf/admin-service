@@ -35,7 +35,7 @@
     "@fastify/response-validation": "^3.0.3",
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
-    "@tazama-lf/auth-lib": "^2.0.0",
+    "@tazama-lf/auth-lib": "^2.1.0",
     "@tazama-lf/frms-coe-startup-lib": "2.4.0-rc.4",
     "@tazama-lf/frms-coe-lib": "5.1.0-rc.7",
     "ajv": "^8.17.1",

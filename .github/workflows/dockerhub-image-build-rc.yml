@@ -15,7 +15,7 @@ name: Publish Docker image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "dev" ]
 
 jobs:
   push_to_registry:
@@ -51,7 +51,7 @@ jobs:
         with:
           images: tazamaorg/${{ env.REPO_NAME }}
           tags: |
-            type=raw,value=2.2.0
+            type=raw,value=rc
 
       - name: Build and push Docker image
         id: push
@@ -75,4 +75,4 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          curl -X POST -H 'Content-type: application/json' --data '{"blocks": [{"type": "header","text": {"type": "plain_text","text": "New Dockerhub Image published :ship::ship:","emoji": true}},{"type": "section","fields": [{"type": "mrkdwn","text": "*Service:*\n${{ env.REPO_NAME }} "},{"type": "mrkdwn","text": "*Tazama Dockerhub:*\n<https://hub.docker.com/orgs/tazamaorg/repositories>"}]}]}' $SLACK_WEBHOOK_URL
+          curl -X POST -H 'Content-type: application/json' --data '{"blocks": [{"type": "header","text": {"type": "plain_text","text": "New Dockerhub Release Candidate Image published :ship::ship:","emoji": true}},{"type": "section","fields": [{"type": "mrkdwn","text": "*Service:*\n${{ env.REPO_NAME }} "},{"type": "mrkdwn","text": "*Tazama Dockerhub:*\n<https://hub.docker.com/orgs/tazamaorg/repositories>"}]}]}' $SLACK_WEBHOOK_URL

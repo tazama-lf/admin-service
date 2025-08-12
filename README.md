@@ -50,7 +50,7 @@ Before you start using the Admin API, ensure that you have the following items:
 
 ## API Endpoints
 
-### 1. `/v1/admin/reports/getreportbymsgid`
+### 1. Get report by message id 
 
 #### Description
 This endpoint retrieves a report by the specified message ID (`msgid`). The message ID is provided as a query parameter.
@@ -120,7 +120,7 @@ GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
     ```
 
 
-### 2. 
+### 2. Condition Management
 ##### a. `/v1/admin/event-flow-control/entity`
 ##### b. `/v1/admin/event-flow-control/account`
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import {
   getAccountConditionsHandler,
   getEntityConditionHandler,
@@ -24,7 +24,7 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
 };
 
-async function Routes(fastify: FastifyInstance): Promise<void> {
+function Routes(fastify: FastifyInstance): void {
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
   fastify.get(

@@ -13,6 +13,7 @@ import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { configuration } from '..';
 
 const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
 const queryAccountConditionSchema = { ...queryAccountCondition, $id: 'queryAccountConditionSchema' };
@@ -69,19 +70,17 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
     },
     staticCSP: true,
     transformStaticCSP: (header) => header,
-    transformSpecification: (swaggerObject, request, reply) => {
-      return swaggerObject;
-    },
+    transformSpecification: (swaggerObject, request, reply) => swaggerObject,
     transformSpecificationClone: true,
   });
 
-  fastify.setValidatorCompiler(({ schema }) => {
-    return ajv.compile(schema);
-  });
+  fastify.setValidatorCompiler(({ schema }) => ajv.compile(schema));
+
+  const methods = configuration.CORS_POLICY?.toLowerCase() === 'demo' ? ['GET', 'POST', 'PUT'] : ['GET'];
 
   await fastify.register(fastifyCors, {
     origin: '*',
-    methods: ['GET'],
+    methods,
     allowedHeaders: '*',
   });
 

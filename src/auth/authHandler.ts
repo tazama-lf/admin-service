@@ -1,9 +1,8 @@
 import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { loggerService } from '..';
 
-export const tokenHandler = (claim: string) => {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const tokenHandler = (claim: string) => async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const logContext = 'tokenHandler()';
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Bearer ') || !claim) {
@@ -24,4 +23,3 @@ export const tokenHandler = (claim: string) => {
       reply.code(401).send({ error: 'Unauthorized' });
     }
   };
-};

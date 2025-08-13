@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
-import { type AccountCondition, type ConditionEdge, type EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import {
-  type AccountConditionResponse,
-  type EntityConditionResponse,
+import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type {
+  AccountConditionResponse,
+  EntityConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import {
-  type Account,
-  type Entity,
-  type RawConditionResponse,
+import type {
+  Account,
+  Entity,
+  RawConditionResponse,
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { configuration, databaseManager, loggerService } from '..';
-import { type ConditionRequest } from '../interface/query';
+import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from '../utils/parse-condition';
@@ -77,7 +77,7 @@ export const handlePostConditionEntity = async (
 
     if (!entityId) {
       if (condition.forceCret) {
-        const entityIdentifier = `${condition.ntty.id + condition.ntty.schmeNm.prtry}`;
+        const entityIdentifier = condition.ntty.id + condition.ntty.schmeNm.prtry;
         try {
           condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
           entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })?._id;
@@ -130,13 +130,17 @@ export const handleGetConditionsForEntity = async (
   loggerService.trace('successfully parsed parameters', fnName, params.id);
   const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
 
-  if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+  if (!accountExist[0]?.[0]?._id) {
     return { result: 'Entity does not exist in the database', code: 404 };
   }
 
   const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const report = (await databaseManager.getEntityConditionsByGraph(
+    params.id,
+    params.schmenm,
+    params.activeonly !== 'yes',
+  )) as RawConditionResponse[][];
 
   loggerService.log('called database', fnName, params.id);
   if (!report.length || !report[0].length) {
@@ -229,7 +233,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
 
-  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true)) as RawConditionResponse[][];
 
   const retVal = parseConditionEntity(updatedReport[0]);
 
@@ -348,11 +352,16 @@ export const handleGetConditionsForAccount = async (
   if (params.agt) {
     const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
 
-    if (!accountExist[0] || !accountExist[0][0] || !accountExist[0][0]._id) {
+    if (!accountExist[0]?.[0]?._id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
-    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    report = (await databaseManager.getAccountConditionsByGraph(
+      params.id,
+      params.schmenm,
+      params.agt,
+      params.activeonly !== 'yes',
+    )) as RawConditionResponse[][];
   }
 
   loggerService.log('called database', fnName, params.id);
@@ -366,6 +375,12 @@ export const handleGetConditionsForAccount = async (
     return { code: 204 };
   }
 
+  // Updating cache based on the synccache parameter
+  // all - update all conditions
+  // active - update only active conditions
+  // default - use env variable ACTIVE_CONDITIONS_ONLY
+  // no - do not update cache
+  // default - use env variable ACTIVE_CONDITIONS_ONLY
   switch (params.synccache) {
     case 'all':
       loggerService.trace('syncCache=all option specified', 'cache update', cacheKey);
@@ -450,7 +465,12 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    updatedReport = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    updatedReport = (await databaseManager.getAccountConditionsByGraph(
+      params.id,
+      params.schmenm,
+      params.agt,
+      true,
+    )) as RawConditionResponse[][];
   }
   const retVal = parseConditionAccount(updatedReport[0]);
 

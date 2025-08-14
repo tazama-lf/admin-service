@@ -15,6 +15,7 @@ import {
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handlePostExecuteSqlStatement } from './services/database.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -144,6 +145,20 @@ export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest
     reply.status(code);
     if (code !== 200) throw Error(message);
     reply.send(message);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition for entity request');
+  }
+};
+
+export const executeQueryStatementHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition for entity request');
+  const { databaseName, queryString } = req.body as { queryString: string; databaseName: string };
+
+  try {
+    reply.send(await handlePostExecuteSqlStatement(queryString, databaseName));
+    reply.status(200);
   } catch (err) {
     reply.send(err);
   } finally {

@@ -42,6 +42,7 @@ const connect = async (): Promise<void> => {
     }
   } catch (err) {
     loggerService.error(`Error while starting server on Worker ${process.pid}`, util.inspect(err));
+    loggerService.error(util.inspect(err));
     process.exit(1);
   }
 })();

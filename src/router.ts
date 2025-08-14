@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
+  executeQueryStatementHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -22,6 +23,7 @@ const routePrivilege = {
   postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
+  executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -66,6 +68,7 @@ function Routes(fastify: FastifyInstance): void {
     ),
   );
   fastify.put('/v1/admin/event-flow-control/cache', SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache));
+  fastify.post('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandler, routePrivilege.executeDatabase));
 }
 
 export default Routes;

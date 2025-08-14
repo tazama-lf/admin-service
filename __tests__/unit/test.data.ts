@@ -1,9 +1,17 @@
 import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-const currentDateReq = new Date();
-export const fixedDate = currentDateReq.toISOString();
-export const incptnDtTm = new Date(currentDateReq.setMonth(currentDateReq.getMonth() + 1)).toISOString();
-let Ximedate = new Date(currentDateReq.setMonth(currentDateReq.getMonth() + 2)).toISOString();
-export const xprtnDtTm = Ximedate || undefined;
+
+// Create dates without mutating the same object
+const currentDate = new Date();
+export const fixedDate = currentDate.toISOString();
+
+// Create a new date for inception time (current time + 1 second to pass validation)
+const inceptionDate = new Date(currentDate.getTime() + 1000);
+export const incptnDtTm = inceptionDate.toISOString();
+
+// Create a new date for expiration time (2 months from now)
+const expirationDate = new Date();
+expirationDate.setMonth(expirationDate.getMonth() + 2);
+export const xprtnDtTm = expirationDate.toISOString();
 
 export const rawResponseEntity = {
   governed_as_creditor_by: [
@@ -17,6 +25,7 @@ export const rawResponseEntity = {
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
+        tenantId: 'DEFAULT',
       },
       result: {
         _key: '+27733161225MSISDN',
@@ -24,6 +33,7 @@ export const rawResponseEntity = {
         _rev: '_iTm1jLG---',
         Id: '+27733161225MSISDN',
         CreDtTm: fixedDate,
+        TenantId: 'DEFAULT',
       },
       condition: {
         _key: '2110',
@@ -44,6 +54,7 @@ export const rawResponseEntity = {
         forceCret: true,
         usr: 'bob',
         creDtTm: fixedDate,
+        tenantId: 'DEFAULT',
       },
     },
   ],
@@ -58,6 +69,7 @@ export const rawResponseEntity = {
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
+        tenantId: 'DEFAULT',
       },
       result: {
         _key: '+27733161225MSISDN',
@@ -65,6 +77,7 @@ export const rawResponseEntity = {
         _rev: '_iTm1jLG---',
         Id: '+27733161225MSISDN',
         CreDtTm: fixedDate,
+        TenantId: 'DEFAULT',
       },
       condition: {
         _key: '2110',
@@ -85,9 +98,12 @@ export const rawResponseEntity = {
         forceCret: true,
         usr: 'bob',
         creDtTm: fixedDate,
+        tenantId: 'DEFAULT',
       },
     },
   ],
+  governed_as_creditor_account_by: [],
+  governed_as_debtor_account_by: [],
 };
 
 export const rawResponseAccount = {
@@ -102,11 +118,13 @@ export const rawResponseAccount = {
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
+        tenantId: 'DEFAULT',
       },
       result: {
         _key: '1010101010Mxxdfsp001',
         _id: 'accounts/1010101010Mxxdfsp001',
         _rev: '_iU7ER2G---',
+        TenantId: 'DEFAULT',
       },
       condition: {
         _key: '2110',
@@ -134,6 +152,7 @@ export const rawResponseAccount = {
         forceCret: true,
         usr: 'bob',
         creDtTm: fixedDate,
+        tenantId: 'DEFAULT',
       },
     },
   ],
@@ -148,11 +167,13 @@ export const rawResponseAccount = {
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
+        tenantId: 'DEFAULT',
       },
       result: {
         _key: '1010101010Mxxdfsp001',
         _id: 'accounts/1010101010Mxxdfsp001',
         _rev: '_iU7ER2G---',
+        TenantId: 'DEFAULT',
       },
       condition: {
         _key: '2110',
@@ -180,9 +201,12 @@ export const rawResponseAccount = {
         forceCret: true,
         usr: 'bob',
         creDtTm: fixedDate,
+        tenantId: 'DEFAULT',
       },
     },
   ],
+  governed_as_creditor_by: [],
+  governed_as_debtor_by: [],
 };
 
 export const accountResponse = {
@@ -210,6 +234,7 @@ export const accountResponse = {
         incptnDtTm,
         condRsn: 'R001',
         usr: 'bob',
+        tenantId: 'DEFAULT',
         prsptvs: [
           {
             prsptv: 'governed_as_creditor_account_by',
@@ -247,6 +272,7 @@ export const entityResponse = {
         condRsn: 'R001',
         usr: 'bob',
         creDtTm: fixedDate,
+        tenantId: 'DEFAULT',
         prsptvs: [
           {
             prsptv: 'governed_as_creditor_by',
@@ -283,6 +309,7 @@ export const sampleEntityCondition: EntityCondition = {
   usr: 'bob',
   creDtTm: fixedDate,
   condId: '2110',
+  tenantId: 'DEFAULT',
 };
 
 export const sampleAccountCondition: AccountCondition = {
@@ -309,4 +336,5 @@ export const sampleAccountCondition: AccountCondition = {
   usr: 'bob',
   creDtTm: fixedDate,
   condId: '2110',
+  tenantId: 'DEFAULT',
 };

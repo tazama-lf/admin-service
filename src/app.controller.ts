@@ -15,12 +15,14 @@ import {
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import type { TenantAwareRequest } from './utils/tenant-context';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
+    const { tenantId } = req as TenantAwareRequest;
     const request = req.query as { msgid: string };
-    const data = await handleGetReportRequestByMsgId(request.msgid);
+    const data = await handleGetReportRequestByMsgId(request.msgid, tenantId);
     const body = {
       message: 'Report was found',
       data,
@@ -37,10 +39,11 @@ export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyRe
 };
 
 export const postConditionHandlerEntity = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle saving entity condition  request');
+  loggerService.log('Start - Handle saving entity condition request');
   try {
     const condition = req.body as EntityCondition;
-    const data = await handlePostConditionEntity(condition);
+    const { tenantId } = req as TenantAwareRequest;
+    const data = await handlePostConditionEntity(condition, tenantId);
 
     reply.status(200);
     reply.send(data);
@@ -56,7 +59,8 @@ export const postConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
   loggerService.log('Start - Handle saving account condition request');
   try {
     const condition = req.body as AccountCondition;
-    const data = await handlePostConditionAccount(condition);
+    const { tenantId } = req as TenantAwareRequest;
+    const data = await handlePostConditionAccount(condition, tenantId);
 
     reply.status(200);
     reply.send(data);
@@ -71,9 +75,10 @@ export const postConditionHandlerAccount = async (req: FastifyRequest, reply: Fa
 export const putRefreshCache = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle cache refresh');
   try {
+    const { tenantId } = req as TenantAwareRequest;
     const ttl = configuration.redisConfig.distributedCacheTTL!;
     const activeOnly = configuration.ACTIVE_CONDITIONS_ONLY;
-    await handleRefreshCache(activeOnly, ttl);
+    await handleRefreshCache(activeOnly, tenantId, ttl);
     reply.status(204);
   } catch (err) {
     reply.status(500);
@@ -90,7 +95,8 @@ export const handleHealthCheck = (): { status: string } => ({
 export const getEntityConditionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.trace('getting conditions for an entity');
   try {
-    const { code, result } = await handleGetConditionsForEntity(req.query as ConditionRequest);
+    const { tenantId } = req as TenantAwareRequest;
+    const { code, result } = await handleGetConditionsForEntity(req.query as ConditionRequest, tenantId);
 
     reply.status(code);
     reply.send(result);
@@ -106,7 +112,8 @@ export const getEntityConditionHandler = async (req: FastifyRequest, reply: Fast
 export const getAccountConditionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle get account condition request');
   try {
-    const { code, result } = await handleGetConditionsForAccount(req.query as ConditionRequest);
+    const { tenantId } = req as TenantAwareRequest;
+    const { code, result } = await handleGetConditionsForAccount(req.query as ConditionRequest, tenantId);
 
     reply.status(code);
     reply.send(result);
@@ -123,7 +130,8 @@ export const updateAccountConditionExpiryDateHandler = async (req: FastifyReques
   loggerService.log('Start - Handle update condition for account request');
   const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
-    const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, expiryDate);
+    const { tenantId } = req as TenantAwareRequest;
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, tenantId, expiryDate);
 
     reply.status(code);
     if (code !== 200) throw Error(message);
@@ -139,7 +147,8 @@ export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest
   loggerService.log('Start - Handle update condition for entity request');
   const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
-    const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, expiryDate);
+    const { tenantId } = req as TenantAwareRequest;
+    const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, tenantId, expiryDate);
 
     reply.status(code);
     if (code !== 200) throw Error(message);

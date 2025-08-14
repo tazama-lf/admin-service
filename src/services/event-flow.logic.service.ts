@@ -2,20 +2,14 @@
 import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import type {
-  AccountConditionResponse,
-  EntityConditionResponse,
-} from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import type {
-  Account,
-  Entity,
-  RawConditionResponse,
-} from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import type { AccountConditionResponse, EntityConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
+import type { Account, Entity, RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { configuration, databaseManager, loggerService } from '..';
 import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from '../utils/parse-condition';
+import { generateTenantEntityKey, generateTenantAccountKey } from '../utils/tenant-database';
 import { updateCache } from '../utils/update-cache';
 
 const saveConditionEdges = async (
@@ -24,7 +18,11 @@ const saveConditionEdges = async (
   entityAccntId: string,
   condition: ConditionEdge,
   memberType: 'entity' | 'account',
+  tenantId: string,
 ): Promise<void> => {
+  // Ensure condition has tenantId set
+  condition.tenantId ||= tenantId;
+
   switch (perspective) {
     case 'both':
       if (memberType === 'entity') {
@@ -60,6 +58,7 @@ const saveConditionEdges = async (
 
 export const handlePostConditionEntity = async (
   condition: EntityCondition,
+  tenantId: string,
 ): Promise<{ message: string; result: EntityConditionResponse }> => {
   try {
     loggerService.log(`Started handling post request of entity condition executed by ${condition.usr}.`);
@@ -68,19 +67,28 @@ export const handlePostConditionEntity = async (
 
     checkConditionValidity(condition);
 
+    // Ensure tenantId is set on the condition
+    condition.tenantId = tenantId;
+
     let condId = '';
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
 
-    const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary)) as Array<Array<{ _id: string }>>;
+    // Generate tenant-aware entity identifier
+    const tenantEntityIdentifier = generateTenantEntityKey(condEntityId, condSchemeProprietary, tenantId);
+
+    const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary, tenantId)) as Array<
+      Array<{ _id: string }>
+    >;
     let entityId = unwrap<{ _id: string }>(alreadyExistingEntity)?._id;
 
     if (!entityId) {
       if (condition.forceCret) {
-        const entityIdentifier = condition.ntty.id + condition.ntty.schmeNm.prtry;
+        // Create new entity with tenant-aware identifier
         try {
-          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
-          entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })?._id;
+          condition.creDtTm = nowDateTime;
+          condId = ((await databaseManager.saveCondition(condition)) as { _id: string })?._id;
+          entityId = ((await databaseManager.saveEntity(tenantEntityIdentifier, tenantId, nowDateTime)) as { _id: string })?._id;
         } catch (err) {
           throw Error('Error: while trying to save new entity: ' + (err as { message: string }).message);
         }
@@ -89,14 +97,15 @@ export const handlePostConditionEntity = async (
         throw Error('Error: entity was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
+      condition.creDtTm = nowDateTime;
+      condId = ((await databaseManager.saveCondition(condition)) as { _id: string })?._id;
     }
 
-    await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity');
+    await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity', tenantId);
 
-    const report = (await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary)) as RawConditionResponse[][];
+    const report = await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary, tenantId);
 
-    const retVal = parseConditionEntity(report[0]);
+    const retVal = parseConditionEntity(report[0], tenantId);
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
@@ -124,11 +133,12 @@ export const handlePostConditionEntity = async (
 
 export const handleGetConditionsForEntity = async (
   params: ConditionRequest,
+  tenantId: string,
 ): Promise<{ code: number; result?: string | EntityConditionResponse }> => {
   const fnName = 'getConditionsForEntity';
 
   loggerService.trace('successfully parsed parameters', fnName, params.id);
-  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
+  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm, tenantId)) as Entity[][];
 
   if (!accountExist[0]?.[0]?._id) {
     return { result: 'Entity does not exist in the database', code: 404 };
@@ -136,18 +146,14 @@ export const handleGetConditionsForEntity = async (
 
   const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-  const report = (await databaseManager.getEntityConditionsByGraph(
-    params.id,
-    params.schmenm,
-    params.activeonly !== 'yes',
-  )) as RawConditionResponse[][];
+  const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId, params.activeonly !== 'yes');
 
   loggerService.log('called database', fnName, params.id);
   if (!report.length || !report[0].length) {
     return { code: 404 };
   }
 
-  const retVal = parseConditionEntity(report[0]);
+  const retVal = parseConditionEntity(report[0], tenantId);
 
   if (!retVal.conditions.length) {
     return { code: 204 };
@@ -184,6 +190,7 @@ export const handleGetConditionsForEntity = async (
 
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
   params: ConditionRequest,
+  tenantId: string,
   xprtnDtTm?: string,
 ): Promise<{ code: number; message: string }> => {
   const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
@@ -193,7 +200,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     return { code: 400, message: expireDateResult.message };
   }
 
-  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId);
 
   if (!report.length || !report[0].length || !report[0][0]) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
@@ -229,13 +236,18 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+  await databaseManager.updateExpiryDateOfEntityEdges(
+    creditorByEdge[0]?.edge._key,
+    debtorByEdge[0]?.edge._key,
+    expireDateResult.dateStr,
+    tenantId,
+  );
 
-  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
 
-  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true)) as RawConditionResponse[][];
+  const updatedReport = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId, true);
 
-  const retVal = parseConditionEntity(updatedReport[0]);
+  const retVal = parseConditionEntity(updatedReport[0], tenantId);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
   const cacheKey = `entities/${params.id}${params.schmenm}`;
@@ -247,6 +259,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
 export const handlePostConditionAccount = async (
   condition: AccountCondition,
+  tenantId: string,
 ): Promise<{ message: string; result: AccountConditionResponse }> => {
   try {
     loggerService.log(`Started handling post request of account condition executed by ${condition.usr}.`);
@@ -255,22 +268,31 @@ export const handlePostConditionAccount = async (
 
     checkConditionValidity(condition);
 
+    // Ensure tenantId is set on the condition
+    condition.tenantId = tenantId;
+
     let condId = '';
     const condAccounntId: string = condition.acct.id;
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
 
-    const alreadyExistingAccount = (await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid)) as Array<
-      Array<{ _id: string }>
-    >;
+    // Generate tenant-aware account identifier
+    const tenantAccountIdentifier = generateTenantAccountKey(condAccounntId, condSchemeProprietary, condMemberid, tenantId);
+
+    const alreadyExistingAccount = (await databaseManager.getAccount(
+      condAccounntId,
+      condSchemeProprietary,
+      condMemberid,
+      tenantId,
+    )) as Array<Array<{ _id: string }>>;
     let accountId = unwrap<{ _id: string }>(alreadyExistingAccount)?._id;
 
     if (!accountId) {
       if (condition.forceCret) {
-        const accountIdentifier = `${condAccounntId}${condSchemeProprietary}${condMemberid}`;
+        // Create new account with tenant-aware identifier
         try {
-          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
-          accountId = ((await databaseManager.saveAccount(accountIdentifier)) as { _id: string })?._id;
+          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId })) as { _id: string })?._id;
+          accountId = ((await databaseManager.saveAccount(tenantAccountIdentifier, tenantId)) as { _id: string })?._id;
         } catch (err) {
           throw Error('Error: while trying to save new account: ' + (err as { message: string }).message);
         }
@@ -279,18 +301,14 @@ export const handlePostConditionAccount = async (
         throw Error('Error: account was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
+      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId })) as { _id: string })?._id;
     }
 
-    await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account');
+    await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account', tenantId);
 
-    const report = (await databaseManager.getAccountConditionsByGraph(
-      condAccounntId,
-      condSchemeProprietary,
-      condMemberid,
-    )) as RawConditionResponse[][];
+    const report = await databaseManager.getAccountConditionsByGraph(condAccounntId, condSchemeProprietary, tenantId, condMemberid);
 
-    const retVal = parseConditionAccount(report[0]);
+    const retVal = parseConditionAccount(report[0], tenantId);
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
@@ -318,9 +336,9 @@ export const handlePostConditionAccount = async (
   }
 };
 
-export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Promise<void> => {
+export const handleRefreshCache = async (activeOnly: boolean, tenantId: string, ttl: number): Promise<void> => {
   try {
-    const data = (await databaseManager.getConditions(activeOnly)) as Array<Array<EntityCondition | AccountCondition>>;
+    const data = (await databaseManager.getConditions(activeOnly, tenantId)) as Array<Array<EntityCondition | AccountCondition>>;
     if (!data.length || !data[0].length) {
       return; // no conditions
     }
@@ -342,6 +360,7 @@ export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Prom
 
 export const handleGetConditionsForAccount = async (
   params: ConditionRequest,
+  tenantId: string,
 ): Promise<{ code: number; result?: string | AccountConditionResponse }> => {
   const fnName = 'getConditionsForAccount';
 
@@ -350,18 +369,19 @@ export const handleGetConditionsForAccount = async (
 
   let report: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
+    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt, tenantId)) as Account[][];
 
     if (!accountExist[0]?.[0]?._id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
-    report = (await databaseManager.getAccountConditionsByGraph(
+    report = await databaseManager.getAccountConditionsByGraph(
       params.id,
       params.schmenm,
+      tenantId,
       params.agt,
       params.activeonly !== 'yes',
-    )) as RawConditionResponse[][];
+    );
   }
 
   loggerService.log('called database', fnName, params.id);
@@ -369,7 +389,7 @@ export const handleGetConditionsForAccount = async (
     return { code: 404 };
   }
 
-  const retVal = parseConditionAccount(report[0]);
+  const retVal = parseConditionAccount(report[0], tenantId);
 
   if (!retVal.conditions.length) {
     return { code: 204 };
@@ -411,6 +431,7 @@ export const handleGetConditionsForAccount = async (
 
 export const handleUpdateExpiryDateForConditionsOfAccount = async (
   params: ConditionRequest,
+  tenantId: string,
   xprtnDtTm?: string,
 ): Promise<{ code: number; message: string }> => {
   const expireDateResult = validateAndParseExpirationDate(xprtnDtTm);
@@ -422,7 +443,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   let report: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    report = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, tenantId, params.agt);
   }
 
   if (!report.length || !report[0].length || !report[0][0]) {
@@ -459,20 +480,20 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+  await databaseManager.updateExpiryDateOfAccountEdges(
+    creditorByEdge[0]?.edge._key,
+    debtorByEdge[0]?.edge._key,
+    expireDateResult.dateStr,
+    tenantId,
+  );
 
-  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    updatedReport = (await databaseManager.getAccountConditionsByGraph(
-      params.id,
-      params.schmenm,
-      params.agt,
-      true,
-    )) as RawConditionResponse[][];
+    updatedReport = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, tenantId, params.agt, true);
   }
-  const retVal = parseConditionAccount(updatedReport[0]);
+  const retVal = parseConditionAccount(updatedReport[0], tenantId);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
   const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;

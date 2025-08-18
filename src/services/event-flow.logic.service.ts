@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
-import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
+//import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import type {
-  AccountConditionResponse,
-  EntityConditionResponse,
-} from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import type {
-  Account,
-  Entity,
-  RawConditionResponse,
-} from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import type { AccountConditionResponse, EntityConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
+import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { configuration, databaseManager, loggerService } from '..';
 import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from '../utils/parse-condition';
 import { updateCache } from '../utils/update-cache';
+import { v4 } from 'uuid';
 
 const saveConditionEdges = async (
   perspective: string,
@@ -68,19 +62,19 @@ export const handlePostConditionEntity = async (
 
     checkConditionValidity(condition);
 
-    let condId = '';
+    const condId = v4();
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
 
-    const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary)) as Array<Array<{ _id: string }>>;
-    let entityId = unwrap<{ _id: string }>(alreadyExistingEntity)?._id;
+    const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary))!;
+    let entityId = alreadyExistingEntity.id;
 
     if (!entityId) {
       if (condition.forceCret) {
-        const entityIdentifier = condition.ntty.id + condition.ntty.schmeNm.prtry;
+        entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
         try {
-          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
-          entityId = ((await databaseManager.saveEntity(entityIdentifier, nowDateTime)) as { _id: string })?._id;
+          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
+          await databaseManager.saveEntity(entityId, nowDateTime);
         } catch (err) {
           throw Error('Error: while trying to save new entity: ' + (err as { message: string }).message);
         }
@@ -89,12 +83,12 @@ export const handlePostConditionEntity = async (
         throw Error('Error: entity was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
+      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
     }
 
     await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity');
 
-    const report = (await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary)) as RawConditionResponse[][];
+    const report = await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary);
 
     const retVal = parseConditionEntity(report[0]);
 
@@ -128,19 +122,15 @@ export const handleGetConditionsForEntity = async (
   const fnName = 'getConditionsForEntity';
 
   loggerService.trace('successfully parsed parameters', fnName, params.id);
-  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm)) as Entity[][];
+  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm))!;
 
-  if (!accountExist[0]?.[0]?._id) {
+  if (!accountExist?.id) {
     return { result: 'Entity does not exist in the database', code: 404 };
   }
 
   const cacheKey = `entities/${params.id}${params.schmenm}`;
 
-  const report = (await databaseManager.getEntityConditionsByGraph(
-    params.id,
-    params.schmenm,
-    params.activeonly !== 'yes',
-  )) as RawConditionResponse[][];
+  const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, params.activeonly !== 'yes');
 
   loggerService.log('called database', fnName, params.id);
   if (!report.length || !report[0].length) {
@@ -181,7 +171,7 @@ export const handleGetConditionsForEntity = async (
 
   return { code: 200, result: retVal };
 };
-
+// TODO WAITING FIX TO RETURN CONDITION ID
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
   params: ConditionRequest,
   xprtnDtTm?: string,
@@ -193,7 +183,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     return { code: 400, message: expireDateResult.message };
   }
 
-  const report = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm)) as RawConditionResponse[][];
+  const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm);
 
   if (!report.length || !report[0].length || !report[0][0]) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
@@ -205,17 +195,17 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
   }
 
-  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
-  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition.condId === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition.condId === params.condid);
 
   if (
-    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
+    !creditorByEdge.some((eachDocument) => eachDocument.condition.condId) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition.condId)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result.id) && !debtorByEdge.some((eachDocument) => eachDocument.result.id)) {
     return { code: 404, message: 'Entity does not exist in the database.' };
   }
 
@@ -229,11 +219,18 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+  // await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
+  if (creditorByEdge[0]) {
+    await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge.id, expireDateResult.dateStr, '');
+  }
+
+  if (debtorByEdge[0]) {
+    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+  }
 
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
 
-  const updatedReport = (await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true)) as RawConditionResponse[][];
+  const updatedReport = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true);
 
   const retVal = parseConditionEntity(updatedReport[0]);
 
@@ -245,6 +242,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
   return { code: 200, message: '' };
 };
 
+// TODO AWAITING FIX FOR saveCondition TO RETURN NEW ID
 export const handlePostConditionAccount = async (
   condition: AccountCondition,
 ): Promise<{ message: string; result: AccountConditionResponse }> => {
@@ -255,22 +253,20 @@ export const handlePostConditionAccount = async (
 
     checkConditionValidity(condition);
 
-    let condId = '';
+    const condId = v4();
     const condAccounntId: string = condition.acct.id;
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
 
-    const alreadyExistingAccount = (await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid)) as Array<
-      Array<{ _id: string }>
-    >;
-    let accountId = unwrap<{ _id: string }>(alreadyExistingAccount)?._id;
+    const alreadyExistingAccount = await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid);
+    let accountId = alreadyExistingAccount?.id;
 
     if (!accountId) {
       if (condition.forceCret) {
-        const accountIdentifier = `${condAccounntId}${condSchemeProprietary}${condMemberid}`;
+        accountId = `${condAccounntId}${condSchemeProprietary}${condMemberid}`;
         try {
-          condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
-          accountId = ((await databaseManager.saveAccount(accountIdentifier)) as { _id: string })?._id;
+          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
+          await databaseManager.saveAccount(accountId);
         } catch (err) {
           throw Error('Error: while trying to save new account: ' + (err as { message: string }).message);
         }
@@ -279,16 +275,12 @@ export const handlePostConditionAccount = async (
         throw Error('Error: account was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      condId = ((await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime })) as { _id: string })?._id;
+      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
     }
 
     await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account');
 
-    const report = (await databaseManager.getAccountConditionsByGraph(
-      condAccounntId,
-      condSchemeProprietary,
-      condMemberid,
-    )) as RawConditionResponse[][];
+    const report = await databaseManager.getAccountConditionsByGraph(condAccounntId, condSchemeProprietary, condMemberid);
 
     const retVal = parseConditionAccount(report[0]);
 
@@ -320,12 +312,12 @@ export const handlePostConditionAccount = async (
 
 export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Promise<void> => {
   try {
-    const data = (await databaseManager.getConditions(activeOnly)) as Array<Array<EntityCondition | AccountCondition>>;
-    if (!data.length || !data[0].length) {
+    const data = (await databaseManager.getConditions(activeOnly)) as Array<AccountCondition | EntityCondition>;
+    if (data?.length > 0) {
       return; // no conditions
     }
 
-    const buf = createSimpleConditionsBuffer(data[0]);
+    const buf = createSimpleConditionsBuffer(data);
 
     if (buf) {
       await databaseManager.set(`conditions:expired=${activeOnly}`, buf, ttl);
@@ -350,18 +342,13 @@ export const handleGetConditionsForAccount = async (
 
   let report: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt)) as Account[][];
+    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt))!;
 
-    if (!accountExist[0]?.[0]?._id) {
+    if (!accountExist?.id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
-    report = (await databaseManager.getAccountConditionsByGraph(
-      params.id,
-      params.schmenm,
-      params.agt,
-      params.activeonly !== 'yes',
-    )) as RawConditionResponse[][];
+    report = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt, params.activeonly !== 'yes');
   }
 
   loggerService.log('called database', fnName, params.id);
@@ -422,7 +409,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   let report: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    report = (await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt)) as RawConditionResponse[][];
+    report = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt);
   }
 
   if (!report.length || !report[0].length || !report[0][0]) {
@@ -435,17 +422,17 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
   }
 
-  const creditorByEdge = resultByEdge.governed_as_creditor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
-  const debtorByEdge = resultByEdge.governed_as_debtor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const creditorByEdge = resultByEdge.governed_as_creditor_account_by.filter((eachResult) => eachResult.condition.condId === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_account_by.filter((eachResult) => eachResult.condition.condId === params.condid);
 
   if (
-    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
+    !creditorByEdge.some((eachDocument) => eachDocument.condition.condId) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition.condId)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result.id) && !debtorByEdge.some((eachDocument) => eachDocument.result.id)) {
     return { code: 404, message: 'Account does not exist in the database.' };
   }
 
@@ -459,18 +446,23 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge._key, debtorByEdge[0]?.edge._key, expireDateResult.dateStr);
+  // TODO tenantID stuff
+  // await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
+  if (creditorByEdge[0]) {
+    await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+  }
 
-  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+  if (debtorByEdge[0]) {
+    await databaseManager.updateExpiryDateOfDebtorAccountEdges(debtorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+  }
+
+  if (params.condid) {
+    await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
+  }
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {
-    updatedReport = (await databaseManager.getAccountConditionsByGraph(
-      params.id,
-      params.schmenm,
-      params.agt,
-      true,
-    )) as RawConditionResponse[][];
+    updatedReport = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt, true);
   }
   const retVal = parseConditionAccount(updatedReport[0]);
 

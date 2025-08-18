@@ -15,7 +15,7 @@ let configuration: Configuration;
 
 export const dbInit = async (): Promise<void> => {
   const { db, config } = await CreateStorageManager(
-    [Database.PSEUDONYMS, Database.EVALUATION, Cache.DISTRIBUTED],
+    [Database.EVENT_HISTORY, Database.EVALUATION, Cache.DISTRIBUTED, Database.CONFIGURATION],
     processorConfig.nodeEnv === 'production',
   );
 

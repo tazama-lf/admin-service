@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type { AccountCondition, EntityCondition, NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import * as util from 'node:util';
 import { configuration, loggerService } from '.';
@@ -15,6 +15,8 @@ import {
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handlePostExecuteSqlStatement } from './services/database.logic.service';
+import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -144,6 +146,69 @@ export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest
     reply.status(code);
     if (code !== 200) throw Error(message);
     reply.send(message);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition for entity request');
+  }
+};
+
+export const executeQueryStatementHandlerGet = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition for entity request');
+  const { dbname, object, field, value } = req.query as { dbname: string; object: string; field: string; value: string };
+  const queryString = `SELECT * FROM ${object} ${field ? `WHERE configuration->>'${field}' = '${value}'` : ''}`;
+
+  try {
+    reply.send(await handlePostExecuteSqlStatement(queryString, dbname));
+    reply.status(200);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition for entity request');
+  }
+};
+
+export const executeQueryStatementHandlerPut = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition for entity request');
+  const nm = req.body as NetworkMap;
+  try {
+    const query: PgQueryConfig = {
+      text: `INSERT INTO network_map
+              (network_map)
+            VALUES
+              ($1)`,
+      values: [nm],
+    };
+
+    reply.send(await handlePostExecuteSqlStatement(query, 'configuration'));
+    reply.status(200);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition for entity request');
+  }
+};
+
+export const executeQueryStatementHandlerPost = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition for entity request');
+  const { databaseName, queryString } = req.body as { queryString: string; databaseName: string };
+  try {
+    reply.send(await handlePostExecuteSqlStatement(queryString, databaseName));
+    reply.status(200);
+  } catch (err) {
+    reply.send(err);
+  } finally {
+    loggerService.log('End - Handle update condition for entity request');
+  }
+};
+
+export const executeQueryStatementHandlerDelete = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update condition for entity request');
+  let { databaseName, queryString } = req.body as { queryString: string; databaseName: string };
+  queryString = `DELETE FROM "public"."account" WHERE "id" = '${queryString}';`;
+  try {
+    reply.send(await handlePostExecuteSqlStatement(queryString, databaseName));
+    reply.status(200);
   } catch (err) {
     reply.send(err);
   } finally {

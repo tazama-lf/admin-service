@@ -77,7 +77,7 @@ const conditionObjectAssign = (
   conditionsById: Record<string, ConditionDetails>,
 ): void => {
   item[fieldName].forEach(({ condition }) => {
-    const condId = condition._key;
+    const { condId } = condition;
 
     const conditionDetails: ConditionDetails = {
       condId,

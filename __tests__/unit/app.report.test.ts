@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { databaseManager, loggerService } from '../../src';
 import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.service';
 
@@ -32,10 +31,6 @@ jest.mock('../../src/', () => ({
   },
 }));
 
-jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/unwrap', () => ({
-  unwrap: jest.fn(),
-}));
-
 describe('handleGetReportRequestByMsgId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,13 +44,11 @@ describe('handleGetReportRequestByMsgId', () => {
     ];
     // Ensure getReportByMessageId is typed as a Jest mock function
     (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
 
     const msgid = 'test-msg-id';
     const result = await handleGetReportRequestByMsgId(msgid);
 
     expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
-    expect(unwrap).toHaveBeenCalledWith([mockReport]);
     expect(result).toBe(mockReport);
     expect(loggerService.log).toHaveBeenCalledWith(`Started handling get request by message id the message id is ${msgid}`);
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
@@ -83,7 +76,6 @@ describe('handleGetReportRequestByMsgId', () => {
       },
     ];
     (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
 
     const msgid = 'test-msg-id';
     await handleGetReportRequestByMsgId(msgid);

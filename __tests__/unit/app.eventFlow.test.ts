@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { configuration, databaseManager, loggerService } from '../../src';
 import {
   handleGetConditionsForAccount,
@@ -20,7 +19,7 @@ import {
   sampleEntityCondition,
   xprtnDtTm,
 } from './test.data';
-import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { AccountCondition, Entity, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
   const original = jest.requireActual('@tazama-lf/frms-coe-lib');
@@ -67,19 +66,15 @@ jest.mock('../../src/', () => ({
   },
 }));
 
-jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/unwrap', () => ({
-  unwrap: jest.fn(),
-}));
-
 describe('handlePostConditionEntity', () => {
   beforeEach(() => {
     jest.clearAllMocks(); // Clear mocks before each test
 
-    jest.spyOn(databaseManager, 'getEntity').mockImplementation(() => {
-      return Promise.resolve(
-        [[]], // No existing entity
-      );
-    });
+    jest
+      .spyOn(databaseManager, 'getEntity')
+      .mockImplementation((entityId: string, schemeProprietary: string): Promise<Entity | undefined> => {
+        return Promise.resolve({} as Entity);
+      });
 
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([[rawResponseEntity]]);

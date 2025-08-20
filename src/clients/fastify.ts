@@ -73,6 +73,11 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
     transformSpecification: (swaggerObject, request, reply) => swaggerObject,
     transformSpecificationClone: true,
   });
+  fastify.addHook('onRoute', r => {
+    if (r.url === '/v1/admin/config/networkmap') {
+      fastify.log.info({ schema: r?.schema?.response }, '200 schema');
+    }
+  });
 
   fastify.setValidatorCompiler(({ schema }) => ajv.compile(schema));
 

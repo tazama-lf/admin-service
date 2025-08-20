@@ -16,6 +16,11 @@ import {
   updateEntityConditionExpiryDateHandler,
 } from './app.controller';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import { buildCrudPlugin } from './utils/crud-schema';
+import {  NetworkMapRepo } from './repositories/network.map.repository';
+import { NetworkMap } from './schemas/NetworkMapEntity';
+import { RuleConfig } from './schemas/RuleConfigEntity';
+import { RuleConfigRepo } from './repositories/rule.config.repository';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -73,26 +78,32 @@ function Routes(fastify: FastifyInstance): void {
   fastify.put('/v1/admin/event-flow-control/cache', SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache));
   fastify.post('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPost, routePrivilege.executeDatabase));
   fastify.put('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPut, routePrivilege.executeDatabase));
-  // fastify.get('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerGet, routePrivilege.executeDatabase));
-  fastify.get(
-    '/v1/admin/database/execute',
-    {
-      schema: {
-        querystring: {
-          type: 'object',
-          properties: {
-            dbname: { type: 'string' },
-            object: { type: 'string' },
-            field: { type: 'string' },
-            value: { type: 'string' },
-            // limit: { type: 'integer', default: 10 }
-          },
-        },
-      },
-    },
-    executeQueryStatementHandlerGet,
+  fastify.put('/v1/admin/history/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPut, routePrivilege.executeDatabase));
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/config/networkmap',
+      repo: NetworkMapRepo,
+      schemas: { Entity: NetworkMap, Create: NetworkMap, Update: NetworkMap }
+    })
   );
-  fastify.delete('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerDelete, routePrivilege.executeDatabase));
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/config/ruleconfig',
+      repo: RuleConfigRepo,
+      schemas: { Entity: RuleConfig, Create: RuleConfig, Update: RuleConfig }
+    })
+  );
+  // fastify.register(
+  //   buildCrudPlugin({
+  //     prefix: "/v1/admin/config/rule-config",
+  //     repo: RuleConfigRepo,
+  //     schemas: { Entity: RuleConfigEntity, Create: RuleConfigEntity, Update: RuleConfigEntity, Id: String }
+  //   })
+  // );
+
+  // fastify.delete('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerDelete, routePrivilege.executeDatabase));
 }
 
 export default Routes;

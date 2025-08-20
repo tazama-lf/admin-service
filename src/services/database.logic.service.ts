@@ -3,10 +3,10 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { loggerService } from '..';
 import { Pool, type QueryResult, type PoolConfig, type QueryResultRow } from 'pg';
 
-export const handlePostExecuteSqlStatement = async (
+export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
   queryString: string | PgQueryConfig,
   databaseName: string,
-): Promise<QueryResult<QueryResultRow>> => {
+): Promise<QueryResult<T>> => {
   try {
     loggerService.log('Started handling execution of the sql statement');
 
@@ -19,7 +19,7 @@ export const handlePostExecuteSqlStatement = async (
     };
 
     const db = new Pool(databaseConfig);
-    return await db.query(queryString);
+    return await db.query<T>(queryString);
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(

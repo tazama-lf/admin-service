@@ -77,50 +77,50 @@ export const tokenHandler =
     }
   };
 
-export const tenantAwareTokenHandler = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  const logContext = 'tenantAwareTokenHandler()';
+/**
+ * Validates both tenantId and claims from JWT token
+ * @param claims Array of claims to validate (privileges, etc)
+ */
+export const tenantAwareTokenHandler =
+  (claims: string[] = []) =>
+  async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const logContext = 'tenantAwareTokenHandler()';
+    let tenantId: string;
 
-  let tenantId: string;
-
-  if (!configuration.AUTHENTICATED) {
-    // If authentication is disabled, always use "DEFAULT" as tenant ID
-    tenantId = 'DEFAULT';
-    loggerService.debug(`Authentication disabled, using default tenant: ${tenantId}`, logContext);
-  } else {
-    const authHeader = request.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      reply.code(401).send({ error: 'Unauthorized' });
-      return;
-    }
-
-    try {
-      const token = authHeader.split(' ')[1];
-
-      // First validate the token using auth-lib
-      const validated = validateTokenAndClaims(token, []);
-      if (!validated || typeof validated !== 'object') {
+    if (!configuration.AUTHENTICATED) {
+      tenantId = 'DEFAULT';
+      loggerService.debug(`Authentication disabled, using default tenant: ${tenantId}`, logContext);
+    } else {
+      const authHeader = request.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
         reply.code(401).send({ error: 'Unauthorized' });
         return;
       }
-
-      // Extract tenant ID from JWT payload (not claims)
-      const extractedTenantId = extractTenantFromToken(token);
-      if (!extractedTenantId || extractedTenantId.trim() === '') {
-        loggerService.error('tenantId field is missing or empty in JWT token', logContext);
+      try {
+        const token = authHeader.split(' ')[1];
+        // Validate token and claims
+        const validated = validateTokenAndClaims(token, claims);
+        // Check all claims are present and true
+        if (!validated || typeof validated !== 'object' || claims.some((claim) => !validated[claim])) {
+          reply.code(401).send({ error: 'Unauthorized: Missing required claims' });
+          return;
+        }
+        // Extract tenant ID from JWT payload
+        const extractedTenantId = extractTenantFromToken(token);
+        if (!extractedTenantId || extractedTenantId.trim() === '') {
+          loggerService.error('tenantId field is missing or empty in JWT token', logContext);
+          reply.code(403).send({ error: 'Forbidden: Tenant ID required' });
+          return;
+        }
+        tenantId = extractedTenantId;
+        loggerService.debug(`Authenticated with tenant: ${tenantId}`, logContext);
+      } catch (error) {
+        const err = error as Error;
+        loggerService.error(`${err.name}: ${err.message}\n${err.stack}`, logContext);
         reply.code(403).send({ error: 'Forbidden: Tenant ID required' });
         return;
       }
-
-      tenantId = extractedTenantId;
-      loggerService.debug(`Authenticated with tenant: ${tenantId}`, logContext);
-    } catch (error) {
-      const err = error as Error;
-      loggerService.error(`${err.name}: ${err.message}\n${err.stack}`, logContext);
-      reply.code(403).send({ error: 'Forbidden: Tenant ID required' });
-      return;
     }
-  }
-
-  // Store tenant ID in request context for use by handlers
-  (request as TenantAwareRequest).tenantId = tenantId;
-};
+    // Store tenant ID in request context for use by handlers
+    (request as TenantAwareRequest).tenantId = tenantId;
+  };

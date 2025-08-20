@@ -17,10 +17,10 @@ import {
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 import type { TenantAwareRequest } from './utils/tenant-context';
 
-export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const reportRequestHandler = async (req: TenantAwareRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
-    const { tenantId } = req as TenantAwareRequest;
+    const { tenantId } = req;
     const request = req.query as { msgid: string };
     const data = await handleGetReportRequestByMsgId(request.msgid, tenantId);
     const body = {

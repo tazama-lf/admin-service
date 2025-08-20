@@ -57,7 +57,7 @@ describe('tenantAwareTokenHandler', () => {
       authorization: `Bearer ${mockToken}`,
     };
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that tenant ID was extracted and set on request
     expect((mockRequest as any).tenantId).toBe('tenant123');
@@ -83,7 +83,7 @@ describe('tenantAwareTokenHandler', () => {
       authorization: `Bearer ${mockToken}`,
     };
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that tenant ID was extracted and set on request
     expect((mockRequest as any).tenantId).toBe('tenant123');
@@ -107,7 +107,7 @@ describe('tenantAwareTokenHandler', () => {
       authorization: `Bearer ${mockToken}`,
     };
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that request was rejected
     expect(mockReply.code).toHaveBeenCalledWith(403);
@@ -131,7 +131,7 @@ describe('tenantAwareTokenHandler', () => {
       authorization: `Bearer ${mockToken}`,
     };
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that request was rejected
     expect(mockReply.code).toHaveBeenCalledWith(403);
@@ -145,7 +145,7 @@ describe('tenantAwareTokenHandler', () => {
       authorization: `Bearer ${malformedToken}`,
     };
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that request was rejected due to malformed token
     expect(mockReply.code).toHaveBeenCalledWith(403);
@@ -158,7 +158,7 @@ describe('tenantAwareTokenHandler', () => {
     const originalAuthenticated = configuration.AUTHENTICATED;
     configuration.AUTHENTICATED = false;
 
-    await tenantAwareTokenHandler(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
     // Verify that DEFAULT tenant was used
     expect((mockRequest as any).tenantId).toBe('DEFAULT');

@@ -8,9 +8,7 @@ interface JWTPayload {
   tenantId?: string; // Fallback for backward compatibility
 }
 
-interface TenantAwareRequest extends FastifyRequest {
-  tenantId: string;
-}
+// ...existing code...
 
 /**
  * Extract tenant ID from JWT token payload using TENANT_ID attribute
@@ -122,5 +120,5 @@ export const tenantAwareTokenHandler =
       }
     }
     // Store tenant ID in request context for use by handlers
-    (request as TenantAwareRequest).tenantId = tenantId;
+    (request as FastifyRequest & { tenantId: string }).tenantId = tenantId;
   };

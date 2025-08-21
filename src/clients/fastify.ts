@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import Ajv from 'ajv';
-import messageIDParamsSchema from '../schemas/paramsSchemas.json';
-import queryEntityCondition from '../schemas/queryEntityCondition.json';
-import entityConditionBodySchema from '../schemas/entityCondition.json';
-import accountConditionBodySchema from '../schemas/accountCondition.json';
-import queryAccountCondition from '../schemas/queryAccountCondition.json';
-import expireAccountConditionSchema from '../schemas/expireAccountCondition.json';
-import expireEntityConditionSchema from '../schemas/expireEntityCondition.json';
-import expireDateTimeSchema from '../schemas/expireDateTime.json';
+import messageIDParamsSchema from '..//schemas/json.schemas/paramsSchemas.json';
+import queryEntityCondition from '../schemas/json.schemas/queryEntityCondition.json';
+import entityConditionBodySchema from '../schemas/json.schemas/entityCondition.json';
+import accountConditionBodySchema from '../schemas/json.schemas/accountCondition.json';
+import queryAccountCondition from '../schemas/json.schemas/queryAccountCondition.json';
+import expireAccountConditionSchema from '../schemas/json.schemas/expireAccountCondition.json';
+import expireEntityConditionSchema from '../schemas/json.schemas/expireEntityCondition.json';
+import expireDateTimeSchema from '../schemas/json.schemas/expireDateTime.json';
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
@@ -73,7 +73,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
     transformSpecification: (swaggerObject, request, reply) => swaggerObject,
     transformSpecificationClone: true,
   });
-  fastify.addHook('onRoute', r => {
+  fastify.addHook('onRoute', (r) => {
     if (r.url === '/v1/admin/config/networkmap') {
       fastify.log.info({ schema: r?.schema?.response }, '200 schema');
     }

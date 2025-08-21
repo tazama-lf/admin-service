@@ -1,25 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
-import { loggerService } from '..';
-import { Pool, type QueryResult, type PoolConfig, type QueryResultRow } from 'pg';
+import type { QueryResult, QueryResultRow } from 'pg';
+import { databaseManager, loggerService } from '..';
 
 export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
-  queryString: string | PgQueryConfig,
+  queryConfig: PgQueryConfig,
   databaseName: string,
 ): Promise<QueryResult<T>> => {
   try {
     loggerService.log('Started handling execution of the sql statement');
 
-    const databaseConfig: PoolConfig = {
-      host: 'localhost',
-      database: databaseName,
-      user: 'postgres',
-      password: 'password',
-      port: 5432,
-    };
-
-    const db = new Pool(databaseConfig);
-    return await db.query<T>(queryString);
+    switch (databaseName) {
+      case 'configuration':
+        return await databaseManager._configuration.query<T>(queryConfig.text, queryConfig.values);
+      case 'raw_history':
+        return await databaseManager._rawHistory.query<T>(queryConfig.text, queryConfig.values);
+      case 'event_history':
+        return await databaseManager._eventHistory.query<T>(queryConfig.text, queryConfig.values);
+      case 'evaluation':
+        return await databaseManager._evaluation.query<T>(queryConfig.text, queryConfig.values);
+      default:
+        throw new Error('Specified database was not found.');
+    }
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(

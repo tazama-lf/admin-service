@@ -25,8 +25,8 @@ export const Message = Type.Object({
   typologies: Type.Array(Typology),
 });
 
-export type NetworkMap = Static<typeof NetworkMap>;
-export const NetworkMap = Type.Object({
+export type NetworkMapSchema = Static<typeof NetworkMapSchema>;
+export const NetworkMapSchema = Type.Object({
   active: Type.Boolean(),
   cfg: Type.String(),
   messages: Type.Array(Message),

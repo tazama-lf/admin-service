@@ -8,7 +8,7 @@ export const filterConditions = (conditions: ConditionDetails[]): ConditionDetai
       const dt = new Date(condition.xprtnDtTm);
       return now < dt;
     } else {
-      return true; //condition has no expiry
+      return true;
     }
   });
 };

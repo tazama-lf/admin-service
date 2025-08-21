@@ -45,8 +45,8 @@ export const Config = Type.Object({
   timeframes: Type.Optional(Type.Array(Timeframe)),
 });
 
-export type RuleConfig = Static<typeof RuleConfig>;
-export const RuleConfig = Type.Object({
+export type RuleSchema = Static<typeof RuleSchema>;
+export const RuleSchema = Type.Object({
   id: Type.String(),
   cfg: Type.String(),
   config: Config,

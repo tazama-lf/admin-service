@@ -43,7 +43,6 @@
     "ajv": "^8.17.1",
     "dotenv": "^17.2.0",
     "fastify": "^5.4.0",
-    "pg": "^8.16.3",
     "tslib": "^2.8.1",
     "uuid": "^11.1.0"
   },
@@ -67,6 +66,9 @@
     "typescript": "^5.8.3"
   },
   "lint-staged": {
-    
+    "*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

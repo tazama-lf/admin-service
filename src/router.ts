@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
-  executeQueryStatementHandlerDelete,
-  executeQueryStatementHandlerGet,
-  executeQueryStatementHandlerPost,
-  executeQueryStatementHandlerPut,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -15,12 +11,36 @@ import {
   updateAccountConditionExpiryDateHandler,
   updateEntityConditionExpiryDateHandler,
 } from './app.controller';
-import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import {
+  AccountHolderRepo,
+  AccountRepo,
+  ConditionRepo,
+  EntityRepo,
+  GovernedAsCreditorAccountByRepo,
+  GovernedAsCreditorByRepo,
+  GovernedAsDebtorAccountByRepo,
+  GovernedAsDebtorByRepo,
+  NetworkMapRepo,
+  Pacs002Repo,
+  Pacs008Repo,
+  RuleConfigRepo,
+  TransactionRepo,
+  TypologyConfigRepo,
+} from './repositories';
+import {
+  AccountSchema,
+  AlertSchema,
+  ConditionSchema,
+  EntitySchema,
+  NetworkMapSchema,
+  Pacs002Schema,
+  Pacs008Schema,
+  RuleSchema,
+  TypologySchema,
+} from './schemas/typebox.schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
-import {  NetworkMapRepo } from './repositories/network.map.repository';
-import { NetworkMap } from './schemas/NetworkMapEntity';
-import { RuleConfig } from './schemas/RuleConfigEntity';
-import { RuleConfigRepo } from './repositories/rule.config.repository';
+import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import { TransactionRelationshipSchema } from './schemas/typebox.schemas/TransactionSchema';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -76,34 +96,131 @@ function Routes(fastify: FastifyInstance): void {
     ),
   );
   fastify.put('/v1/admin/event-flow-control/cache', SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache));
-  fastify.post('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPost, routePrivilege.executeDatabase));
-  fastify.put('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPut, routePrivilege.executeDatabase));
-  fastify.put('/v1/admin/history/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerPut, routePrivilege.executeDatabase));
 
+  //-- configuration
   fastify.register(
     buildCrudPlugin({
-      prefix: '/v1/admin/config/networkmap',
+      prefix: '/v1/admin/configuration/network_map',
       repo: NetworkMapRepo,
-      schemas: { Entity: NetworkMap, Create: NetworkMap, Update: NetworkMap }
-    })
+      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
+    }),
   );
 
   fastify.register(
     buildCrudPlugin({
-      prefix: '/v1/admin/config/ruleconfig',
+      prefix: '/v1/admin/configuration/rule',
       repo: RuleConfigRepo,
-      schemas: { Entity: RuleConfig, Create: RuleConfig, Update: RuleConfig }
-    })
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
   );
-  // fastify.register(
-  //   buildCrudPlugin({
-  //     prefix: "/v1/admin/config/rule-config",
-  //     repo: RuleConfigRepo,
-  //     schemas: { Entity: RuleConfigEntity, Create: RuleConfigEntity, Update: RuleConfigEntity, Id: String }
-  //   })
-  // );
 
-  // fastify.delete('/v1/admin/database/execute', SetOptionsBodyAndParams(executeQueryStatementHandlerDelete, routePrivilege.executeDatabase));
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/configuration/typology',
+      repo: TypologyConfigRepo,
+      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
+    }),
+  );
+
+  //-- evaluation
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/evaluation/evaluation',
+      repo: TypologyConfigRepo,
+      schemas: { Entity: AlertSchema, Create: AlertSchema, Update: AlertSchema },
+    }),
+  );
+
+  //-- raw_history
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/raw_history/pacs002',
+      repo: Pacs002Repo,
+      schemas: { Entity: Pacs002Schema, Create: Pacs002Schema, Update: Pacs002Schema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/raw_history/pacs008',
+      repo: Pacs008Repo,
+      schemas: { Entity: Pacs008Schema, Create: Pacs008Schema, Update: Pacs008Schema },
+    }),
+  );
+
+  //-- event_history
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/account',
+      repo: AccountRepo,
+      schemas: { Entity: AccountSchema, Create: AccountSchema, Update: AccountSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/account_holder',
+      repo: AccountHolderRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/entity',
+      repo: EntityRepo,
+      schemas: { Entity: EntitySchema, Create: EntitySchema, Update: EntitySchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/transaction',
+      repo: TransactionRepo,
+      schemas: { Entity: TransactionRelationshipSchema, Create: TransactionRelationshipSchema, Update: TransactionRelationshipSchema },
+    }),
+  );
+
+  //-- event_history: event-flow
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/condition',
+      repo: ConditionRepo,
+      schemas: { Entity: ConditionSchema, Create: ConditionSchema, Update: ConditionSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/governed_as_creditor_account_by',
+      repo: GovernedAsCreditorAccountByRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/governed_as_creditor_by',
+      repo: GovernedAsCreditorByRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/governed_as_debtor_account_by',
+      repo: GovernedAsDebtorAccountByRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/event_history/governed_as_debtor_by',
+      repo: GovernedAsDebtorByRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
 }
 
 export default Routes;

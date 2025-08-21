@@ -15,11 +15,11 @@ let configuration: Configuration;
 
 export const dbInit = async (): Promise<void> => {
   const { db, config } = await CreateStorageManager(
-    [Database.EVENT_HISTORY, Database.EVALUATION, Cache.DISTRIBUTED, Database.CONFIGURATION],
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Cache.DISTRIBUTED],
     processorConfig.nodeEnv === 'production',
   );
 
-  databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
   configuration = { ...config, ...processorConfig };
   loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };
@@ -42,7 +42,7 @@ const connect = async (): Promise<void> => {
     }
   } catch (err) {
     loggerService.error(`Error while starting server on Worker ${process.pid}`, util.inspect(err));
-    console.error('error', err);
+    loggerService.error(util.inspect(err));
     process.exit(1);
   }
 })();

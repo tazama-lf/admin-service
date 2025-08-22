@@ -51,13 +51,13 @@ export const Pacs002Repo: CrudRepository<Pacs002> = {
     return queryRes.rowCount ? queryRes.rows[0].document : null;
   },
   remove: async function (name: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ document: Pacs002 }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ document: Pacs002 }>(
       {
         text: 'DELETE FROM pacs002 WHERE messageid = $1',
         values: [name],
       } satisfies PgQueryConfig,
       'raw_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

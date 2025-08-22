@@ -28,18 +28,18 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   get: async function (id: string): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'SELECT configuration FROM rule WHERE ruleid = "$1"',
+        text: 'SELECT configuration FROM rule WHERE ruleid = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'configuration',
     );
 
-    return queryRes.rows[0].configuration;
+    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
   create: async function (payload: RuleConfig): Promise<RuleConfig> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'INSERT INTO rule (configuration) VALUE ($1) RETURNING configuration',
+        text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration',
         values: [payload],
       } satisfies PgQueryConfig,
       'configuration',
@@ -49,7 +49,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   update: async function (id: string, payload: RuleConfig): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2',
+        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 RETURNING configuration',
         values: [payload, id],
       } satisfies PgQueryConfig,
       'configuration',

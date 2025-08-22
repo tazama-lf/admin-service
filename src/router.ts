@@ -28,19 +28,21 @@ import {
   TypologyConfigRepo,
 } from './repositories';
 import {
+  AccountHolderSchema,
   AccountSchema,
   AlertSchema,
   ConditionSchema,
+  EdgeSchema,
   EntitySchema,
   NetworkMapSchema,
   Pacs002Schema,
   Pacs008Schema,
   RuleSchema,
   TypologySchema,
+  TransactionRelationshipSchema,
 } from './schemas/typebox.schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
-import { TransactionRelationshipSchema } from './schemas/typebox.schemas/TransactionSchema';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -161,7 +163,8 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/event_history/account_holder',
       repo: AccountHolderRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: AccountHolderSchema, Create: AccountHolderSchema, Update: AccountHolderSchema },
+      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 
@@ -194,7 +197,8 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/event_history/governed_as_creditor_account_by',
       repo: GovernedAsCreditorAccountByRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
+      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 
@@ -202,7 +206,8 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/event_history/governed_as_creditor_by',
       repo: GovernedAsCreditorByRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
+      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 
@@ -210,7 +215,8 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/event_history/governed_as_debtor_account_by',
       repo: GovernedAsDebtorAccountByRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
+      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 
@@ -218,7 +224,8 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/event_history/governed_as_debtor_by',
       repo: GovernedAsDebtorByRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
+      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 }

@@ -9,9 +9,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 
 export type AccountSchema = Static<typeof AccountSchema>;
-export const AccountSchema = Type.Object({
-  id: Type.String(),
-});
+export const AccountSchema = Type.String();
 
 export type EntitySchema = Static<typeof EntitySchema>;
 export const EntitySchema = Type.Object({
@@ -83,8 +81,8 @@ export const AccountCondition = Type.Composite([
   }),
 ]);
 
-export type Edge = Static<typeof Edge>;
-export const Edge = Type.Object({
+export type EdgeSchema = Static<typeof EdgeSchema>;
+export const EdgeSchema = Type.Object({
   id: Type.String(),
   source: Type.String(),
   destination: Type.String(),

@@ -43,7 +43,7 @@ export const EvaluationRepo: CrudRepository<Alert> = {
   update: async function (name: string, payload: Alert): Promise<Alert | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: Alert }>(
       {
-        text: 'UPDATE evaluation SET evaluation = $1 WHERE messageid = $2',
+        text: 'UPDATE evaluation SET evaluation = $1 WHERE messageid = $2 RETURNING evaluation',
         values: [payload, name],
       } satisfies PgQueryConfig,
       'evaluation',
@@ -51,13 +51,13 @@ export const EvaluationRepo: CrudRepository<Alert> = {
     return queryRes.rowCount ? queryRes.rows[0].evaluation : null;
   },
   remove: async function (name: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ evaluation: Alert }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ evaluation: Alert }>(
       {
         text: 'DELETE FROM evaluation WHERE messageid = $1',
         values: [name],
       } satisfies PgQueryConfig,
       'evaluation',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

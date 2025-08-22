@@ -28,18 +28,18 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   get: async function (id: string): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'SELECT configuration FROM typology WHERE typologyid = "$1"',
+        text: 'SELECT configuration FROM typology WHERE typologyid = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'configuration',
     );
 
-    return queryRes.rows[0].configuration;
+    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
   create: async function (payload: TypologyConfig): Promise<TypologyConfig> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'INSERT INTO typology (configuration) VALUE ($1) RETURNING configuration',
+        text: 'INSERT INTO typology (configuration) VALUES ($1) RETURNING configuration',
         values: [payload],
       } satisfies PgQueryConfig,
       'configuration',
@@ -49,7 +49,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   update: async function (id: string, payload: TypologyConfig): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2',
+        text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 RETURNING configuration',
         values: [payload, id],
       } satisfies PgQueryConfig,
       'configuration',
@@ -59,7 +59,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   remove: async function (id: string): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'DELETE FROM typology WHERE typologyid = $2',
+        text: 'DELETE FROM typology WHERE typologyid = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'configuration',

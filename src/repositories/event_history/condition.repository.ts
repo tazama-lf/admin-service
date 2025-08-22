@@ -43,7 +43,7 @@ export const ConditionRepo: CrudRepository<Condition> = {
   update: async function (id: string, payload: Condition): Promise<Condition | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
-        text: 'UPDATE condition SET condition = $1 WHERE id = $2',
+        text: 'UPDATE condition SET condition = $1 WHERE id = $2 RETURNING condition',
         values: [payload, id],
       } satisfies PgQueryConfig,
       'event_history',
@@ -51,13 +51,13 @@ export const ConditionRepo: CrudRepository<Condition> = {
     return queryRes.rowCount ? queryRes.rows[0].condition : null;
   },
   remove: async function (id: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ condition: Condition }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
         text: 'DELETE FROM condition WHERE id = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

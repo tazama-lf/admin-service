@@ -4,8 +4,10 @@ import { NetworkMapSchema } from './NetworkMapEntity';
 import { RuleSchema } from './RuleSchemaEntity';
 import { TypologySchema } from './TypologySchema';
 import { AlertSchema } from './AlertSchema';
-import { ConditionSchema, AccountSchema, EntitySchema } from './EventHistorySchema';
+import { ConditionSchema, AccountSchema, EntitySchema, EdgeSchema } from './EventHistorySchema';
 import { TransactionRelationshipSchema } from './TransactionSchema';
+import { AccountHolderSchema } from './AccountHolderSchema';
+
 export {
   Pacs002Schema,
   Pacs008Schema,
@@ -17,4 +19,6 @@ export {
   AccountSchema,
   EntitySchema,
   TransactionRelationshipSchema,
+  EdgeSchema,
+  AccountHolderSchema,
 };

@@ -19,7 +19,7 @@ export const Pacs008Repo: CrudRepository<Pacs008> = {
       ? { data: queryRes.rows.map((values) => values.document), total: queryRes.rowCount! }
       : { data: [], total: 0 };
   },
-  get: async function (id: string): Promise<Pacs008 | null> {
+  get: async function (id): Promise<Pacs008 | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ document: Pacs008 }>(
       {
         text: 'SELECT document FROM pacs008 WHERE messageid = $1;',
@@ -40,24 +40,24 @@ export const Pacs008Repo: CrudRepository<Pacs008> = {
     );
     return queryRes.rows[0].document;
   },
-  update: async function (name: string, payload: Pacs008): Promise<Pacs008 | null> {
+  update: async function (id: string, payload: Pacs008): Promise<Pacs008 | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ document: Pacs008 }>(
       {
-        text: 'UPDATE pacs008 SET document = $1 WHERE messageid = $2',
-        values: [payload, name],
+        text: 'UPDATE pacs008 SET document = $1 WHERE messageid = $2 RETURNING document',
+        values: [payload, id],
       } satisfies PgQueryConfig,
       'raw_history',
     );
     return queryRes.rowCount ? queryRes.rows[0].document : null;
   },
-  remove: async function (name: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ document: Pacs008 }>(
+  remove: async function (id: string): Promise<boolean> {
+    const queryRes = await handlePostExecuteSqlStatement<{ document: Pacs008 }>(
       {
         text: 'DELETE FROM pacs008 WHERE messageid = $1',
-        values: [name],
+        values: [id],
       } satisfies PgQueryConfig,
       'raw_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

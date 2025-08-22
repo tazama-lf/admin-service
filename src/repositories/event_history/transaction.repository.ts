@@ -43,7 +43,7 @@ export const TransactionRepo: CrudRepository<TransactionRelationship> = {
   update: async function (id: string, payload: TransactionRelationship): Promise<TransactionRelationship | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
       {
-        text: 'UPDATE transaction SET source = $1,destination = $2,transaction = $3 WHERE msgid = $4',
+        text: 'UPDATE transaction SET source = $1,destination = $2,transaction = $3 WHERE msgid = $4 RETURNING transaction',
         values: [payload.from, payload.to, payload, id],
       } satisfies PgQueryConfig,
       'event_history',
@@ -51,13 +51,13 @@ export const TransactionRepo: CrudRepository<TransactionRelationship> = {
     return queryRes.rowCount ? queryRes.rows[0].transaction : null;
   },
   remove: async function (id: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
       {
         text: 'DELETE FROM transaction WHERE msgid = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

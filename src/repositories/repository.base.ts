@@ -7,10 +7,17 @@ export interface ListQuery {
   filters?: Record<string, string>; // exact-match filters
 }
 
-export interface CrudRepository<TEntity, TId = string> {
+export type Node = string;
+export interface Connector {
+  source: string;
+  destination: string;
+}
+export type AllowedId = Node | Connector;
+
+export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   list: (params: ListQuery) => Promise<{ data: TEntity[]; total: number }>;
   get: (id: TId) => Promise<TEntity | null>;
   create: (payload: TEntity) => Promise<TEntity>;
   update: (id: TId, payload: TEntity) => Promise<TEntity | null>;
-  remove: (id: TId) => Promise<boolean>; // true if deleted
+  remove: (id: TId) => Promise<boolean>;
 }

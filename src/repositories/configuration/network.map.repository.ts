@@ -9,7 +9,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   list: async function ({ limit, offset }): Promise<{ data: NetworkMap[]; total: number }> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>active = true OFFSET $1 LIMIT $2;',
+        text: 'SELECT configuration FROM network_map WHERE  OFFSET $1 LIMIT $2;',
         values: [offset, limit],
       },
       'configuration',
@@ -22,7 +22,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   get: async function (id: string): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>cfg = $1;',
+        text: 'SELECT configuration FROM network_map WHERE configuration->>active = true;',
         values: [id],
       },
       'configuration',
@@ -41,7 +41,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   update: async function (name: string, payload: NetworkMap): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2',
+        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 RETURNING configuration',
         values: [payload, name],
       } satisfies PgQueryConfig,
       'configuration',
@@ -49,13 +49,13 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
   remove: async function (name: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
         text: 'DELETE FROM network_map WHERE configuration->>name = $1',
         values: [name],
       } satisfies PgQueryConfig,
       'configuration',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

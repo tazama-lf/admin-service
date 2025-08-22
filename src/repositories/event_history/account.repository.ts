@@ -6,11 +6,11 @@ import type { CrudRepository } from '../repository.base';
 //npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs002.d.ts" -o "src\schemas\Pacs002Entity.ts"
 
 export const AccountRepo: CrudRepository<Account> = {
-  list: async function ({ limit }): Promise<{ data: Account[]; total: number }> {
+  list: async function ({ limit, offset }): Promise<{ data: Account[]; total: number }> {
     const queryRes = await handlePostExecuteSqlStatement<{ id: Account }>(
       {
-        text: 'SELECT id FROM account LIMIT $1',
-        values: [limit],
+        text: 'SELECT id FROM account OFFSET $1 LIMIT $2',
+        values: [offset, limit],
       } satisfies PgQueryConfig,
       'event_history',
     );
@@ -42,7 +42,7 @@ export const AccountRepo: CrudRepository<Account> = {
   update: async function (id: string, payload: Account): Promise<Account | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ account: Account }>(
       {
-        text: 'UPDATE account SET id = $1 WHERE id = $2',
+        text: 'UPDATE account SET id = $1 WHERE id = $2 RETURNING id',
         values: [payload, id],
       } satisfies PgQueryConfig,
       'event_history',
@@ -50,13 +50,13 @@ export const AccountRepo: CrudRepository<Account> = {
     return queryRes.rowCount ? queryRes.rows[0].account : null;
   },
   remove: async function (id: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ account: Account }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ account: Account }>(
       {
         text: 'DELETE FROM account WHERE id = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

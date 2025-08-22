@@ -33,7 +33,7 @@ export const EntityRepo: CrudRepository<Entity> = {
   create: async function (payload: Entity): Promise<Entity> {
     const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
       {
-        text: 'INSERT INTO entity (id, credttm) VALUES ($1,$2) RETURNING entity',
+        text: 'INSERT INTO entity (id, credttm) VALUES ($1,$2) RETURNING id, credttm',
         values: [payload.id, payload.creDtTm],
       } satisfies PgQueryConfig,
       'event_history',
@@ -43,7 +43,7 @@ export const EntityRepo: CrudRepository<Entity> = {
   update: async function (id: string, payload: Entity): Promise<Entity | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
       {
-        text: 'UPDATE entity SET id = $1, credttm = $2 WHERE id = $3',
+        text: 'UPDATE entity SET id = $1, credttm = $2 WHERE id = $3 RETURNING id, credttm',
         values: [payload.id, payload.creDtTm, id],
       } satisfies PgQueryConfig,
       'event_history',
@@ -51,13 +51,13 @@ export const EntityRepo: CrudRepository<Entity> = {
     return queryRes.rowCount ? queryRes.rows[0].entity : null;
   },
   remove: async function (id: string): Promise<boolean> {
-    await handlePostExecuteSqlStatement<{ entity: Entity }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
       {
         text: 'DELETE FROM entity WHERE id = $1',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return true;
+    return queryRes.rowCount ? true : false;
   },
 };

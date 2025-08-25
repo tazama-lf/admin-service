@@ -6,7 +6,8 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { CrudRepository } from '../repository.base';
 
 export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
-  list: async function ({ filters, limit, offset }): Promise<{ data: TypologyConfig[]; total: number }> {
+  list: async function ({ filters, limit, offset, order, sort }): Promise<{ data: TypologyConfig[]; total: number }> {
+    sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'typologyid', value: '' };
     if (filters) {
       filter.field = filters[0];
@@ -15,8 +16,8 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: "SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) OFFSET $3 LIMIT $4;",
-        values: [filter.field, filter.value, offset, limit],
+        text: `SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$5 ${order} OFFSET $3 LIMIT $4;`,
+        values: [filter.field, filter.value, offset, limit, sort],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -25,6 +26,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
       ? { data: queryRes.rows.map((values) => values.configuration), total: queryRes.rowCount! }
       : { data: [], total: 0 };
   },
+
   get: async function (id: string): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
@@ -36,6 +38,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
 
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
+
   create: async function (payload: TypologyConfig): Promise<TypologyConfig> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
@@ -46,6 +49,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     );
     return queryRes.rows[0].configuration;
   },
+
   update: async function (id: string, payload: TypologyConfig): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
@@ -56,6 +60,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
+
   remove: async function (id: string): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {

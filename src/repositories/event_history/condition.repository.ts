@@ -6,19 +6,21 @@ import type { CrudRepository } from '../repository.base';
 //npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs002.d.ts" -o "src\schemas\Pacs002Entity.ts"
 
 export const ConditionRepo: CrudRepository<Condition> = {
-  list: async function ({ limit }): Promise<{ data: Condition[]; total: number }> {
+  list: async function ({ offset, limit, sort, order }): Promise<{ data: Condition[]; total: number }> {
+    sort ??= 'creDtTm';
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
-        text: 'SELECT condition FROM condition',
-        values: [limit],
+        text: `SELECT condition FROM condition ORDER BY condition->>$3 ${order} OFFSET $1 LIMIT $2`,
+        values: [offset, limit, sort],
       } satisfies PgQueryConfig,
-      'condition',
+      'event_history',
     );
 
     return queryRes.rows.length > 0
       ? { data: queryRes.rows.map((values) => values.condition), total: queryRes.rowCount! }
       : { data: [], total: 0 };
   },
+
   get: async function (id: string): Promise<Condition | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
@@ -30,6 +32,7 @@ export const ConditionRepo: CrudRepository<Condition> = {
 
     return queryRes.rows.length > 0 ? queryRes.rows[0].condition : null;
   },
+
   create: async function (payload: Condition): Promise<Condition> {
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
@@ -40,6 +43,7 @@ export const ConditionRepo: CrudRepository<Condition> = {
     );
     return queryRes.rows[0].condition;
   },
+
   update: async function (id: string, payload: Condition): Promise<Condition | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {
@@ -50,6 +54,7 @@ export const ConditionRepo: CrudRepository<Condition> = {
     );
     return queryRes.rowCount ? queryRes.rows[0].condition : null;
   },
+
   remove: async function (id: string): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ condition: Condition }>(
       {

@@ -6,54 +6,57 @@ import type { CrudRepository } from '../repository.base';
 //npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs002.d.ts" -o "src\schemas\Pacs002Entity.ts"
 
 export const EntityRepo: CrudRepository<Entity> = {
-  list: async function ({ limit }): Promise<{ data: Entity[]; total: number }> {
-    const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
+  list: async function ({ limit, offset, sort, order }): Promise<{ data: Entity[]; total: number }> {
+    sort ??= 'creDtTm';
+    const queryRes = await handlePostExecuteSqlStatement<Entity>(
       {
-        text: 'SELECT id,credttm FROM entity LIMIT $1',
-        values: [limit],
+        text: `SELECT id, credttm as "creDtTm" FROM entity ORDER BY ${sort} ${order} OFFSET $1 LIMIT $2`,
+        values: [offset, limit],
       } satisfies PgQueryConfig,
       'event_history',
     );
 
-    return queryRes.rows.length > 0
-      ? { data: queryRes.rows.map((values) => values.entity), total: queryRes.rowCount! }
-      : { data: [], total: 0 };
+    return queryRes.rows.length > 0 ? { data: queryRes.rows.map((values) => values), total: queryRes.rowCount! } : { data: [], total: 0 };
   },
+
   get: async function (id: string): Promise<Entity | null> {
-    const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
+    const queryRes = await handlePostExecuteSqlStatement<Entity>(
       {
-        text: 'SELECT * FROM entity WHERE id = $1;',
+        text: 'SELECT id, credttm as "creDtTm" FROM entity WHERE id = $1;',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',
     );
 
-    return queryRes.rows.length > 0 ? queryRes.rows[0].entity : null;
+    return queryRes.rows.length > 0 ? queryRes.rows[0] : null;
   },
+
   create: async function (payload: Entity): Promise<Entity> {
     const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
       {
-        text: 'INSERT INTO entity (id, credttm) VALUES ($1,$2) RETURNING id, credttm',
+        text: 'INSERT INTO entity (id, creDtTm) VALUES ($1,$2) RETURNING id, credttm as "creDtTm";',
         values: [payload.id, payload.creDtTm],
       } satisfies PgQueryConfig,
       'event_history',
     );
     return queryRes.rows[0].entity;
   },
+
   update: async function (id: string, payload: Entity): Promise<Entity | null> {
-    const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
+    const queryRes = await handlePostExecuteSqlStatement<Entity>(
       {
-        text: 'UPDATE entity SET id = $1, credttm = $2 WHERE id = $3 RETURNING id, credttm',
+        text: 'UPDATE entity SET id = $1, creDtTm = $2 WHERE id = $3 RETURNING id, credttm AS "creDtTm";',
         values: [payload.id, payload.creDtTm, id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return queryRes.rowCount ? queryRes.rows[0].entity : null;
+    return queryRes.rowCount ? queryRes.rows[0] : null;
   },
+
   remove: async function (id: string): Promise<boolean> {
-    const queryRes = await handlePostExecuteSqlStatement<{ entity: Entity }>(
+    const queryRes = await handlePostExecuteSqlStatement<Entity>(
       {
-        text: 'DELETE FROM entity WHERE id = $1',
+        text: 'DELETE FROM entity WHERE id = $1;',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',

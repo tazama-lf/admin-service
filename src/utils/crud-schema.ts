@@ -24,7 +24,7 @@ const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   sort: Type.Optional(Type.String()),
-  order: Type.Optional(Type.Union([Type.Literal('asc'), Type.Literal('desc')])), // public name
+  order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])), // public name
   q: Type.Optional(Type.String()),
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
@@ -78,12 +78,14 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
       async (req, reply) => {
         const q = req.query as Static<typeof QuerySchema>;
-        const { limit = 20, offset = 0, sort, order = 'asc', q: search, filters } = q;
+        const { limit = 20, offset = 0, sort, order = 'ASC', q: search, filters } = q;
 
-        const params: ListQuery = {
+        type SortField = Extract<keyof TEntity, string>;
+
+        const params: ListQuery<SortField> = {
           limit,
           offset,
-          sort,
+          sort: sort as SortField | undefined,
           order,
           q: search,
           filters,

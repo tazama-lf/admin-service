@@ -5,22 +5,28 @@ import type { CrudRepository } from '../repository.base';
 
 //npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs002.d.ts" -o "src\schemas\Pacs002Entity.ts"
 
-export const TransactionRepo: CrudRepository<TransactionRelationship> = {
-  list: async function ({ limit }): Promise<{ data: TransactionRelationship[]; total: number }> {
-    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+interface Transaction {
+  source: string;
+  destination: string;
+  transaction: TransactionRelationship;
+}
+
+export const TransactionRepo: CrudRepository<Transaction> = {
+  list: async function ({ limit, offset, order, sort }): Promise<{ data: Transaction[]; total: number }> {
+    sort ??= 'destination';
+    const queryRes = await handlePostExecuteSqlStatement<Transaction>(
       {
-        text: 'SELECT * FROM transaction',
-        values: [limit],
-      },
+        text: `SELECT * FROM transaction ORDER BY ${sort} ${order} OFFSET $1 LIMIT $2;`,
+        values: [offset, limit],
+      } satisfies PgQueryConfig,
       'event_history',
     );
 
-    return queryRes.rows.length > 0
-      ? { data: queryRes.rows.map((values) => values.transaction), total: queryRes.rowCount! }
-      : { data: [], total: 0 };
+    return queryRes.rows.length > 0 ? { data: queryRes.rows.map((values) => values), total: queryRes.rowCount! } : { data: [], total: 0 };
   },
-  get: async function (id: string): Promise<TransactionRelationship | null> {
-    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+
+  get: async function (id: string): Promise<Transaction | null> {
+    const queryRes = await handlePostExecuteSqlStatement<Transaction>(
       {
         text: 'SELECT * FROM transaction WHERE msgid = $1;',
         values: [id],
@@ -28,32 +34,35 @@ export const TransactionRepo: CrudRepository<TransactionRelationship> = {
       'event_history',
     );
 
-    return queryRes.rows.length > 0 ? queryRes.rows[0].transaction : null;
+    return queryRes.rows.length > 0 ? queryRes.rows[0] : null;
   },
-  create: async function (payload: TransactionRelationship): Promise<TransactionRelationship> {
-    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+
+  create: async function (payload: Transaction): Promise<Transaction> {
+    const queryRes = await handlePostExecuteSqlStatement<Transaction>(
       {
-        text: 'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3) RETURNING transaction',
-        values: [payload.from, payload.to, payload],
+        text: 'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3) RETURNING source, destination, transaction;',
+        values: [payload.source, payload.destination, payload.transaction],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return queryRes.rows[0].transaction;
+    return { source: queryRes.rows[0].source, destination: queryRes.rows[0].destination, transaction: queryRes.rows[0].transaction };
   },
-  update: async function (id: string, payload: TransactionRelationship): Promise<TransactionRelationship | null> {
-    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+
+  update: async function (id: string, payload: Transaction): Promise<Transaction | null> {
+    const queryRes = await handlePostExecuteSqlStatement<Transaction>(
       {
-        text: 'UPDATE transaction SET source = $1,destination = $2,transaction = $3 WHERE msgid = $4 RETURNING transaction',
-        values: [payload.from, payload.to, payload, id],
+        text: 'UPDATE transaction SET source = $1,destination = $2,transaction = $3 WHERE msgid = $4 RETURNING source, destination, transaction;',
+        values: [payload.source, payload.destination, payload.transaction, id],
       } satisfies PgQueryConfig,
       'event_history',
     );
-    return queryRes.rowCount ? queryRes.rows[0].transaction : null;
+    return queryRes.rowCount ? queryRes.rows[0] : null;
   },
+
   remove: async function (id: string): Promise<boolean> {
-    const queryRes = await handlePostExecuteSqlStatement<{ transaction: TransactionRelationship }>(
+    const queryRes = await handlePostExecuteSqlStatement<{ transaction: Transaction }>(
       {
-        text: 'DELETE FROM transaction WHERE msgid = $1',
+        text: 'DELETE FROM transaction WHERE msgid = $1;',
         values: [id],
       } satisfies PgQueryConfig,
       'event_history',

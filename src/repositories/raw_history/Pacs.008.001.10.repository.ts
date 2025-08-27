@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { Pacs008 } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
-
-//npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs.008.001.10.d.ts" -o "src\schemas\interface.schemas\Pacs008Entity.ts"
 
 export const Pacs008Repo: CrudRepository<Pacs008> = {
   list: async function ({ offset, limit, sort, order }): Promise<{ data: Pacs008[]; total: number }> {

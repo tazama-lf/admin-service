@@ -1,5 +1,4 @@
-//npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\rule\RuleConfig.d.ts" -o "src\schemas\RuleConfigEntity.ts"
-
+// SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { RuleConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';

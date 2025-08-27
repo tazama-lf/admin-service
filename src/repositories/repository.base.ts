@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 type StringKeys<T> = Extract<keyof T, string>;
 export interface ListQuery<TSort extends string = string> {
   limit?: number; // default 20

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Pacs002Schema } from './Pacs002Entity';
 import { Pacs008Schema } from './Pacs008Entity';
 import { NetworkMapSchema } from './NetworkMapEntity';

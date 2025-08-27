@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
-//import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { AccountConditionResponse, EntityConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
@@ -66,8 +65,8 @@ export const handlePostConditionEntity = async (
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
 
-    const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary))!;
-    let entityId = alreadyExistingEntity.id;
+    const alreadyExistingEntity = await databaseManager.getEntity(condEntityId, condSchemeProprietary);
+    let entityId = alreadyExistingEntity?.id;
 
     if (!entityId) {
       if (condition.forceCret) {
@@ -96,7 +95,7 @@ export const handlePostConditionEntity = async (
 
     await updateCache(entityId, activeConditionsOnly);
 
-    if (retVal.conditions && retVal.conditions.length > 1) {
+    if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the entity`;
       loggerService.warn(message);
       return {
@@ -221,11 +220,11 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   // await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
   if (creditorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge.id, expireDateResult.dateStr, '');
+    await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge.source, expireDateResult.dateStr, '');
   }
 
   if (debtorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
   }
 
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
@@ -449,11 +448,11 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
   // TODO tenantID stuff
   // await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
   if (creditorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+    await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
   }
 
   if (debtorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfDebtorAccountEdges(debtorByEdge[0]?.edge.id, expireDateResult.dateStr, '');
+    await databaseManager.updateExpiryDateOfDebtorAccountEdges(debtorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
   }
 
   if (params.condid) {

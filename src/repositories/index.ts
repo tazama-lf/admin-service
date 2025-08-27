@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Pacs002Repo } from './raw_history/Pacs.002.001.12.repository';
 import { Pacs008Repo } from './raw_history/Pacs.008.001.10.repository';
 import { NetworkMapRepo } from './configuration/network.map.repository';

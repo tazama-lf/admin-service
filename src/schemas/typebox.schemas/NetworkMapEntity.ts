@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Type, type Static } from '@sinclair/typebox';
 
 export type Rule = Static<typeof Rule>;

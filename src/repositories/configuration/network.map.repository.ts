@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
-
-//npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\NetworkMap.d.ts" -o "src\schemas\NetworkMapEntity.ts"
 
 export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   list: async function ({ limit, offset, sort, order, filters }): Promise<{ data: NetworkMap[]; total: number }> {

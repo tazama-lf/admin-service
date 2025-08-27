@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { type Static, type TSchema, Type, type TObject } from '@sinclair/typebox';
 import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';

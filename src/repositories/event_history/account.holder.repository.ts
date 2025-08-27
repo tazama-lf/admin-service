@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { Connector, CrudRepository } from '../repository.base';
 import type { AccountHolder } from '../../interface/account.holder';
-
-//npx ts2typebox -i "node_modules\@tazama-lf\frms-coe-lib\lib\interfaces\Pacs002.d.ts" -o "src\schemas\Pacs002Entity.ts"
 
 export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   list: async function ({ limit, offset, order, sort }): Promise<{ data: AccountHolder[]; total: number }> {

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
-import type { TransactionRelationship } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
 
 interface Transaction {
   source: string;
   destination: string;
-  transaction: TransactionRelationship;
+  transaction: TransactionDetails;
 }
 
 export const TransactionRepo: CrudRepository<Transaction> = {

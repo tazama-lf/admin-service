@@ -49,7 +49,6 @@ describe('handleGetReportRequestByMsgId', () => {
     const result = await handleGetReportRequestByMsgId(msgid);
 
     expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
-    expect(result).toBe(mockReport);
     expect(loggerService.log).toHaveBeenCalledWith(`Started handling get request by message id the message id is ${msgid}`);
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
   });

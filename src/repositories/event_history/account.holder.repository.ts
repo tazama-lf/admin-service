@@ -6,7 +6,7 @@ import type { AccountHolder } from '../../interface/account.holder';
 
 export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   list: async function ({ limit, offset, order, sort }): Promise<{ data: AccountHolder[]; total: number }> {
-    sort ??= 'CreDtTm';
+    sort ??= 'credttm';
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: AccountHolder }>(
       {
         text: `SELECT * FROM account_holder ORDER BY ${sort} ${order} OFFSET $1 LIMIT $2;`,
@@ -23,7 +23,7 @@ export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   get: async function ({ source, destination }): Promise<AccountHolder | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: AccountHolder }>(
       {
-        text: 'SELECT * FROM account_holder WHERE source = $1, destination = $2;',
+        text: 'SELECT * FROM account_holder WHERE source = $1 AND destination = $2;',
         values: [source, destination],
       } satisfies PgQueryConfig,
       'event_history',
@@ -35,8 +35,8 @@ export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   create: async function (payload: AccountHolder): Promise<AccountHolder> {
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: AccountHolder }>(
       {
-        text: 'INSERT INTO account_holder (source, destination, credttm) VALUES ($1, $2, $3) RETURNING evaluation;',
-        values: [payload.entityId, payload.accountId, payload.CreDtTm],
+        text: 'INSERT INTO account_holder (source, destination, credttm) VALUES ($1, $2, $3) RETURNING source, destination, credttm;',
+        values: [payload.source, payload.destination, payload.credttm],
       } satisfies PgQueryConfig,
       'event_history',
     );
@@ -46,8 +46,8 @@ export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   update: async function ({ source, destination }, payload: AccountHolder): Promise<AccountHolder | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: AccountHolder }>(
       {
-        text: 'UPDATE account_holder SET evaluation = $1 WHERE source = $2, destination = $3 RETURNING evaluation;',
-        values: [payload, source, destination],
+        text: 'UPDATE account_holder SET credttm = $1, source = $2, destination = $3 WHERE source = $4 AND destination = $5 RETURNING source, destination, credttm;',
+        values: [payload.credttm, payload.source, payload.destination, source, destination],
       } satisfies PgQueryConfig,
       'event_history',
     );
@@ -57,7 +57,7 @@ export const AccountHolderRepo: CrudRepository<AccountHolder, Connector> = {
   remove: async function ({ source, destination }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ evaluation: AccountHolder }>(
       {
-        text: 'DELETE FROM account_holder WHERE source = $1;',
+        text: 'DELETE FROM account_holder WHERE source = $1 AND destination = $2;',
         values: [source, destination],
       } satisfies PgQueryConfig,
       'event_history',

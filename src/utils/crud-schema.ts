@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import { type Static, type TSchema, Type, type TObject } from '@sinclair/typebox';
-import type { FastifyPluginAsync } from 'fastify';
+import { Type, type Static, type TObject, type TSchema } from '@sinclair/typebox';
+import type { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fastify';
 import fp from 'fastify-plugin';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { configuration } from '..';
+import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
 
 export interface CrudSchemas {
@@ -25,7 +28,7 @@ const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   sort: Type.Optional(Type.String()),
-  order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])), // public name
+  order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
   q: Type.Optional(Type.String()),
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
@@ -46,7 +49,7 @@ const makeIdSchema = (
 };
 
 export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: BuildCrudOptions<TEntity, TId>): FastifyPluginAsync => {
-  const plugin: FastifyPluginAsync = async (app) => {
+  const plugin: FastifyPluginAsync = async (app: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse>) => {
     const { prefix, repo, schemas, idParam } = opts;
     const { Entity, Create, Update } = schemas;
 
@@ -66,8 +69,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
         offset: Type.Integer(),
       }),
     });
-
-    // --- LIST ---
+    // --- LIST --- AUTH:EXAMPLE(LIST_V1_ADMIN_RAW_HISTORY_PACS002)
     app.get(
       prefix,
       {
@@ -76,6 +78,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           querystring: QuerySchema,
           response: { 200: ListResponse },
         },
+        preHandler: configuration.AUTHENTICATED ? tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
       },
       async (req, reply) => {
         const q = req.query as Static<typeof QuerySchema>;
@@ -97,7 +100,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
     );
 
-    // --- GET ---
+    // --- GET --- AUTH:EXAMPLE(GET_V1_ADMIN_RAW_HISTORY_PACS002)
     app.get(
       `${prefix}${idPath}`,
       {
@@ -106,6 +109,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           params: IdParam,
           response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
         },
+        preHandler: configuration.AUTHENTICATED ? tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
@@ -121,7 +125,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
     );
 
-    // --- CREATE ---
+    // --- CREATE --- AUTH:EXAMPLE(POST_V1_ADMIN_RAW_HISTORY_PACS002)
     app.post(
       prefix,
       {
@@ -130,6 +134,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           body: Create,
           response: { 201: Entity },
         },
+        preHandler: configuration.AUTHENTICATED ? tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
       },
       async (req, reply) => {
         const created = await repo.create(req.body as TEntity);
@@ -137,6 +142,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
     );
 
+    // --- PUT --- AUTH:EXAMPLE(PUT_V1_ADMIN_RAW_HISTORY_PACS002)
     app.put(
       `${prefix}${idPath}`,
       {
@@ -146,6 +152,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           body: Update,
           response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
         },
+        preHandler: configuration.AUTHENTICATED ? tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
@@ -160,7 +167,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
     );
 
-    // --- DELETE ---
+    // --- DELETE --- AUTH:EXAMPLE(DELETE_V1_ADMIN_RAW_HISTORY_PACS002)
     app.delete(
       `${prefix}${idPath}`,
       {
@@ -169,6 +176,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           params: IdParam,
           response: { 200: Type.Object({ success: Type.Boolean() }) },
         },
+        preHandler: configuration.AUTHENTICATED ? tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;

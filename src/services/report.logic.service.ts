@@ -8,7 +8,7 @@ export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: str
   try {
     loggerService.log(`Started handling get request by message id the message id is ${msgid} for tenant ${tenantId}`);
 
-    // Use the updated frms-coe-lib getReportByMessageId method with tenantId support
+    // ...existing code...
     const report = (await databaseManager.getReportByMessageId(msgid, tenantId)) as Report[][];
 
     unWrappedReport = unwrap<Report>(report);

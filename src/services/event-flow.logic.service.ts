@@ -5,6 +5,7 @@ import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-l
 import type { AccountConditionResponse, EntityConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import type { Account, Entity, RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { configuration, databaseManager, loggerService } from '..';
+// ...existing code...
 import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
@@ -236,14 +237,9 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfEntityEdges(
-    creditorByEdge[0]?.edge._key,
-    debtorByEdge[0]?.edge._key,
-    expireDateResult.dateStr,
-    tenantId,
-  );
-
-  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  if (params.condid) {
+    await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  }
 
   const updatedReport = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId, true);
 
@@ -480,14 +476,9 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  await databaseManager.updateExpiryDateOfAccountEdges(
-    creditorByEdge[0]?.edge._key,
-    debtorByEdge[0]?.edge._key,
-    expireDateResult.dateStr,
-    tenantId,
-  );
-
-  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  if (params.condid) {
+    await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  }
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {

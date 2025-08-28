@@ -785,19 +785,12 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     };
     delete (copyOfAccountRawResponse.governed_as_debtor_account_by[0].condition as any).xprtnDtTm;
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfAccountRawResponse]]);
-    (databaseManager.updateExpiryDateOfAccountEdges as jest.Mock).mockResolvedValue('test');
+    // (databaseManager.updateExpiryDateOfAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, 'DEFAULT', xprtnDtTm);
 
-    expect(databaseManager.updateExpiryDateOfAccountEdges).toHaveBeenCalledWith(
-      '21101010101010Mxxdfsp001',
-      '21101010101010Mxxdfsp001',
-      xprtnDtTm,
-      'DEFAULT',
-    );
     expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm, 'DEFAULT');
-
     expect(result).toEqual({ code: 200, message: '' });
   });
 });
@@ -910,19 +903,12 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     };
     delete (copyOfEntityRawResponse.governed_as_debtor_by[0].condition as any).xprtnDtTm;
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfEntityRawResponse]]);
-    (databaseManager.updateExpiryDateOfEntityEdges as jest.Mock).mockResolvedValue('test');
+    // (databaseManager.updateExpiryDateOfEntityEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
 
     const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', xprtnDtTm);
 
-    expect(databaseManager.updateExpiryDateOfEntityEdges).toHaveBeenCalledWith(
-      '2110+27733161225MSISDN',
-      '2110+27733161225MSISDN',
-      xprtnDtTm,
-      'DEFAULT',
-    );
     expect(databaseManager.updateCondition).toHaveBeenCalledWith('2110', xprtnDtTm, 'DEFAULT');
-
     expect(result).toEqual({ code: 200, message: '' });
   });
 });

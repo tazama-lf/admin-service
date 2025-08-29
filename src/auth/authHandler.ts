@@ -8,12 +8,6 @@ interface JWTPayload {
   tenantId?: string;
 }
 
-// ...existing code...
-
-/**
- * Extract tenant ID from JWT token payload using TENANT_ID attribute
- * As per user story: extract tenantId from the TENANT_ID attribute in JWT token
- */
 const extractTenantFromToken = (token: string): string | null => {
   try {
     // Decode JWT token payload directly (the payload is the second part after splitting by '.')
@@ -27,7 +21,6 @@ const extractTenantFromToken = (token: string): string | null => {
     const decodedPayload = Buffer.from(payload, 'base64').toString('utf8');
     const parsedPayload = JSON.parse(decodedPayload) as JWTPayload;
 
-    // Extract tenantId from TENANT_ID attribute (primary) or tenantId field (fallback)
     let tenantId: string | undefined;
 
     if (parsedPayload.TENANT_ID && typeof parsedPayload.TENANT_ID === 'string') {
@@ -51,12 +44,6 @@ const extractTenantFromToken = (token: string): string | null => {
   }
 };
 
-// tokenHandler removed (unused)
-
-/**
- * Validates both tenantId and claims from JWT token
- * @param claims Array of claims to validate (privileges, etc)
- */
 export const tenantAwareTokenHandler =
   (claims: string[] = []) =>
   async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -74,14 +61,11 @@ export const tenantAwareTokenHandler =
       }
       try {
         const token = authHeader.split(' ')[1];
-        // Validate token and claims
         const validated = validateTokenAndClaims(token, claims);
-        // Check all claims are present and true
         if (!validated || typeof validated !== 'object' || claims.some((claim) => !validated[claim])) {
           reply.code(401).send({ error: 'Unauthorized: Missing required claims' });
           return;
         }
-        // Extract tenant ID from JWT payload
         const extractedTenantId = extractTenantFromToken(token);
         if (!extractedTenantId || extractedTenantId.trim() === '') {
           loggerService.error('tenantId field is missing or empty in JWT token', logContext);
@@ -97,6 +81,5 @@ export const tenantAwareTokenHandler =
         return;
       }
     }
-    // Store tenant ID in request context for use by handlers
     (request as FastifyRequest & { tenantId: string }).tenantId = tenantId;
   };

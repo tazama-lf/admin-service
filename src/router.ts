@@ -18,15 +18,15 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/health', handleHealthCheck);
   fastify.get(
     '/v1/admin/reports/getreportbymsgid',
-    SetOptionsBodyAndParams(reportRequestHandler, 'GET_V1_GETREPORTBYMSGID', 'messageIDSchema'),
+    SetOptionsBodyAndParams(reportRequestHandler, 'GET_V1_GETREPORTBYMSGID', undefined, 'messageIDSchema'),
   );
   fastify.get(
     '/v1/admin/event-flow-control/entity',
-    SetOptionsBodyAndParams(getEntityConditionHandler, 'GET_V1_EVENT_FLOW_CONTROL_ENTITY', 'queryEntityConditionSchema'),
+    SetOptionsBodyAndParams(getEntityConditionHandler, 'GET_V1_EVENT_FLOW_CONTROL_ENTITY', undefined, 'queryEntityConditionSchema'),
   );
   fastify.get(
     '/v1/admin/event-flow-control/account',
-    SetOptionsBodyAndParams(getAccountConditionsHandler, 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT', 'queryAccountConditionSchema'),
+    SetOptionsBodyAndParams(getAccountConditionsHandler, 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT', undefined, 'queryAccountConditionSchema'),
   );
   fastify.post(
     '/v1/admin/event-flow-control/entity',

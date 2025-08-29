@@ -16,10 +16,13 @@ export const SetOptionsBodyAndParams = (
   // Normalize claims to array
   const claimsArray = typeof claims === 'string' ? [claims] : (claims ?? []);
   const preHandler = configuration.AUTHENTICATED ? tenantAwareTokenHandler(claimsArray) : undefined;
-  const querystring = paramSchemaName ? { querystring: { $ref: `${paramSchemaName}#` } } : undefined;
-  const body = bodySchemaName ? { body: { $ref: `${bodySchemaName}#` } } : undefined;
-  const schema: FastifySchema = { ...querystring, ...body };
-
+  const schema: FastifySchema = {};
+  if (paramSchemaName) {
+    schema.querystring = { $ref: `${paramSchemaName}#` };
+  }
+  if (bodySchemaName) {
+    schema.body = { $ref: `${bodySchemaName}#` };
+  }
   return {
     preHandler,
     handler,

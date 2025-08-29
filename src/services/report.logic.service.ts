@@ -13,19 +13,19 @@ export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: str
 
     unWrappedReport = unwrap<Report>(report);
 
-    // Additional tenant access control validation
+    // ...existing code...
     if (unWrappedReport) {
       const reportTenantId = 'tenantId' in unWrappedReport ? (unWrappedReport as Report & { tenantId?: string }).tenantId : undefined;
 
-      // Check if report has tenant context
+      // ...existing code...
       if (reportTenantId === undefined) {
-        // Allow access only for default tenant when no tenant context exists
+        // ...existing code...
         if (tenantId !== 'default') {
           loggerService.log(`Access denied: Report ${msgid} has no tenant context, requested by tenant ${tenantId}`);
           throw new Error('Access denied: Report not found or access forbidden');
         }
       } else {
-        // Check if requesting tenant matches report tenant
+        // ...existing code...
         if (reportTenantId !== tenantId) {
           loggerService.log(`Access denied: Report ${msgid} belongs to tenant ${reportTenantId}, requested by tenant ${tenantId}`);
           throw new Error('Access denied: Report not found or access forbidden');

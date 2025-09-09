@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { tenantAwareTokenHandler } from '../../src/auth/authHandler';
+import { validateTenantMiddleware } from '../../src/middleware/tenantMiddleware';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
 // Mock logger and configuration
@@ -13,21 +13,19 @@ jest.mock('../../src', () => ({
   },
 }));
 
-// Mock the auth-lib validateTokenAndClaims function
+// Mock the auth-lib functions
+const extractTenantMock = jest.fn();
 jest.mock('@tazama-lf/auth-lib', () => ({
   validateTokenAndClaims: jest.fn(() => ({})),
+  extractTenant: (...args: any[]) => extractTenantMock(...args),
 }));
 
-describe('tenantAwareTokenHandler', () => {
+describe('validateTenantMiddleware', () => {
   let mockRequest: Partial<FastifyRequest>;
   let mockReply: Partial<FastifyReply>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Set up the mock for validateTokenAndClaims to return a valid object
-    const { validateTokenAndClaims } = require('@tazama-lf/auth-lib');
-    (validateTokenAndClaims as jest.Mock).mockReturnValue({});
 
     mockRequest = {
       headers: {},
@@ -39,133 +37,56 @@ describe('tenantAwareTokenHandler', () => {
     };
   });
 
-  it('should extract tenant ID from JWT token TENANT_ID claim correctly', async () => {
-    // Create a mock JWT token with TENANT_ID claim
-    const payload = {
-      TENANT_ID: 'tenant123',
-      sub: 'user123',
-      iat: Date.now(),
-    };
-
-    // Create a mock JWT token: header.payload.signature
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
-    const signature = 'mock-signature';
-    const mockToken = `${header}.${encodedPayload}.${signature}`;
-
+  it('should extract tenant ID from JWT token correctly', async () => {
+    // Mock extractTenant to return a valid tenantId
+    extractTenantMock.mockReturnValueOnce({ success: true, tenantId: 'tenant123' });
     mockRequest.headers = {
-      authorization: `Bearer ${mockToken}`,
+      authorization: 'Bearer sometoken',
     };
 
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    // Verify that tenant ID was extracted and set on request
+    await validateTenantMiddleware(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    // Debug log
+    // eslint-disable-next-line no-console
+    console.log('Request after middleware:', mockRequest);
+    expect(Object.prototype.hasOwnProperty.call(mockRequest, 'tenantId')).toBe(true);
     expect((mockRequest as any).tenantId).toBe('tenant123');
     expect(mockReply.code).not.toHaveBeenCalled();
     expect(mockReply.send).not.toHaveBeenCalled();
   });
 
-  it('should extract tenant ID from legacy tenantId field correctly', async () => {
-    // Create a mock JWT token with legacy tenantId field
-    const payload = {
-      tenantId: 'tenant123',
-      sub: 'user123',
-      iat: Date.now(),
+  it('should reject invalid token', async () => {
+    mockRequest.headers = {
+      authorization: `Bearer invalid.token`,
     };
 
-    // Create a mock JWT token: header.payload.signature
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
-    const signature = 'mock-signature';
-    const mockToken = `${header}.${encodedPayload}.${signature}`;
+    await validateTenantMiddleware(mockRequest as FastifyRequest, mockReply as FastifyReply);
+
+    expect(mockReply.code).toHaveBeenCalledWith(401);
+    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should reject token with empty tenant ID', async () => {
+    // Create a JWT token with empty tenantId
+    const payload = { tenantId: '', sub: 'user123' };
+    const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const mockToken = `header.${base64Payload}.signature`;
 
     mockRequest.headers = {
       authorization: `Bearer ${mockToken}`,
     };
 
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
+    await validateTenantMiddleware(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
-    // Verify that tenant ID was extracted and set on request
-    expect((mockRequest as any).tenantId).toBe('tenant123');
-    expect(mockReply.code).not.toHaveBeenCalled();
-    expect(mockReply.send).not.toHaveBeenCalled();
+    expect(mockReply.code).toHaveBeenCalledWith(401);
+    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Unauthorized' });
   });
 
-  it('should reject token with missing TENANT_ID claim and tenantId field', async () => {
-    // Create a mock JWT token without TENANT_ID claim or tenantId field
-    const payload = {
-      sub: 'user123',
-      iat: Date.now(),
-    };
+  it('should reject request without authorization header', async () => {
+    mockRequest.headers = {};
 
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
-    const signature = 'mock-signature';
-    const mockToken = `${header}.${encodedPayload}.${signature}`;
+    await validateTenantMiddleware(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
-    mockRequest.headers = {
-      authorization: `Bearer ${mockToken}`,
-    };
-
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    // Verify that request was rejected
-    expect(mockReply.code).toHaveBeenCalledWith(403);
-    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Forbidden: Tenant ID required' });
-  });
-
-  it('should reject token with empty TENANT_ID claim', async () => {
-    // Create a mock JWT token with empty TENANT_ID claim
-    const payload = {
-      TENANT_ID: '',
-      sub: 'user123',
-      iat: Date.now(),
-    };
-
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
-    const signature = 'mock-signature';
-    const mockToken = `${header}.${encodedPayload}.${signature}`;
-
-    mockRequest.headers = {
-      authorization: `Bearer ${mockToken}`,
-    };
-
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    // Verify that request was rejected
-    expect(mockReply.code).toHaveBeenCalledWith(403);
-    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Forbidden: Tenant ID required' });
-  });
-
-  it('should reject malformed JWT token', async () => {
-    const malformedToken = 'not.a.valid.jwt.token';
-
-    mockRequest.headers = {
-      authorization: `Bearer ${malformedToken}`,
-    };
-
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    // Verify that request was rejected due to malformed token
-    expect(mockReply.code).toHaveBeenCalledWith(403);
-    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Forbidden: Tenant ID required' });
-  });
-
-  it('should use DEFAULT tenant when authentication is disabled', async () => {
-    // Mock the configuration module to return AUTHENTICATED as false
-    const { configuration } = require('../../src');
-    const originalAuthenticated = configuration.AUTHENTICATED;
-    configuration.AUTHENTICATED = false;
-
-    await tenantAwareTokenHandler()(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    // Verify that DEFAULT tenant was used
-    expect((mockRequest as any).tenantId).toBe('DEFAULT');
-    expect(mockReply.code).not.toHaveBeenCalled();
-    expect(mockReply.send).not.toHaveBeenCalled();
-
-    // Restore the original value
-    configuration.AUTHENTICATED = originalAuthenticated;
+    expect(mockReply.code).toHaveBeenCalledWith(401);
+    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Unauthorized' });
   });
 });

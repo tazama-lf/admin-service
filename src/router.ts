@@ -13,48 +13,53 @@ import {
 } from './app.controller';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 
+// Privilege mapping for each route, for easier maintenance and claim management
+const routePrivilege = {
+  getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
+  getEntity: 'GET_V1_EVENT_FLOW_CONTROL_ENTITY',
+  putAccount: 'PUT_V1_EVENT_FLOW_CONTROL_ACCOUNT',
+  putEntity: 'PUT_V1_EVENT_FLOW_CONTROL_ENTITY',
+  postAccount: 'POST_V1_EVENT_FLOW_CONTROL_ACCOUNT',
+  postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
+  putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
+  getReport: 'GET_V1_GETREPORTBYMSGID',
+};
+
 function Routes(fastify: FastifyInstance): void {
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
-  fastify.get(
-    '/v1/admin/reports/getreportbymsgid',
-    SetOptionsBodyAndParams(reportRequestHandler, 'GET_V1_GETREPORTBYMSGID', undefined, 'messageIDSchema'),
-  );
-  fastify.get(
-    '/v1/admin/event-flow-control/entity',
-    SetOptionsBodyAndParams(getEntityConditionHandler, 'GET_V1_EVENT_FLOW_CONTROL_ENTITY', undefined, 'queryEntityConditionSchema'),
-  );
-  fastify.get(
-    '/v1/admin/event-flow-control/account',
-    SetOptionsBodyAndParams(getAccountConditionsHandler, 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT', undefined, 'queryAccountConditionSchema'),
-  );
-  fastify.post(
-    '/v1/admin/event-flow-control/entity',
-    SetOptionsBodyAndParams(postConditionHandlerEntity, 'POST_V1_EVENT_FLOW_CONTROL_ENTITY', 'entityConditionSchema'),
-  );
-  fastify.post(
-    '/v1/admin/event-flow-control/account',
-    SetOptionsBodyAndParams(postConditionHandlerAccount, 'POST_V1_EVENT_FLOW_CONTROL_ACCOUNT', 'accountConditionSchema'),
-  );
-  fastify.put(
-    '/v1/admin/event-flow-control/entity',
-    SetOptionsBodyAndParams(
+  fastify.get('/v1/admin/reports/getreportbymsgid', {
+    ...SetOptionsBodyAndParams(reportRequestHandler, routePrivilege.getReport, undefined, 'messageIDSchema'),
+  });
+  fastify.get('/v1/admin/event-flow-control/entity', {
+    ...SetOptionsBodyAndParams(getEntityConditionHandler, routePrivilege.getEntity, undefined, 'queryEntityConditionSchema'),
+  });
+  fastify.get('/v1/admin/event-flow-control/account', {
+    ...SetOptionsBodyAndParams(getAccountConditionsHandler, routePrivilege.getAccount, undefined, 'queryAccountConditionSchema'),
+  });
+  fastify.post('/v1/admin/event-flow-control/entity', {
+    ...SetOptionsBodyAndParams(postConditionHandlerEntity, routePrivilege.postEntity, 'entityConditionSchema'),
+  });
+  fastify.post('/v1/admin/event-flow-control/account', {
+    ...SetOptionsBodyAndParams(postConditionHandlerAccount, routePrivilege.postAccount, 'accountConditionSchema'),
+  });
+  fastify.put('/v1/admin/event-flow-control/entity', {
+    ...SetOptionsBodyAndParams(
       updateEntityConditionExpiryDateHandler,
-      'PUT_V1_EVENT_FLOW_CONTROL_ENTITY',
+      routePrivilege.putEntity,
       'expireDateTimeSchema',
       'expireEntityConditionSchema',
     ),
-  );
-  fastify.put(
-    '/v1/admin/event-flow-control/account',
-    SetOptionsBodyAndParams(
+  });
+  fastify.put('/v1/admin/event-flow-control/account', {
+    ...SetOptionsBodyAndParams(
       updateAccountConditionExpiryDateHandler,
-      'PUT_V1_EVENT_FLOW_CONTROL_ACCOUNT',
+      routePrivilege.putAccount,
       'expireDateTimeSchema',
       'expireAccountConditionSchema',
     ),
-  );
-  fastify.put('/v1/admin/event-flow-control/cache', SetOptionsBodyAndParams(putRefreshCache, 'PUT_V1_EVENT_FLOW_CONTROL_CACHE'));
+  });
+  fastify.put('/v1/admin/event-flow-control/cache', { ...SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache) });
 }
 
 export default Routes;

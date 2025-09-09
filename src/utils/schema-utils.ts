@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyReply, FastifyRequest, RouteHandlerMethod } from 'fastify';
 import type { FastifySchema } from 'fastify/types/schema';
-import { configuration, loggerService } from '..';
-import { tenantAwareTokenHandler } from '../auth/authHandler';
+import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
+import { tokenHandler } from '../auth/authHandler';
+import { loggerService, configuration } from '../index';
 
-type preHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+type preHandler = (request: FastifyRequest, reply: FastifyReply) => void | Promise<void>;
 
 export const SetOptionsBodyAndParams = (
   handler: RouteHandlerMethod,
-  claims?: string[] | string,
+  claim: string,
   bodySchemaName?: string,
   paramSchemaName?: string,
-): { preHandler?: preHandler; handler: RouteHandlerMethod; schema: FastifySchema } => {
+): { preHandler?: preHandler[]; handler: RouteHandlerMethod; schema: FastifySchema } => {
   loggerService.debug(`Authentication is ${configuration.AUTHENTICATED ? 'ENABLED' : 'DISABLED'} for ${handler.name}`);
-  // Normalize claims to array
-  const claimsArray = typeof claims === 'string' ? [claims] : (claims ?? []);
-  const preHandler = configuration.AUTHENTICATED ? tenantAwareTokenHandler(claimsArray) : undefined;
+  const preHandlers: preHandler[] = configuration.AUTHENTICATED
+    ? [validateTenantMiddleware, tokenHandler(claim)]
+    : [validateTenantMiddleware];
   const schema: FastifySchema = {};
   if (paramSchemaName) {
     schema.querystring = { $ref: `${paramSchemaName}#` };
@@ -24,8 +25,10 @@ export const SetOptionsBodyAndParams = (
     schema.body = { $ref: `${bodySchemaName}#` };
   }
   return {
-    preHandler,
+    preHandler: preHandlers,
     handler,
     schema,
   };
 };
+
+export default SetOptionsBodyAndParams;

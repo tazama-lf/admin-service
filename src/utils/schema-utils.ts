@@ -17,13 +17,9 @@ export const SetOptionsBodyAndParams = (
   const preHandlers: preHandler[] = configuration.AUTHENTICATED
     ? [validateTenantMiddleware, tokenHandler(claim)]
     : [validateTenantMiddleware];
-  const schema: FastifySchema = {};
-  if (paramSchemaName) {
-    schema.querystring = { $ref: `${paramSchemaName}#` };
-  }
-  if (bodySchemaName) {
-    schema.body = { $ref: `${bodySchemaName}#` };
-  }
+  const querystring = paramSchemaName ? { querystring: { $ref: `${paramSchemaName}#` } } : undefined;
+  const body = bodySchemaName ? { body: { $ref: `${bodySchemaName}#` } } : undefined;
+  const schema: FastifySchema = { ...querystring, ...body };
   return {
     preHandler: preHandlers,
     handler,

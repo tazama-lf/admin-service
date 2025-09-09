@@ -10,19 +10,9 @@ export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: str
 
     const report = (await databaseManager.getReportByMessageId(msgid, tenantId)) as Report[][];
     unWrappedReport = unwrap<Report>(report);
-    if (unWrappedReport) {
-      const reportTenantId = 'tenantId' in unWrappedReport ? (unWrappedReport as Report & { tenantId?: string }).tenantId : undefined;
-      if (reportTenantId === undefined) {
-        if (tenantId !== 'default') {
-          loggerService.log(`Access denied: Report ${msgid} has no tenant context, requested by tenant ${tenantId}`);
-          throw new Error('Access denied: Report not found or access forbidden');
-        }
-      } else {
-        if (reportTenantId !== tenantId) {
-          loggerService.log(`Access denied: Report ${msgid} belongs to tenant ${reportTenantId}, requested by tenant ${tenantId}`);
-          throw new Error('Access denied: Report not found or access forbidden');
-        }
-      }
+    if (!unWrappedReport) {
+      loggerService.log(`Report not found for msgid ${msgid} and tenant ${tenantId}`);
+      return undefined;
     }
   } catch (error) {
     const errorMessage = error as { message: string };

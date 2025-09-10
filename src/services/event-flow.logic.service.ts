@@ -9,7 +9,6 @@ import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
 import { filterConditions } from '../utils/filter-active-conditions';
 import { parseConditionAccount, parseConditionEntity } from '../utils/parse-condition';
-import { generateTenantEntityKey, generateTenantAccountKey } from '../utils/tenant-database';
 import { updateCache } from '../utils/update-cache';
 
 const saveConditionEdges = async (
@@ -72,7 +71,7 @@ export const handlePostConditionEntity = async (
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
 
-    const tenantEntityIdentifier = generateTenantEntityKey(condEntityId, condSchemeProprietary, tenantId);
+    const tenantEntityIdentifier = `${tenantId}:${condEntityId}:${condSchemeProprietary}`;
 
     const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary, tenantId)) as Array<
       Array<{ _id: string }>
@@ -199,42 +198,31 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   const resultByEdge = report[0][0];
 
-  if (!Array.isArray(resultByEdge.governed_as_creditor_by) || !Array.isArray(resultByEdge.governed_as_debtor_by)) {
-    return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
-  }
-
   if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
   }
 
-  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter(
-    (eachResult) => eachResult && eachResult.condition && eachResult.condition._key === params.condid,
-  );
-  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter(
-    (eachResult) => eachResult && eachResult.condition && eachResult.condition._key === params.condid,
-  );
+  const creditorByEdge = resultByEdge.governed_as_creditor_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_by.filter((eachResult) => eachResult.condition._key === params.condid);
 
   if (
-    !creditorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition._id)
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (
-    !creditorByEdge.some((eachDocument) => eachDocument && eachDocument.result && eachDocument.result._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument && eachDocument.result && eachDocument.result._id)
-  ) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
     return { code: 404, message: 'Entity does not exist in the database.' };
   }
 
   if (
-    creditorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition.xprtnDtTm) ||
-    debtorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition.xprtnDtTm)
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
   ) {
     return {
       code: 405,
-      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0]?.condition?.xprtnDtTm}`,
+      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
     };
   }
 
@@ -272,7 +260,7 @@ export const handlePostConditionAccount = async (
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
 
-    const tenantAccountIdentifier = generateTenantAccountKey(condAccounntId, condSchemeProprietary, condMemberid, tenantId);
+    const tenantAccountIdentifier = `${tenantId}:${condAccounntId}:${condSchemeProprietary}:${condMemberid}`;
 
     const alreadyExistingAccount = (await databaseManager.getAccount(
       condAccounntId,
@@ -446,42 +434,31 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
 
   const resultByEdge = report[0][0];
 
-  if (!Array.isArray(resultByEdge.governed_as_creditor_account_by) || !Array.isArray(resultByEdge.governed_as_debtor_account_by)) {
-    return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
-  }
-
   if (!resultByEdge.governed_as_creditor_account_by.length && !resultByEdge.governed_as_debtor_account_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
   }
 
-  const creditorByEdge = resultByEdge.governed_as_creditor_account_by.filter(
-    (eachResult) => eachResult && eachResult.condition && eachResult.condition._key === params.condid,
-  );
-  const debtorByEdge = resultByEdge.governed_as_debtor_account_by.filter(
-    (eachResult) => eachResult && eachResult.condition && eachResult.condition._key === params.condid,
-  );
+  const creditorByEdge = resultByEdge.governed_as_creditor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
+  const debtorByEdge = resultByEdge.governed_as_debtor_account_by.filter((eachResult) => eachResult.condition._key === params.condid);
 
   if (
-    !creditorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition._id)
+    !creditorByEdge.some((eachDocument) => eachDocument.condition._id) &&
+    !debtorByEdge.some((eachDocument) => eachDocument.condition._id)
   ) {
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (
-    !creditorByEdge.some((eachDocument) => eachDocument && eachDocument.result && eachDocument.result._id) &&
-    !debtorByEdge.some((eachDocument) => eachDocument && eachDocument.result && eachDocument.result._id)
-  ) {
+  if (!creditorByEdge.some((eachDocument) => eachDocument.result._id) && !debtorByEdge.some((eachDocument) => eachDocument.result._id)) {
     return { code: 404, message: 'Account does not exist in the database.' };
   }
 
   if (
-    creditorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition.xprtnDtTm) ||
-    debtorByEdge.some((eachDocument) => eachDocument && eachDocument.condition && eachDocument.condition.xprtnDtTm)
+    creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
+    debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
   ) {
     return {
       code: 405,
-      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0]?.condition?.xprtnDtTm}`,
+      message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
     };
   }
 

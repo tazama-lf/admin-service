@@ -3,7 +3,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { configuration, loggerService } from '../';
 import { extractTenant } from '@tazama-lf/auth-lib';
-
 import type { ITenantRequest } from '../interface/ITenantRequest';
 
 export const validateTenantMiddleware = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {

@@ -230,11 +230,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
   }
   if (debtorByEdge[0]?.edge._key) {
-    (await databaseManager.updateExpiryDateOfDebtorEntityEdges(
-      debtorByEdge[0].edge._key,
-      expireDateResult.dateStr,
-      tenantId,
-    )) as RawConditionResponse[][];
+    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
   }
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
 

@@ -52,8 +52,10 @@ jest.mock('../../src/', () => ({
     saveGovernedAsCreditorAccountByEdge: jest.fn(),
     saveGovernedAsDebtorAccountByEdge: jest.fn(),
     addOneGetCount: jest.fn(),
-    updateExpiryDateOfAccountEdges: jest.fn(),
-    updateExpiryDateOfEntityEdges: jest.fn(),
+    updateExpiryDateOfCreditorEntityEdges: jest.fn(),
+    updateExpiryDateOfDebtorEntityEdges: jest.fn(),
+    updateExpiryDateOfCreditorAccountEdges: jest.fn(),
+    updateExpiryDateOfDebtorAccountEdges: jest.fn(),
     updateCondition: jest.fn(),
     // Enhanced tenant-aware methods
     getReportByMessageId: jest.fn().mockImplementation((msgid: string, tenantId: string) => {
@@ -916,13 +918,14 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 describe('handleCacheUpdate', () => {
   const params = { id: '2110', schmenm: 'scheme', condid: '2110' };
   const xprtnDtTm = '2025-09-08T10:00:00.999Z';
+  let toISOStringSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(xprtnDtTm);
+    toISOStringSpy = jest.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(xprtnDtTm);
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    toISOStringSpy.mockRestore();
   });
 
   it('should cache conditions', async () => {
@@ -1038,9 +1041,39 @@ describe('Multi-Tenant Event Flow Tests', () => {
     it('should use tenant-aware account keys when creating new accounts', async () => {
       const tenantId = 'tenant-test-2';
 
-      // Use the existing sample and just modify the tenant ID
+      // Create a new inception time for this test using a more explicit approach
+      const nowTime = new Date();
+      const futureTime = new Date(nowTime.getTime() + 10 * 60 * 1000); // 10 minutes in future
+      const testIncptnDtTm = futureTime.toISOString();
+
+      const farFutureTime = new Date(nowTime.getTime() + 60 * 60 * 1000); // 1 hour in future
+      const testXprtnDtTm = farFutureTime.toISOString();
+
+      // Create a completely fresh object manually
       const accountCondition: AccountCondition = {
-        ...sampleAccountCondition,
+        evtTp: ['pacs.008.001.10', 'pacs.002.001.12'],
+        condTp: 'non-overridable-block',
+        prsptv: 'both',
+        incptnDtTm: testIncptnDtTm,
+        xprtnDtTm: testXprtnDtTm,
+        condRsn: 'R001',
+        acct: {
+          id: '1010101010',
+          schmeNm: {
+            prtry: 'Mxx',
+          },
+          agt: {
+            finInstnId: {
+              clrSysMmbId: {
+                mmbId: 'dfsp001',
+              },
+            },
+          },
+        },
+        forceCret: true,
+        usr: 'bob',
+        creDtTm: nowTime.toISOString(),
+        condId: '2110',
         tenantId: tenantId,
       };
 

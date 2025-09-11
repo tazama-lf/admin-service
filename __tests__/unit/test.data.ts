@@ -4,8 +4,8 @@ import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/i
 const currentDate = new Date();
 export const fixedDate = currentDate.toISOString();
 
-// Create a new date for inception time (current time + 1 second to pass validation)
-const inceptionDate = new Date(currentDate.getTime() + 1000);
+// Create a new date for inception time (current time + 5 minutes to pass validation)
+const inceptionDate = new Date(currentDate.getTime() + 5 * 60 * 1000);
 export const incptnDtTm = inceptionDate.toISOString();
 
 // Create a new date for expiration time (2 months from now)

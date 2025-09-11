@@ -226,9 +226,13 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
 
-  if (params.condid) {
-    await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  if (creditorByEdge[0]?.edge._key) {
+    await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
   }
+  if (debtorByEdge[0]?.edge._key) {
+    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
+  }
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
 
   const updatedReport = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId, true);
 
@@ -462,9 +466,14 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  if (params.condid) {
-    await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
+  if (creditorByEdge[0]?.edge._key) {
+    await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
   }
+  if (debtorByEdge[0]?.edge._key) {
+    await databaseManager.updateExpiryDateOfDebtorAccountEdges(debtorByEdge[0].edge._key, expireDateResult.dateStr, tenantId);
+  }
+
+  if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr, tenantId);
 
   let updatedReport: RawConditionResponse[][] = [[]];
   if (params.agt) {

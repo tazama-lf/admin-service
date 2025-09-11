@@ -11,37 +11,8 @@ import {
   updateAccountConditionExpiryDateHandler,
   updateEntityConditionExpiryDateHandler,
 } from './app.controller';
-import {
-  AccountHolderRepo,
-  AccountRepo,
-  ConditionRepo,
-  EntityRepo,
-  EvaluationRepo,
-  GovernedAsCreditorAccountByRepo,
-  GovernedAsCreditorByRepo,
-  GovernedAsDebtorAccountByRepo,
-  GovernedAsDebtorByRepo,
-  NetworkMapRepo,
-  Pacs002Repo,
-  Pacs008Repo,
-  RuleConfigRepo,
-  TransactionRepo,
-  TypologyConfigRepo,
-} from './repositories';
-import {
-  AccountHolderSchema,
-  AccountSchema,
-  ConditionSchema,
-  EdgeSchema,
-  EntitySchema,
-  NetworkMapSchema,
-  Pacs002Schema,
-  Pacs008Schema,
-  RuleSchema,
-  TypologySchema,
-  TransactionRelationshipSchema,
-  ReportSchema,
-} from './schemas/typebox.schemas';
+import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
+import { NetworkMapSchema, RuleSchema, TypologySchema } from './schemas/typebox.schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 
@@ -122,111 +93,6 @@ function Routes(fastify: FastifyInstance): void {
       prefix: '/v1/admin/configuration/typology',
       repo: TypologyConfigRepo,
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
-    }),
-  );
-
-  //-- evaluation
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/evaluation/evaluation',
-      repo: EvaluationRepo,
-      schemas: { Entity: ReportSchema, Create: ReportSchema, Update: ReportSchema },
-    }),
-  );
-
-  //-- raw_history
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/raw_history/pacs002',
-      repo: Pacs002Repo,
-      schemas: { Entity: Pacs002Schema, Create: Pacs002Schema, Update: Pacs002Schema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/raw_history/pacs008',
-      repo: Pacs008Repo,
-      schemas: { Entity: Pacs008Schema, Create: Pacs008Schema, Update: Pacs008Schema },
-    }),
-  );
-
-  //-- event_history
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/account',
-      repo: AccountRepo,
-      schemas: { Entity: AccountSchema, Create: AccountSchema, Update: AccountSchema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/account_holder',
-      repo: AccountHolderRepo,
-      schemas: { Entity: AccountHolderSchema, Create: AccountHolderSchema, Update: AccountHolderSchema },
-      idParam: { kind: 'composite', names: ['source', 'destination'] },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/entity',
-      repo: EntityRepo,
-      schemas: { Entity: EntitySchema, Create: EntitySchema, Update: EntitySchema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/transaction',
-      repo: TransactionRepo,
-      schemas: { Entity: TransactionRelationshipSchema, Create: TransactionRelationshipSchema, Update: TransactionRelationshipSchema },
-    }),
-  );
-
-  //-- event_history: event-flow
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/condition',
-      repo: ConditionRepo,
-      schemas: { Entity: ConditionSchema, Create: ConditionSchema, Update: ConditionSchema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/governed_as_creditor_account_by',
-      repo: GovernedAsCreditorAccountByRepo,
-      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
-      idParam: { kind: 'composite', names: ['source', 'destination'] },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/governed_as_creditor_by',
-      repo: GovernedAsCreditorByRepo,
-      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
-      idParam: { kind: 'composite', names: ['source', 'destination'] },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/governed_as_debtor_account_by',
-      repo: GovernedAsDebtorAccountByRepo,
-      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
-      idParam: { kind: 'composite', names: ['source', 'destination'] },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/event_history/governed_as_debtor_by',
-      repo: GovernedAsDebtorByRepo,
-      schemas: { Entity: EdgeSchema, Create: EdgeSchema, Update: EdgeSchema },
-      idParam: { kind: 'composite', names: ['source', 'destination'] },
     }),
   );
 }

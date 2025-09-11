@@ -13,8 +13,6 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
     switch (databaseName) {
       case 'configuration':
         return await databaseManager._configuration.query<T>(queryConfig.text, queryConfig.values);
-      case 'raw_history':
-        return await databaseManager._rawHistory.query<T>(queryConfig.text, queryConfig.values);
       case 'event_history':
         return await databaseManager._eventHistory.query<T>(queryConfig.text, queryConfig.values);
       case 'evaluation':

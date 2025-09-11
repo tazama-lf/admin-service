@@ -251,17 +251,17 @@ export const handlePostConditionAccount = async (
     checkConditionValidity(condition);
 
     const condId = v4();
-    const condAccounntId: string = condition.acct.id;
+    const condAccountId: string = condition.acct.id;
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
     condition.condId = condId;
 
-    const alreadyExistingAccount = await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid);
+    const alreadyExistingAccount = await databaseManager.getAccount(condAccountId, condSchemeProprietary, condMemberid);
     let accountId = alreadyExistingAccount?.id;
 
     if (!accountId) {
       if (condition.forceCret) {
-        accountId = `${condAccounntId}${condSchemeProprietary}${condMemberid}`;
+        accountId = `${condAccountId}${condSchemeProprietary}${condMemberid}`;
         try {
           await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
           await databaseManager.saveAccount(accountId);
@@ -278,7 +278,7 @@ export const handlePostConditionAccount = async (
 
     await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account');
 
-    const report = await databaseManager.getAccountConditionsByGraph(condAccounntId, condSchemeProprietary, condMemberid);
+    const report = await databaseManager.getAccountConditionsByGraph(condAccountId, condSchemeProprietary, condMemberid);
 
     const retVal = parseConditionAccount(report);
 

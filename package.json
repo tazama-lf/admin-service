@@ -37,7 +37,7 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@sinclair/typebox": "^0.34.40",
     "@tazama-lf/auth-lib": "^2.0.0",
-    "@tazama-lf/frms-coe-lib": "6.0.0-postgres.alpha.3",
+    "@tazama-lf/frms-coe-lib": "6.0.0-postgres.alpha.7",
     "@tazama-lf/frms-coe-startup-lib": "2.4.0-rc.4",
     "@types/pg": "^8.15.5",
     "ajv": "^8.17.1",

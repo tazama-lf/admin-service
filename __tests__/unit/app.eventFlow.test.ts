@@ -78,8 +78,8 @@ describe('handlePostConditionEntity', () => {
         return Promise.resolve({ id: `${entityId}${schemeProprietary}` } as Entity);
       });
 
-    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[][]> => {
-      return Promise.resolve([[rawResponseEntity]] as unknown as RawConditionResponse[][]);
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseEntity] as unknown as RawConditionResponse[]);
     });
 
     jest.spyOn(databaseManager, 'set').mockImplementation(() => {
@@ -278,7 +278,7 @@ describe('handlePostConditionEntity', () => {
     });
 
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementationOnce(() => {
-      return Promise.resolve([[copyofRawResponseEntity]]);
+      return Promise.resolve([copyofRawResponseEntity]);
     });
 
     // Act
@@ -291,8 +291,8 @@ describe('handlePostConditionEntity', () => {
 
 describe('getConditionForEntity', () => {
   beforeEach(() => {
-    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[][]> => {
-      return Promise.resolve([[rawResponseEntity]] as unknown as RawConditionResponse[][]);
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseEntity] as unknown as RawConditionResponse[]);
     });
 
     jest.spyOn(databaseManager, 'set').mockImplementationOnce(() => {
@@ -372,8 +372,8 @@ describe('handlePostConditionAccount', () => {
         return Promise.resolve({ id: `${accountId}${schemeProprietary}${agtMemberId}` });
       });
 
-    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[][]> => {
-      return Promise.resolve([[rawResponseAccount]] as RawConditionResponse[][]);
+    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseAccount] as RawConditionResponse[]);
     });
 
     jest.spyOn(databaseManager, 'saveCondition').mockImplementation((): Promise<void> => {
@@ -539,7 +539,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementationOnce(() => {
-      return Promise.resolve([[copyofRawResponseAccount]]);
+      return Promise.resolve([copyofRawResponseAccount]);
     });
 
     // Act
@@ -580,8 +580,8 @@ describe('getConditionForAccount', () => {
       return Promise.resolve({ id: 'account456' });
     });
 
-    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[][]> => {
-      return Promise.resolve([[rawResponseAccount]] as RawConditionResponse[][]);
+    jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseAccount] as RawConditionResponse[]);
     });
 
     jest.spyOn(databaseManager, 'set').mockImplementation(() => {
@@ -704,7 +704,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if no active conditions exist for the account', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_account_by: [], governed_as_debtor_account_by: [] }],
+      { governed_as_creditor_account_by: [], governed_as_debtor_account_by: [] },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -717,7 +717,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if condition does not exist in the database', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_account_by: [{ condition: { _key: '' } }], governed_as_debtor_account_by: [{ condition: { _key: '' } }] }],
+      { governed_as_creditor_account_by: [{ condition: { _key: '' } }], governed_as_debtor_account_by: [{ condition: { _key: '' } }] },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -730,12 +730,10 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
   it('should return 404 if account does not exist in the database', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([
-      [
-        {
-          governed_as_creditor_account_by: [{ condition: { condId: 'cond123' }, result: {} }],
-          governed_as_debtor_account_by: [{ condition: { condId: 'cond123' }, result: {} }],
-        },
-      ],
+      {
+        governed_as_creditor_account_by: [{ condition: { condId: 'cond123' }, result: {} }],
+        governed_as_debtor_account_by: [{ condition: { condId: 'cond123' }, result: {} }],
+      },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
@@ -747,7 +745,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
   });
 
   it('should return 405 if condition already contains an expiration date', async () => {
-    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[rawResponseAccount]]);
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([rawResponseAccount]);
 
     const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
 
@@ -761,7 +759,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     const copyOfAccountRawResponse = rawResponseAccount;
     delete copyOfAccountRawResponse.governed_as_creditor_account_by[0].condition.xprtnDtTm;
     delete copyOfAccountRawResponse.governed_as_debtor_account_by[0].condition.xprtnDtTm;
-    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfAccountRawResponse]]);
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([copyOfAccountRawResponse]);
     (databaseManager.updateExpiryDateOfCreditorAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateExpiryDateOfDebtorAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
@@ -824,7 +822,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
   it('should return 404 if no active conditions exist for the entity', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [], governed_as_debtor_by: [] }],
+      { governed_as_creditor_by: [], governed_as_debtor_by: [] },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
@@ -837,7 +835,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
   it('should return 404 if condition does not exist in the database', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
-      [{ governed_as_creditor_by: [{ condition: { condId: '' } }], governed_as_debtor_by: [{ condition: { condId: '' } }] }],
+      { governed_as_creditor_by: [{ condition: { condId: '' } }], governed_as_debtor_by: [{ condition: { condId: '' } }] },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
@@ -850,12 +848,10 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
   it('should return 404 if entity does not exist in the database', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([
-      [
-        {
-          governed_as_creditor_by: [{ condition: { condId: 'cond123' }, result: {} }],
-          governed_as_debtor_by: [{ condition: { condId: 'cond123' }, result: {} }],
-        },
-      ],
+      {
+        governed_as_creditor_by: [{ condition: { condId: 'cond123' }, result: {} }],
+        governed_as_debtor_by: [{ condition: { condId: 'cond123' }, result: {} }],
+      },
     ]);
 
     const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
@@ -867,7 +863,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   });
 
   it('should return 405 if condition already contains an expiration date', async () => {
-    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([[rawResponseEntity]]);
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([rawResponseEntity]);
 
     const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
 
@@ -881,7 +877,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     const copyOfEntityRawResponse = rawResponseEntity;
     delete copyOfEntityRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
     delete copyOfEntityRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
-    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([[copyOfEntityRawResponse]]);
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([copyOfEntityRawResponse]);
     (databaseManager.updateExpiryDateOfCreditorEntityEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateExpiryDateOfDebtorEntityEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');

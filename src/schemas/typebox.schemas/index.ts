@@ -4,18 +4,17 @@ import { Pacs008Schema } from './Pacs008Entity';
 import { NetworkMapSchema } from './NetworkMapEntity';
 import { RuleSchema } from './RuleSchemaEntity';
 import { TypologySchema } from './TypologySchema';
-import { AlertSchema } from './AlertSchema';
+import { ReportSchema } from './AlertSchema';
 import { ConditionSchema, AccountSchema, EntitySchema, EdgeSchema } from './EventHistorySchema';
 import { TransactionRelationshipSchema } from './TransactionSchema';
 import { AccountHolderSchema } from './AccountHolderSchema';
-
 export {
   Pacs002Schema,
   Pacs008Schema,
   NetworkMapSchema,
   RuleSchema,
   TypologySchema,
-  AlertSchema,
+  ReportSchema,
   ConditionSchema,
   AccountSchema,
   EntitySchema,

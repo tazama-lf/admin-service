@@ -64,6 +64,7 @@ export const handlePostConditionEntity = async (
     const condId = v4();
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
+    condition.condId = condId;
 
     const alreadyExistingEntity = await databaseManager.getEntity(condEntityId, condSchemeProprietary);
     let entityId = alreadyExistingEntity?.id;
@@ -89,7 +90,7 @@ export const handlePostConditionEntity = async (
 
     const report = await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary);
 
-    const retVal = parseConditionEntity(report[0]);
+    const retVal = parseConditionEntity(report);
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
@@ -132,11 +133,11 @@ export const handleGetConditionsForEntity = async (
   const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, params.activeonly !== 'yes');
 
   loggerService.log('called database', fnName, params.id);
-  if (!report.length || !report[0].length) {
+  if (!report.length) {
     return { code: 404 };
   }
 
-  const retVal = parseConditionEntity(report[0]);
+  const retVal = parseConditionEntity(report);
 
   if (!retVal.conditions.length) {
     return { code: 204 };
@@ -150,10 +151,8 @@ export const handleGetConditionsForEntity = async (
     case 'active':
       loggerService.trace('syncCache=active option specified', 'cache update', cacheKey);
       await updateCache(cacheKey, { ...retVal, conditions: filterConditions(retVal.conditions) });
-
       break;
     case 'default':
-      // use env
       loggerService.trace('syncCache=default option specified', 'cache update', cacheKey);
       if (configuration.ACTIVE_CONDITIONS_ONLY) {
         loggerService.trace('using env to update active conditions only', 'cache update', cacheKey);
@@ -170,7 +169,7 @@ export const handleGetConditionsForEntity = async (
 
   return { code: 200, result: retVal };
 };
-// TODO WAITING FIX TO RETURN CONDITION ID
+
 export const handleUpdateExpiryDateForConditionsOfEntity = async (
   params: ConditionRequest,
   xprtnDtTm?: string,
@@ -184,11 +183,11 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm);
 
-  if (!report.length || !report[0].length || !report[0][0]) {
+  if (!report.length) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
   }
 
-  const resultByEdge = report[0][0];
+  const resultByEdge = report[0];
 
   if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
@@ -231,7 +230,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
 
   const updatedReport = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, true);
 
-  const retVal = parseConditionEntity(updatedReport[0]);
+  const retVal = parseConditionEntity(updatedReport);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
   const cacheKey = `entities/${params.id}${params.schmenm}`;
@@ -241,7 +240,6 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
   return { code: 200, message: '' };
 };
 
-// TODO AWAITING FIX FOR saveCondition TO RETURN NEW ID
 export const handlePostConditionAccount = async (
   condition: AccountCondition,
 ): Promise<{ message: string; result: AccountConditionResponse }> => {
@@ -256,6 +254,7 @@ export const handlePostConditionAccount = async (
     const condAccounntId: string = condition.acct.id;
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
+    condition.condId = condId;
 
     const alreadyExistingAccount = await databaseManager.getAccount(condAccounntId, condSchemeProprietary, condMemberid);
     let accountId = alreadyExistingAccount?.id;
@@ -281,13 +280,13 @@ export const handlePostConditionAccount = async (
 
     const report = await databaseManager.getAccountConditionsByGraph(condAccounntId, condSchemeProprietary, condMemberid);
 
-    const retVal = parseConditionAccount(report[0]);
+    const retVal = parseConditionAccount(report);
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
     await updateCache(accountId, activeConditionsOnly);
 
-    if (retVal && retVal.conditions.length > 1) {
+    if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the account`;
       loggerService.warn(message);
       loggerService.trace('using env to update active conditions only', 'cache update', accountId);
@@ -312,7 +311,7 @@ export const handlePostConditionAccount = async (
 export const handleRefreshCache = async (activeOnly: boolean, ttl: number): Promise<void> => {
   try {
     const data = (await databaseManager.getConditions(activeOnly)) as Array<AccountCondition | EntityCondition>;
-    if (data?.length > 0) {
+    if (data.length > 0) {
       return; // no conditions
     }
 
@@ -339,11 +338,11 @@ export const handleGetConditionsForAccount = async (
   loggerService.trace('successfully parsed parameters', fnName, params.id);
   const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
 
-  let report: RawConditionResponse[][] = [[]];
+  let report: RawConditionResponse[] = [];
   if (params.agt) {
     const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt))!;
 
-    if (!accountExist?.id) {
+    if (!accountExist.id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
@@ -351,11 +350,11 @@ export const handleGetConditionsForAccount = async (
   }
 
   loggerService.log('called database', fnName, params.id);
-  if (!report.length || !report[0].length) {
+  if (!report.length) {
     return { code: 404 };
   }
 
-  const retVal = parseConditionAccount(report[0]);
+  const retVal = parseConditionAccount(report);
 
   if (!retVal.conditions.length) {
     return { code: 204 };
@@ -406,16 +405,16 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     return { code: 400, message: expireDateResult.message };
   }
 
-  let report: RawConditionResponse[][] = [[]];
+  let report: RawConditionResponse[] = [];
   if (params.agt) {
     report = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt);
   }
 
-  if (!report.length || !report[0].length || !report[0][0]) {
+  if (!report.length) {
     return { code: 404, message: 'No records were found in the database using the provided data.' };
   }
 
-  const resultByEdge = report[0][0];
+  const resultByEdge = report[0];
 
   if (!resultByEdge.governed_as_creditor_account_by.length && !resultByEdge.governed_as_debtor_account_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };
@@ -445,8 +444,6 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
 
-  // TODO tenantID stuff
-  // await databaseManager.updateExpiryDateOfAccountEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
   if (creditorByEdge[0]) {
     await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
   }
@@ -459,11 +456,11 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
   }
 
-  let updatedReport: RawConditionResponse[][] = [[]];
+  let updatedReport: RawConditionResponse[] = [];
   if (params.agt) {
     updatedReport = await databaseManager.getAccountConditionsByGraph(params.id, params.schmenm, params.agt, true);
   }
-  const retVal = parseConditionAccount(updatedReport[0]);
+  const retVal = parseConditionAccount(updatedReport);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
   const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;

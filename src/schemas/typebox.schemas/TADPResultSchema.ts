@@ -8,5 +8,4 @@ export const TADPResult = Type.Object({
   id: Type.String(),
   cfg: Type.String(),
   typologyResult: Type.Array(TypologyResult),
-  prcgTm: Type.Optional(Type.Number()),
 });

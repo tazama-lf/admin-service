@@ -16,6 +16,7 @@ import {
   AccountRepo,
   ConditionRepo,
   EntityRepo,
+  EvaluationRepo,
   GovernedAsCreditorAccountByRepo,
   GovernedAsCreditorByRepo,
   GovernedAsDebtorAccountByRepo,
@@ -30,7 +31,6 @@ import {
 import {
   AccountHolderSchema,
   AccountSchema,
-  AlertSchema,
   ConditionSchema,
   EdgeSchema,
   EntitySchema,
@@ -40,6 +40,7 @@ import {
   RuleSchema,
   TypologySchema,
   TransactionRelationshipSchema,
+  ReportSchema,
 } from './schemas/typebox.schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -128,8 +129,8 @@ function Routes(fastify: FastifyInstance): void {
   fastify.register(
     buildCrudPlugin({
       prefix: '/v1/admin/evaluation/evaluation',
-      repo: TypologyConfigRepo,
-      schemas: { Entity: AlertSchema, Create: AlertSchema, Update: AlertSchema },
+      repo: EvaluationRepo,
+      schemas: { Entity: ReportSchema, Create: ReportSchema, Update: ReportSchema },
     }),
   );
 

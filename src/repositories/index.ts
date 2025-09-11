@@ -15,6 +15,7 @@ import {
   GovernedAsDebtorAccountByRepo,
   GovernedAsDebtorByRepo,
 } from './event_history/event.flow.edges.repository';
+import { EvaluationRepo } from './evaluation/evaluation.repository';
 export {
   Pacs002Repo,
   Pacs008Repo,
@@ -30,4 +31,5 @@ export {
   GovernedAsCreditorByRepo,
   GovernedAsDebtorAccountByRepo,
   GovernedAsDebtorByRepo,
+  EvaluationRepo,
 };

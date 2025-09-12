@@ -5,7 +5,7 @@ import type {
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 
-export const parseConditionEntity = (input: RawConditionResponse[], tenantId = 'DEFAULT'): EntityConditionResponse => {
+export const parseConditionEntity = (input: RawConditionResponse[], tenantId: string): EntityConditionResponse => {
   // Initialize the result object
   const result: Partial<EntityConditionResponse> = {
     conditions: [],
@@ -38,7 +38,7 @@ export const parseConditionEntity = (input: RawConditionResponse[], tenantId = '
   return result as EntityConditionResponse;
 };
 
-export const parseConditionAccount = (input: RawConditionResponse[], tenantId = 'DEFAULT'): AccountConditionResponse => {
+export const parseConditionAccount = (input: RawConditionResponse[], tenantId: string): AccountConditionResponse => {
   // Initialize the result object
   const result: Partial<AccountConditionResponse> = {
     conditions: [],

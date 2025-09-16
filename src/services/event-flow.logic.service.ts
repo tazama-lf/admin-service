@@ -342,7 +342,7 @@ export const handleGetConditionsForAccount = async (
   if (params.agt) {
     const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt))!;
 
-    if (!accountExist.id) {
+    if (!accountExist?.id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 

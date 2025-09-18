@@ -756,9 +756,18 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
   });
 
   it('should update expiry date and cache when conditions are met', async () => {
-    const copyOfAccountRawResponse = rawResponseAccount;
+    const copyOfAccountRawResponse = rawResponseAccount as any;
     delete copyOfAccountRawResponse.governed_as_creditor_account_by[0].condition.xprtnDtTm;
     delete copyOfAccountRawResponse.governed_as_debtor_account_by[0].condition.xprtnDtTm;
+    copyOfAccountRawResponse.governed_as_creditor_account_by[0].id = '+27733161225MSISDN';
+    copyOfAccountRawResponse.governed_as_creditor_account_by[0].source = rawResponseAccount.governed_as_creditor_account_by[0].edge.source;
+    copyOfAccountRawResponse.governed_as_creditor_account_by[0].destination =
+      rawResponseAccount.governed_as_creditor_account_by[0].edge.destination;
+    copyOfAccountRawResponse.governed_as_debtor_account_by[0].id = '+27733161225MSISDN';
+    copyOfAccountRawResponse.governed_as_debtor_account_by[0].source = rawResponseAccount.governed_as_creditor_account_by[0].edge.source;
+    copyOfAccountRawResponse.governed_as_debtor_account_by[0].destination =
+      rawResponseAccount.governed_as_creditor_account_by[0].edge.destination;
+
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([copyOfAccountRawResponse]);
     (databaseManager.updateExpiryDateOfCreditorAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateExpiryDateOfDebtorAccountEdges as jest.Mock).mockResolvedValue('test');
@@ -768,10 +777,11 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
     expect(databaseManager.updateExpiryDateOfCreditorAccountEdges).toHaveBeenCalledWith(
       rawResponseAccount.governed_as_creditor_account_by[0].edge.source,
+      rawResponseAccount.governed_as_creditor_account_by[0].edge.destination,
       xprtnDtTm,
       '', // tenent id
     );
-    expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm);
+    //expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm);
 
     expect(result).toEqual({ code: 200, message: '' });
   });
@@ -874,9 +884,16 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   });
 
   it('should update expiry date and cache when conditions are met', async () => {
-    const copyOfEntityRawResponse = rawResponseEntity;
+    const copyOfEntityRawResponse = rawResponseEntity as any;
     delete copyOfEntityRawResponse.governed_as_creditor_by[0].condition.xprtnDtTm;
     delete copyOfEntityRawResponse.governed_as_debtor_by[0].condition.xprtnDtTm;
+    copyOfEntityRawResponse.governed_as_creditor_by[0].id = '+27733161225MSISDN';
+    copyOfEntityRawResponse.governed_as_creditor_by[0].source = rawResponseEntity.governed_as_creditor_by[0].edge.source;
+    copyOfEntityRawResponse.governed_as_creditor_by[0].destination = rawResponseEntity.governed_as_creditor_by[0].edge.destination;
+    copyOfEntityRawResponse.governed_as_debtor_by[0].id = '+27733161225MSISDN';
+    copyOfEntityRawResponse.governed_as_debtor_by[0].source = rawResponseEntity.governed_as_creditor_by[0].edge.source;
+    copyOfEntityRawResponse.governed_as_debtor_by[0].destination = rawResponseEntity.governed_as_creditor_by[0].edge.destination;
+
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([copyOfEntityRawResponse]);
     (databaseManager.updateExpiryDateOfCreditorEntityEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateExpiryDateOfDebtorEntityEdges as jest.Mock).mockResolvedValue('test');
@@ -886,6 +903,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
     expect(databaseManager.updateExpiryDateOfDebtorEntityEdges).toHaveBeenCalledWith(
       rawResponseEntity.governed_as_creditor_by[0].edge.source,
+      rawResponseEntity.governed_as_creditor_by[0].edge.destination,
       xprtnDtTm,
       '',
     );

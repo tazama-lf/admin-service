@@ -2,7 +2,7 @@
 import { createSimpleConditionsBuffer } from '@tazama-lf/frms-coe-lib/lib/helpers/protobuf';
 import type { AccountCondition, ConditionEdge, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { AccountConditionResponse, EntityConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
-import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
+import type { Edge, RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 import { configuration, databaseManager, loggerService } from '..';
 import type { ConditionRequest } from '../interface/query';
 import { checkConditionValidity, validateAndParseExpirationDate } from '../utils/condition-validation';
@@ -203,10 +203,6 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (!creditorByEdge.some((eachDocument) => eachDocument.result.id) && !debtorByEdge.some((eachDocument) => eachDocument.result.id)) {
-    return { code: 404, message: 'Entity does not exist in the database.' };
-  }
-
   if (
     creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
     debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
@@ -216,14 +212,29 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
       message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
     };
   }
+  const creditorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
 
-  // await databaseManager.updateExpiryDateOfEntityEdges(creditorByEdge[0]?.edge.id, debtorByEdge[0]?.edge.id, expireDateResult.dateStr);
-  if (creditorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfCreditorEntityEdges(creditorByEdge[0].edge.source, expireDateResult.dateStr, '');
+  if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
+    return { code: 404, message: 'Entity does not exist in the database.' };
   }
 
-  if (debtorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfDebtorEntityEdges(debtorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
+  if (creditorByEdgeE[0]) {
+    await databaseManager.updateExpiryDateOfCreditorEntityEdges(
+      creditorByEdgeE[0].source,
+      creditorByEdgeE[0].destination,
+      expireDateResult.dateStr,
+      '',
+    );
+  }
+
+  if (debtorByEdgeE[0]) {
+    await databaseManager.updateExpiryDateOfDebtorEntityEdges(
+      debtorByEdgeE[0]?.source,
+      debtorByEdgeE[0]?.destination,
+      expireDateResult.dateStr,
+      '',
+    );
   }
 
   if (params.condid) await databaseManager.updateCondition(params.condid, expireDateResult.dateStr);
@@ -430,10 +441,6 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     return { code: 404, message: 'Condition does not exist in the database.' };
   }
 
-  if (!creditorByEdge.some((eachDocument) => eachDocument.result.id) && !debtorByEdge.some((eachDocument) => eachDocument.result.id)) {
-    return { code: 404, message: 'Account does not exist in the database.' };
-  }
-
   if (
     creditorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm) ||
     debtorByEdge.some((eachDocument) => eachDocument.condition.xprtnDtTm)
@@ -443,13 +450,29 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
       message: `Update failed - condition ${params.condid} already contains an expiration date ${creditorByEdge[0].condition.xprtnDtTm}`,
     };
   }
+  const creditorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
 
-  if (creditorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfCreditorAccountEdges(creditorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
+  if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
+    return { code: 404, message: 'Account does not exist in the database.' };
   }
 
-  if (debtorByEdge[0]) {
-    await databaseManager.updateExpiryDateOfDebtorAccountEdges(debtorByEdge[0]?.edge.source, expireDateResult.dateStr, '');
+  if (creditorByEdgeE[0]) {
+    await databaseManager.updateExpiryDateOfCreditorAccountEdges(
+      creditorByEdgeE[0]?.source,
+      creditorByEdgeE[0]?.destination,
+      expireDateResult.dateStr,
+      '',
+    );
+  }
+
+  if (debtorByEdgeE[0]) {
+    await databaseManager.updateExpiryDateOfDebtorAccountEdges(
+      debtorByEdgeE[0]?.source,
+      debtorByEdgeE[0]?.destination,
+      expireDateResult.dateStr,
+      '',
+    );
   }
 
   if (params.condid) {

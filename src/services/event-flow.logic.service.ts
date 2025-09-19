@@ -94,7 +94,7 @@ export const handlePostConditionEntity = async (
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
-    await updateCache(entityId, activeConditionsOnly);
+    await updateCache(`entities/${entityId}`, activeConditionsOnly);
 
     if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the entity`;
@@ -295,7 +295,7 @@ export const handlePostConditionAccount = async (
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
-    await updateCache(accountId, activeConditionsOnly);
+    await updateCache(`accounts/${accountId}`, activeConditionsOnly);
 
     if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the account`;

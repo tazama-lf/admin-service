@@ -9,7 +9,6 @@ import * as util from 'node:util';
 
 export const loggerService: LoggerService = new LoggerService(processorConfig);
 
-// using the 'Required' utility type so autocompletion kicks in only the services we want
 let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
 let configuration: Configuration;
 

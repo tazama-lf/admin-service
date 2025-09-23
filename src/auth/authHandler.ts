@@ -2,7 +2,9 @@ import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { loggerService } from '..';
 
-export const tokenHandler = (claim: string) => async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const tokenHandler =
+  (claim: string) =>
+  async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const logContext = 'tokenHandler()';
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Bearer ') || !claim) {

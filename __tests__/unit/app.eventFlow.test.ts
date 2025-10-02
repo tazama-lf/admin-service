@@ -468,7 +468,7 @@ describe('handlePostConditionAccount', () => {
       `Started handling post request of account condition executed by ${sampleAccountCondition.usr}.`,
     );
     expect(databaseManager.saveAccount).toHaveBeenCalledWith(
-      `DEFAULT:${sampleAccountCondition.acct.id}:${sampleAccountCondition.acct.schmeNm.prtry}:${sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
+      `DEFAULT${sampleAccountCondition.acct.id}${sampleAccountCondition.acct.schmeNm.prtry}${sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
       'DEFAULT',
     );
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', 'account456', sampleAccountCondition);
@@ -1086,7 +1086,7 @@ describe('Multi-Tenant Event Flow Tests', () => {
 
       // Verify that tenant-aware account identifier was used
       expect(databaseManager.saveAccount).toHaveBeenCalledWith(
-        `${tenantId}:${accountCondition.acct.id}:${accountCondition.acct.schmeNm.prtry}:${accountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
+        `${tenantId}${accountCondition.acct.id}${accountCondition.acct.schmeNm.prtry}${accountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`,
         tenantId,
       );
     });

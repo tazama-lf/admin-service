@@ -71,7 +71,7 @@ export const handlePostConditionEntity = async (
     const condEntityId: string = condition.ntty.id;
     const condSchemeProprietary: string = condition.ntty.schmeNm.prtry;
 
-    const tenantEntityIdentifier = `${tenantId}:${condEntityId}:${condSchemeProprietary}`;
+    const tenantEntityIdentifier = `${tenantId}${condEntityId}${condSchemeProprietary}`;
 
     const alreadyExistingEntity = (await databaseManager.getEntity(condEntityId, condSchemeProprietary, tenantId)) as Array<
       Array<{ _id: string }>
@@ -264,7 +264,7 @@ export const handlePostConditionAccount = async (
     const condSchemeProprietary: string = condition.acct.schmeNm.prtry;
     const condMemberid: string = condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
 
-    const tenantAccountIdentifier = `${tenantId}:${condAccounntId}:${condSchemeProprietary}:${condMemberid}`;
+    const tenantAccountIdentifier = `${tenantId}${condAccounntId}${condSchemeProprietary}${condMemberid}`;
 
     const alreadyExistingAccount = (await databaseManager.getAccount(
       condAccounntId,

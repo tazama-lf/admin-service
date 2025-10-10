@@ -19,7 +19,7 @@ Before you start using the Admin API, ensure that you have the following items:
 3. **Git**: Version control system for cloning the repository.
     - Download from [Git Official Website](https://git-scm.com/).
 
-4. **Database**: Arango database setup.
+4. **Database**: Postgres database setup.
     - Ensure the database is running and accessible from your Node.js environment.
 
 5. **Environment Variables**: Set up environment variables required by the application, such as database connection strings. Typically stored in a `.env` file.
@@ -60,7 +60,7 @@ This endpoint retrieves a report by the specified message ID (`msgid`). The mess
 sequenceDiagram
     participant Client as Client<br>System
     participant ADMIN as Admin-Service    
-    participant DB as ArangoDB
+    participant DB as PostgresDB
 
 Client ->> ADMIN: 1. Fetch evaluationResult
 ADMIN->> DB: 2. Fetch evaluationResult 

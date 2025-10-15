@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { configuration } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
+import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -78,7 +79,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           querystring: QuerySchema,
           response: { 200: ListResponse },
         },
-        preHandler: configuration.AUTHENTICATED ? tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
+        preHandler: configuration.AUTHENTICATED
+          ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
+          : [validateTenantMiddleware],
       },
       async (req, reply) => {
         const q = req.query as Static<typeof QuerySchema>;
@@ -109,7 +112,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           params: IdParam,
           response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
         },
-        preHandler: configuration.AUTHENTICATED ? tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
+        preHandler: configuration.AUTHENTICATED
+          ? [validateTenantMiddleware, tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`)]
+          : [validateTenantMiddleware],
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
@@ -134,7 +139,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           body: Create,
           response: { 201: Entity },
         },
-        preHandler: configuration.AUTHENTICATED ? tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
+        preHandler: configuration.AUTHENTICATED
+          ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`)]
+          : [validateTenantMiddleware],
       },
       async (req, reply) => {
         const created = await repo.create(req.body as TEntity);
@@ -152,7 +159,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           body: Update,
           response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
         },
-        preHandler: configuration.AUTHENTICATED ? tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
+        preHandler: configuration.AUTHENTICATED
+          ? [validateTenantMiddleware, tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`)]
+          : [validateTenantMiddleware],
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
@@ -176,7 +185,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
           params: IdParam,
           response: { 200: Type.Object({ success: Type.Boolean() }) },
         },
-        preHandler: configuration.AUTHENTICATED ? tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`) : undefined,
+        preHandler: configuration.AUTHENTICATED
+          ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]
+          : [validateTenantMiddleware],
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;

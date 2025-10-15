@@ -74,11 +74,9 @@ export const handlePostConditionEntity = async (
     const tenantEntityIdentifier = `${tenantId}${condEntityId}${condSchemeProprietary}`;
 
     const alreadyExistingEntity = await databaseManager.getEntity(condEntityId, condSchemeProprietary, tenantId);
-    let entityId = alreadyExistingEntity?.id;
 
-    if (!entityId) {
+    if (!alreadyExistingEntity?.id) {
       if (condition.forceCret) {
-        entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
         try {
           await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
           await databaseManager.saveEntity(tenantEntityIdentifier, tenantId, nowDateTime);
@@ -93,7 +91,7 @@ export const handlePostConditionEntity = async (
       await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
     }
 
-    await saveConditionEdges(condition.prsptv, condId, entityId, condition, 'entity', tenantId);
+    await saveConditionEdges(condition.prsptv, condId, tenantEntityIdentifier, condition, 'entity', tenantId);
 
     const report = await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary, tenantId);
 
@@ -101,7 +99,7 @@ export const handlePostConditionEntity = async (
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
-    await updateCache(entityId, activeConditionsOnly);
+    await updateCache(tenantEntityIdentifier, activeConditionsOnly);
 
     if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the entity`;
@@ -136,7 +134,7 @@ export const handleGetConditionsForEntity = async (
     return { result: 'Entity does not exist in the database', code: 404 };
   }
 
-  const cacheKey = `entities/${params.id}${params.schmenm}`;
+  const cacheKey = `${tenantId}${params.id}${params.schmenm}`;
 
   const report = await databaseManager.getEntityConditionsByGraph(params.id, params.schmenm, tenantId, params.activeonly !== 'yes');
 
@@ -253,7 +251,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
   const retVal = parseConditionEntity(updatedReport, tenantId);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
-  const cacheKey = `entities/${params.id}${params.schmenm}`;
+  const cacheKey = `${tenantId}${params.id}${params.schmenm}`;
 
   await updateCache(cacheKey, activeConditionsOnly);
 
@@ -282,11 +280,9 @@ export const handlePostConditionAccount = async (
     const tenantAccountIdentifier = `${tenantId}${condAccountId}${condSchemeProprietary}${condMemberid}`;
 
     const alreadyExistingAccount = await databaseManager.getAccount(condAccountId, condSchemeProprietary, condMemberid, tenantId);
-    let accountId = alreadyExistingAccount?.id;
 
-    if (!accountId) {
+    if (!alreadyExistingAccount?.id) {
       if (condition.forceCret) {
-        accountId = `${condAccountId}${condSchemeProprietary}${condMemberid}`;
         try {
           await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId });
           await databaseManager.saveAccount(tenantAccountIdentifier, tenantId);
@@ -301,7 +297,7 @@ export const handlePostConditionAccount = async (
       await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId });
     }
 
-    await saveConditionEdges(condition.prsptv, condId, accountId, condition as ConditionEdge, 'account', tenantId);
+    await saveConditionEdges(condition.prsptv, condId, tenantAccountIdentifier, condition as ConditionEdge, 'account', tenantId);
 
     const report = await databaseManager.getAccountConditionsByGraph(condAccountId, condSchemeProprietary, tenantId, condMemberid);
 
@@ -309,12 +305,12 @@ export const handlePostConditionAccount = async (
 
     const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
 
-    await updateCache(accountId, activeConditionsOnly);
+    await updateCache(tenantAccountIdentifier, activeConditionsOnly);
 
     if (retVal.conditions.length > 1) {
       const message = `${retVal.conditions.length - 1} conditions already exist for the account`;
       loggerService.warn(message);
-      loggerService.trace('using env to update active conditions only', 'cache update', accountId);
+      loggerService.trace('using env to update active conditions only', 'cache update', tenantAccountIdentifier);
 
       return {
         message,
@@ -362,7 +358,7 @@ export const handleGetConditionsForAccount = async (
   const fnName = 'getConditionsForAccount';
 
   loggerService.trace('successfully parsed parameters', fnName, params.id);
-  const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
+  const cacheKey = `${tenantId}${params.id}${params.schmenm}${params.agt}`;
 
   let report: RawConditionResponse[] = [];
   if (params.agt) {
@@ -508,7 +504,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
   const retVal = parseConditionAccount(updatedReport, tenantId);
 
   const activeConditionsOnly = { ...retVal, conditions: filterConditions(retVal.conditions) };
-  const cacheKey = `accounts/${params.id}${params.schmenm}${params.agt}`;
+  const cacheKey = `${tenantId}${params.id}${params.schmenm}${params.agt}`;
 
   await updateCache(cacheKey, activeConditionsOnly);
 

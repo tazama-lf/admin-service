@@ -108,8 +108,8 @@ describe('handlePostConditionEntity', () => {
       `Started handling post request of entity condition executed by ${sampleEntityCondition.usr}.`,
     );
     const entityId = `${typedCondition.ntty.id}${typedCondition.ntty.schmeNm.prtry}`;
-    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, sampleEntityCondition);
-    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', entityId, sampleEntityCondition);
+    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', 'DEFAULT' + entityId, sampleEntityCondition);
+    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'DEFAULT' + entityId, sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       result: entityResponse.result,
@@ -118,7 +118,7 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a case where the entity already exists', async () => {
     // Arrange
-    const existingEntityId = 'entity456';
+    const existingEntityId = '+27733161225MSISDN';
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {
       return Promise.resolve({ id: existingEntityId } as Entity);
     });
@@ -127,8 +127,12 @@ describe('handlePostConditionEntity', () => {
     const result = await handlePostConditionEntity(sampleEntityCondition as EntityCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleEntityCondition);
-    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleEntityCondition);
+    expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith(
+      'cond123',
+      'DEFAULT' + existingEntityId,
+      sampleEntityCondition,
+    );
+    expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', 'DEFAULT' + existingEntityId, sampleEntityCondition);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       result: entityResponse.result,
@@ -150,7 +154,7 @@ describe('handlePostConditionEntity', () => {
         creDtTm: nowDateTime,
       }),
     );
-    const entityId = `${conditionDebtor.ntty.id}${conditionDebtor.ntty.schmeNm.prtry}`;
+    const entityId = `DEFAULT${conditionDebtor.ntty.id}${conditionDebtor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionDebtor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
@@ -187,7 +191,7 @@ describe('handlePostConditionEntity', () => {
       ...conditionCreditor,
       creDtTm: nowDateTime,
     });
-    const entityId = `${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
+    const entityId = `DEFAULT${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionCreditor);
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
@@ -396,8 +400,16 @@ describe('handlePostConditionAccount', () => {
       `Started handling post request of account condition executed by ${sampleAccountCondition.usr}.`,
     );
     const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
-    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', accountId, sampleAccountCondition);
-    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', accountId, sampleAccountCondition);
+    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith(
+      'cond123',
+      'DEFAULT' + accountId,
+      sampleAccountCondition,
+    );
+    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith(
+      'cond123',
+      'DEFAULT' + accountId,
+      sampleAccountCondition,
+    );
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       result: accountResponse.result,
@@ -405,9 +417,7 @@ describe('handlePostConditionAccount', () => {
   });
 
   it('should handle a case where the account already exists', async () => {
-    // Arrange
-
-    const existingAccountId = 'account456';
+    const existingAccountId = '1010101010Mxxdfsp001';
     jest.spyOn(databaseManager, 'getAccount').mockImplementation((): Promise<Account | undefined> => {
       return Promise.resolve(
         { id: existingAccountId, TenantId: 'DEFAULT' }, // No existing account
@@ -418,8 +428,16 @@ describe('handlePostConditionAccount', () => {
     const result = await handlePostConditionAccount(sampleAccountCondition as AccountCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
-    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
+    expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith(
+      'cond123',
+      'DEFAULT' + existingAccountId,
+      sampleAccountCondition,
+    );
+    expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith(
+      'cond123',
+      'DEFAULT' + existingAccountId,
+      sampleAccountCondition,
+    );
     expect(result).toEqual({
       message: 'New condition was saved successfully.',
       result: accountResponse.result,
@@ -433,7 +451,7 @@ describe('handlePostConditionAccount', () => {
 
     // Act
     const result = await handlePostConditionAccount(conditionDebtor, 'DEFAULT');
-    const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
+    const accountId = `DEFAULT${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
 
     // Assert
     expect(databaseManager.saveGovernedAsDebtorAccountByEdge).toHaveBeenCalledWith('cond123', accountId, conditionDebtor);
@@ -471,7 +489,7 @@ describe('handlePostConditionAccount', () => {
         creDtTm: nowDateTime,
       }),
     );
-    const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
+    const accountId = `DEFAULT${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
 
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', accountId, conditionCreditor);
     expect(result).toEqual({

@@ -2,6 +2,7 @@
 type StringKeys<T> = Extract<keyof T, string>;
 export interface ListQuery<TSort extends string = string> {
   limit?: number; // default 20
+  tenantId?: string; // tenant id is (optional) default "DEFAULT"
   offset?: number; // default 0
   sort?: TSort; // field name
   order?: 'ASC' | 'DESC';

@@ -28,6 +28,7 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
 const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
+  tenantId: Type.Optional(Type.String()),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
   q: Type.Optional(Type.String()),
@@ -85,12 +86,13 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
       async (req, reply) => {
         const q = req.query as Static<typeof QuerySchema>;
-        const { limit = 20, offset = 0, sort, order = 'ASC', q: search, filters } = q;
+        const { limit = 20, tenantId = 'DEFAULT', offset = 0, sort, order = 'ASC', q: search, filters } = q;
 
         type SortField = Extract<keyof TEntity, string>;
 
         const params: ListQuery<SortField> = {
           limit,
+          tenantId,
           offset,
           sort: sort as SortField | undefined,
           order,

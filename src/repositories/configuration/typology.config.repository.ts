@@ -5,7 +5,7 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { CrudRepository } from '../repository.base';
 
 export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
-  list: async function ({ filters, limit, offset, order, sort }): Promise<{ data: TypologyConfig[]; total: number }> {
+  list: async function ({ filters, limit, offset, order, sort, tenantId }): Promise<{ data: TypologyConfig[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'typologyid', value: '' };
     if (filters) {
@@ -15,8 +15,8 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: `SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$5 ${order} OFFSET $3 LIMIT $4;`,
-        values: [filter.field, filter.value, offset, limit, sort],
+        text: `SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 ${order} OFFSET $3 LIMIT $4;`,
+        values: [filter.field, filter.value, offset, limit, sort, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

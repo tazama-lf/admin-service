@@ -43,6 +43,7 @@ export type RuleSchema = Static<typeof RuleSchema>;
 export const RuleSchema = Type.Object({
   id: Type.String(),
   cfg: Type.String(),
+  tenantId: Type.String(),
   config: Config,
   desc: Type.Optional(Type.String()),
 });

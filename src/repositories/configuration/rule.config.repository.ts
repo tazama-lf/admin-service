@@ -5,7 +5,7 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { CrudRepository } from '../repository.base';
 
 export const RuleConfigRepo: CrudRepository<RuleConfig> = {
-  list: async function ({ offset, limit, filters, order, sort }): Promise<{ data: RuleConfig[]; total: number }> {
+  list: async function ({ offset, limit, filters, order, sort, tenantId }): Promise<{ data: RuleConfig[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'ruleid', value: '' };
     if (filters) {
@@ -15,8 +15,8 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: `SELECT configuration FROM rule ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit],
+        text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
+        values: [filter.field, filter.value, sort, offset, limit, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

@@ -36,6 +36,7 @@ export type TypologySchema = Static<typeof TypologySchema>;
 export const TypologySchema = Type.Object({
   id: Type.String(),
   cfg: Type.String(),
+  tenantId: Type.String(),
   desc: Type.Optional(Type.String()),
   rules: Type.Array(IRuleValue),
   expression: ExpressionMathJSON,

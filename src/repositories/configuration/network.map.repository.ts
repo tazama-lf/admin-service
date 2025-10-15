@@ -5,7 +5,7 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { CrudRepository } from '../repository.base';
 
 export const NetworkMapRepo: CrudRepository<NetworkMap> = {
-  list: async function ({ limit, offset, sort, order, filters }): Promise<{ data: NetworkMap[]; total: number }> {
+  list: async function ({ limit, offset, sort, order, filters, tenantId }): Promise<{ data: NetworkMap[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'cfg', value: '' };
     if (filters) {
@@ -14,8 +14,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     }
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: `SELECT configuration FROM network_map ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit],
+        text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
+        values: [filter.field, filter.value, sort, offset, limit, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

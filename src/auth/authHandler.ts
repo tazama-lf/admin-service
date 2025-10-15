@@ -4,7 +4,7 @@ import { loggerService } from '..';
 
 export const tokenHandler =
   (claim: string) =>
-  (request: FastifyRequest, reply: FastifyReply): void => {
+  async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const logContext = 'tokenHandler()';
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Bearer ') || !claim) {

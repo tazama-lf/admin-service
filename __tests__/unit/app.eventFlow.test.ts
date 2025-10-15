@@ -101,7 +101,7 @@ describe('handlePostConditionEntity', () => {
     });
     const typedCondition = sampleEntityCondition as EntityCondition;
     // Act
-    const result = await handlePostConditionEntity(typedCondition);
+    const result = await handlePostConditionEntity(typedCondition, 'DEFAULT');
 
     // Assert
     expect(loggerService.log).toHaveBeenCalledWith(
@@ -124,7 +124,7 @@ describe('handlePostConditionEntity', () => {
     });
 
     // Act
-    const result = await handlePostConditionEntity(sampleEntityCondition as EntityCondition);
+    const result = await handlePostConditionEntity(sampleEntityCondition as EntityCondition, 'DEFAULT');
 
     // Assert
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', existingEntityId, sampleEntityCondition);
@@ -141,7 +141,7 @@ describe('handlePostConditionEntity', () => {
     const conditionDebtor = { ...sampleEntityCondition, prsptv: 'debtor' };
 
     // Act
-    const result = await handlePostConditionEntity(conditionDebtor as EntityCondition);
+    const result = await handlePostConditionEntity(conditionDebtor as EntityCondition, 'DEFAULT');
 
     // Assert
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
@@ -164,7 +164,7 @@ describe('handlePostConditionEntity', () => {
 
     // Act
     try {
-      await handlePostConditionEntity(conditionDebtor as EntityCondition);
+      await handlePostConditionEntity(conditionDebtor as EntityCondition, 'DEFAULT');
     } catch (error) {
       console.log(error);
       expect(`${error}`).toEqual('Error: Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
@@ -180,7 +180,7 @@ describe('handlePostConditionEntity', () => {
       return Promise.resolve(void '');
     });
     // Act
-    const result = await handlePostConditionEntity(conditionCreditor as EntityCondition);
+    const result = await handlePostConditionEntity(conditionCreditor as EntityCondition, 'DEFAULT');
 
     // Assert
     expect(databaseManager.saveCondition).toHaveBeenCalledWith({
@@ -209,9 +209,9 @@ describe('handlePostConditionEntity', () => {
     } as EntityCondition;
 
     // Act & Assert
-    await handlePostConditionEntity(condition as EntityCondition);
-    const entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
-    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, nowDateTime);
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
+    const entityId = 'DEFAULT' + condition.ntty.id + condition.ntty.schmeNm.prtry;
+    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, 'DEFAULT', nowDateTime);
   });
   it('should handle error when creating a new entity if entity does not exist and forceCret is set to true', async () => {
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {
@@ -233,7 +233,7 @@ describe('handlePostConditionEntity', () => {
 
     // Act & Assert
     const entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
-    await expect(handlePostConditionEntity(condition as EntityCondition)).rejects.toThrow(
+    await expect(handlePostConditionEntity(condition as EntityCondition, 'DEFAULT')).rejects.toThrow(
       'Error: while trying to save new entity: Test Error',
     );
   });
@@ -246,7 +246,7 @@ describe('handlePostConditionEntity', () => {
     const conditionWithoutForceCret = { ...sampleEntityCondition, forceCret: false } as EntityCondition;
 
     // Act & Assert
-    await expect(handlePostConditionEntity(conditionWithoutForceCret as EntityCondition)).rejects.toThrow(
+    await expect(handlePostConditionEntity(conditionWithoutForceCret as EntityCondition, 'DEFAULT')).rejects.toThrow(
       'Error: entity was not found and we could not create one because forceCret is set to false',
     );
   });
@@ -260,7 +260,7 @@ describe('handlePostConditionEntity', () => {
     });
 
     // Act & Assert
-    await expect(handlePostConditionEntity(sampleEntityCondition as EntityCondition)).rejects.toThrow('Database error');
+    await expect(handlePostConditionEntity(sampleEntityCondition as EntityCondition, 'DEFAULT')).rejects.toThrow('Database error');
     expect(loggerService.log).toHaveBeenCalledWith('Error: posting condition for entity with error message: Database error');
   });
 
@@ -282,7 +282,7 @@ describe('handlePostConditionEntity', () => {
     });
 
     // Act
-    await handlePostConditionEntity(sampleEntityCondition as EntityCondition);
+    await handlePostConditionEntity(sampleEntityCondition as EntityCondition, 'DEFAULT');
 
     // Assert
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the entity');
@@ -300,14 +300,14 @@ describe('getConditionForEntity', () => {
     });
 
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {
-      return Promise.resolve({ id: 'entity456', creDtTm: '' });
+      return Promise.resolve({ id: 'entity456', creDtTm: '', TenantId: 'DEFAULT' } as Entity);
     });
   });
 
   afterEach(() => jest.clearAllMocks());
 
   it('should get conditions for entity', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(entityResponse);
   });
@@ -317,47 +317,47 @@ describe('getConditionForEntity', () => {
     jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' }, 'DEFAULT');
     // Assert
     expect(result).toEqual({ code: 404 });
   });
 
   it('should get no entity was found', async () => {
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {
-      return Promise.resolve({ id: '', creDtTm: '' });
+      return Promise.resolve({ id: '', creDtTm: '', TenantId: 'DEFAULT' } as Entity);
     });
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'no' }, 'DEFAULT');
     // Assert
     expect(result).toEqual({ result: 'Entity does not exist in the database', code: 404 });
   });
 
   it('should get conditions for entity and update cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'active' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'active' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'all' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'all' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should skip caching', async () => {
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(entityResponse);
   });
 
   it('should sync active condition by using default and environment variable', async () => {
     configuration.ACTIVE_CONDITIONS_ONLY = true;
-    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' });
+    const result = await handleGetConditionsForEntity({ id: '', schmenm: '', synccache: 'default' }, 'DEFAULT');
     configuration.ACTIVE_CONDITIONS_ONLY = false;
     // Assert
     expect(result).toEqual(entityResponse);
@@ -369,7 +369,7 @@ describe('handlePostConditionAccount', () => {
     jest
       .spyOn(databaseManager, 'getAccount')
       .mockImplementation((accountId: string, schemeProprietary: string, agtMemberId: string): Promise<Account | undefined> => {
-        return Promise.resolve({ id: `${accountId}${schemeProprietary}${agtMemberId}` });
+        return Promise.resolve({ id: `${accountId}${schemeProprietary}${agtMemberId}`, TenantId: 'DEFAULT' } as Account);
       });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
@@ -389,7 +389,7 @@ describe('handlePostConditionAccount', () => {
 
   it('should handle a successful post request for a new account', async () => {
     // Act
-    const result = await handlePostConditionAccount(sampleAccountCondition);
+    const result = await handlePostConditionAccount(sampleAccountCondition, 'DEFAULT');
 
     // Assert
     expect(loggerService.log).toHaveBeenCalledWith(
@@ -410,12 +410,12 @@ describe('handlePostConditionAccount', () => {
     const existingAccountId = 'account456';
     jest.spyOn(databaseManager, 'getAccount').mockImplementation((): Promise<Account | undefined> => {
       return Promise.resolve(
-        { id: existingAccountId }, // No existing account
+        { id: existingAccountId, TenantId: 'DEFAULT' }, // No existing account
       );
     });
 
     // Act
-    const result = await handlePostConditionAccount(sampleAccountCondition as AccountCondition);
+    const result = await handlePostConditionAccount(sampleAccountCondition as AccountCondition, 'DEFAULT');
 
     // Assert
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', existingAccountId, sampleAccountCondition);
@@ -432,7 +432,7 @@ describe('handlePostConditionAccount', () => {
     const conditionDebtor = { ...sampleAccountCondition, prsptv: 'debtor' } as AccountCondition;
 
     // Act
-    const result = await handlePostConditionAccount(conditionDebtor);
+    const result = await handlePostConditionAccount(conditionDebtor, 'DEFAULT');
     const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
 
     // Assert
@@ -449,7 +449,7 @@ describe('handlePostConditionAccount', () => {
 
     // Act
     try {
-      await handlePostConditionAccount(conditionDebtor as AccountCondition);
+      await handlePostConditionAccount(conditionDebtor as AccountCondition, 'DEFAULT');
     } catch (error) {
       console.log(error);
       expect(`${error}`).toEqual('Error: Error: Please enter a valid perspective. Accepted values are: both, debtor, or creditor.');
@@ -462,7 +462,7 @@ describe('handlePostConditionAccount', () => {
     const conditionCreditor = { ...sampleAccountCondition, prsptv: 'creditor' };
 
     // Act
-    const result = await handlePostConditionAccount(conditionCreditor as AccountCondition);
+    const result = await handlePostConditionAccount(conditionCreditor as AccountCondition, 'DEFAULT');
 
     // Assert
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
@@ -489,9 +489,9 @@ describe('handlePostConditionAccount', () => {
     const condition = { ...sampleAccountCondition, forceCret: true } as AccountCondition;
 
     // Act & Assert
-    await handlePostConditionAccount(condition as AccountCondition);
-    const accountId = condition.acct.id + condition.acct.schmeNm.prtry + condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
-    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId);
+    await handlePostConditionAccount(condition as AccountCondition, 'DEFAULT');
+    const accountId = 'DEFAULT' + condition.acct.id + condition.acct.schmeNm.prtry + condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
+    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT');
   });
 
   it('should handle error when creating a new account if account does not exist and forceCret is set to true', async () => {
@@ -507,7 +507,7 @@ describe('handlePostConditionAccount', () => {
     const condition = { ...sampleAccountCondition, forceCret: true } as AccountCondition;
 
     // Act & Assert
-    await expect(handlePostConditionAccount(condition as AccountCondition)).rejects.toThrow(
+    await expect(handlePostConditionAccount(condition as AccountCondition, 'DEFAULT')).rejects.toThrow(
       'Error: while trying to save new account: Test Error',
     );
   });
@@ -520,7 +520,7 @@ describe('handlePostConditionAccount', () => {
     const conditionWithoutForceCret = { ...sampleAccountCondition, forceCret: false };
 
     // Act & Assert
-    await expect(handlePostConditionAccount(conditionWithoutForceCret as AccountCondition)).rejects.toThrow(
+    await expect(handlePostConditionAccount(conditionWithoutForceCret as AccountCondition, 'DEFAULT')).rejects.toThrow(
       'Error: account was not found and we could not create one because forceCret is set to false',
     );
   });
@@ -543,7 +543,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     // Act
-    await handlePostConditionAccount(sampleAccountCondition as AccountCondition);
+    await handlePostConditionAccount(sampleAccountCondition as AccountCondition, 'DEFAULT');
 
     // Assert
     expect(loggerService.warn).toHaveBeenCalledWith('2 conditions already exist for the account');
@@ -556,7 +556,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     // Assert
-    await expect(handlePostConditionAccount(sampleAccountCondition as AccountCondition)).rejects.toThrow('Database error');
+    await expect(handlePostConditionAccount(sampleAccountCondition as AccountCondition, 'DEFAULT')).rejects.toThrow('Database error');
   });
 
   it('should log and throw an error when database save fails', async () => {
@@ -567,7 +567,7 @@ describe('handlePostConditionAccount', () => {
     });
 
     // Act & Assert
-    await expect(handlePostConditionAccount(sampleAccountCondition as AccountCondition)).rejects.toThrow('Database error');
+    await expect(handlePostConditionAccount(sampleAccountCondition as AccountCondition, 'DEFAULT')).rejects.toThrow('Database error');
     expect(loggerService.error).toHaveBeenCalledWith('Error: posting condition for account with error message: Database error');
   });
 });
@@ -577,7 +577,7 @@ describe('getConditionForAccount', () => {
     jest.clearAllMocks(); // Clear mocks before each test
 
     jest.spyOn(databaseManager, 'getAccount').mockImplementation((): Promise<Account | undefined> => {
-      return Promise.resolve({ id: 'account456' });
+      return Promise.resolve({ id: 'account456', TenantId: 'DEFAULT' } as Account);
     });
 
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
@@ -590,7 +590,7 @@ describe('getConditionForAccount', () => {
   });
 
   it('should get conditions for account', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
@@ -599,7 +599,7 @@ describe('getConditionForAccount', () => {
     jest.spyOn(databaseManager, 'getAccountConditionsByGraph').mockImplementation(() => {
       return Promise.resolve([]);
     });
-    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' }, 'DEFAULT');
 
     // Assert
     expect(result).toEqual({ code: 404 });
@@ -607,53 +607,53 @@ describe('getConditionForAccount', () => {
 
   it('should get no account was found', async () => {
     jest.spyOn(databaseManager, 'getAccount').mockImplementation((): Promise<Account | undefined> => {
-      return Promise.resolve({ id: '' });
+      return Promise.resolve({ id: '', TenantId: 'DEFAULT' } as Account);
     });
-    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' }, 'DEFAULT');
     // Assert
     expect(result).toEqual({ result: 'Account does not exist in the database', code: 404 });
   });
 
   it('should get conditions for account and update cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should prune active conditions for cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' });
+    const result = await handleGetConditionsForAccount({ id: '1010101010', synccache: 'no', schmenm: 'Mxx', agt: 'dfsp001' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should prune active conditions for cache (using env)', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '007', synccache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '007', synccache: 'default' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should skip caching', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '008', synccache: 'no' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '008', synccache: 'no' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync all cache', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '009', synccache: 'all' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '009', synccache: 'all' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache by using environment variable', async () => {
     configuration.ACTIVE_CONDITIONS_ONLY = true;
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'default' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'default' }, 'DEFAULT');
     configuration.ACTIVE_CONDITIONS_ONLY = false;
     // Assert
     expect(result).toEqual(accountResponse);
   });
 
   it('should sync active cache only', async () => {
-    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'active' });
+    const result = await handleGetConditionsForAccount({ id: '', schmenm: '', agt: '001', synccache: 'active' }, 'DEFAULT');
     // Assert
     expect(result).toEqual(accountResponse);
   });
@@ -694,7 +694,7 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
   it('should handle when xprtnDtTm is provided but with invalid date', async () => {
     (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([]);
 
-    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, '2024-07-06T50:00:00.999Z');
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, 'DEFAULT', '2024-07-06T50:00:00.999Z');
 
     expect(result).toEqual({
       code: 400,
@@ -773,13 +773,13 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
     (databaseManager.updateExpiryDateOfDebtorAccountEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
 
-    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, xprtnDtTm);
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, 'DEFAULT', xprtnDtTm);
 
     expect(databaseManager.updateExpiryDateOfCreditorAccountEdges).toHaveBeenCalledWith(
       rawResponseAccount.governed_as_creditor_account_by[0].edge.source,
       rawResponseAccount.governed_as_creditor_account_by[0].edge.destination,
       xprtnDtTm,
-      '', // tenent id
+      'DEFAULT', // tenent id
     );
     //expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm);
 
@@ -811,7 +811,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   it('should handle when xprtnDtTm is not provided', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
 
-    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, undefined);
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', undefined);
 
     expect(result).toEqual({
       code: 404,
@@ -822,7 +822,7 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
   it('should handle when xprtnDtTm is provided but with invalid date', async () => {
     (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([]);
 
-    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, '2024-07-06T50:00:00.999Z');
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', '2024-07-06T50:00:00.999Z');
 
     expect(result).toEqual({
       code: 400,
@@ -899,15 +899,15 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
     (databaseManager.updateExpiryDateOfDebtorEntityEdges as jest.Mock).mockResolvedValue('test');
     (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
 
-    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, xprtnDtTm);
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', xprtnDtTm);
 
     expect(databaseManager.updateExpiryDateOfDebtorEntityEdges).toHaveBeenCalledWith(
       rawResponseEntity.governed_as_creditor_by[0].edge.source,
       rawResponseEntity.governed_as_creditor_by[0].edge.destination,
       xprtnDtTm,
-      '',
+      'DEFAULT',
     );
-    expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm);
+    expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm, 'DEFAULT');
 
     expect(result).toEqual({ code: 200, message: '' });
   });
@@ -999,7 +999,7 @@ describe('handleCacheUpdate', () => {
       ],
     ]);
 
-    const result = await handleRefreshCache(true, 12);
+    const result = await handleRefreshCache(true, 'DEFAULT', 12);
 
     expect(result).toBe(undefined);
   });

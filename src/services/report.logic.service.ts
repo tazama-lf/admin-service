@@ -2,12 +2,12 @@
 import type { Evaluation } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TADPReport';
 import { databaseManager, loggerService } from '..';
 
-export const handleGetReportRequestByMsgId = async (msgid: string): Promise<Evaluation | undefined> => {
+export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: string): Promise<Evaluation | undefined> => {
   let report;
   try {
-    loggerService.log(`Started handling get request by message id the message id is ${msgid}`);
+    loggerService.log(`Started handling get request by message id the message id is ${msgid} for tenant ${tenantId}`);
 
-    report = (await databaseManager.getReportByMessageId(msgid))!;
+    report = await databaseManager.getReportByMessageId(msgid, tenantId);
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(

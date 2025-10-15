@@ -7,11 +7,6 @@ jest.mock('@tazama-lf/frms-coe-lib', () => {
 
   return {
     ...original,
-    aql: jest.fn().mockImplementation((templateLiteral) => {
-      return {
-        query: templateLiteral,
-      };
-    }),
   };
 });
 // Mock the module
@@ -37,19 +32,23 @@ describe('handleGetReportRequestByMsgId', () => {
   });
 
   it('should successfully retrieve and unwrap the report', async () => {
-    const mockReport = [
-      {
-        /* mock report data */
-      },
-    ];
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      tenantId: 'test-tenant', // Add tenant ID to match the test tenant
+      /* mock report data */
+    };
     // Ensure getReportByMessageId is typed as a Jest mock function
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
 
     const msgid = 'test-msg-id';
-    const result = await handleGetReportRequestByMsgId(msgid);
+    const tenantId = 'test-tenant';
+    const result = await handleGetReportRequestByMsgId(msgid, tenantId);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
-    expect(loggerService.log).toHaveBeenCalledWith(`Started handling get request by message id the message id is ${msgid}`);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid, tenantId);
+    expect(result).toBe(mockReport);
+    expect(loggerService.log).toHaveBeenCalledWith(
+      `Started handling get request by message id the message id is ${msgid} for tenant ${tenantId}`,
+    );
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
   });
 
@@ -58,9 +57,10 @@ describe('handleGetReportRequestByMsgId', () => {
     (databaseManager.getReportByMessageId as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
     const msgid = 'test-msg-id';
-    await expect(handleGetReportRequestByMsgId(msgid)).rejects.toThrow(errorMessage);
+    const tenantId = 'test-tenant';
+    await expect(handleGetReportRequestByMsgId(msgid, tenantId)).rejects.toThrow(errorMessage);
 
-    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid);
+    expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid, tenantId);
     expect(loggerService.log).toHaveBeenCalledWith(
       `Failed fetching report from database service with error message: ${errorMessage}`,
       'handleGetReportRequestByMsgId()',
@@ -69,15 +69,16 @@ describe('handleGetReportRequestByMsgId', () => {
   });
 
   it('should log "Completed handling get report by message id" when the operation is successful', async () => {
-    const mockReport = [
-      {
-        /* mock report data */
-      },
-    ];
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      tenantId: 'test-tenant', // Add tenant ID to match the test tenant
+      /* mock report data */
+    };
     (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
 
     const msgid = 'test-msg-id';
-    await handleGetReportRequestByMsgId(msgid);
+    const tenantId = 'test-tenant';
+    await handleGetReportRequestByMsgId(msgid, tenantId);
 
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
   });
@@ -87,12 +88,76 @@ describe('handleGetReportRequestByMsgId', () => {
     (databaseManager.getReportByMessageId as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
     const msgid = 'test-msg-id';
+    const tenantId = 'test-tenant';
     try {
-      await handleGetReportRequestByMsgId(msgid);
+      await handleGetReportRequestByMsgId(msgid, tenantId);
     } catch (e) {
       // Expected to throw an error
     }
 
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get report by message id');
+  });
+
+  it('should allow access to report for correct tenant', async () => {
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      tenantId: 'tenant-a',
+      /* other mock report data */
+    };
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
+
+    const msgid = 'test-msg-id';
+    const tenantId = 'tenant-a';
+    const result = await handleGetReportRequestByMsgId(msgid, tenantId);
+
+    expect(result).toBe(mockReport);
+    expect(loggerService.log).toHaveBeenCalledWith(
+      `Started handling get request by message id the message id is ${msgid} for tenant ${tenantId}`,
+    );
+  });
+
+  it('should return undefined for wrong tenant (query filters by tenantId)', async () => {
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      tenantId: 'tenant-a',
+      /* other mock report data */
+    };
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(undefined); // Simulate query returns nothing for non-default tenant
+
+    const msgid = 'test-msg-id';
+    const tenantId = 'tenant-b';
+
+    const result = await handleGetReportRequestByMsgId(msgid, tenantId);
+    expect(result).toBeUndefined();
+  });
+
+  it('should return undefined for report without tenant context for non-default tenant', async () => {
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      // No tenantId field
+      /* other mock report data */
+    };
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(undefined); // Simulate query returns nothing for non-default tenant
+
+    const msgid = 'test-msg-id';
+    const tenantId = 'tenant-a';
+
+    const result = await handleGetReportRequestByMsgId(msgid, tenantId);
+    expect(result).toBeUndefined();
+  });
+
+  it('should allow access to report without tenant context for default tenant', async () => {
+    const mockReport = {
+      transactionID: 'test-tx-id',
+      // No tenantId field
+      /* other mock report data */
+    };
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
+
+    const msgid = 'test-msg-id';
+    const tenantId = 'default';
+    const result = await handleGetReportRequestByMsgId(msgid, tenantId);
+
+    expect(result).toBe(mockReport);
   });
 });

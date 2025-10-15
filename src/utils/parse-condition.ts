@@ -6,7 +6,7 @@ import type {
 } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/ConditionDetails';
 import type { RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces/event-flow/EntityConditionEdge';
 
-export const parseConditionEntity = (input: RawConditionResponse[]): EntityConditionResponse => {
+export const parseConditionEntity = (input: RawConditionResponse[], tenantId: string): EntityConditionResponse => {
   // Initialize the result object
   const result: Partial<EntityConditionResponse> = {
     conditions: [],
@@ -20,7 +20,7 @@ export const parseConditionEntity = (input: RawConditionResponse[]): EntityCondi
     fields.forEach((key) => {
       const fieldName = key as keyof RawConditionResponse;
 
-      conditionObjectAssign(fieldName, item, conditionsById);
+      conditionObjectAssign(fieldName, item, conditionsById, tenantId);
 
       // Set the ntty or acct field if not already set
       if (!result.ntty) {
@@ -39,7 +39,7 @@ export const parseConditionEntity = (input: RawConditionResponse[]): EntityCondi
   return result as EntityConditionResponse;
 };
 
-export const parseConditionAccount = (input: RawConditionResponse[]): AccountConditionResponse => {
+export const parseConditionAccount = (input: RawConditionResponse[], tenantId: string): AccountConditionResponse => {
   // Initialize the result object
   const result: Partial<AccountConditionResponse> = {
     conditions: [],
@@ -53,7 +53,7 @@ export const parseConditionAccount = (input: RawConditionResponse[]): AccountCon
     fields.forEach((key) => {
       const fieldName = key as keyof RawConditionResponse;
 
-      conditionObjectAssign(fieldName, item, conditionsById);
+      conditionObjectAssign(fieldName, item, conditionsById, tenantId);
 
       // Set the ntty or acct field if not already set
       if (!result.acct) {
@@ -76,6 +76,7 @@ const conditionObjectAssign = (
   fieldName: keyof RawConditionResponse,
   item: RawConditionResponse,
   conditionsById: Record<string, ConditionDetails>,
+  tenantId: string,
 ): void => {
   item[fieldName].forEach(({ condition }) => {
     const { condId } = condition;
@@ -88,6 +89,7 @@ const conditionObjectAssign = (
       condRsn: condition.condRsn,
       usr: condition.usr,
       creDtTm: condition.creDtTm,
+      tenantId,
       prsptvs: [],
     };
 

@@ -30,6 +30,6 @@ export type NetworkMapSchema = Static<typeof NetworkMapSchema>;
 export const NetworkMapSchema = Type.Object({
   active: Type.Boolean(),
   cfg: Type.String(),
-  tenantId: Type.String(),
+  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
   messages: Type.Array(Message),
 });

@@ -26,11 +26,11 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
       : { data: [], total: 0 };
   },
 
-  get: async function (id: string): Promise<TypologyConfig | null> {
+  get: async function ({ id, cfg, tenantId }): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'SELECT configuration FROM typology WHERE typologyid = $1',
-        values: [id],
+        text: 'SELECT configuration FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -49,22 +49,22 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     return queryRes.rows[0].configuration;
   },
 
-  update: async function (id: string, payload: TypologyConfig): Promise<TypologyConfig | null> {
+  update: async function ({ id, cfg, tenantId }, payload: TypologyConfig): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 RETURNING configuration',
-        values: [payload, id],
+        text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 AND typologycfg = $3 AND tenantid = $4 RETURNING configuration',
+        values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  remove: async function (id: string): Promise<boolean> {
+  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'DELETE FROM typology WHERE typologyid = $1',
-        values: [id],
+        text: 'DELETE FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

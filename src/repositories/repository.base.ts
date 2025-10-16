@@ -10,10 +10,15 @@ export interface ListQuery<TSort extends string = string> {
   filters?: Record<string, string>; // exact-match filters
 }
 
-export type Node = string;
+export interface Node {
+  id: string;
+  cfg: string;
+  tenantId: string;
+}
 export interface Connector {
   source: string;
   destination: string;
+  tenantId: string;
 }
 
 // Table types one with composite keys and with primary id key

@@ -25,11 +25,11 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
       : { data: [], total: 0 };
   },
 
-  get: async function (id: string): Promise<NetworkMap | null> {
+  get: async function ({ id, cfg, tenantId }): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>active = true;',
-        values: [id],
+        text: 'SELECT configuration FROM network_map WHERE configuration->>name = $1, configuration->>cfg = $2 AND tenantId = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -48,21 +48,21 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     return queryRes.rows[0].configuration;
   },
 
-  update: async function (name: string, payload: NetworkMap): Promise<NetworkMap | null> {
+  update: async function ({ id, cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 RETURNING configuration;',
-        values: [payload, name],
+        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
+        values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
-  remove: async function (name: string): Promise<boolean> {
+  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'DELETE FROM network_map WHERE configuration->>name = $1;',
-        values: [name],
+        text: 'DELETE FROM network_map WHERE configuration->>name = $1 AND configuration->>cfg = $2 AND tenantId = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

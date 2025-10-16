@@ -26,11 +26,11 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
       : { data: [], total: 0 };
   },
 
-  get: async function (id: string): Promise<RuleConfig | null> {
+  get: async function ({ id, cfg, tenantId }): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'SELECT configuration FROM rule WHERE ruleid = $1;',
-        values: [id],
+        text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -49,22 +49,22 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
     return queryRes.rows[0].configuration;
   },
 
-  update: async function (id: string, payload: RuleConfig): Promise<RuleConfig | null> {
+  update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 RETURNING configuration;',
-        values: [payload, id],
+        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',
+        values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  remove: async function (id: string): Promise<boolean> {
+  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'DELETE FROM rule WHERE ruleid = $2;',
-        values: [id],
+        text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

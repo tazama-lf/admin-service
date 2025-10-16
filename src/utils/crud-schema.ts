@@ -7,6 +7,7 @@ import { configuration } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
 import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
+import type { ITenantRequest } from '../interface/ITenantRequest';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -38,7 +39,7 @@ const DefaultQuery = Type.Object({
 const makeIdSchema = (
   cfg?: { kind: 'single'; name?: string } | { kind: 'composite'; names: readonly [string, string] },
 ): TObject<Record<string, TSchema>> => {
-  const props: Record<string, TSchema> = {};
+  const props: Record<string, TSchema> = { cfg: Type.String() };
   if (cfg?.kind === 'composite') {
     const [a, b] = cfg.names;
     props[a] = Type.String();
@@ -50,14 +51,16 @@ const makeIdSchema = (
   return Type.Object(props);
 };
 
-export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: BuildCrudOptions<TEntity, TId>): FastifyPluginAsync => {
+export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; cfg: string; tenantId: string }>(
+  opts: BuildCrudOptions<TEntity, TId>,
+): FastifyPluginAsync => {
   const plugin: FastifyPluginAsync = async (app: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse>) => {
     const { prefix, repo, schemas, idParam } = opts;
     const { Entity, Create, Update } = schemas;
 
     // --- Build path and param schema based on idParam ---
     const singleName: string = idParam?.kind === 'single' ? (idParam.name ?? 'id') : 'id';
-    const idPath = idParam?.kind === 'composite' ? `/:${idParam.names[0]}/:${idParam.names[1]}` : `/:${singleName}`;
+    const idPath = idParam?.kind === 'composite' ? `/:${idParam.names[0]}/:${idParam.names[1]}/:cfg` : `/:${singleName}/:cfg`;
 
     const IdParam = schemas.Id ?? makeIdSchema(idParam);
 
@@ -120,11 +123,12 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
+        const { tenantId } = req as ITenantRequest;
 
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]] } as unknown as TId)
-            : (p[singleName] as unknown as TId);
+            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
+            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
 
         const entity = await repo.get(id);
         if (!entity) return await reply.code(404).send({ message: 'Not found' });
@@ -167,10 +171,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
+        const { tenantId } = req as ITenantRequest;
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]] } as unknown as TId)
-            : (p[singleName] as unknown as TId);
+            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
+            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
 
         const updated = await repo.update(id, req.body as TEntity);
         if (!updated) return await reply.code(404).send({ message: 'Not found' });
@@ -193,10 +198,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = string>(opts: B
       },
       async (req, reply) => {
         const p = req.params as Record<string, string>;
+        const { tenantId } = req as ITenantRequest;
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]] } as unknown as TId)
-            : (p[singleName] as unknown as TId);
+            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
+            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
 
         const ok = await repo.remove(id);
         return { success: ok };

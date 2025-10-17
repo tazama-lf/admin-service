@@ -29,7 +29,7 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
 const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
-  tenantId: Type.Optional(Type.String()),
+  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
   q: Type.Optional(Type.String()),
@@ -127,10 +127,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
 
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
-            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
+            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
+            : { id: p[singleName], cfg: p.cfg, tenantId };
 
-        const entity = await repo.get(id);
+        const entity = await repo.get(id as TId);
         if (!entity) return await reply.code(404).send({ message: 'Not found' });
         return entity;
       },
@@ -174,10 +174,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const { tenantId } = req as ITenantRequest;
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
-            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
+            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
+            : { id: p[singleName], cfg: p.cfg, tenantId };
 
-        const updated = await repo.update(id, req.body as TEntity);
+        const updated = await repo.update(id as TId, req.body as TEntity);
         if (!updated) return await reply.code(404).send({ message: 'Not found' });
         return updated;
       },
@@ -201,10 +201,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const { tenantId } = req as ITenantRequest;
         const id =
           idParam?.kind === 'composite'
-            ? ({ [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId } as unknown as TId)
-            : ({ id: p[singleName], cfg: p.cfg, tenantId } as unknown as TId);
+            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
+            : { id: p[singleName], cfg: p.cfg, tenantId };
 
-        const ok = await repo.remove(id);
+        const ok = await repo.remove(id as TId);
         return { success: ok };
       },
     );

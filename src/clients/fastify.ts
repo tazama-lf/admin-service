@@ -1,28 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import Ajv from 'ajv';
-import messageIDParamsSchema from '..//schemas/json.schemas/paramsSchemas.json';
-import queryEntityCondition from '../schemas/json.schemas/queryEntityCondition.json';
-import entityConditionBodySchema from '../schemas/json.schemas/entityCondition.json';
-import accountConditionBodySchema from '../schemas/json.schemas/accountCondition.json';
-import queryAccountCondition from '../schemas/json.schemas/queryAccountCondition.json';
-import expireAccountConditionSchema from '../schemas/json.schemas/expireAccountCondition.json';
-import expireEntityConditionSchema from '../schemas/json.schemas/expireEntityCondition.json';
-import expireDateTimeSchema from '../schemas/json.schemas/expireDateTime.json';
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { configuration } from '..';
-
-const paramsMessageSchema = { ...messageIDParamsSchema, $id: 'messageIDSchema' };
-const queryAccountConditionSchema = { ...queryAccountCondition, $id: 'queryAccountConditionSchema' };
-const queryEntityConditionSchema = { ...queryEntityCondition, $id: 'queryEntityConditionSchema' };
-const entityConditionMessageSchema = { ...entityConditionBodySchema, $id: 'entityConditionSchema' };
-const accountConditionMessageSchema = { ...accountConditionBodySchema, $id: 'accountConditionSchema' };
-const expireAccountCondition = { ...expireAccountConditionSchema, $id: 'expireAccountConditionSchema' };
-const expireEntityCondition = { ...expireEntityConditionSchema, $id: 'expireEntityConditionSchema' };
-const expireDateTime = { ...expireDateTimeSchema, $id: 'expireDateTimeSchema' };
 
 const fastify = Fastify();
 const ajv = new Ajv({
@@ -32,27 +15,10 @@ const ajv = new Ajv({
   strictTuples: false,
 });
 
-ajv.addSchema(queryAccountConditionSchema);
-ajv.addSchema(paramsMessageSchema);
-ajv.addSchema(queryEntityConditionSchema);
-ajv.addSchema(entityConditionMessageSchema);
-ajv.addSchema(accountConditionMessageSchema);
-ajv.addSchema(expireAccountCondition);
-ajv.addSchema(expireEntityCondition);
-ajv.addSchema(expireDateTime);
-
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
     prefix: '/swagger',
   });
-  fastify.addSchema(paramsMessageSchema);
-  fastify.addSchema(queryEntityConditionSchema);
-  fastify.addSchema(entityConditionMessageSchema);
-  fastify.addSchema(accountConditionMessageSchema);
-  fastify.addSchema(queryAccountConditionSchema);
-  fastify.addSchema(expireAccountCondition);
-  fastify.addSchema(expireEntityCondition);
-  fastify.addSchema(expireDateTime);
 
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/documentation',

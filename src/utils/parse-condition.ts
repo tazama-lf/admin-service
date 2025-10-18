@@ -36,6 +36,7 @@ export const parseConditionEntity = (input: RawConditionResponse[], tenantId: st
   });
   // Convert conditionsById to an array
   result.conditions = Object.values(conditionsById);
+  result.conditions.sort((a, b) => new Date(a.creDtTm).getTime() - new Date(b.creDtTm).getTime());
   return result as EntityConditionResponse;
 };
 
@@ -69,6 +70,7 @@ export const parseConditionAccount = (input: RawConditionResponse[], tenantId: s
   });
   // Convert conditionsById to an array
   result.conditions = Object.values(conditionsById);
+  result.conditions.sort((a, b) => new Date(a.creDtTm).getTime() - new Date(b.creDtTm).getTime());
   return result as AccountConditionResponse;
 };
 

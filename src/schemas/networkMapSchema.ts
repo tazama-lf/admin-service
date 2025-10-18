@@ -1,35 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Type, type Static } from '@sinclair/typebox';
 
-export type Rule = Static<typeof Rule>;
-export const Rule = Type.Object({
+export type Rule = Static<typeof RuleSchema>;
+export const RuleSchema = Type.Object({
   id: Type.String(),
   cfg: Type.String(),
   host: Type.Optional(Type.String()),
 });
 
-export type Typology = Static<typeof Typology>;
-export const Typology = Type.Object({
+export type Typology = Static<typeof TypologySchema>;
+export const TypologySchema = Type.Object({
   id: Type.String(),
   host: Type.Optional(Type.String()),
   cfg: Type.String(),
   desc: Type.Optional(Type.String()),
-  rules: Type.Array(Rule),
+  rules: Type.Array(RuleSchema),
 });
 
-export type Message = Static<typeof Message>;
-export const Message = Type.Object({
+export type Message = Static<typeof MessageSchema>;
+export const MessageSchema = Type.Object({
   id: Type.String(),
   host: Type.Optional(Type.String()),
   cfg: Type.String(),
   txTp: Type.String(),
-  typologies: Type.Array(Typology),
+  typologies: Type.Array(TypologySchema),
 });
 
-export type NetworkMapSchema = Static<typeof NetworkMapSchema>;
+export type NetworkMap = Static<typeof NetworkMapSchema>;
 export const NetworkMapSchema = Type.Object({
   active: Type.Boolean(),
   cfg: Type.String(),
   tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
-  messages: Type.Array(Message),
+  messages: Type.Array(MessageSchema),
 });

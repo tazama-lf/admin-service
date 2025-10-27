@@ -6,7 +6,6 @@ export interface ListQuery<TSort extends string = string> {
   offset?: number; // default 0
   sort?: TSort; // field name
   order?: 'ASC' | 'DESC';
-  q?: string; // free-text filter (optional)
   filters?: Record<string, string>; // exact-match filters
 }
 
@@ -27,7 +26,7 @@ export type AllowedId = Node | Connector;
 export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   list: (params: ListQuery<StringKeys<TEntity>>) => Promise<{ data: TEntity[]; total: number }>;
   get: (id: TId) => Promise<TEntity | null>;
-  create: (payload: TEntity) => Promise<TEntity>;
+  create: (payload: TEntity, tenantId: string) => Promise<TEntity>;
   update: (id: TId, payload: TEntity) => Promise<TEntity | null>;
   remove: (id: TId) => Promise<boolean>;
 }

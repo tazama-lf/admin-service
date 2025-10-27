@@ -38,7 +38,8 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: TypologyConfig): Promise<TypologyConfig> {
+  create: async function (payload: TypologyConfig, tenantId: string): Promise<TypologyConfig> {
+    payload.tenantId = tenantId;
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
         text: 'INSERT INTO typology (configuration) VALUES ($1) RETURNING configuration',

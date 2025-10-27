@@ -32,7 +32,6 @@ const DefaultQuery = Type.Object({
   tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
-  q: Type.Optional(Type.String()),
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
@@ -41,9 +40,9 @@ const makeIdSchema = (
 ): TObject<Record<string, TSchema>> => {
   const props: Record<string, TSchema> = { cfg: Type.String() };
   if (cfg?.kind === 'composite') {
-    const [a, b] = cfg.names;
-    props[a] = Type.String();
-    props[b] = Type.String();
+    const [firstParamKey, secondParamKey] = cfg.names;
+    props[firstParamKey] = Type.String();
+    props[secondParamKey] = Type.String();
   } else {
     const name = cfg?.kind === 'single' ? (cfg.name ?? 'id') : 'id';
     props[name] = Type.String();
@@ -88,8 +87,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           : [validateTenantMiddleware],
       },
       async (req, reply) => {
-        const q = req.query as Static<typeof QuerySchema>;
-        const { limit = 20, tenantId = 'DEFAULT', offset = 0, sort, order = 'ASC', q: search, filters } = q;
+        const queryParams = req.query as Static<typeof QuerySchema>;
+        const { tenantId: authTenantId } = req as ITenantRequest;
+        const { limit = 20, tenantId = authTenantId, offset = 0, sort, order = 'ASC', filters } = queryParams;
 
         type SortField = Extract<keyof TEntity, string>;
 
@@ -99,7 +99,6 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           offset,
           sort: sort as SortField | undefined,
           order,
-          q: search,
           filters,
         };
 
@@ -150,7 +149,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           : [validateTenantMiddleware],
       },
       async (req, reply) => {
-        const created = await repo.create(req.body as TEntity);
+        const { tenantId } = req as ITenantRequest;
+        const created = await repo.create(req.body as TEntity, tenantId);
         return await reply.code(201).send(created);
       },
     );

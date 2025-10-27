@@ -40,10 +40,12 @@ export const Config = Type.Object({
 });
 
 export type Rule = Static<typeof RuleSchema>;
-export const RuleSchema = Type.Object({
-  id: Type.String(),
-  cfg: Type.String(),
-  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
-  config: Config,
-  desc: Type.Optional(Type.String()),
-});
+export const RuleSchema = Type.Object(
+  {
+    id: Type.String(),
+    cfg: Type.String(),
+    config: Config,
+    desc: Type.Optional(Type.String()),
+  },
+  { additionalProperties: true },
+);

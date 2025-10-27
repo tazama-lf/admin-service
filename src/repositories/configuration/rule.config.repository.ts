@@ -38,7 +38,8 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: RuleConfig): Promise<RuleConfig> {
+  create: async function (payload: RuleConfig, tenantId: string): Promise<RuleConfig> {
+    payload.tenantId = tenantId;
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
         text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration;',

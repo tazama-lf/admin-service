@@ -18,7 +18,7 @@ export const dbInit = async (): Promise<void> => {
     processorConfig.nodeEnv === 'production',
   );
 
-  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
   configuration = { ...config, ...processorConfig };
   loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };

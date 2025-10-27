@@ -38,7 +38,6 @@ const routePrivilege = {
   postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
-  executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
 };
 
 function Routes(fastify: FastifyInstance): void {

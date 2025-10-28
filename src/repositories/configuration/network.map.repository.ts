@@ -37,7 +37,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     return queryRes.rows.length > 0 ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: NetworkMap): Promise<NetworkMap> {
+  create: async function (payload: NetworkMap, tenantId: string): Promise<NetworkMap> {
+    payload.tenantId = tenantId;
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
         text: 'INSERT INTO network_map (configuration) VALUES ($1) RETURNING configuration',

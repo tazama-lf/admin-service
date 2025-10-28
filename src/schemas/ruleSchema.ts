@@ -25,25 +25,21 @@ export const Case = Type.Composite([
   }),
 ]);
 
-export type Timeframe = Static<typeof Timeframe>;
-export const Timeframe = Type.Object({
-  threshold: Type.Number(),
-});
-
 export type Config = Static<typeof Config>;
 export const Config = Type.Object({
   parameters: Type.Optional(Type.Record(Type.Optional(Type.Union([Type.String(), Type.Number()])), Type.Optional(Type.Unknown()))),
   exitConditions: Type.Optional(Type.Array(OutcomeResult)),
   bands: Type.Optional(Type.Array(Band)),
   cases: Type.Optional(Type.Array(Case)),
-  timeframes: Type.Optional(Type.Array(Timeframe)),
 });
 
 export type Rule = Static<typeof RuleSchema>;
-export const RuleSchema = Type.Object({
-  id: Type.String(),
-  cfg: Type.String(),
-  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
-  config: Config,
-  desc: Type.Optional(Type.String()),
-});
+export const RuleSchema = Type.Object(
+  {
+    id: Type.String(),
+    cfg: Type.String(),
+    config: Config,
+    desc: Type.Optional(Type.String()),
+  },
+  { additionalProperties: true },
+);

@@ -9,13 +9,16 @@ export const RuleSchema = Type.Object({
 });
 
 export type Typology = Static<typeof TypologySchema>;
-export const TypologySchema = Type.Object({
-  id: Type.String(),
-  host: Type.Optional(Type.String()),
-  cfg: Type.String(),
-  desc: Type.Optional(Type.String()),
-  rules: Type.Array(RuleSchema),
-});
+export const TypologySchema = Type.Object(
+  {
+    id: Type.String(),
+    host: Type.Optional(Type.String()),
+    cfg: Type.String(),
+    desc: Type.Optional(Type.String()),
+    rules: Type.Array(RuleSchema),
+  },
+  { additionalProperties: true },
+);
 
 export type Message = Static<typeof MessageSchema>;
 export const MessageSchema = Type.Object({
@@ -27,9 +30,11 @@ export const MessageSchema = Type.Object({
 });
 
 export type NetworkMap = Static<typeof NetworkMapSchema>;
-export const NetworkMapSchema = Type.Object({
-  active: Type.Boolean(),
-  cfg: Type.String(),
-  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
-  messages: Type.Array(MessageSchema),
-});
+export const NetworkMapSchema = Type.Object(
+  {
+    active: Type.Boolean(),
+    cfg: Type.String(),
+    messages: Type.Array(MessageSchema),
+  },
+  { additionalProperties: true },
+);

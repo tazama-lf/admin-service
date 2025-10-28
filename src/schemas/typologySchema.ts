@@ -22,13 +22,15 @@ const WorkFlow = Type.Object({
 });
 
 // Final top-level schema — fully inline except for the recursive array
-export const TypologySchema = Type.Object({
-  id: Type.String(),
-  cfg: Type.String(),
-  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
-  desc: Type.Optional(Type.String()),
-  rules: Type.Array(RuleValue),
-  expression: Type.Array(ExpressionMathJSON),
-  workflow: WorkFlow,
-});
+export const TypologySchema = Type.Object(
+  {
+    id: Type.String(),
+    cfg: Type.String(),
+    desc: Type.Optional(Type.String()),
+    rules: Type.Array(RuleValue),
+    expression: Type.Array(ExpressionMathJSON),
+    workflow: WorkFlow,
+  },
+  { additionalProperties: true },
+);
 export type Typology = Static<typeof TypologySchema>;

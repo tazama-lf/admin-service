@@ -9,13 +9,16 @@ export const RuleSchema = Type.Object({
 });
 
 export type Typology = Static<typeof TypologySchema>;
-export const TypologySchema = Type.Object({
-  id: Type.String(),
-  host: Type.Optional(Type.String()),
-  cfg: Type.String(),
-  desc: Type.Optional(Type.String()),
-  rules: Type.Array(RuleSchema),
-});
+export const TypologySchema = Type.Object(
+  {
+    id: Type.String(),
+    host: Type.Optional(Type.String()),
+    cfg: Type.String(),
+    desc: Type.Optional(Type.String()),
+    rules: Type.Array(RuleSchema),
+  },
+  { additionalProperties: true },
+);
 
 export type Message = Static<typeof MessageSchema>;
 export const MessageSchema = Type.Object({

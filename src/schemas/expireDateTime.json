@@ -1,9 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "xprtnDtTm": {
-      "type": "string"
-    }
-  },
-  "required":[]
-}

@@ -38,7 +38,7 @@ export default defineConfig([
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': 'off',
-      '@typescript-eslint/no-magic-numbers': 'warn',
+      '@typescript-eslint/no-magic-numbers': 'off',
       '@typescript-eslint/no-misused-spread': 'off',
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-unsafe-type-assertion': 'off',

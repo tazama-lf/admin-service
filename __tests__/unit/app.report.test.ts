@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { unwrap } from '@tazama-lf/frms-coe-lib/lib/helpers/unwrap';
 import { databaseManager, loggerService } from '../../src';
 import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.service';
 
@@ -8,11 +7,6 @@ jest.mock('@tazama-lf/frms-coe-lib', () => {
 
   return {
     ...original,
-    aql: jest.fn().mockImplementation((templateLiteral) => {
-      return {
-        query: templateLiteral,
-      };
-    }),
   };
 });
 // Mock the module
@@ -32,10 +26,6 @@ jest.mock('../../src/', () => ({
   },
 }));
 
-jest.mock('@tazama-lf/frms-coe-lib/lib/helpers/unwrap', () => ({
-  unwrap: jest.fn(),
-}));
-
 describe('handleGetReportRequestByMsgId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,15 +38,13 @@ describe('handleGetReportRequestByMsgId', () => {
       /* mock report data */
     };
     // Ensure getReportByMessageId is typed as a Jest mock function
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
 
     const msgid = 'test-msg-id';
     const tenantId = 'test-tenant';
     const result = await handleGetReportRequestByMsgId(msgid, tenantId);
 
     expect(databaseManager.getReportByMessageId).toHaveBeenCalledWith(msgid, tenantId);
-    expect(unwrap).toHaveBeenCalledWith([mockReport]);
     expect(result).toBe(mockReport);
     expect(loggerService.log).toHaveBeenCalledWith(
       `Started handling get request by message id the message id is ${msgid} for tenant ${tenantId}`,
@@ -87,7 +75,6 @@ describe('handleGetReportRequestByMsgId', () => {
       /* mock report data */
     };
     (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
 
     const msgid = 'test-msg-id';
     const tenantId = 'test-tenant';
@@ -117,8 +104,7 @@ describe('handleGetReportRequestByMsgId', () => {
       tenantId: 'tenant-a',
       /* other mock report data */
     };
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
 
     const msgid = 'test-msg-id';
     const tenantId = 'tenant-a';
@@ -136,8 +122,7 @@ describe('handleGetReportRequestByMsgId', () => {
       tenantId: 'tenant-a',
       /* other mock report data */
     };
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(undefined); // Simulate query returns nothing for wrong tenant
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(undefined); // Simulate query returns nothing for non-default tenant
 
     const msgid = 'test-msg-id';
     const tenantId = 'tenant-b';
@@ -152,8 +137,7 @@ describe('handleGetReportRequestByMsgId', () => {
       // No tenantId field
       /* other mock report data */
     };
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(undefined); // Simulate query returns nothing for non-default tenant
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(undefined); // Simulate query returns nothing for non-default tenant
 
     const msgid = 'test-msg-id';
     const tenantId = 'tenant-a';
@@ -168,8 +152,7 @@ describe('handleGetReportRequestByMsgId', () => {
       // No tenantId field
       /* other mock report data */
     };
-    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue([mockReport]);
-    (unwrap as jest.Mock).mockReturnValue(mockReport);
+    (databaseManager.getReportByMessageId as jest.Mock).mockResolvedValue(mockReport);
 
     const msgid = 'test-msg-id';
     const tenantId = 'default';

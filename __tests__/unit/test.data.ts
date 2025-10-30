@@ -1,4 +1,4 @@
-import { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { AccountCondition, EntityCondition, RawConditionResponse } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 // Create dates without mutating the same object
 const currentDate = new Date();
@@ -17,28 +17,20 @@ export const rawResponseEntity = {
   governed_as_creditor_by: [
     {
       edge: {
-        _key: '2110+27733161225MSISDN',
-        _id: 'governed_as_creditor_by/2110+27733161225MSISDN',
-        _from: 'entities/+27733161225MSISDN',
-        _to: 'conditions/2110',
-        _rev: '_iTm1jLS---',
+        source: '+27733161225MSISDN',
+        destination: 'cond123',
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
         tenantId: 'DEFAULT',
       },
       result: {
-        _key: '+27733161225MSISDN',
-        _id: 'entities/+27733161225MSISDN',
-        _rev: '_iTm1jLG---',
-        Id: '+27733161225MSISDN',
+        id: '+27733161225MSISDN',
         CreDtTm: fixedDate,
         TenantId: 'DEFAULT',
       },
       condition: {
-        _key: '2110',
-        _id: 'conditions/2110',
-        _rev: '_iTm1jK6---',
+        condId: 'cond123',
         evtTp: ['pacs.008.001.10'],
         condTp: 'overridable-block',
         prsptv: 'both',
@@ -61,28 +53,20 @@ export const rawResponseEntity = {
   governed_as_debtor_by: [
     {
       edge: {
-        _key: '2110+27733161225MSISDN',
-        _id: 'governed_as_debtor_by/2110+27733161225MSISDN',
-        _from: 'entities/+27733161225MSISDN',
-        _to: 'conditions/2110',
-        _rev: '_iTm1jLW---',
+        source: '+27733161225MSISDN',
+        destination: 'cond123',
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
         tenantId: 'DEFAULT',
       },
       result: {
-        _key: '+27733161225MSISDN',
-        _id: 'entities/+27733161225MSISDN',
-        _rev: '_iTm1jLG---',
-        Id: '+27733161225MSISDN',
+        id: '+27733161225MSISDN',
         CreDtTm: fixedDate,
         TenantId: 'DEFAULT',
       },
       condition: {
-        _key: '2110',
-        _id: 'conditions/2110',
-        _rev: '_iTm1jK6---',
+        condId: 'cond123',
         evtTp: ['pacs.008.001.10'],
         condTp: 'overridable-block',
         prsptv: 'both',
@@ -106,30 +90,24 @@ export const rawResponseEntity = {
   governed_as_debtor_account_by: [],
 };
 
-export const rawResponseAccount = {
+export const rawResponseAccount: RawConditionResponse = {
   governed_as_creditor_account_by: [
     {
       edge: {
-        _key: '21101010101010Mxxdfsp001',
-        _id: 'governed_as_creditor_by/21101010101010Mxxdfsp001',
-        _from: 'accounts/1010101010Mxxdfsp001',
-        _to: 'conditions/2110',
-        _rev: '_iU7ER2a---',
+        id: 'edge-id-1',
+        source: '1010101010Mxxdfsp001',
+        destination: 'cond123',
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
         tenantId: 'DEFAULT',
       },
       result: {
-        _key: '1010101010Mxxdfsp001',
-        _id: 'accounts/1010101010Mxxdfsp001',
-        _rev: '_iU7ER2G---',
+        id: '1010101010Mxxdfsp001',
         TenantId: 'DEFAULT',
       },
       condition: {
-        _key: '2110',
-        _id: 'conditions/2110',
-        _rev: '_iU7ER2----',
+        condId: 'cond123',
         evtTp: ['pacs.008.001.10'],
         condTp: 'overridable-block',
         prsptv: 'both',
@@ -159,26 +137,20 @@ export const rawResponseAccount = {
   governed_as_debtor_account_by: [
     {
       edge: {
-        _key: '21101010101010Mxxdfsp001',
-        _id: 'governed_as_debtor_by/21101010101010Mxxdfsp001',
-        _from: 'accounts/1010101010Mxxdfsp001',
-        _to: 'conditions/2110',
-        _rev: '_iU7ER2e---',
+        id: 'edge-id-2',
+        source: '1010101010Mxxdfsp001',
+        destination: 'cond123',
         evtTp: ['pacs.008.001.10'],
         incptnDtTm,
         xprtnDtTm,
         tenantId: 'DEFAULT',
       },
       result: {
-        _key: '1010101010Mxxdfsp001',
-        _id: 'accounts/1010101010Mxxdfsp001',
-        _rev: '_iU7ER2G---',
+        id: '1010101010Mxxdfsp001',
         TenantId: 'DEFAULT',
       },
       condition: {
-        _key: '2110',
-        _id: 'conditions/2110',
-        _rev: '_iU7ER2----',
+        condId: 'cond123',
         evtTp: ['pacs.008.001.10'],
         condTp: 'overridable-block',
         prsptv: 'both',
@@ -227,7 +199,7 @@ export const accountResponse = {
     },
     conditions: [
       {
-        condId: '2110',
+        condId: 'cond123',
         xprtnDtTm,
         condTp: 'overridable-block',
         creDtTm: fixedDate,
@@ -265,7 +237,7 @@ export const entityResponse = {
     },
     conditions: [
       {
-        condId: '2110',
+        condId: 'cond123',
         condTp: 'overridable-block',
         incptnDtTm,
         xprtnDtTm,

@@ -35,16 +35,19 @@
     "@fastify/response-validation": "^3.0.3",
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
+    "@sinclair/typebox": "^0.34.41",
     "@tazama-lf/auth-lib": "2.2.0-rc.1",
-    "@tazama-lf/frms-coe-lib": "6.0.0-rc.11",
+    "@tazama-lf/frms-coe-lib": "6.0.0-postgres.alpha.12",
     "@tazama-lf/frms-coe-startup-lib": "3.0.0-rc.1",
     "ajv": "^8.17.1",
     "dotenv": "^17.2.0",
     "fastify": "^5.4.0",
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.5.0",
+    "@sinclair/typebox-codegen": "^0.11.1",
     "@stylistic/eslint-plugin": "^5.2.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",
@@ -54,11 +57,13 @@
     "eslint-config-love": "^121.0.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "ioredis-mock": "^8.9.0",
     "jest": "^30.0.4",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
+    "typebox-cli": "^1.0.5",
     "typescript": "^5.8.3"
   },
   "lint-staged": {

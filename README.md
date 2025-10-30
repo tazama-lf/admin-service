@@ -348,11 +348,11 @@ Repositories provide a clear abstraction between the data layer and the API laye
 
 ---
 
-## 2) Request → Auth → CRUD → Repo Flow (Mermaid)
+## 2) Request → Auth → CRUD → Repository Flow
 
 ```mermaid
 flowchart TD
-  A[ClientRequestHTTPGETPOSTPUTDELETE] --> B{Fastify Router}
+  A[ClientRequest HTTP GET, POST, PUT, DELETE] --> B{Fastify Router}
   B -->|"/"| HC[Health Check
 200 OK]
   B -->|"/v1/... (CRUD)"| C[CRUD Route Handler

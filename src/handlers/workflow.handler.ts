@@ -18,15 +18,16 @@ import jwt from 'jsonwebtoken';
 
 const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
-  [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED, CS.CHANGES_REQUESTED],
-  [CS.APPROVED]: [CS.DEPLOYED],
-  [CS.EXPORTED]: [],
+  [CS.SUSPENDED]: [CS.IN_PROGRESS],
+  [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED],
+  [CS.APPROVED]: [CS.EXPORTED],
+  [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT],
+  [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED],
   [CS.DEPLOYED]: [],
   [CS.REJECTED]: [CS.IN_PROGRESS],
-  [CS.CHANGES_REQUESTED]: [CS.IN_PROGRESS],
 };
 
-const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.CHANGES_REQUESTED];
+const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.REJECTED];
 
 function getUserEmailFromRequest(req: FastifyRequest): string | null {
   try {
@@ -372,10 +373,10 @@ function validateUserPermissions(
           message: 'Only editors can return configurations to progress',
         };
       }
-      if (![CS.REJECTED, CS.CHANGES_REQUESTED].includes(currentStatus)) {
+      if (currentStatus !== CS.REJECTED) {
         return {
           canPerform: false,
-          message: 'Can only return rejected or change-requested configurations to progress',
+          message: 'Can only return rejected configurations to progress',
         };
       }
       break;
@@ -403,7 +404,7 @@ function canEditConfig(currentStatus: ConfigStatus): { canEdit: boolean; message
   if (!EDITABLE_STATUSES.includes(currentStatus)) {
     return {
       canEdit: false,
-      message: `Cannot edit configuration in ${currentStatus} status. Only configurations in IN_PROGRESS or CHANGES_REQUESTED status can be edited.`,
+      message: `Cannot edit configuration in ${currentStatus} status. Only configurations in IN_PROGRESS or REJECTED status can be edited.`,
     };
   }
   return { canEdit: true };
@@ -694,7 +695,8 @@ export const requestChangesHandler = async (req: FastifyRequest, reply: FastifyR
     }
 
     const currentStatus = config.status!;
-    const newStatus: ConfigStatus = CS.CHANGES_REQUESTED;
+    // When changes are requested, set status to IN_PROGRESS so editor can make changes
+    const newStatus: ConfigStatus = CS.IN_PROGRESS;
     const action: WorkflowAction = 'request_changes';
 
     const permissionValidation = validateUserPermissions(userClaims, currentStatus, action);

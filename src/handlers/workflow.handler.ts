@@ -14,6 +14,7 @@ import type {
   StatusTransitionDto,
 } from '@tazama-lf/tcs-lib';
 import { ConfigStatus as CS } from '@tazama-lf/tcs-lib';
+import jwt from 'jsonwebtoken';
 
 const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
@@ -25,6 +26,245 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
 };
 
 const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.CHANGES_REQUESTED];
+
+function getUserEmailFromRequest(req: FastifyRequest): string | null {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      loggerService.warn('No Bearer token found in Authorization header');
+      return null;
+    }
+    const [, token] = authHeader.split(' ');
+    const decoded = jwt.decode(token) as { preferred_username?: string; email?: string };
+    const email = decoded?.preferred_username ?? decoded?.email ?? null;
+
+    loggerService.log('[Workflow] Extracted email from JWT:');
+    loggerService.log(`   - preferred_username: ${decoded?.preferred_username ?? 'N/A'}`);
+    loggerService.log(`   - email field: ${decoded?.email ?? 'N/A'}`);
+    loggerService.log(`   - Final email: ${email ?? 'NOT FOUND'}`);
+
+    return email;
+  } catch (error) {
+    loggerService.error(`Failed to extract email from JWT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return null;
+  }
+}
+
+function getUserNameFromRequest(req: FastifyRequest): string | null {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return null;
+    }
+    const [, token] = authHeader.split(' ');
+    const decoded = jwt.decode(token) as { name?: string; given_name?: string };
+    return decoded?.name ?? decoded?.given_name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getApproverGroupForTenant(tenantId: string): Promise<string | null> {
+  try {
+    const { autoDiscoveryCache } = await import('../services/auto-discovery-cache.service.js');
+
+    const cachedGroup = autoDiscoveryCache.getCachedGroup(tenantId);
+    if (cachedGroup) {
+      return cachedGroup;
+    }
+
+    loggerService.log(` Auto-discovering approver group for tenant '${tenantId}'...`);
+
+    const { keycloakService } = await import('../services/keycloak.service.js');
+    const approverGroup = await keycloakService.getApproverGroupForTenant(tenantId);
+
+    if (approverGroup) {
+      loggerService.log(`Auto-discovered approver group '${approverGroup}' for tenant '${tenantId}'`);
+
+      autoDiscoveryCache.cacheGroup(tenantId, approverGroup);
+
+      return approverGroup;
+    } else {
+      loggerService.log(`ℹNo specific approver group found for tenant '${tenantId}', using default approver role`);
+
+      autoDiscoveryCache.cacheGroup(tenantId, '__none__', 5 * 60 * 1000);
+
+      return null;
+    }
+  } catch (error) {
+    loggerService.error(
+      `Failed to auto-discover approver group for tenant '${tenantId}': ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    loggerService.log(`Falling back to default approver role for tenant '${tenantId}'`);
+    return null;
+  }
+}
+
+interface ConfigData {
+  transactionType?: string;
+  version?: string;
+}
+
+interface SendNotificationParams {
+  type: 'submit' | 'changes_requested';
+  configId: number;
+  config: ConfigData;
+  tenantId: string;
+  requesterEmail: string;
+  requesterName: string | null;
+  comment?: string;
+}
+
+async function sendNotificationAsync(params: SendNotificationParams): Promise<void> {
+  const { type, configId, config, tenantId, requesterEmail, requesterName, comment } = params;
+  try {
+    if (type === 'submit') {
+      const { keycloakService } = await import('../services/keycloak.service.js');
+      const { userEmailCache } = await import('../index.js');
+
+      let approverEmails: string[] = [];
+      const approverGroup = await getApproverGroupForTenant(tenantId);
+
+      if (approverGroup && approverGroup !== '__none__') {
+        loggerService.log(`📧 Looking up approvers for tenant '${tenantId}' from auto-discovered group '${approverGroup}'...`);
+
+        const cachedApprovers = userEmailCache.getGroupApprovers(tenantId, approverGroup);
+
+        if (cachedApprovers && cachedApprovers.length > 0) {
+          approverEmails = cachedApprovers;
+          loggerService.log(`Using cached approvers (${approverEmails.length}) for tenant '${tenantId}' group '${approverGroup}'`);
+        } else {
+          loggerService.log(`Cache miss - querying Keycloak for tenant '${tenantId}' group '${approverGroup}'...`);
+          approverEmails = await keycloakService.getApproverEmailsByTenantAndGroup(tenantId, approverGroup);
+
+          if (approverEmails.length > 0) {
+            loggerService.log(`Found ${approverEmails.length} approver(s) in group '${approverGroup}' for tenant '${tenantId}'`);
+
+            userEmailCache.cacheGroupApprovers(tenantId, approverGroup, approverEmails);
+
+            loggerService.log('Approver emails:');
+            for (const email of approverEmails) {
+              loggerService.log(`   - ${email}`);
+            }
+          } else {
+            loggerService.warn(`No approvers found in auto-discovered group '${approverGroup}' for tenant '${tenantId}'`);
+            loggerService.warn('   Falling back to cached role-based approvers or default query');
+
+            approverEmails = userEmailCache.getEmailsByRole(tenantId, 'approver');
+
+            if (approverEmails.length === 0) {
+              loggerService.log('   Trying default approver role query...');
+              approverEmails = await keycloakService.getApproverEmails();
+            }
+          }
+        }
+      } else {
+        loggerService.log("📧 No group configured - querying all approvers using default 'approver' role...");
+        approverEmails = await keycloakService.getApproverEmails();
+      }
+
+      if (approverEmails.length === 0) {
+        loggerService.warn(`No approver emails found in Keycloak for tenant ${tenantId}`);
+        loggerService.warn("   Make sure users with 'approver' role exist in Keycloak realm");
+        loggerService.warn('   Or configure TENANT_APPROVER_GROUPS environment variable');
+        return;
+      }
+
+      loggerService.log(`Sending approval notification to ${approverEmails.length} approver(s): ${approverEmails.join(', ')}`);
+
+      try {
+        const axios = (await import('axios')).default;
+        const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
+        const notificationEndpoint = `${connectionStudioUrl}/notifications/submit-for-approval`;
+
+        const emailContext = {
+          configId,
+          configName: config.transactionType ?? 'Configuration',
+          version: config.version ?? '1.0',
+          transactionType: config.transactionType,
+          requesterName,
+          requesterEmail,
+          comment,
+          tenantId,
+        };
+
+        loggerService.log('Calling connection-studio notification service...');
+        loggerService.log(`   Endpoint: ${notificationEndpoint}`);
+        loggerService.log(`   Recipients: ${approverEmails.join(', ')}`);
+
+        const response = await axios.post(
+          notificationEndpoint,
+          { approverEmails, context: emailContext },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 10000,
+          },
+        );
+
+        const responseData = response.data as { success: boolean; recipients?: number; message?: string };
+        if (responseData.success) {
+          loggerService.log(`Email notification sent successfully to ${responseData.recipients ?? 0} approver(s)`);
+        } else {
+          loggerService.warn(` ${responseData.message ?? 'Unknown error'}`);
+        }
+      } catch (error) {
+        loggerService.error(` Failed to call notification service: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        loggerService.warn('   Email notification not sent - check if connection-studio is running');
+      }
+    } else if (type === 'changes_requested') {
+      const editorEmail = await databaseService.getConfigEditorEmail(configId, tenantId);
+
+      if (!editorEmail) {
+        loggerService.warn(`Could not find editor email for config ${configId}`);
+        return;
+      }
+
+      loggerService.log(`Sending changes requested notification to editor: ${editorEmail}`);
+
+      try {
+        const axios = (await import('axios')).default;
+        const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
+        const notificationEndpoint = `${connectionStudioUrl}/notifications/changes-requested`;
+
+        const emailContext = {
+          configId,
+          configName: config.transactionType ?? 'Configuration',
+          version: config.version ?? '1.0',
+          transactionType: config.transactionType,
+          requesterName,
+          requesterEmail,
+          comment,
+          tenantId,
+        };
+
+        loggerService.log('Calling connection-studio notification service...');
+        loggerService.log(`   Endpoint: ${notificationEndpoint}`);
+        loggerService.log(`   Recipient: ${editorEmail}`);
+
+        const response = await axios.post(
+          notificationEndpoint,
+          { editorEmail, context: emailContext },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 10000,
+          },
+        );
+
+        const responseData = response.data as { success: boolean; message?: string };
+        if (responseData.success) {
+          loggerService.log(`Changes requested email sent successfully to ${editorEmail}`);
+        } else {
+          loggerService.warn(responseData.message ?? 'Unknown error');
+        }
+      } catch (error) {
+        loggerService.error(`Failed to call notification service: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        loggerService.warn('   Email notification not sent - check if connection-studio is running');
+      }
+    }
+  } catch (error) {
+    loggerService.error(`Failed to send notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 function validateStatusTransition(fromStatus: ConfigStatus, toStatus: ConfigStatus): { isValid: boolean; message?: string } {
   const allowedTransitions = VALID_TRANSITIONS[fromStatus];
@@ -203,6 +443,36 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
     });
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
+
+    const userEmail = getUserEmailFromRequest(req);
+    if (userEmail) {
+      await databaseService.logAction({
+        action: 'submit_for_approval',
+        entityType: 'config',
+        entityId: id,
+        actor: dto.userId,
+        actorEmail: userEmail,
+        tenantId,
+        details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,
+        newValues: { status: newStatus },
+      });
+    }
+
+    const userName = getUserNameFromRequest(req);
+    if (userEmail) {
+      sendNotificationAsync({
+        type: 'submit',
+        configId: Number(id),
+        config: updatedConfig!,
+        tenantId,
+        requesterEmail: userEmail,
+        requesterName: userName,
+        comment: dto.comment,
+      }).catch((err: unknown) => {
+        const error = err as Error;
+        loggerService.error(`Notification error: ${error.message}`);
+      });
+    }
 
     loggerService.log(
       `Config ${id} submitted for approval. Status: ${currentStatus} → ${newStatus}${dto.comment ? ` - Comment: ${dto.comment}` : ''}`,
@@ -387,6 +657,7 @@ export const requestChangesHandler = async (req: FastifyRequest, reply: FastifyR
     const userClaims = authReq.user?.claims ?? [];
 
     loggerService.log(`Requesting changes for config ${id} by user ${dto.userId}`);
+    loggerService.log(` Changes requested: ${dto.requestedChanges}`);
 
     if (!dto.requestedChanges?.trim()) {
       reply.status(400).send({
@@ -430,12 +701,50 @@ export const requestChangesHandler = async (req: FastifyRequest, reply: FastifyR
 
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
+      comments: dto.requestedChanges,
     });
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 
+    const userEmail = getUserEmailFromRequest(req);
+    if (userEmail) {
+      await databaseService.logAction({
+        action: 'request_changes',
+        entityType: 'config',
+        entityId: id,
+        actor: dto.userId,
+        actorEmail: userEmail,
+        tenantId,
+        details: `Changes requested: ${dto.requestedChanges}`,
+        newValues: { status: newStatus, comments: dto.requestedChanges },
+      });
+    }
+
+    const userName = getUserNameFromRequest(req);
+    if (userEmail) {
+      loggerService.log(' Preparing email notification for changes requested:');
+      loggerService.log(`   - From: ${userName ?? userEmail} (approver)`);
+      loggerService.log(`   - To: Editor of config ${id}`);
+      loggerService.log(`   - Subject: Changes Requested for Config ${id}`);
+      loggerService.log(`   - Message: ${dto.requestedChanges}`);
+      loggerService.log('   - Connection: admin-service → connection-studio → NotificationService → SMTP');
+
+      sendNotificationAsync({
+        type: 'changes_requested',
+        configId: Number(id),
+        config: updatedConfig!,
+        tenantId,
+        requesterEmail: userEmail,
+        requesterName: userName,
+        comment: dto.requestedChanges,
+      }).catch((err: unknown) => {
+        const error = err as Error;
+        loggerService.error(`Notification error: ${error.message}`);
+      });
+    }
+
     loggerService.log(
-      `Changes requested for config ${id}. Status: ${currentStatus} → ${newStatus} - Requested changes: ${dto.requestedChanges}`,
+      `Changes requested for config ${id}. Status: ${currentStatus} → ${newStatus} - Comments saved: ${dto.requestedChanges}`,
     );
 
     reply.status(200).send({

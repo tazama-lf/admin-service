@@ -7,6 +7,8 @@ export interface DecodedToken {
   sub?: string;
   tenantId?: string;
   tenant_id?: string;
+  preferred_username?: string;
+  email?: string;
 }
 
 export interface AuthenticatedUserInfo {

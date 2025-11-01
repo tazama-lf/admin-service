@@ -20,6 +20,7 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
   [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED, CS.CHANGES_REQUESTED],
   [CS.APPROVED]: [CS.DEPLOYED],
+  [CS.EXPORTED]: [],
   [CS.DEPLOYED]: [],
   [CS.REJECTED]: [CS.IN_PROGRESS],
   [CS.CHANGES_REQUESTED]: [CS.IN_PROGRESS],
@@ -375,6 +376,21 @@ function validateUserPermissions(
         return {
           canPerform: false,
           message: 'Can only return rejected or change-requested configurations to progress',
+        };
+      }
+      break;
+
+    case 'export':
+      if (!hasPublisherRole) {
+        return {
+          canPerform: false,
+          message: 'Only publishers can export configurations',
+        };
+      }
+      if (currentStatus !== CS.APPROVED) {
+        return {
+          canPerform: false,
+          message: 'Can only export configurations in APPROVED status',
         };
       }
       break;

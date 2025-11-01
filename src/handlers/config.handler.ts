@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ConfigStatus, ContentType, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
-import { databaseService } from '../index';
+import { databaseService, loggerService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -296,6 +296,8 @@ export const deleteConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
 export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
+    loggerService.log('📝 [ADMIN-SERVICE] writeConfigHandler called', 'ConfigHandler');
+
     const configData = req.body as Record<string, unknown>;
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';

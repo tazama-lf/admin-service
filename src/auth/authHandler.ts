@@ -56,7 +56,7 @@ export const tokenHandler =
       if (tenantId && userId && email) {
         const rolesArray = Array.isArray(claims) ? claims : [];
         try {
-          userEmailCache.cacheUser(tenantId, userId, email, rolesArray ?? undefined);
+          userEmailCache.cacheUser(tenantId, userId, email, rolesArray);
           loggerService.log(`User cached: ${email} (tenant: ${tenantId}, userId: ${userId})`, logContext);
         } catch (err) {
           const error = err as Error;

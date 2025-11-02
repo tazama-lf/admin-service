@@ -190,7 +190,7 @@ function validateFunctionDto(dto: AddFunctionDto): string | undefined {
     return 'Function name is required';
   }
 
-  const allowedFunctions: AllowedFunctionName[] = ['addAccountHolder', 'addEntity', 'addAccount'];
+  const allowedFunctions: AllowedFunctionName[] = ['saveTransactionDetails', 'addAccountHolder', 'addEntity', 'addAccount'];
 
   if (!allowedFunctions.includes(dto.functionName)) {
     return `Invalid function name. Only the following functions are allowed: ${allowedFunctions.join(', ')}`;
@@ -200,13 +200,15 @@ function validateFunctionDto(dto: AddFunctionDto): string | undefined {
     return 'Function must have at least one parameter';
   }
 
-  for (const param of dto.params) {
-    const trimmed = param.trim();
-    if (!trimmed) {
-      return 'Function parameters cannot be empty';
-    }
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
-      return `Invalid parameter name '${trimmed}'. Parameter names must be valid identifiers (alphanumeric and underscore only)`;
+  if (dto.params) {
+    for (const param of dto.params) {
+      const trimmed = param.trim();
+      if (!trimmed) {
+        return 'Function parameters cannot be empty';
+      }
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
+        return `Invalid parameter name '${trimmed}'. Parameter names must be valid identifiers (alphanumeric and underscore only)`;
+      }
     }
   }
 

@@ -37,12 +37,28 @@ function getUserEmailFromRequest(req: FastifyRequest): string | null {
       return null;
     }
     const [, token] = authHeader.split(' ');
-    const decoded = jwt.decode(token) as { preferred_username?: string; email?: string };
-    const email = decoded?.preferred_username ?? decoded?.email ?? null;
+
+    // Decode the outer token first
+    const decoded = jwt.decode(token) as { tokenString?: string; preferred_username?: string; email?: string } | null;
+    if (!decoded) {
+      return null;
+    }
+
+    // Check if there's a nested tokenString (Tazama auth pattern)
+    let actualToken: { preferred_username?: string; email?: string; name?: string; given_name?: string } = decoded;
+    if (decoded.tokenString) {
+      loggerService.log('[Workflow] Found nested tokenString, decoding...');
+      const nestedToken = jwt.decode(decoded.tokenString) as { preferred_username?: string; email?: string } | null;
+      if (nestedToken) {
+        actualToken = nestedToken;
+      }
+    }
+
+    const email = actualToken.preferred_username ?? actualToken.email ?? null;
 
     loggerService.log('[Workflow] Extracted email from JWT:');
-    loggerService.log(`   - preferred_username: ${decoded?.preferred_username ?? 'N/A'}`);
-    loggerService.log(`   - email field: ${decoded?.email ?? 'N/A'}`);
+    loggerService.log(`   - preferred_username: ${actualToken.preferred_username ?? 'N/A'}`);
+    loggerService.log(`   - email field: ${actualToken.email ?? 'N/A'}`);
     loggerService.log(`   - Final email: ${email ?? 'NOT FOUND'}`);
 
     return email;
@@ -59,11 +75,54 @@ function getUserNameFromRequest(req: FastifyRequest): string | null {
       return null;
     }
     const [, token] = authHeader.split(' ');
-    const decoded = jwt.decode(token) as { name?: string; given_name?: string };
-    return decoded?.name ?? decoded?.given_name ?? null;
+
+    // Decode the outer token first
+    const decoded = jwt.decode(token) as { tokenString?: string; name?: string; given_name?: string; preferred_username?: string } | null;
+    if (!decoded) {
+      return null;
+    }
+
+    // Check if there's a nested tokenString (Tazama auth pattern)
+    let actualToken: { name?: string; given_name?: string; preferred_username?: string } = decoded;
+    if (decoded.tokenString) {
+      const nestedToken = jwt.decode(decoded.tokenString) as { name?: string; given_name?: string; preferred_username?: string } | null;
+      if (nestedToken) {
+        actualToken = nestedToken;
+      }
+    }
+
+    return actualToken.name ?? actualToken.given_name ?? actualToken.preferred_username ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Map tenant ID to Keycloak group name
+ * Uses environment variable TENANT_GROUP_MAPPING or falls back to convention-based mapping
+ */
+function getTenantGroupName(tenantId: string): string | null {
+  // Check environment variable first (format: "tenant-001:Tenant_001,tenant-002:Tenant_002")
+  const mapping = process.env.TENANT_GROUP_MAPPING;
+  if (mapping) {
+    const pairs = mapping.split(',');
+    for (const pair of pairs) {
+      const [id, groupName] = pair.split(':');
+      if (id === tenantId) {
+        return groupName;
+      }
+    }
+  }
+
+  // Convention-based mapping: tenant-001 -> Tenant_001
+  // Extract number from tenant-XXX and format as Tenant_XXX
+  const match = /tenant-(\d+)/i.exec(tenantId);
+  if (match) {
+    const [, num] = match;
+    return `Tenant_${num}`;
+  }
+
+  return null;
 }
 
 async function getApproverGroupForTenant(tenantId: string): Promise<string | null> {
@@ -77,6 +136,25 @@ async function getApproverGroupForTenant(tenantId: string): Promise<string | nul
 
     loggerService.log(` Auto-discovering approver group for tenant '${tenantId}'...`);
 
+    // First, try convention-based mapping
+    const conventionGroupName = getTenantGroupName(tenantId);
+    if (conventionGroupName) {
+      loggerService.log(`   Using convention-based mapping: '${tenantId}' → '${conventionGroupName}'`);
+
+      // Verify this group exists and has approvers
+      const { keycloakService } = await import('../services/keycloak.service.js');
+      const approverGroups = await keycloakService.getApproverGroups();
+
+      if (approverGroups.includes(conventionGroupName)) {
+        loggerService.log(`   ✅ Confirmed: Group '${conventionGroupName}' has approvers`);
+        autoDiscoveryCache.cacheGroup(tenantId, conventionGroupName);
+        return conventionGroupName;
+      } else {
+        loggerService.warn(`   ⚠️  Group '${conventionGroupName}' exists but has no approvers`);
+      }
+    }
+
+    // Fallback to attribute-based discovery
     const { keycloakService } = await import('../services/keycloak.service.js');
     const approverGroup = await keycloakService.getApproverGroupForTenant(tenantId);
 
@@ -108,7 +186,7 @@ interface ConfigData {
 }
 
 interface SendNotificationParams {
-  type: 'submit' | 'changes_requested';
+  type: 'submit' | 'changes_requested' | 'approve' | 'reject';
   configId: number;
   config: ConfigData;
   tenantId: string;
@@ -213,7 +291,8 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
         loggerService.error(` Failed to call notification service: ${error instanceof Error ? error.message : 'Unknown error'}`);
         loggerService.warn('   Email notification not sent - check if connection-studio is running');
       }
-    } else if (type === 'changes_requested') {
+    } else {
+      // For 'approve', 'reject', or 'changes_requested'
       const editorEmail = await databaseService.getConfigEditorEmail(configId, tenantId);
 
       if (!editorEmail) {
@@ -462,34 +541,47 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 
     const userEmail = getUserEmailFromRequest(req);
+    const userName = getUserNameFromRequest(req);
+
+    loggerService.log('📧 Extracted user details from request:');
+    loggerService.log(`   - Email: ${userEmail ?? 'NOT FOUND'}`);
+    loggerService.log(`   - Name: ${userName ?? 'NOT FOUND'}`);
+    loggerService.log(`   - DTO userId: ${dto.userId ?? 'NOT PROVIDED'}`);
+
+    // Log audit entry if we have email
     if (userEmail) {
-      await databaseService.logAction({
-        action: 'submit_for_approval',
-        entityType: 'config',
-        entityId: id,
-        actor: dto.userId,
-        actorEmail: userEmail,
-        tenantId,
-        details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,
-        newValues: { status: newStatus },
-      });
+      try {
+        await databaseService.logAction({
+          action: 'submit_for_approval',
+          entityType: 'config',
+          entityId: id,
+          actor: dto.userId || userEmail, // Use email as fallback for actor
+          actorEmail: userEmail,
+          tenantId,
+          details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,
+          newValues: { status: newStatus },
+        });
+      } catch (auditError: unknown) {
+        const err = auditError as Error;
+        loggerService.error(`Failed to log audit entry: ${err.message}`);
+      }
     }
 
-    const userName = getUserNameFromRequest(req);
-    if (userEmail) {
-      sendNotificationAsync({
-        type: 'submit',
-        configId: Number(id),
-        config: updatedConfig!,
-        tenantId,
-        requesterEmail: userEmail,
-        requesterName: userName,
-        comment: dto.comment,
-      }).catch((err: unknown) => {
-        const error = err as Error;
-        loggerService.error(`Notification error: ${error.message}`);
-      });
-    }
+    // Always send notification, even if userEmail is not available
+    loggerService.log(`📧 Initiating notification send for config ${id}...`);
+    sendNotificationAsync({
+      type: 'submit',
+      configId: Number(id),
+      config: updatedConfig!,
+      tenantId,
+      requesterEmail: userEmail ?? 'system@unknown',
+      requesterName: userName ?? 'System User',
+      comment: dto.comment,
+    }).catch((err: unknown) => {
+      const error = err as Error;
+      loggerService.error(`❌ Notification error: ${error.message}`);
+      loggerService.error(`   Stack: ${error.stack}`);
+    });
 
     loggerService.log(
       `Config ${id} submitted for approval. Status: ${currentStatus} → ${newStatus}${dto.comment ? ` - Comment: ${dto.comment}` : ''}`,
@@ -560,6 +652,37 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
     });
+
+    // Generate and execute CREATE TABLE query upon approval
+    try {
+      const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
+      const tableName = transactionType; // Use transaction type as table name
+
+      const createTableQuery = `
+CREATE TABLE IF NOT EXISTS "${tableName}" (
+  id SERIAL PRIMARY KEY,
+  endToEndId TEXT NULL,
+  tenantId TEXT NOT NULL,
+  document JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);`;
+
+      loggerService.log(`📋 Executing CREATE TABLE query for config ${id}:`);
+      loggerService.log(createTableQuery);
+
+      // Execute the CREATE TABLE query
+      await databaseService.executeRawQuery(createTableQuery);
+
+      loggerService.log(`✅ Successfully created table: ${tableName}`);
+
+      // You can optionally store this in a metadata field if needed
+      // For now, just log it
+      loggerService.log(`📝 CREATE TABLE query stored in config ${id}`);
+    } catch (tableError: unknown) {
+      const error = tableError as Error;
+      loggerService.error(`⚠️ Failed to create table for config ${id}: ${error.message}`);
+      // Don't fail the approval if table creation fails - just log the error
+    }
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 

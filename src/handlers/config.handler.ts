@@ -34,7 +34,7 @@ export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyRe
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to get config',
+      message: err.message || 'Failed to get config',
     });
   }
 };
@@ -54,7 +54,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to get configs',
+      message: err.message || 'Failed to get configs',
     });
   }
 };
@@ -75,7 +75,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to get configs by transaction type',
+      message: err.message || 'Failed to get configs by transaction type',
     });
   }
 };
@@ -110,7 +110,7 @@ export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: Fas
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to get config by endpoint',
+      message: err.message || 'Failed to get config by endpoint',
     });
   }
 };
@@ -130,7 +130,7 @@ export const getActiveConfigsHandler = async (req: FastifyRequest, reply: Fastif
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to get pending approvals',
+      message: err.message || 'Failed to get pending approvals',
     });
   }
 };
@@ -143,11 +143,11 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
 
     const newConfig = {
-      msgFam: (configData.msgFam as string) ?? '',
-      transactionType: (configData.transactionType as string) ?? '',
-      endpointPath: (configData.endpointPath as string) ?? '',
-      version: (configData.version as string) ?? '',
-      contentType: (configData.contentType as ContentType) ?? ContentType.JSON,
+      msgFam: (configData.msgFam as string) || '',
+      transactionType: (configData.transactionType as string) || '',
+      endpointPath: (configData.endpointPath as string) || '',
+      version: (configData.version as string) || '',
+      contentType: (configData.contentType as ContentType) || ContentType.JSON,
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
@@ -167,7 +167,7 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to create config',
+      message: err.message || 'Failed to create config',
     });
   }
 };
@@ -211,7 +211,7 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to update config',
+      message: err.message || 'Failed to update config',
     });
   }
 };
@@ -260,7 +260,7 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to clone config',
+      message: err.message || 'Failed to clone config',
     });
   }
 };
@@ -289,7 +289,7 @@ export const deleteConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to delete config',
+      message: err.message || 'Failed to delete config',
     });
   }
 };
@@ -312,7 +312,7 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
-      status: (configData.status as ConfigStatus) ?? ConfigStatus.IN_PROGRESS,
+      status: (configData.status as ConfigStatus) || ConfigStatus.IN_PROGRESS,
       tenantId,
       createdBy: userId,
     };
@@ -328,7 +328,7 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to write config',
+      message: err.message || 'Failed to write config',
     });
   }
 };
@@ -372,7 +372,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message ?? 'Failed to update config',
+      message: err.message || 'Failed to update config',
     });
   }
 };

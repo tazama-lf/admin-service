@@ -20,9 +20,9 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
   [CS.SUSPENDED]: [CS.IN_PROGRESS],
   [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED],
-  [CS.APPROVED]: [CS.EXPORTED],
-  [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT],
-  [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED],
+  [CS.APPROVED]: [CS.EXPORTED], // Exporter exports approved configs
+  [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT, CS.DEPLOYED], // Can go to READY_FOR_DEPLOYMENT or directly to DEPLOYED
+  [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED], // Publisher publishes/deploys
   [CS.DEPLOYED]: [],
   [CS.REJECTED]: [CS.IN_PROGRESS],
 };
@@ -438,10 +438,11 @@ function validateUserPermissions(
           message: 'Only publishers can deploy configurations',
         };
       }
-      if (currentStatus !== CS.APPROVED) {
+      // Publishers can deploy from APPROVED, EXPORTED, or READY_FOR_DEPLOYMENT status
+      if (currentStatus !== CS.APPROVED && currentStatus !== CS.EXPORTED && currentStatus !== CS.READY_FOR_DEPLOYMENT) {
         return {
           canPerform: false,
-          message: 'Can only deploy configurations in APPROVED status',
+          message: 'Can only deploy configurations in APPROVED, EXPORTED, or READY_FOR_DEPLOYMENT status',
         };
       }
       break;
@@ -672,9 +673,13 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
       loggerService.log(createTableQuery);
 
       // Execute the CREATE TABLE query
-      await databaseService.executeRawQuery(createTableQuery);
-
-      loggerService.log(`✅ Successfully created table: ${tableName}`);
+      const client = await databaseService.getClient();
+      try {
+        await client.query(createTableQuery);
+        loggerService.log(`✅ Successfully created table: ${tableName}`);
+      } finally {
+        client.release();
+      }
 
       // You can optionally store this in a metadata field if needed
       // For now, just log it
@@ -954,6 +959,37 @@ export const deployConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
     });
+
+    // Generate and execute CREATE TABLE query upon deployment (publish)
+    try {
+      const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
+      const tableName = transactionType; // Use transaction type as table name
+
+      const createTableQuery = `
+CREATE TABLE IF NOT EXISTS "${tableName}" (
+  id SERIAL PRIMARY KEY,
+  endToEndId TEXT NULL,
+  tenantId TEXT NOT NULL,
+  document JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);`;
+
+      loggerService.log(`📋 Executing CREATE TABLE query for config ${id} on publish:`);
+      loggerService.log(createTableQuery);
+
+      // Execute the CREATE TABLE query
+      const client = await databaseService.getClient();
+      try {
+        await client.query(createTableQuery);
+        loggerService.log(`✅ Successfully created table on publish: ${tableName}`);
+      } finally {
+        client.release();
+      }
+    } catch (tableError: unknown) {
+      const error = tableError as Error;
+      loggerService.error(`⚠️ Failed to create table for config ${id} on publish: ${error.message}`);
+      // Don't fail the deployment if table creation fails - just log the error
+    }
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 

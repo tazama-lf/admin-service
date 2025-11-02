@@ -368,6 +368,7 @@ function validateUserPermissions(
   const hasEditorRole = userClaims.includes('editor');
   const hasApproverRole = userClaims.includes('approver');
   const hasPublisherRole = userClaims.includes('publisher');
+  const hasExporterRole = userClaims.includes('exporter');
 
   switch (action) {
     case 'submit_for_approval':
@@ -461,10 +462,10 @@ function validateUserPermissions(
       break;
 
     case 'export':
-      if (!hasPublisherRole) {
+      if (!hasExporterRole) {
         return {
           canPerform: false,
-          message: 'Only publishers can export configurations',
+          message: 'Only exporters can export configurations',
         };
       }
       if (currentStatus !== CS.APPROVED) {
@@ -974,6 +975,63 @@ export const deployConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     });
   } finally {
     loggerService.log('End - Handle deploy config request');
+  }
+};
+export const exportConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle export config request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const dto = req.body as StatusTransitionDto;
+    const authReq = req as AuthenticatedRequest;
+    const userClaims = authReq.user?.claims ?? [];
+    loggerService.log(`Exporting config ${id} by user ${dto.userId}`);
+    const config = await databaseService.findConfigById(Number(id), tenantId);
+    if (!config) {
+      reply.status(404).send({
+        success: false,
+        message: 'Config not found',
+      });
+      return;
+    }
+    const currentStatus = config.status!;
+    const newStatus: ConfigStatus = CS.EXPORTED;
+    const action: WorkflowAction = 'export';
+    const permissionValidation = validateUserPermissions(userClaims, currentStatus, action);
+    if (!permissionValidation.canPerform) {
+      reply.status(403).send({
+        success: false,
+        message: permissionValidation.message,
+      });
+      return;
+    }
+    const transitionValidation = validateStatusTransition(currentStatus, newStatus);
+    if (!transitionValidation.isValid) {
+      reply.status(400).send({
+        success: false,
+        message: transitionValidation.message,
+      });
+      return;
+    }
+    await databaseService.updateConfig(Number(id), tenantId, {
+      status: newStatus,
+    });
+    const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
+    loggerService.log(`Config ${id} exported. Status: ${currentStatus} → ${newStatus}${dto.comment ? ` - Comment: ${dto.comment}` : ''}`);
+    reply.status(200).send({
+      success: true,
+      message: 'Configuration exported successfully. Ready for publishing.',
+      config: updatedConfig,
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    loggerService.error(`Failed to export config: ${error.message}`, error.stack ?? '');
+    reply.status(500).send({
+      success: false,
+      message: `Failed to export config: ${error.message}`,
+    });
+  } finally {
+    loggerService.log('End - Handle export config request');
   }
 };
 

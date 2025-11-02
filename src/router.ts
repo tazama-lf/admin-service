@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import {
   getAccountConditionsHandler,
   getEntityConditionHandler,
@@ -32,6 +32,7 @@ import {
   rejectConfigHandler,
   requestChangesHandler,
   deployConfigHandler,
+  exportConfigHandler,
   returnToProgressHandler,
   getWorkflowStatusHandler,
 } from './handlers/workflow.handler';
@@ -51,6 +52,8 @@ import {
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import { validateTenantMiddleware } from './middleware/tenantMiddleware';
+import { loggerService, configuration } from './index';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -85,6 +88,7 @@ const routePrivilege = {
   postTcsWorkflowReject: 'approver',
   postTcsWorkflowRequestChanges: 'approver',
   postTcsWorkflowDeploy: 'publisher',
+  postTcsWorkflowExport: 'exporter',
   postTcsWorkflowReturnToProgress: 'editor',
   getTcsWorkflowStatus: 'view-profile',
 };
@@ -381,7 +385,37 @@ function Routes(fastify: FastifyInstance): void {
   fastify.put('/v1/admin/tcs/config/:id/write', {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
   });
-
+  fastify.patch('/v1/admin/tcs/config/:id/status', {
+    preHandler: configuration.AUTHENTICATED
+      ? [
+          validateTenantMiddleware,
+          async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+            const authHeader = request.headers.authorization;
+            if (!authHeader?.startsWith('Bearer ')) {
+              loggerService.error('No Bearer token in authorization header for PATCH /status');
+              reply.code(401).send({ error: 'Unauthorized', message: 'No Bearer token provided' });
+              return;
+            }
+            try {
+              const [, token] = authHeader.split(' ');
+              const { validateTokenAndClaims } = await import('@tazama-lf/auth-lib');
+              // Check if user has either exporter or publisher claims
+              const validation = validateTokenAndClaims(token, ['exporter', 'publisher']);
+              if (!validation.exporter && !validation.publisher) {
+                loggerService.error('Token validation failed: missing exporter or publisher claims');
+                reply.code(401).send({ error: 'Unauthorized', message: 'Insufficient permissions' });
+                return;
+              }
+              loggerService.log('PATCH /status authentication successful');
+            } catch (error) {
+              loggerService.error(`Token validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              reply.code(401).send({ error: 'Unauthorized', message: 'Token validation failed' });
+            }
+          },
+        ]
+      : [validateTenantMiddleware],
+    handler: writeConfigUpdateHandler,
+  });
   fastify.post('/v1/admin/tcs/config/:id/mapping', {
     ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),
     schema: {
@@ -482,6 +516,9 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/deploy', {
     ...SetOptionsBodyAndParams(deployConfigHandler, routePrivilege.postTcsWorkflowDeploy),
+  });
+  fastify.post('/v1/admin/tcs/config/:id/workflow/export', {
+    ...SetOptionsBodyAndParams(exportConfigHandler, routePrivilege.postTcsWorkflowExport),
   });
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/return-to-progress', {

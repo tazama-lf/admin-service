@@ -202,10 +202,12 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         status?: string;
       },
     );
+    const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
 
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
+      config: updatedConfig,
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -363,10 +365,11 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
         status?: string;
       },
     );
-
+    const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
+      config: updatedConfig,
     });
   } catch (error: unknown) {
     const err = error as Error;

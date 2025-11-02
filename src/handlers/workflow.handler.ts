@@ -555,7 +555,7 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
           action: 'submit_for_approval',
           entityType: 'config',
           entityId: id,
-          actor: dto.userId || userEmail, // Use email as fallback for actor
+          actor: dto.userId ?? userEmail, // Use email as fallback for actor
           actorEmail: userEmail,
           tenantId,
           details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,

@@ -147,7 +147,7 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       transactionType: (configData.transactionType as string) || '',
       endpointPath: (configData.endpointPath as string) || '',
       version: (configData.version as string) || '',
-      contentType: (configData.contentType as ContentType) || ContentType.JSON,
+      contentType: (configData.contentType as ContentType) ?? ContentType.JSON,
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
@@ -312,7 +312,7 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
-      status: (configData.status as ConfigStatus) || ConfigStatus.IN_PROGRESS,
+      status: (configData.status as ConfigStatus) ?? ConfigStatus.IN_PROGRESS,
       tenantId,
       createdBy: userId,
     };

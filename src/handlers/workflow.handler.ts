@@ -20,7 +20,7 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
   [CS.SUSPENDED]: [CS.IN_PROGRESS],
   [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED],
-  [CS.APPROVED]: [CS.EXPORTED], // Exporter exports approved configs
+  [CS.APPROVED]: [CS.EXPORTED, CS.DEPLOYED], // Exporter exports approved configs, or Publisher can deploy directly
   [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT, CS.DEPLOYED], // Can go to READY_FOR_DEPLOYMENT or directly to DEPLOYED
   [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED], // Publisher publishes/deploys
   [CS.DEPLOYED]: [],

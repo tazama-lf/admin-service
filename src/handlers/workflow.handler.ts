@@ -25,6 +25,7 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED], // Publisher publishes/deploys
   [CS.DEPLOYED]: [],
   [CS.REJECTED]: [CS.IN_PROGRESS],
+  [CS.CHANGES_REQUESTED]: [CS.IN_PROGRESS],
 };
 
 const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.REJECTED];

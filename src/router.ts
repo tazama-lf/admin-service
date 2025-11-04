@@ -30,7 +30,6 @@ import {
   submitForApprovalHandler,
   approveConfigHandler,
   rejectConfigHandler,
-  requestChangesHandler,
   deployConfigHandler,
   exportConfigHandler,
   returnToProgressHandler,
@@ -508,10 +507,6 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/reject', {
     ...SetOptionsBodyAndParams(rejectConfigHandler, routePrivilege.postTcsWorkflowReject),
-  });
-
-  fastify.post('/v1/admin/tcs/config/:id/workflow/request-changes', {
-    ...SetOptionsBodyAndParams(requestChangesHandler, routePrivilege.postTcsWorkflowRequestChanges),
   });
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/deploy', {

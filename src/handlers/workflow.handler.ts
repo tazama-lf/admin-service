@@ -9,7 +9,6 @@ import type {
   SubmitForApprovalDto,
   ApprovalDto,
   RejectionDto,
-  ChangeRequestDto,
   DeploymentDto,
   StatusTransitionDto,
 } from '@tazama-lf/tcs-lib';
@@ -18,14 +17,13 @@ import jwt from 'jsonwebtoken';
 
 const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.IN_PROGRESS]: [CS.UNDER_REVIEW],
-  [CS.SUSPENDED]: [CS.IN_PROGRESS],
+  [CS.ON_HOLD]: [CS.IN_PROGRESS],
   [CS.UNDER_REVIEW]: [CS.APPROVED, CS.REJECTED],
-  [CS.APPROVED]: [CS.EXPORTED, CS.DEPLOYED], // Exporter exports approved configs, or Publisher can deploy directly
-  [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT, CS.DEPLOYED], // Can go to READY_FOR_DEPLOYMENT or directly to DEPLOYED
-  [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED], // Publisher publishes/deploys
+  [CS.APPROVED]: [CS.EXPORTED, CS.DEPLOYED],
+  [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT, CS.DEPLOYED],
+  [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED],
   [CS.DEPLOYED]: [],
   [CS.REJECTED]: [CS.IN_PROGRESS],
-  [CS.CHANGES_REQUESTED]: [CS.IN_PROGRESS],
 };
 
 const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.REJECTED];
@@ -83,7 +81,6 @@ function getUserNameFromRequest(req: FastifyRequest): string | null {
       return null;
     }
 
-    // Check if there's a nested tokenString (Tazama auth pattern)
     let actualToken: { name?: string; given_name?: string; preferred_username?: string } = decoded;
     if (decoded.tokenString) {
       const nestedToken = jwt.decode(decoded.tokenString) as { name?: string; given_name?: string; preferred_username?: string } | null;
@@ -98,10 +95,6 @@ function getUserNameFromRequest(req: FastifyRequest): string | null {
   }
 }
 
-/**
- * Map tenant ID to Keycloak group name
- * Uses environment variable TENANT_GROUP_MAPPING or falls back to convention-based mapping
- */
 function getTenantGroupName(tenantId: string): string | null {
   // Check environment variable first (format: "tenant-001:Tenant_001,tenant-002:Tenant_002")
   const mapping = process.env.TENANT_GROUP_MAPPING;
@@ -115,8 +108,6 @@ function getTenantGroupName(tenantId: string): string | null {
     }
   }
 
-  // Convention-based mapping: tenant-001 -> Tenant_001
-  // Extract number from tenant-XXX and format as Tenant_XXX
   const match = /tenant-(\d+)/i.exec(tenantId);
   if (match) {
     const [, num] = match;
@@ -187,7 +178,7 @@ interface ConfigData {
 }
 
 interface SendNotificationParams {
-  type: 'submit' | 'changes_requested' | 'approve' | 'reject';
+  type: 'submit' | 'approve' | 'reject';
   configId: number;
   config: ConfigData;
   tenantId: string;
@@ -293,7 +284,7 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
         loggerService.warn('   Email notification not sent - check if connection-studio is running');
       }
     } else {
-      // For 'approve', 'reject', or 'changes_requested'
+      // For 'approve' or 'reject'
       const editorEmail = await databaseService.getConfigEditorEmail(configId, tenantId);
 
       if (!editorEmail) {
@@ -301,12 +292,13 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
         return;
       }
 
-      loggerService.log(`Sending changes requested notification to editor: ${editorEmail}`);
+      const notificationType = type === 'reject' ? 'rejection' : 'approval';
+      loggerService.log(`Sending ${notificationType} notification to editor: ${editorEmail}`);
 
       try {
         const axios = (await import('axios')).default;
         const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
-        const notificationEndpoint = `${connectionStudioUrl}/notifications/changes-requested`;
+        const notificationEndpoint = `${connectionStudioUrl}/notifications/${notificationType}`;
 
         const emailContext = {
           configId,
@@ -334,7 +326,7 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
 
         const responseData = response.data as { success: boolean; message?: string };
         if (responseData.success) {
-          loggerService.log(`Changes requested email sent successfully to ${editorEmail}`);
+          loggerService.log(`${notificationType === 'rejection' ? 'Rejection' : 'Approval'} email sent successfully to ${editorEmail}`);
         } else {
           loggerService.warn(responseData.message ?? 'Unknown error');
         }
@@ -413,21 +405,6 @@ function validateUserPermissions(
         return {
           canPerform: false,
           message: 'Can only reject configurations in UNDER_REVIEW status',
-        };
-      }
-      break;
-
-    case 'request_changes':
-      if (!hasApproverRole) {
-        return {
-          canPerform: false,
-          message: 'Only approvers can request changes',
-        };
-      }
-      if (currentStatus !== CS.UNDER_REVIEW) {
-        return {
-          canPerform: false,
-          message: 'Can only request changes for configurations in UNDER_REVIEW status',
         };
       }
       break;
@@ -570,14 +547,20 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
       }
     }
 
+    // Get editor email from database (who created this config)
+    const editorEmail = await databaseService.getConfigEditorEmail(Number(id), tenantId);
+
     // Always send notification, even if userEmail is not available
     loggerService.log(`📧 Initiating notification send for config ${id}...`);
+    loggerService.log(`   - Editor email (config creator): ${editorEmail ?? 'NOT FOUND'}`);
+    loggerService.log(`   - Requester email (who clicked submit): ${userEmail ?? 'NOT FOUND'}`);
+
     sendNotificationAsync({
       type: 'submit',
       configId: Number(id),
       config: updatedConfig!,
       tenantId,
-      requesterEmail: userEmail ?? 'system@unknown',
+      requesterEmail: editorEmail ?? userEmail ?? 'system@unknown',
       requesterName: userName ?? 'System User',
       comment: dto.comment,
     }).catch((err: unknown) => {
@@ -769,15 +752,61 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
+      comments: dto.rejectionReason,
     });
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
+
+    const userEmail = getUserEmailFromRequest(req);
+    const userName = getUserNameFromRequest(req);
+
+    // Log audit entry if we have email
+    if (userEmail) {
+      try {
+        await databaseService.logAction({
+          action: 'reject',
+          entityType: 'config',
+          entityId: id,
+          actor: dto.userId,
+          actorEmail: userEmail,
+          tenantId,
+          details: `Configuration rejected: ${dto.rejectionReason}`,
+          newValues: { status: newStatus, comments: dto.rejectionReason },
+        });
+      } catch (auditError: unknown) {
+        const err = auditError as Error;
+        loggerService.error(`Failed to log audit entry: ${err.message}`);
+      }
+    }
+
+    // Send email notification to editor
+    if (userEmail) {
+      loggerService.log('📧 Preparing email notification for rejection:');
+      loggerService.log(`   - From: ${userName ?? userEmail} (approver)`);
+      loggerService.log(`   - To: Editor of config ${id}`);
+      loggerService.log(`   - Subject: Configuration Rejected - Config ${id}`);
+      loggerService.log(`   - Message: ${dto.rejectionReason}`);
+      loggerService.log('   - Connection: admin-service → connection-studio → NotificationService → SMTP');
+
+      sendNotificationAsync({
+        type: 'reject',
+        configId: Number(id),
+        config: updatedConfig!,
+        tenantId,
+        requesterEmail: userEmail,
+        requesterName: userName,
+        comment: dto.rejectionReason,
+      }).catch((err: unknown) => {
+        const error = err as Error;
+        loggerService.error(`❌ Notification error: ${error.message}`);
+      });
+    }
 
     loggerService.log(`Config ${id} rejected. Status: ${currentStatus} → ${newStatus} - Reason: ${dto.rejectionReason}`);
 
     reply.status(200).send({
       success: true,
-      message: 'Configuration rejected successfully',
+      message: 'Configuration rejected successfully. Editor has been notified.',
       config: updatedConfig,
     });
   } catch (err: unknown) {
@@ -789,126 +818,6 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     });
   } finally {
     loggerService.log('End - Handle reject config request');
-  }
-};
-
-export const requestChangesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle request changes request');
-
-  try {
-    const { id } = req.params as { id: string };
-    const { tenantId } = req as ITenantRequest;
-    const dto = req.body as ChangeRequestDto;
-
-    const authReq = req as AuthenticatedRequest;
-    const userClaims = authReq.user?.claims ?? [];
-
-    loggerService.log(`Requesting changes for config ${id} by user ${dto.userId}`);
-    loggerService.log(` Changes requested: ${dto.requestedChanges}`);
-
-    if (!dto.requestedChanges?.trim()) {
-      reply.status(400).send({
-        success: false,
-        message: 'Requested changes description is required',
-      });
-      return;
-    }
-
-    const config = await databaseService.findConfigById(Number(id), tenantId);
-
-    if (!config) {
-      reply.status(404).send({
-        success: false,
-        message: 'Config not found',
-      });
-      return;
-    }
-
-    const currentStatus = config.status!;
-    // When changes are requested, set status to IN_PROGRESS so editor can make changes
-    const newStatus: ConfigStatus = CS.IN_PROGRESS;
-    const action: WorkflowAction = 'request_changes';
-
-    const permissionValidation = validateUserPermissions(userClaims, currentStatus, action);
-    if (!permissionValidation.canPerform) {
-      reply.status(403).send({
-        success: false,
-        message: permissionValidation.message,
-      });
-      return;
-    }
-
-    const transitionValidation = validateStatusTransition(currentStatus, newStatus);
-    if (!transitionValidation.isValid) {
-      reply.status(400).send({
-        success: false,
-        message: transitionValidation.message,
-      });
-      return;
-    }
-
-    await databaseService.updateConfig(Number(id), tenantId, {
-      status: newStatus,
-      comments: dto.requestedChanges,
-    });
-
-    const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
-
-    const userEmail = getUserEmailFromRequest(req);
-    if (userEmail) {
-      await databaseService.logAction({
-        action: 'request_changes',
-        entityType: 'config',
-        entityId: id,
-        actor: dto.userId,
-        actorEmail: userEmail,
-        tenantId,
-        details: `Changes requested: ${dto.requestedChanges}`,
-        newValues: { status: newStatus, comments: dto.requestedChanges },
-      });
-    }
-
-    const userName = getUserNameFromRequest(req);
-    if (userEmail) {
-      loggerService.log(' Preparing email notification for changes requested:');
-      loggerService.log(`   - From: ${userName ?? userEmail} (approver)`);
-      loggerService.log(`   - To: Editor of config ${id}`);
-      loggerService.log(`   - Subject: Changes Requested for Config ${id}`);
-      loggerService.log(`   - Message: ${dto.requestedChanges}`);
-      loggerService.log('   - Connection: admin-service → connection-studio → NotificationService → SMTP');
-
-      sendNotificationAsync({
-        type: 'changes_requested',
-        configId: Number(id),
-        config: updatedConfig!,
-        tenantId,
-        requesterEmail: userEmail,
-        requesterName: userName,
-        comment: dto.requestedChanges,
-      }).catch((err: unknown) => {
-        const error = err as Error;
-        loggerService.error(`Notification error: ${error.message}`);
-      });
-    }
-
-    loggerService.log(
-      `Changes requested for config ${id}. Status: ${currentStatus} → ${newStatus} - Comments saved: ${dto.requestedChanges}`,
-    );
-
-    reply.status(200).send({
-      success: true,
-      message: 'Changes requested successfully',
-      config: updatedConfig,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    loggerService.error(`Failed to request changes: ${error.message}`, error.stack ?? '');
-    reply.status(500).send({
-      success: false,
-      message: `Failed to request changes: ${error.message}`,
-    });
-  } finally {
-    loggerService.log('End - Handle request changes request');
   }
 };
 
@@ -1173,7 +1082,6 @@ export const getWorkflowStatusHandler = async (req: FastifyRequest, reply: Fasti
     const canSubmit = validateUserPermissions(userClaims, currentStatus, 'submit_for_approval').canPerform;
     const canApprove = validateUserPermissions(userClaims, currentStatus, 'approve').canPerform;
     const canReject = validateUserPermissions(userClaims, currentStatus, 'reject').canPerform;
-    const canRequestChanges = validateUserPermissions(userClaims, currentStatus, 'request_changes').canPerform;
     const canDeploy = validateUserPermissions(userClaims, currentStatus, 'deploy').canPerform;
     const canReturnToProgress = validateUserPermissions(userClaims, currentStatus, 'return_to_progress').canPerform;
 
@@ -1188,7 +1096,6 @@ export const getWorkflowStatusHandler = async (req: FastifyRequest, reply: Fasti
         canSubmit,
         canApprove,
         canReject,
-        canRequestChanges,
         canDeploy,
         canReturnToProgress,
       },

@@ -649,10 +649,7 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
       const createTableQuery = `
 CREATE TABLE IF NOT EXISTS "${tableName}" (
   id SERIAL PRIMARY KEY,
-  endToEndId TEXT NULL,
-  tenantId TEXT NOT NULL,
   document JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
 
       loggerService.log(`📋 Executing CREATE TABLE query for config ${id}:`);
@@ -881,10 +878,7 @@ export const deployConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       const createTableQuery = `
 CREATE TABLE IF NOT EXISTS "${tableName}" (
   id SERIAL PRIMARY KEY,
-  endToEndId TEXT NULL,
-  tenantId TEXT NOT NULL,
   document JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
 
       loggerService.log(`📋 Executing CREATE TABLE query for config ${id} on publish:`);

@@ -231,12 +231,14 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
           }
         }
       } else {
+        // eslint-disable-next-line @stylistic/quotes -- Double quotes needed for emoji and nested single quotes
         loggerService.log("📧 No group configured - querying all approvers using default 'approver' role...");
         approverEmails = await keycloakService.getApproverEmails();
       }
 
       if (approverEmails.length === 0) {
         loggerService.warn(`No approver emails found in Keycloak for tenant ${tenantId}`);
+        // eslint-disable-next-line @stylistic/quotes -- Double quotes needed for nested single quotes in 'approver' role text
         loggerService.warn("   Make sure users with 'approver' role exist in Keycloak realm");
         loggerService.warn('   Or configure TENANT_APPROVER_GROUPS environment variable');
         return;
@@ -868,6 +870,7 @@ export const deployConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
+      publishing_status: 'active',
     });
 
     // Generate and execute CREATE TABLE query upon deployment (publish)

@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { ConfigStatus, ContentType, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
+import { ConfigStatus, ContentType, type Config, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
 import { databaseService, loggerService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
@@ -187,21 +187,7 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       });
     }
 
-    await databaseService.updateConfig(
-      parseInt(id),
-      tenantId,
-      updateData as {
-        msgFam?: string;
-        transactionType?: string;
-        endpointPath?: string;
-        version?: string;
-        contentType?: string;
-        schema?: JSONSchema;
-        mapping?: FieldMapping[];
-        functions?: FunctionDefinition[];
-        status?: string;
-      },
-    );
+    await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
 
     return await reply.code(200).send({
@@ -350,21 +336,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
       });
     }
 
-    await databaseService.updateConfig(
-      parseInt(id),
-      tenantId,
-      updateData as {
-        msgFam?: string;
-        transactionType?: string;
-        endpointPath?: string;
-        version?: string;
-        contentType?: string;
-        schema?: JSONSchema;
-        mapping?: FieldMapping[];
-        functions?: FunctionDefinition[];
-        status?: string;
-      },
-    );
+    await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
     return await reply.code(200).send({
       success: true,

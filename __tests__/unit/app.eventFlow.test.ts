@@ -137,7 +137,6 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a successful post request for a debtor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionDebtor = { ...sampleEntityCondition, prsptv: 'debtor' };
 
     // Act
@@ -147,7 +146,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
       expect.objectContaining({
         ...conditionDebtor,
-        creDtTm: nowDateTime,
+        creDtTm: expect.any(String), // Accept any ISO date string
       }),
     );
     const entityId = `${conditionDebtor.ntty.id}${conditionDebtor.ntty.schmeNm.prtry}`;

@@ -143,11 +143,11 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
 
     const newConfig = {
-      msgFam: (configData.msgFam as string) || '',
-      transactionType: (configData.transactionType as string) || '',
-      endpointPath: (configData.endpointPath as string) || '',
-      version: (configData.version as string) || '',
-      contentType: (configData.contentType as ContentType) ?? ContentType.JSON,
+      msgFam: (configData.msgFam as string) ?? '',
+      transactionType: (configData.transactionType as string) ?? '',
+      endpointPath: (configData.endpointPath as string) ?? '',
+      version: (configData.version as string) ?? '',
+      contentType: (configData.contentType as ContentType | undefined) ?? ContentType.JSON,
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
@@ -165,9 +165,40 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     });
   } catch (error: unknown) {
     const err = error as Error;
-    return await reply.code(500).send({
+    const body = req.body as Record<string, unknown>;
+
+    // Extract field values for better error messages
+    const msgFam = (body.msgFam as string | undefined) ?? 'unknown';
+    const transactionType = (body.transactionType as string | undefined) ?? 'unknown';
+    const version = (body.version as string | undefined) ?? 'v1';
+
+    // Convert technical database errors to user-friendly messages
+    let userMessage = 'Failed to create configuration. Please check your input and try again.';
+    let statusCode = 500;
+
+    if (
+      err.message?.includes('duplicate key value') ||
+      err.message?.includes('unique constraint') ||
+      err.message?.includes('already exists')
+    ) {
+      userMessage = `A configuration with Message Family '${msgFam}', Transaction Type '${transactionType}', and Version '${version}' already exists. Please use different values.`;
+      statusCode = 400; // Bad Request for duplicate
+    } else if (err.message?.includes('validation')) {
+      userMessage = `Validation error: ${err.message}`;
+      statusCode = 400;
+    } else if (err.message?.includes('required')) {
+      userMessage = `Missing required field: ${err.message}`;
+      statusCode = 400;
+    } else if (err.message) {
+      // Use the error message if it's already user-friendly
+      userMessage = err.message;
+    }
+
+    loggerService.error(`Failed to create config: ${err.message}`, 'createConfigHandler');
+
+    return await reply.code(statusCode).send({
       success: false,
-      message: err.message || 'Failed to create config',
+      message: userMessage,
     });
   }
 };
@@ -197,37 +228,68 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     });
   } catch (error: unknown) {
     const err = error as Error;
-    return await reply.code(500).send({
+    const updateData = req.body as Record<string, unknown>;
+
+    // Extract field values for better error messages
+    const msgFam = (updateData.msgFam as string | undefined) ?? 'unknown';
+    const transactionType = (updateData.transactionType as string | undefined) ?? 'unknown';
+    const version = (updateData.version as string | undefined) ?? 'v1';
+
+    // Convert technical database errors to user-friendly messages
+    let userMessage = 'Failed to update configuration. Please check your input and try again.';
+    let statusCode = 500;
+
+    if (
+      err.message?.includes('duplicate key value') ||
+      err.message?.includes('unique constraint') ||
+      err.message?.includes('already exists')
+    ) {
+      userMessage = `A configuration with Message Family '${msgFam}', Transaction Type '${transactionType}', and Version '${version}' already exists. Please use different values.`;
+      statusCode = 400;
+    } else if (err.message?.includes('validation')) {
+      userMessage = `Validation error: ${err.message}`;
+      statusCode = 400;
+    } else if (err.message?.includes('not found')) {
+      userMessage = err.message;
+      statusCode = 404;
+    } else if (err.message) {
+      userMessage = err.message;
+    }
+
+    loggerService.error(`Failed to update config: ${err.message}`, 'updateConfigHandler');
+
+    return await reply.code(statusCode).send({
       success: false,
-      message: err.message || 'Failed to update config',
+      message: userMessage,
     });
   }
 };
 
 export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { sourceId, transactionType, version } = req.body as {
-      sourceId: number;
-      transactionType?: string;
-      version?: string;
+    const { sourceConfigId, newTransactionType, newVersion, newMsgFam } = req.body as {
+      sourceConfigId: number;
+      newTransactionType?: string;
+      newVersion?: string;
+      newMsgFam?: string;
     };
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const userId = authReq.user?.clientId ?? 'system';
 
-    const sourceConfig = await databaseService.findConfigById(sourceId, tenantId);
+    const sourceConfig = await databaseService.findConfigById(sourceConfigId, tenantId);
     if (!sourceConfig) {
       return await reply.code(404).send({
         success: false,
-        message: `Source config with id ${sourceId} not found`,
+        message: `Source config with id ${sourceConfigId} not found`,
       });
     }
 
     const clonedConfig = {
-      msgFam: sourceConfig.msgFam,
-      transactionType: transactionType ?? sourceConfig.transactionType,
+      msgFam: newMsgFam ?? sourceConfig.msgFam,
+      transactionType: newTransactionType ?? sourceConfig.transactionType,
       endpointPath: sourceConfig.endpointPath,
-      version: version ?? sourceConfig.version,
+      version: newVersion ?? sourceConfig.version,
       contentType: sourceConfig.contentType,
       schema: sourceConfig.schema,
       mapping: sourceConfig.mapping,
@@ -246,9 +308,42 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
     });
   } catch (error: unknown) {
     const err = error as Error;
-    return await reply.code(500).send({
+    const { newTransactionType, newVersion } = req.body as {
+      sourceConfigId: number;
+      newTransactionType?: string;
+      newVersion?: string;
+      newMsgFam?: string;
+    };
+
+    // Convert technical database errors to user-friendly messages
+    let userMessage = 'Failed to clone configuration. Please check your input and try again.';
+    let statusCode = 500;
+
+    if (
+      err.message?.includes('duplicate key value') ||
+      err.message?.includes('unique constraint') ||
+      err.message?.includes('already exists')
+    ) {
+      if (newTransactionType !== undefined && newVersion !== undefined) {
+        userMessage = `A configuration with Transaction Type '${newTransactionType}' and Version '${newVersion}' already exists. Please use different values.`;
+      } else if (newTransactionType !== undefined) {
+        userMessage = `A configuration with Transaction Type '${newTransactionType}' already exists. Please use a different transaction type or version.`;
+      } else {
+        userMessage = 'This configuration already exists. Please use a different transaction type or version.';
+      }
+      statusCode = 400;
+    } else if (err.message?.includes('not found')) {
+      userMessage = err.message;
+      statusCode = 404;
+    } else if (err.message) {
+      userMessage = err.message;
+    }
+
+    loggerService.error(`Failed to clone config: ${err.message}`, 'cloneConfigHandler');
+
+    return await reply.code(statusCode).send({
       success: false,
-      message: err.message || 'Failed to clone config',
+      message: userMessage,
     });
   }
 };

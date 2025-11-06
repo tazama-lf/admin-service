@@ -3,6 +3,8 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { databaseService, loggerService } from '../index';
 import type { ITenantRequest } from '../interface/ITenantRequest';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
+import { keycloakService } from '../services/keycloak.service.js';
+import { userEmailCache } from '../index.js';
 import type {
   ConfigStatus,
   WorkflowAction,
@@ -37,13 +39,11 @@ function getUserEmailFromRequest(req: FastifyRequest): string | null {
     }
     const [, token] = authHeader.split(' ');
 
-    // Decode the outer token first
     const decoded = jwt.decode(token) as { tokenString?: string; preferred_username?: string; email?: string } | null;
     if (!decoded) {
       return null;
     }
 
-    // Check if there's a nested tokenString (Tazama auth pattern)
     let actualToken: { preferred_username?: string; email?: string; name?: string; given_name?: string } = decoded;
     if (decoded.tokenString) {
       loggerService.log('[Workflow] Found nested tokenString, decoding...');
@@ -75,7 +75,6 @@ function getUserNameFromRequest(req: FastifyRequest): string | null {
     }
     const [, token] = authHeader.split(' ');
 
-    // Decode the outer token first
     const decoded = jwt.decode(token) as { tokenString?: string; name?: string; given_name?: string; preferred_username?: string } | null;
     if (!decoded) {
       return null;
@@ -96,7 +95,6 @@ function getUserNameFromRequest(req: FastifyRequest): string | null {
 }
 
 function getTenantGroupName(tenantId: string): string | null {
-  // Check environment variable first (format: "tenant-001:Tenant_001,tenant-002:Tenant_002")
   const mapping = process.env.TENANT_GROUP_MAPPING;
   if (mapping) {
     const pairs = mapping.split(',');
@@ -128,26 +126,21 @@ async function getApproverGroupForTenant(tenantId: string): Promise<string | nul
 
     loggerService.log(` Auto-discovering approver group for tenant '${tenantId}'...`);
 
-    // First, try convention-based mapping
     const conventionGroupName = getTenantGroupName(tenantId);
     if (conventionGroupName) {
       loggerService.log(`   Using convention-based mapping: '${tenantId}' → '${conventionGroupName}'`);
 
-      // Verify this group exists and has approvers
-      const { keycloakService } = await import('../services/keycloak.service.js');
       const approverGroups = await keycloakService.getApproverGroups();
 
       if (approverGroups.includes(conventionGroupName)) {
-        loggerService.log(`   ✅ Confirmed: Group '${conventionGroupName}' has approvers`);
+        loggerService.log(`  Confirmed: Group '${conventionGroupName}' has approvers`);
         autoDiscoveryCache.cacheGroup(tenantId, conventionGroupName);
         return conventionGroupName;
       } else {
-        loggerService.warn(`   ⚠️  Group '${conventionGroupName}' exists but has no approvers`);
+        loggerService.warn(`  Group '${conventionGroupName}' exists but has no approvers`);
       }
     }
 
-    // Fallback to attribute-based discovery
-    const { keycloakService } = await import('../services/keycloak.service.js');
     const approverGroup = await keycloakService.getApproverGroupForTenant(tenantId);
 
     if (approverGroup) {
@@ -187,54 +180,105 @@ interface SendNotificationParams {
   comment?: string;
 }
 
+async function getApproverEmails(tenantId: string, approverGroup: string | null): Promise<string[]> {
+  if (!approverGroup || approverGroup === '__none__') {
+    // eslint-disable-next-line @stylistic/quotes -- Double quotes needed for emoji and nested single quotes
+    loggerService.log("📧 No group configured - querying all approvers using default 'approver' role...");
+    return await keycloakService.getApproverEmails();
+  }
+
+  loggerService.log(`📧 Looking up approvers for tenant '${tenantId}' from auto-discovered group '${approverGroup}'...`);
+
+  const cachedApprovers = userEmailCache.getGroupApprovers(tenantId, approverGroup);
+  if (cachedApprovers && cachedApprovers.length > 0) {
+    loggerService.log(`Using cached approvers (${cachedApprovers.length}) for tenant '${tenantId}' group '${approverGroup}'`);
+    return cachedApprovers;
+  }
+
+  loggerService.log(`Cache miss - querying Keycloak for tenant '${tenantId}' group '${approverGroup}'...`);
+  const approverEmails = await keycloakService.getApproverEmailsByTenantAndGroup(tenantId, approverGroup);
+
+  if (approverEmails.length > 0) {
+    loggerService.log(`Found ${approverEmails.length} approver(s) in group '${approverGroup}' for tenant '${tenantId}'`);
+    userEmailCache.cacheGroupApprovers(tenantId, approverGroup, approverEmails);
+    loggerService.log('Approver emails:');
+    for (const email of approverEmails) {
+      loggerService.log(`   - ${email}`);
+    }
+    return approverEmails;
+  }
+
+  loggerService.warn(`No approvers found in auto-discovered group '${approverGroup}' for tenant '${tenantId}'`);
+  loggerService.warn('   Falling back to cached role-based approvers or default query');
+
+  const cachedRoleApprovers = userEmailCache.getEmailsByRole(tenantId, 'approver');
+  if (cachedRoleApprovers.length > 0) {
+    return cachedRoleApprovers;
+  }
+
+  loggerService.log('   Trying default approver role query...');
+  return await keycloakService.getApproverEmails();
+}
+
+interface ApprovalNotificationData {
+  approverEmails: string[];
+  configId: number;
+  config: ConfigData;
+  requesterName: string | null;
+  requesterEmail: string;
+  comment: string | undefined;
+  tenantId: string;
+}
+
+async function sendApprovalNotification(data: ApprovalNotificationData): Promise<void> {
+  const { approverEmails, configId, config, requesterName, requesterEmail, comment, tenantId } = data;
+  try {
+    const axios = (await import('axios')).default;
+    const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
+    const notificationEndpoint = `${connectionStudioUrl}/notifications/submit-for-approval`;
+
+    const emailContext = {
+      configId,
+      configName: config.transactionType ?? 'Configuration',
+      version: config.version ?? '1.0',
+      transactionType: config.transactionType,
+      requesterName,
+      requesterEmail,
+      comment,
+      tenantId,
+    };
+
+    loggerService.log('Calling connection-studio notification service...');
+    loggerService.log(`   Endpoint: ${notificationEndpoint}`);
+    loggerService.log(`   Recipients: ${approverEmails.join(', ')}`);
+
+    const response = await axios.post(
+      notificationEndpoint,
+      { approverEmails, context: emailContext },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      },
+    );
+
+    const responseData = response.data as { success: boolean; recipients?: number; message?: string };
+    if (responseData.success) {
+      loggerService.log(`Email notification sent successfully to ${responseData.recipients ?? 0} approver(s)`);
+    } else {
+      loggerService.warn(` ${responseData.message ?? 'Unknown error'}`);
+    }
+  } catch (error) {
+    loggerService.error(` Failed to call notification service: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    loggerService.warn('   Email notification not sent - check if connection-studio is running');
+  }
+}
+
 async function sendNotificationAsync(params: SendNotificationParams): Promise<void> {
   const { type, configId, config, tenantId, requesterEmail, requesterName, comment } = params;
   try {
     if (type === 'submit') {
-      const { keycloakService } = await import('../services/keycloak.service.js');
-      const { userEmailCache } = await import('../index.js');
-
-      let approverEmails: string[] = [];
       const approverGroup = await getApproverGroupForTenant(tenantId);
-
-      if (approverGroup && approverGroup !== '__none__') {
-        loggerService.log(`📧 Looking up approvers for tenant '${tenantId}' from auto-discovered group '${approverGroup}'...`);
-
-        const cachedApprovers = userEmailCache.getGroupApprovers(tenantId, approverGroup);
-
-        if (cachedApprovers && cachedApprovers.length > 0) {
-          approverEmails = cachedApprovers;
-          loggerService.log(`Using cached approvers (${approverEmails.length}) for tenant '${tenantId}' group '${approverGroup}'`);
-        } else {
-          loggerService.log(`Cache miss - querying Keycloak for tenant '${tenantId}' group '${approverGroup}'...`);
-          approverEmails = await keycloakService.getApproverEmailsByTenantAndGroup(tenantId, approverGroup);
-
-          if (approverEmails.length > 0) {
-            loggerService.log(`Found ${approverEmails.length} approver(s) in group '${approverGroup}' for tenant '${tenantId}'`);
-
-            userEmailCache.cacheGroupApprovers(tenantId, approverGroup, approverEmails);
-
-            loggerService.log('Approver emails:');
-            for (const email of approverEmails) {
-              loggerService.log(`   - ${email}`);
-            }
-          } else {
-            loggerService.warn(`No approvers found in auto-discovered group '${approverGroup}' for tenant '${tenantId}'`);
-            loggerService.warn('   Falling back to cached role-based approvers or default query');
-
-            approverEmails = userEmailCache.getEmailsByRole(tenantId, 'approver');
-
-            if (approverEmails.length === 0) {
-              loggerService.log('   Trying default approver role query...');
-              approverEmails = await keycloakService.getApproverEmails();
-            }
-          }
-        }
-      } else {
-        // eslint-disable-next-line @stylistic/quotes -- Double quotes needed for emoji and nested single quotes
-        loggerService.log("📧 No group configured - querying all approvers using default 'approver' role...");
-        approverEmails = await keycloakService.getApproverEmails();
-      }
+      const approverEmails = await getApproverEmails(tenantId, approverGroup);
 
       if (approverEmails.length === 0) {
         loggerService.warn(`No approver emails found in Keycloak for tenant ${tenantId}`);
@@ -245,48 +289,16 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
       }
 
       loggerService.log(`Sending approval notification to ${approverEmails.length} approver(s): ${approverEmails.join(', ')}`);
-
-      try {
-        const axios = (await import('axios')).default;
-        const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
-        const notificationEndpoint = `${connectionStudioUrl}/notifications/submit-for-approval`;
-
-        const emailContext = {
-          configId,
-          configName: config.transactionType ?? 'Configuration',
-          version: config.version ?? '1.0',
-          transactionType: config.transactionType,
-          requesterName,
-          requesterEmail,
-          comment,
-          tenantId,
-        };
-
-        loggerService.log('Calling connection-studio notification service...');
-        loggerService.log(`   Endpoint: ${notificationEndpoint}`);
-        loggerService.log(`   Recipients: ${approverEmails.join(', ')}`);
-
-        const response = await axios.post(
-          notificationEndpoint,
-          { approverEmails, context: emailContext },
-          {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 10000,
-          },
-        );
-
-        const responseData = response.data as { success: boolean; recipients?: number; message?: string };
-        if (responseData.success) {
-          loggerService.log(`Email notification sent successfully to ${responseData.recipients ?? 0} approver(s)`);
-        } else {
-          loggerService.warn(` ${responseData.message ?? 'Unknown error'}`);
-        }
-      } catch (error) {
-        loggerService.error(` Failed to call notification service: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        loggerService.warn('   Email notification not sent - check if connection-studio is running');
-      }
+      await sendApprovalNotification({
+        approverEmails,
+        configId,
+        config,
+        requesterName,
+        requesterEmail,
+        comment,
+        tenantId,
+      });
     } else {
-      // For 'approve' or 'reject'
       const editorEmail = await databaseService.getConfigEditorEmail(configId, tenantId);
 
       if (!editorEmail) {
@@ -418,7 +430,6 @@ function validateUserPermissions(
           message: 'Only publishers can deploy configurations',
         };
       }
-      // Publishers can deploy from APPROVED, EXPORTED, or READY_FOR_DEPLOYMENT status
       if (currentStatus !== CS.APPROVED && currentStatus !== CS.EXPORTED && currentStatus !== CS.READY_FOR_DEPLOYMENT) {
         return {
           canPerform: false,
@@ -530,14 +541,13 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
     loggerService.log(`   - Name: ${userName ?? 'NOT FOUND'}`);
     loggerService.log(`   - DTO userId: ${dto.userId ?? 'NOT PROVIDED'}`);
 
-    // Log audit entry if we have email
     if (userEmail) {
       try {
         await databaseService.logAction({
           action: 'submit_for_approval',
           entityType: 'config',
           entityId: id,
-          actor: dto.userId ?? userEmail, // Use email as fallback for actor
+          actor: dto.userId ?? userEmail,
           actorEmail: userEmail,
           tenantId,
           details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,
@@ -549,10 +559,8 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
       }
     }
 
-    // Get editor email from database (who created this config)
     const editorEmail = await databaseService.getConfigEditorEmail(Number(id), tenantId);
 
-    // Always send notification, even if userEmail is not available
     loggerService.log(`📧 Initiating notification send for config ${id}...`);
     loggerService.log(`   - Editor email (config creator): ${editorEmail ?? 'NOT FOUND'}`);
     loggerService.log(`   - Requester email (who clicked submit): ${userEmail ?? 'NOT FOUND'}`);
@@ -641,10 +649,9 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
       status: newStatus,
     });
 
-    // Generate and execute CREATE TABLE query upon approval
     try {
       const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
-      const tableName = transactionType; // Use transaction type as table name
+      const tableName = transactionType;
 
       const createTableQuery = `
 CREATE TABLE IF NOT EXISTS "${tableName}" (
@@ -652,25 +659,21 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
   document JSONB NOT NULL,
 );`;
 
-      loggerService.log(`📋 Executing CREATE TABLE query for config ${id}:`);
+      loggerService.log(` Executing CREATE TABLE query for config ${id}:`);
       loggerService.log(createTableQuery);
 
-      // Execute the CREATE TABLE query
       const client = await databaseService.getClient();
       try {
         await client.query(createTableQuery);
-        loggerService.log(`✅ Successfully created table: ${tableName}`);
+        loggerService.log(` Successfully created table: ${tableName}`);
       } finally {
         client.release();
       }
 
-      // You can optionally store this in a metadata field if needed
-      // For now, just log it
-      loggerService.log(`📝 CREATE TABLE query stored in config ${id}`);
+      loggerService.log(` CREATE TABLE query stored in config ${id}`);
     } catch (tableError: unknown) {
       const error = tableError as Error;
-      loggerService.error(`⚠️ Failed to create table for config ${id}: ${error.message}`);
-      // Don't fail the approval if table creation fails - just log the error
+      loggerService.error(` Failed to create table for config ${id}: ${error.message}`);
     }
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
@@ -759,7 +762,6 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const userEmail = getUserEmailFromRequest(req);
     const userName = getUserNameFromRequest(req);
 
-    // Log audit entry if we have email
     if (userEmail) {
       try {
         await databaseService.logAction({
@@ -778,7 +780,6 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       }
     }
 
-    // Send email notification to editor
     if (userEmail) {
       loggerService.log('📧 Preparing email notification for rejection:');
       loggerService.log(`   - From: ${userName ?? userEmail} (approver)`);
@@ -797,7 +798,7 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         comment: dto.rejectionReason,
       }).catch((err: unknown) => {
         const error = err as Error;
-        loggerService.error(`❌ Notification error: ${error.message}`);
+        loggerService.error(`Notification error: ${error.message}`);
       });
     }
 
@@ -870,32 +871,28 @@ export const deployConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       publishing_status: 'active',
     });
 
-    // Generate and execute CREATE TABLE query upon deployment (publish)
     try {
       const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
-      const tableName = transactionType; // Use transaction type as table name
-
+      const tableName = transactionType;
       const createTableQuery = `
 CREATE TABLE IF NOT EXISTS "${tableName}" (
   id SERIAL PRIMARY KEY,
   document JSONB NOT NULL,
 );`;
 
-      loggerService.log(`📋 Executing CREATE TABLE query for config ${id} on publish:`);
+      loggerService.log(` Executing CREATE TABLE query for config ${id} on publish:`);
       loggerService.log(createTableQuery);
 
-      // Execute the CREATE TABLE query
       const client = await databaseService.getClient();
       try {
         await client.query(createTableQuery);
-        loggerService.log(`✅ Successfully created table on publish: ${tableName}`);
+        loggerService.log(`Successfully created table on publish: ${tableName}`);
       } finally {
         client.release();
       }
     } catch (tableError: unknown) {
       const error = tableError as Error;
-      loggerService.error(`⚠️ Failed to create table for config ${id} on publish: ${error.message}`);
-      // Don't fail the deployment if table creation fails - just log the error
+      loggerService.error(`Failed to create table for config ${id} on publish: ${error.message}`);
     }
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);

@@ -215,7 +215,7 @@ class KeycloakService {
 
       // First, find the parent group
       const groupsUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups?search=${encodeURIComponent(parentGroupName)}`;
-      loggerService.log(`🔍 Searching for parent group '${parentGroupName}' in realm '${this.config.realm}'`);
+      loggerService.log(`Searching for parent group '${parentGroupName}' in realm '${this.config.realm}'`);
 
       const groupsResponse = await axios.get(groupsUrl, {
         headers: {
@@ -230,7 +230,7 @@ class KeycloakService {
       }>;
 
       if (groups.length === 0) {
-        loggerService.warn(`❌ Parent group '${parentGroupName}' not found in Keycloak realm '${this.config.realm}'`);
+        loggerService.warn(`Parent group '${parentGroupName}' not found in Keycloak realm '${this.config.realm}'`);
         return [];
       }
 
@@ -238,14 +238,13 @@ class KeycloakService {
 
       if (!parentGroup) {
         loggerService.warn(
-          `❌ Exact match for parent group '${parentGroupName}' not found. Available groups: ${groups.map((g) => g.name).join(', ')}`,
+          `Exact match for parent group '${parentGroupName}' not found. Available groups: ${groups.map((g) => g.name).join(', ')}`,
         );
         return [];
       }
 
-      loggerService.log(`✅ Found parent group '${parentGroup.name}' (ID: ${parentGroup.id})`);
+      loggerService.log(`Found parent group '${parentGroup.name}' (ID: ${parentGroup.id})`);
 
-      // Get child groups using /children endpoint (subGroups array is always empty)
       const childrenUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups/${parentGroup.id}/children`;
       const childrenResponse = await axios.get(childrenUrl, {
         headers: {
@@ -256,13 +255,12 @@ class KeycloakService {
       const children = childrenResponse.data as Array<{ id: string; name: string; path: string }>;
 
       if (children.length === 0) {
-        loggerService.warn(`❌ No child groups found in parent group '${parentGroupName}'`);
+        loggerService.warn(` No child groups found in parent group '${parentGroupName}'`);
         return [];
       }
 
-      loggerService.log(`📁 Found ${children.length} child group(s) in '${parentGroupName}': ${children.map((sg) => sg.name).join(', ')}`);
+      loggerService.log(`Found ${children.length} child group(s) in '${parentGroupName}': ${children.map((sg) => sg.name).join(', ')}`);
 
-      // Find the specific subgroup (handle both "approvers" and "/approvers")
       const normalizedSubgroupName = subgroupName.startsWith('/') ? subgroupName.substring(1) : subgroupName;
       const subgroup = children.find(
         (sg) =>
@@ -272,12 +270,12 @@ class KeycloakService {
 
       if (!subgroup) {
         loggerService.warn(
-          `❌ Subgroup '${subgroupName}' not found in parent group '${parentGroupName}'. Available subgroups: ${children.map((sg) => sg.name).join(', ')}`,
+          `Subgroup '${subgroupName}' not found in parent group '${parentGroupName}'. Available subgroups: ${children.map((sg) => sg.name).join(', ')}`,
         );
         return [];
       }
 
-      loggerService.log(`✅ Found subgroup '${subgroup.name}' (ID: ${subgroup.id}, Path: ${subgroup.path})`);
+      loggerService.log(`Found subgroup '${subgroup.name}' (ID: ${subgroup.id}, Path: ${subgroup.path})`);
 
       // Get members of the subgroup
       const membersUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups/${subgroup.id}/members`;
@@ -288,9 +286,8 @@ class KeycloakService {
       });
 
       const members = membersResponse.data as KeycloakUser[];
-      loggerService.log(`✅ Found ${members.length} member(s) in subgroup '${parentGroupName}/${subgroupName}'`);
+      loggerService.log(`Found ${members.length} member(s) in subgroup '${parentGroupName}/${subgroupName}'`);
 
-      // Log member details for debugging
       members.forEach((member) => {
         loggerService.log(`  👤 User: ${member.username} (Email: ${member.email || member.username}, Enabled: ${member.enabled})`);
       });
@@ -299,10 +296,10 @@ class KeycloakService {
     } catch (error: unknown) {
       const axiosError = error as { response?: { status?: number; data?: unknown }; message?: string };
       if (axiosError.response?.status === 404) {
-        loggerService.warn(`❌ Group or subgroup not found: '${parentGroupName}/${subgroupName}' in Keycloak realm '${this.config.realm}'`);
+        loggerService.warn(` Group or subgroup not found: '${parentGroupName}/${subgroupName}' in Keycloak realm '${this.config.realm}'`);
         return [];
       }
-      loggerService.error(`❌ Failed to get users by subgroup '${parentGroupName}/${subgroupName}':`, {
+      loggerService.error(`Failed to get users by subgroup '${parentGroupName}/${subgroupName}':`, {
         message: axiosError.message,
         status: axiosError.response?.status,
         data: axiosError.response?.data,
@@ -328,33 +325,31 @@ class KeycloakService {
     try {
       await this.getAdminToken();
 
-      loggerService.log(`🔍 Finding approvers in subgroup: ${groupName}/approver`);
+      loggerService.log(`Finding approvers in subgroup: ${groupName}/approver`);
 
-      // Get users from the /approver subgroup under the tenant group
       const approverUsers = await this.getUsersBySubgroup(groupName, 'approver');
 
       if (approverUsers.length === 0) {
-        loggerService.warn(`❌ No users found in ${groupName}/approver subgroup`);
+        loggerService.warn(` No users found in ${groupName}/approver subgroup`);
         return [];
       }
 
-      loggerService.log(`✅ Found ${approverUsers.length} approver(s) in ${groupName}/approver subgroup`);
+      loggerService.log(` Found ${approverUsers.length} approver(s) in ${groupName}/approver subgroup`);
 
-      // Filter by enabled status
       const enabledApprovers = approverUsers.filter((user) => user.enabled);
 
       if (enabledApprovers.length < approverUsers.length) {
-        loggerService.log(`ℹ️  Filtered out ${approverUsers.length - enabledApprovers.length} disabled user(s)`);
+        loggerService.log(` Filtered out ${approverUsers.length - enabledApprovers.length} disabled user(s)`);
       }
 
       enabledApprovers.forEach((user) => {
-        loggerService.log(`   👤 ${user.username} (enabled: ${user.enabled})`);
+        loggerService.log(`  ${user.username} (enabled: ${user.enabled})`);
       });
 
       return enabledApprovers;
     } catch (error: unknown) {
       const err = error as Error;
-      loggerService.error('❌ Failed to get approvers by tenant and group:', {
+      loggerService.error(' Failed to get approvers by tenant and group:', {
         tenantId,
         groupName,
         error: err.message,
@@ -366,18 +361,16 @@ class KeycloakService {
   async getApproverEmailsByTenantAndGroup(tenantId: string, groupName: string): Promise<string[]> {
     const approvers = await this.getApproversByTenantAndGroup(tenantId, groupName);
 
-    // In Tazama Keycloak setup, username IS the email
     const emails = approvers
       .filter((user) => user.enabled)
       .map((user) => {
-        // Prefer email field, but fall back to username if email is not set
         const email = user.email || user.username;
-        loggerService.log(`📧 Approver email: ${email} (from ${user.email ? 'email field' : 'username'})`);
+        loggerService.log(` Approver email: ${email} (from ${user.email ? 'email field' : 'username'})`);
         return email;
       })
-      .filter((email) => email); // Remove any undefined/null values
+      .filter((email) => email);
 
-    loggerService.log(`✅ Extracted ${emails.length} approver email(s) for tenant '${tenantId}' in group '${groupName}'`);
+    loggerService.log(` Extracted ${emails.length} approver email(s) for tenant '${tenantId}' in group '${groupName}'`);
     return emails;
   }
 
@@ -385,7 +378,6 @@ class KeycloakService {
     try {
       const token = await this.getAdminToken();
 
-      // Get ALL top-level groups
       const groupsUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups`;
       const groupsResponse = await axios.get(groupsUrl, {
         headers: {
@@ -397,12 +389,11 @@ class KeycloakService {
 
       const approverGroups: string[] = [];
 
-      loggerService.log(`🔍 Auto-discovering approver groups from ${topLevelGroups.length} top-level groups...`);
+      loggerService.log(` Auto-discovering approver groups from ${topLevelGroups.length} top-level groups...`);
       loggerService.log('   Strategy: Check each group for /approver subgroup by fetching children');
 
       for (const group of topLevelGroups) {
         try {
-          // Fetch group details including children
           const groupDetailsUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups/${group.id}/children`;
           const childrenResponse = await axios.get(groupDetailsUrl, {
             headers: {
@@ -412,19 +403,17 @@ class KeycloakService {
 
           const children = childrenResponse.data as Array<{ id: string; name: string; path: string }>;
 
-          loggerService.log(`  🔍 Group '${group.name}': has ${children.length} child group(s)`);
+          loggerService.log(`   Group '${group.name}': has ${children.length} child group(s)`);
 
           if (children.length > 0) {
             loggerService.log(`     Children: ${children.map((c) => c.name).join(', ')}`);
           }
 
-          // Check if any child is named 'approver'
           const approverChild = children.find((child) => child.name.toLowerCase() === 'approver');
 
           if (approverChild) {
-            loggerService.log(`  ✅ Found approver subgroup in: ${group.name} (path: ${approverChild.path})`);
+            loggerService.log(`  Found approver subgroup in: ${group.name} (path: ${approverChild.path})`);
 
-            // Get members count from the approver subgroup
             const membersUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups/${approverChild.id}/members`;
             const membersResponse = await axios.get(membersUrl, {
               headers: { Authorization: `Bearer ${token}` },
@@ -433,27 +422,25 @@ class KeycloakService {
 
             loggerService.log(`     └─ Contains ${members.length} approver(s)`);
 
-            // Log approver usernames
             if (members.length > 0) {
               members.forEach((member) => {
                 loggerService.log(`        👤 ${member.username} (enabled: ${member.enabled})`);
               });
 
-              // Only add if there are members
               approverGroups.push(group.name);
             } else {
-              loggerService.warn(`  ⚠️  Approver subgroup ${approverChild.path} has no members`);
+              loggerService.warn(`   Approver subgroup ${approverChild.path} has no members`);
             }
           } else {
-            loggerService.log(`  ❌ Skipping ${group.name} (no 'approver' child group)`);
+            loggerService.log(`  Skipping ${group.name} (no 'approver' child group)`);
           }
         } catch (error: unknown) {
           const err = error as Error;
-          loggerService.warn(`  ⚠️  Failed to check group '${group.name}': ${err.message}`);
+          loggerService.warn(`   Failed to check group '${group.name}': ${err.message}`);
         }
       }
 
-      loggerService.log(`✅ Auto-discovered ${approverGroups.length} approver groups: ${approverGroups.join(', ')}`);
+      loggerService.log(`Auto-discovered ${approverGroups.length} approver groups: ${approverGroups.join(', ')}`);
       return approverGroups;
     } catch (error: unknown) {
       const err = error as Error;
@@ -533,7 +520,7 @@ class KeycloakService {
       const groups = tenantGroupMap.get(tenantId);
 
       if (!groups || groups.length === 0) {
-        loggerService.log(`ℹNo specific approver group found for tenant '${tenantId}', will use default approver role`);
+        loggerService.log(`No specific approver group found for tenant '${tenantId}', will use default approver role`);
         return null;
       }
 

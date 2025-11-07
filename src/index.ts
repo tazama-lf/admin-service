@@ -9,13 +9,12 @@ import * as util from 'node:util';
 
 export const loggerService: LoggerService = new LoggerService(processorConfig);
 
-// using the 'Required' utility type so autocompletion kicks in only the services we want
 let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
 let configuration: Configuration;
 
 export const dbInit = async (): Promise<void> => {
   const { db, config } = await CreateStorageManager(
-    [Database.PSEUDONYMS, Database.EVALUATION, Cache.DISTRIBUTED],
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
     processorConfig.nodeEnv === 'production',
   );
 
@@ -42,6 +41,7 @@ const connect = async (): Promise<void> => {
     }
   } catch (err) {
     loggerService.error(`Error while starting server on Worker ${process.pid}`, util.inspect(err));
+    loggerService.error(util.inspect(err));
     process.exit(1);
   }
 })();

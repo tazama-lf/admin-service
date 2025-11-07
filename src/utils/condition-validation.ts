@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { EntityCondition, AccountCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 export const checkConditionValidity = (condition: EntityCondition | AccountCondition): void => {

@@ -7,4 +7,5 @@ export interface Report {
   transaction: Pacs002;
   networkMap: NetworkMap;
   alert: Alert;
+  tenantId: string;
 }

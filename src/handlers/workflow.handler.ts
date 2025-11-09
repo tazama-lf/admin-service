@@ -46,7 +46,6 @@ function getUserEmailFromRequest(req: FastifyRequest): string | null {
 
     let actualToken: { preferred_username?: string; email?: string; name?: string; given_name?: string } = decoded;
     if (decoded.tokenString) {
-      loggerService.log('[Workflow] Found nested tokenString, decoding...');
       const nestedToken = jwt.decode(decoded.tokenString) as { preferred_username?: string; email?: string } | null;
       if (nestedToken) {
         actualToken = nestedToken;
@@ -55,14 +54,11 @@ function getUserEmailFromRequest(req: FastifyRequest): string | null {
 
     const email = actualToken.preferred_username ?? actualToken.email ?? null;
 
-    loggerService.log('[Workflow] Extracted email from JWT:');
-    loggerService.log(`   - preferred_username: ${actualToken.preferred_username ?? 'N/A'}`);
-    loggerService.log(`   - email field: ${actualToken.email ?? 'N/A'}`);
-    loggerService.log(`   - Final email: ${email ?? 'NOT FOUND'}`);
+    loggerService.log('[Workflow] User authenticated successfully');
 
     return email;
   } catch (error) {
-    loggerService.error(`Failed to extract email from JWT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    loggerService.error(`Failed to extract user from JWT: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -182,12 +178,11 @@ interface SendNotificationParams {
 
 async function getApproverEmails(tenantId: string, approverGroup: string | null): Promise<string[]> {
   if (!approverGroup || approverGroup === '__none__') {
-    // eslint-disable-next-line @stylistic/quotes -- Double quotes needed for emoji and nested single quotes
-    loggerService.log("📧 No group configured - querying all approvers using default 'approver' role...");
+    loggerService.log("No group configured - querying all approvers using default 'approver' role...");
     return await keycloakService.getApproverEmails();
   }
 
-  loggerService.log(`📧 Looking up approvers for tenant '${tenantId}' from auto-discovered group '${approverGroup}'...`);
+  loggerService.log(`Looking up approvers for tenant '${tenantId}' from auto-discovered group '${approverGroup}'...`);
 
   const cachedApprovers = userEmailCache.getGroupApprovers(tenantId, approverGroup);
   if (cachedApprovers && cachedApprovers.length > 0) {
@@ -536,7 +531,7 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
     const userEmail = getUserEmailFromRequest(req);
     const userName = getUserNameFromRequest(req);
 
-    loggerService.log('📧 Extracted user details from request:');
+    loggerService.log('Extracted user details from request:');
     loggerService.log(`   - Email: ${userEmail ?? 'NOT FOUND'}`);
     loggerService.log(`   - Name: ${userName ?? 'NOT FOUND'}`);
     loggerService.log(`   - DTO userId: ${dto.userId ?? 'NOT PROVIDED'}`);
@@ -561,11 +556,11 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
 
     const editorEmail = await databaseService.getConfigEditorEmail(Number(id), tenantId);
 
-    loggerService.log(`📧 Initiating notification send for config ${id}...`);
+    loggerService.log(`Initiating notification send for config ${id}...`);
     loggerService.log(`   - Editor email (config creator): ${editorEmail ?? 'NOT FOUND'}`);
     loggerService.log(`   - Requester email (who clicked submit): ${userEmail ?? 'NOT FOUND'}`);
 
-    sendNotificationAsync({
+    const notificationPromise = sendNotificationAsync({
       type: 'submit',
       configId: Number(id),
       config: updatedConfig!,
@@ -573,9 +568,10 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
       requesterEmail: editorEmail ?? userEmail ?? 'system@unknown',
       requesterName: userName ?? 'System User',
       comment: dto.comment,
-    }).catch((err: unknown) => {
+    });
+    notificationPromise.catch((err: unknown) => {
       const error = err as Error;
-      loggerService.error(`❌ Notification error: ${error.message}`);
+      loggerService.error(`Notification error: ${error.message}`);
       loggerService.error(`   Stack: ${error.stack}`);
     });
 
@@ -781,14 +777,14 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     }
 
     if (userEmail) {
-      loggerService.log('📧 Preparing email notification for rejection:');
+      loggerService.log('Preparing email notification for rejection:');
       loggerService.log(`   - From: ${userName ?? userEmail} (approver)`);
       loggerService.log(`   - To: Editor of config ${id}`);
       loggerService.log(`   - Subject: Configuration Rejected - Config ${id}`);
       loggerService.log(`   - Message: ${dto.rejectionReason}`);
       loggerService.log('   - Connection: admin-service → connection-studio → NotificationService → SMTP');
 
-      sendNotificationAsync({
+      const notificationPromise = sendNotificationAsync({
         type: 'reject',
         configId: Number(id),
         config: updatedConfig!,
@@ -796,7 +792,8 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         requesterEmail: userEmail,
         requesterName: userName,
         comment: dto.rejectionReason,
-      }).catch((err: unknown) => {
+      });
+      notificationPromise.catch((err: unknown) => {
         const error = err as Error;
         loggerService.error(`Notification error: ${error.message}`);
       });

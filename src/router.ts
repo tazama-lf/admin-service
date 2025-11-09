@@ -16,6 +16,7 @@ import {
   getConfigByIdHandler,
   getAllConfigsHandler,
   updateConfigHandler,
+  updatePublishingStatusHandler,
   cloneConfigHandler,
   deleteConfigHandler,
   getActiveConfigsHandler,
@@ -68,6 +69,7 @@ const routePrivilege = {
   getTcsConfig: 'view-profile',
   getTcsConfigs: 'view-profile',
   putTcsConfig: 'editor',
+  patchTcsConfigPublishingStatus: 'publisher',
   deleteTcsConfig: 'editor',
   postTcsConfigClone: 'editor',
   getTcsPendingApprovals: 'view-profile',
@@ -384,6 +386,11 @@ function Routes(fastify: FastifyInstance): void {
   fastify.put('/v1/admin/tcs/config/:id/write', {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
   });
+
+  fastify.patch('/v1/admin/tcs/config/:id/publishing-status', {
+    ...SetOptionsBodyAndParams(updatePublishingStatusHandler, routePrivilege.patchTcsConfigPublishingStatus),
+  });
+
   fastify.patch('/v1/admin/tcs/config/:id/status', {
     preHandler: configuration.AUTHENTICATED
       ? [

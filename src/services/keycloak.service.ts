@@ -153,7 +153,7 @@ class KeycloakService {
       const token = await this.getAdminToken();
 
       const groupsUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/groups?search=${encodeURIComponent(groupName)}`;
-      loggerService.log(`🔍 Searching for group '${groupName}' in realm '${this.config.realm}'`);
+      loggerService.log(`Searching for group '${groupName}' in realm '${this.config.realm}'`);
 
       const groupsResponse = await axios.get(groupsUrl, {
         headers: {
@@ -289,7 +289,7 @@ class KeycloakService {
       loggerService.log(`Found ${members.length} member(s) in subgroup '${parentGroupName}/${subgroupName}'`);
 
       members.forEach((member) => {
-        loggerService.log(`  👤 User: ${member.username} (Email: ${member.email || member.username}, Enabled: ${member.enabled})`);
+        loggerService.log(`  User: ${member.username} (Email: ${member.email || member.username}, Enabled: ${member.enabled})`);
       });
 
       return members;
@@ -424,7 +424,7 @@ class KeycloakService {
 
             if (members.length > 0) {
               members.forEach((member) => {
-                loggerService.log(`        👤 ${member.username} (enabled: ${member.enabled})`);
+                loggerService.log(`        ${member.username} (enabled: ${member.enabled})`);
               });
 
               approverGroups.push(group.name);

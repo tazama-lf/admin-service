@@ -379,7 +379,7 @@ export const deleteConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
 export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    loggerService.log('📝 [ADMIN-SERVICE] writeConfigHandler called', 'ConfigHandler');
+    loggerService.log('[ADMIN-SERVICE] writeConfigHandler called', 'ConfigHandler');
 
     const configData = req.body as Record<string, unknown>;
     const authReq = req as AuthenticatedRequest;
@@ -443,6 +443,61 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     return await reply.code(500).send({
       success: false,
       message: err.message || 'Failed to update config',
+    });
+  }
+};
+
+/**
+ * @route PATCH /v1/admin/tcs/config/:id/publishing-status
+ * @access Requires 'publisher' claim
+ * @returns 200 with updated config on success, 400/404/500 on error
+ */
+export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { publishing_status: publishingStatus } = req.body as { publishing_status: 'active' | 'inactive' };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const configId = parseInt(id);
+    if (isNaN(configId)) {
+      return await reply.code(400).send({
+        success: false,
+        message: `Invalid config ID: ${id}. Must be a valid number.`,
+      });
+    }
+
+    if (!publishingStatus || (publishingStatus !== 'active' && publishingStatus !== 'inactive')) {
+      return await reply.code(400).send({
+        success: false,
+        message: 'publishing_status must be either "active" or "inactive"',
+      });
+    }
+
+    const existingConfig = await databaseService.findConfigById(configId, tenantId);
+    if (!existingConfig) {
+      return await reply.code(404).send({
+        success: false,
+        message: `Config with id ${id} not found`,
+      });
+    }
+
+    await databaseService.updateConfig(configId, tenantId, { publishing_status: publishingStatus });
+    const updatedConfig = await databaseService.findConfigById(configId, tenantId);
+
+    loggerService.log(`Publishing status updated to ${publishingStatus} for config ${id}`, 'updatePublishingStatusHandler');
+
+    return await reply.code(200).send({
+      success: true,
+      message: `Publishing status updated to ${publishingStatus}`,
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const err = error as Error;
+    loggerService.error(`Failed to update publishing status: ${err.message}`, 'updatePublishingStatusHandler');
+    return await reply.code(500).send({
+      success: false,
+      message: err.message || 'Failed to update publishing status',
     });
   }
 };

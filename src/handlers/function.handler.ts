@@ -189,40 +189,28 @@ function validateFunctionDto(dto: AddFunctionDto): string | undefined {
   if (!dto.functionName?.trim()) {
     return 'Function name is required';
   }
-
   const allowedFunctions: AllowedFunctionName[] = ['saveTransactionDetails', 'addAccountHolder', 'addEntity', 'addAccount'];
-
   if (!allowedFunctions.includes(dto.functionName)) {
     return `Invalid function name. Only the following functions are allowed: ${allowedFunctions.join(', ')}`;
   }
-
   if (dto.params?.length === 0) {
     return 'Function must have at least one parameter';
   }
-
-  if (dto.params) {
-    for (const param of dto.params) {
-      const trimmed = param.trim();
-      if (!trimmed) {
-        return 'Function parameters cannot be empty';
-      }
-      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
-        return `Invalid parameter name '${trimmed}'. Parameter names must be valid identifiers (alphanumeric and underscore only)`;
-      }
+  for (const param of dto.params) {
+    const trimmed = param.trim();
+    if (!trimmed) {
+      return 'Function parameters cannot be empty';
+    }
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$/.test(trimmed)) {
+      return `Invalid parameter name '${trimmed}'. Parameter names must be valid identifiers with optional prefix (e.g., redis.paramName)`;
     }
   }
-
   return undefined;
 }
 
 function createFunctionFromDto(dto: AddFunctionDto): FunctionDefinition {
   return {
     functionName: dto.functionName,
-    params: dto.params
-      .map((p: string) => {
-        const trimmed = p.trim();
-        return trimmed === 'tenantId' ? `transaction.${trimmed}` : `redis.${trimmed}`;
-      })
-      .filter((p: string) => p.length > 0),
+    params: dto.params.map((p: string) => p.trim()).filter((p: string) => p.length > 0),
   };
 }

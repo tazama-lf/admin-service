@@ -245,7 +245,7 @@ async function sendApprovalNotification(data: ApprovalNotificationData): Promise
 
     loggerService.log('Calling connection-studio notification service...');
     loggerService.log(`   Endpoint: ${notificationEndpoint}`);
-    loggerService.log(`   Recipients: ${approverEmails.join(', ')}`);
+    loggerService.log(`   Recipients count: ${approverEmails.length}`); // Don't log email addresses (PII)
 
     const response = await axios.post(
       notificationEndpoint,
@@ -335,7 +335,7 @@ async function sendNotificationAsync(params: SendNotificationParams): Promise<vo
 
         const responseData = response.data as { success: boolean; message?: string };
         if (responseData.success) {
-          loggerService.log(`${notificationType === 'rejection' ? 'Rejection' : 'Approval'} email sent successfully to ${editorEmail}`);
+          loggerService.log(`${notificationType === 'rejection' ? 'Rejection' : 'Approval'} email sent successfully to editor`); // Don't log email (PII)
         } else {
           loggerService.warn(responseData.message ?? 'Unknown error');
         }
@@ -545,8 +545,12 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
           actor: dto.userId ?? userEmail,
           actorEmail: userEmail,
           tenantId,
+          endpointName: config.endpointPath || undefined,
+          version: config.version || undefined,
           details: `Configuration submitted for approval${dto.comment ? `: ${dto.comment}` : ''}`,
           newValues: { status: newStatus },
+          severity: 'MEDIUM',
+          status: 'SUCCESS',
         });
       } catch (auditError: unknown) {
         const err = auditError as Error;
@@ -767,8 +771,13 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
           actor: dto.userId,
           actorEmail: userEmail,
           tenantId,
+          endpointName: config.endpointPath || undefined,
+          version: config.version ? Number(config.version) : undefined,
           details: `Configuration rejected: ${dto.rejectionReason}`,
+          oldValues: { status: currentStatus },
           newValues: { status: newStatus, comments: dto.rejectionReason },
+          severity: 'HIGH',
+          status: 'SUCCESS',
         });
       } catch (auditError: unknown) {
         const err = auditError as Error;

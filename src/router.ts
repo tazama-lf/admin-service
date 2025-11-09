@@ -53,6 +53,14 @@ import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import { validateTenantMiddleware } from './middleware/tenantMiddleware';
 import { loggerService, configuration } from './index';
+import {
+  createScheduleHandler,
+  findScheduleByIdHandler,
+  getAllScheduleHandler,
+  getScheduleByStatusHandler,
+  updateScheduleByStatusHandler,
+  updateScheduleHandler,
+} from './handlers/scheduler.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -90,11 +98,45 @@ const routePrivilege = {
   postTcsWorkflowExport: 'exporter',
   postTcsWorkflowReturnToProgress: 'editor',
   getTcsWorkflowStatus: 'view-profile',
+  createSchedule: 'editor',
+  findSchedule: 'view-profile',
+  updateSchedule: 'view-profile',
+  getSchedules: 'view-profile',
+  getAllSchedules: 'view-profile',
+  updateScheduleStatus: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
+
+  // ==================== SCHEDULER OPERATIONS ====================
+
+  fastify.post('/v1/admin/tcs/schedule/create', {
+    ...SetOptionsBodyAndParams(createScheduleHandler, routePrivilege.createSchedule),
+  });
+
+  fastify.get('/v1/admin/tcs/schedule/:id', {
+    ...SetOptionsBodyAndParams(findScheduleByIdHandler, routePrivilege.findSchedule),
+  });
+
+  fastify.put('/v1/admin/tcs/schedule/update/:id', {
+    ...SetOptionsBodyAndParams(updateScheduleHandler, routePrivilege.updateSchedule),
+  });
+
+  fastify.get('/v1/admin/tcs/schedule/get/all', {
+    ...SetOptionsBodyAndParams(getAllScheduleHandler, routePrivilege.getAllSchedules),
+  });
+
+  fastify.get('/v1/admin/tcs/schedule/get/status', {
+    ...SetOptionsBodyAndParams(getScheduleByStatusHandler, routePrivilege.getSchedules),
+  });
+
+  fastify.put('/v1/admin/tcs/schedule/update/status/:id', {
+    ...SetOptionsBodyAndParams(updateScheduleByStatusHandler, routePrivilege.updateScheduleStatus),
+  });
+
+  // ==================== TCS OPERATIONS ====================
 
   fastify.get('/v1/admin/cache/debug', async (req, reply) => {
     const { userEmailCache } = await import('./index.js');

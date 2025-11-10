@@ -57,12 +57,10 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     return await reply.code(200).send({
       success: true,
       configs: result.data,
-      pagination: {
-        // total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-        pages: Math.ceil(result.total / result.limit),
-      },
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
     const err = error as Error;

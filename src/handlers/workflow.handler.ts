@@ -178,7 +178,6 @@ interface SendNotificationParams {
 
 async function getApproverEmails(tenantId: string, approverGroup: string | null): Promise<string[]> {
   if (!approverGroup || approverGroup === '__none__') {
-    loggerService.log("No group configured - querying all approvers using default 'approver' role...");
     return await keycloakService.getApproverEmails();
   }
 

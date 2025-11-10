@@ -62,6 +62,15 @@ import {
   updateScheduleByStatusHandler,
   updateScheduleHandler,
 } from './handlers/scheduler.handler';
+import {
+  createPullJobHandler,
+  createPushJobHandler,
+  findJobByIdHandler,
+  getAllJobsHandler,
+  getJobsByStatusHandler,
+  updateJobActivationHandler,
+  updateJobByStatusHandler,
+} from './handlers/job.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -106,11 +115,47 @@ const routePrivilege = {
   getSchedules: 'view-profile',
   getAllSchedules: 'view-profile',
   updateScheduleStatus: 'view-profile',
+  createPushJob: 'editor',
+  createPullJob: 'editor',
+  getAllJobs: 'view-profile',
+  getJobById: 'view-profile',
+  getJobByStatus: 'view-profile',
+  updateJobActivation: 'publisher',
+  updateJobStatus: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
+
+  // ==================== Job OPERATIONS ====================
+
+  fastify.post('/v1/admin/tcs/push/create', {
+    ...SetOptionsBodyAndParams(createPushJobHandler, routePrivilege.createPushJob),
+  });
+
+  fastify.post('/v1/admin/tcs/pull/create', {
+    ...SetOptionsBodyAndParams(createPullJobHandler, routePrivilege.createPullJob),
+  });
+
+  fastify.get('/v1/admin/tcs/job/get/all', {
+    ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
+  });
+
+  fastify.get('/v1/admin/tcs/job/get/:id', {
+    ...SetOptionsBodyAndParams(findJobByIdHandler, routePrivilege.getJobById),
+  });
+  fastify.get('/v1/admin/tcs/job/get/status', {
+    ...SetOptionsBodyAndParams(getJobsByStatusHandler, routePrivilege.getJobByStatus),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/activation/:id', {
+    ...SetOptionsBodyAndParams(updateJobActivationHandler, routePrivilege.updateJobActivation),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/status/:id', {
+    ...SetOptionsBodyAndParams(updateJobByStatusHandler, routePrivilege.updateJobStatus),
+  });
 
   // ==================== SCHEDULER OPERATIONS ====================
 

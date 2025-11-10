@@ -76,7 +76,7 @@ export const getAllScheduleHandler = async (req: FastifyRequest, reply: FastifyR
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to fetch schedules by status',
+      message: err.message || 'Failed to fetch schedules',
     });
   }
 };

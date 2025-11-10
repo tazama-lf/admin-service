@@ -384,29 +384,27 @@ function Routes(fastify: FastifyInstance): void {
     ),
   });
   fastify.put('/v1/admin/event-flow-control/cache', { ...SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache) });
-
+  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
+  });
   fastify.post('/v1/admin/tcs/config', {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
 
-  fastify.get('/v1/admin/tcs/config/pending-approvals', {
+  fastify.get('/v1/admin/tcs/config/pending-approvals/:offset/:limit', {
     ...SetOptionsBodyAndParams(getActiveConfigsHandler, routePrivilege.getTcsPendingApprovals),
   });
 
-  fastify.get('/v1/admin/tcs/config/transaction/:transactionType', {
+  fastify.get('/v1/admin/tcs/config/transaction/:transactionType/:offset/:limit', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
   });
 
-  fastify.get('/v1/admin/tcs/config/endpoint/:endpointPath/:version', {
+  fastify.get('/v1/admin/tcs/config/endpoint/:endpointPath/:version/:offset/:limit', {
     ...SetOptionsBodyAndParams(getConfigsByVersionHandler, routePrivilege.getTcsConfigByEndpoint),
   });
 
   fastify.get('/v1/admin/tcs/config/:id', {
     ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
-  });
-
-  fastify.get('/v1/admin/tcs/config', {
-    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
   });
 
   fastify.put('/v1/admin/tcs/config/:id', {

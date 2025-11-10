@@ -44,11 +44,25 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    const configs = await databaseService.findConfigsByTenant(tenantId);
+    // Extract pagination params from path parameters
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    // TODO: Apply filters when database service supports filtering
+    // const filters = req.body as Record<string, unknown> | undefined;
+
+    const result = await databaseService.findConfigsByTenant(tenantId, parsedLimit, parsedOffset);
 
     return await reply.code(200).send({
       success: true,
-      configs,
+      configs: result.data,
+      pagination: {
+        // total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        pages: Math.ceil(result.total / result.limit),
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -61,15 +75,32 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
 
 export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { transactionType } = req.params as { transactionType: string };
+    const {
+      transactionType,
+      offset = '0',
+      limit = '10',
+    } = req.params as {
+      transactionType: string;
+      offset?: string;
+      limit?: string;
+    };
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    const configs = await databaseService.findConfigsByTransactionType(transactionType, tenantId);
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await databaseService.findConfigsByTransactionType(transactionType, tenantId, parsedLimit, parsedOffset);
 
     return await reply.code(200).send({
       success: true,
-      configs,
+      configs: result.data,
+      pagination: {
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        pages: Math.ceil(result.total / result.limit),
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -82,7 +113,17 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
 
 export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { version, endpointPath } = req.params as { version: string; endpointPath: string };
+    const {
+      version,
+      endpointPath,
+      offset = '0',
+      limit = '10',
+    } = req.params as {
+      version: string;
+      endpointPath: string;
+      offset?: string;
+      limit?: string;
+    };
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
@@ -93,9 +134,12 @@ export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: Fas
       });
     }
 
-    const config = await databaseService.findConfigByEndpoint(endpointPath, version, tenantId);
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
 
-    if (!config) {
+    const result = await databaseService.findConfigByEndpoint(endpointPath, version, tenantId, parsedLimit, parsedOffset);
+
+    if (result.total === 0) {
       return await reply.code(404).send({
         success: false,
         message: `Config not found for endpoint ${endpointPath} version ${version}`,
@@ -104,7 +148,13 @@ export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: Fas
 
     return await reply.code(200).send({
       success: true,
-      config,
+      configs: result.data,
+      pagination: {
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        pages: Math.ceil(result.total / result.limit),
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -120,11 +170,22 @@ export const getActiveConfigsHandler = async (req: FastifyRequest, reply: Fastif
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    const configs = await databaseService.findConfigsByStatus(ConfigStatus.UNDER_REVIEW, tenantId);
+    // Extract pagination params from path parameters
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await databaseService.findConfigsByStatus(ConfigStatus.UNDER_REVIEW, tenantId, parsedLimit, parsedOffset);
 
     return await reply.code(200).send({
       success: true,
-      configs,
+      configs: result.data,
+      pagination: {
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        pages: Math.ceil(result.total / result.limit),
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;

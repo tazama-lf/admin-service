@@ -42,7 +42,9 @@ export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyRe
 export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    // const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = (authReq.body as Record<string, unknown>) ?? {};
+    //if body.endpoint_pth ()
 
     // Extract pagination params from path parameters
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
@@ -52,7 +54,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     // TODO: Apply filters when database service supports filtering
     // const filters = req.body as Record<string, unknown> | undefined;
 
-    const result = await databaseService.findConfigsByTenant(tenantId, parsedLimit, parsedOffset);
+    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body);
 
     return await reply.code(200).send({
       success: true,
@@ -173,7 +175,10 @@ export const getActiveConfigsHandler = async (req: FastifyRequest, reply: Fastif
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 
-    const result = await databaseService.findConfigsByStatus(ConfigStatus.UNDER_REVIEW, tenantId, parsedLimit, parsedOffset);
+    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, {
+      status: ConfigStatus.UNDER_REVIEW,
+      tenantId,
+    });
 
     return await reply.code(200).send({
       success: true,

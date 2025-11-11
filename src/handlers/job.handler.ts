@@ -70,7 +70,23 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
     const err = error as Error;
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to retrieve schedule',
+      message: err.message || 'Failed to retrieve Job',
+    });
+  }
+};
+
+export const updateJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { job, type } = req.body as { job: Record<string, unknown>; type: ConfigType };
+    const result = await databaseService.updateJob(id, job, type);
+
+    return await reply.code(200).send(result);
+  } catch (error) {
+    const err = error as Error;
+    return await reply.code(500).send({
+      success: false,
+      message: err.message || 'Failed to update job',
     });
   }
 };
@@ -120,9 +136,9 @@ export const updateJobByStatusHandler = async (req: FastifyRequest, reply: Fasti
   try {
     const { id } = req.params as { id: string };
     const { reason } = req.body as { reason?: string };
-    const { tenantId, type, status } = req.query as { tenantId: string; type: ConfigType; status: JobStatus };
+    const { type, status } = req.query as { tenantId: string; type: ConfigType; status: JobStatus };
 
-    const updatedCount = await databaseService.updateJobByStatus(status, id, tenantId, type, reason);
+    const updatedCount = await databaseService.updateJobByStatus(status, id, type, reason);
 
     return await reply.code(200).send({
       success: true,
@@ -133,6 +149,25 @@ export const updateJobByStatusHandler = async (req: FastifyRequest, reply: Fasti
     return await reply.code(500).send({
       success: false,
       message: err.message || 'Failed to update job publishing status',
+    });
+  }
+};
+
+export const validateTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+  try {
+    const { tableName } = req.query as { tableName: string };
+
+    await databaseService.validateExisting(tableName);
+
+    return await reply.code(200).send({
+      success: true,
+      message: 'Table does not exists',
+    });
+  } catch (error) {
+    const err = error as Error;
+    return await reply.code(500).send({
+      success: false,
+      message: err.message || 'Table Already Exists',
     });
   }
 };

@@ -70,6 +70,8 @@ import {
   getJobsByStatusHandler,
   updateJobActivationHandler,
   updateJobByStatusHandler,
+  updateJobHandler,
+  validateTableHandler,
 } from './handlers/job.handler';
 
 const routePrivilege = {
@@ -122,6 +124,8 @@ const routePrivilege = {
   getJobByStatus: 'view-profile',
   updateJobActivation: 'publisher',
   updateJobStatus: 'view-profile',
+  updateJob: 'editor',
+  validateTable: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -155,6 +159,14 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/tcs/job/update/status/:id', {
     ...SetOptionsBodyAndParams(updateJobByStatusHandler, routePrivilege.updateJobStatus),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/:id', {
+    ...SetOptionsBodyAndParams(updateJobHandler, routePrivilege.updateJob),
+  });
+
+  fastify.get('/v1/admin/tcs/job/table', {
+    ...SetOptionsBodyAndParams(validateTableHandler, routePrivilege.validateTable),
   });
 
   // ==================== SCHEDULER OPERATIONS ====================

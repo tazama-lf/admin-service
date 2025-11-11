@@ -113,7 +113,7 @@ const routePrivilege = {
   postTcsWorkflowExport: 'exporter',
   postTcsWorkflowReturnToProgress: 'editor',
   getTcsWorkflowStatus: 'view-profile',
-  createSchedule: 'editor',
+  createSchedule: 'view-profile',
   findSchedule: 'view-profile',
   updateSchedule: 'view-profile',
   getSchedules: 'view-profile',

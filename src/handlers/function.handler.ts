@@ -51,11 +51,12 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
       config: updatedConfig,
     });
   } catch (err: unknown) {
-    const error = err as Error;
-    loggerService.error(`Failed to add function: ${error.message}`, error.stack ?? '');
+    const errorMessage = err instanceof Error ? err.message : 'Failed to add function';
+    const errorStack = err instanceof Error ? (err.stack ?? '') : '';
+    loggerService.error(`Failed to add function: ${errorMessage}`, errorStack);
     reply.status(500).send({
       success: false,
-      message: `Failed to add function: ${error.message}`,
+      message: `Failed to add function: ${errorMessage}`,
     });
   } finally {
     loggerService.log('End - Handle add function request');
@@ -119,11 +120,12 @@ export const updateFunctionHandler = async (req: FastifyRequest, reply: FastifyR
       config: updatedConfig,
     });
   } catch (err: unknown) {
-    const error = err as Error;
-    loggerService.error(`Failed to update function: ${error.message}`, error.stack ?? '');
+    const errorMessage = err instanceof Error ? err.message : 'Failed to update function';
+    const errorStack = err instanceof Error ? (err.stack ?? '') : '';
+    loggerService.error(`Failed to update function: ${errorMessage}`, errorStack);
     reply.status(500).send({
       success: false,
-      message: `Failed to update function: ${error.message}`,
+      message: `Failed to update function: ${errorMessage}`,
     });
   } finally {
     loggerService.log('End - Handle update function request');
@@ -174,11 +176,12 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
       config: updatedConfig,
     });
   } catch (err: unknown) {
-    const error = err as Error;
-    loggerService.error(`Failed to remove function: ${error.message}`, error.stack ?? '');
+    const errorMessage = err instanceof Error ? err.message : 'Failed to remove function';
+    const errorStack = err instanceof Error ? (err.stack ?? '') : '';
+    loggerService.error(`Failed to remove function: ${errorMessage}`, errorStack);
     reply.status(500).send({
       success: false,
-      message: `Failed to remove function: ${error.message}`,
+      message: `Failed to remove function: ${errorMessage}`,
     });
   } finally {
     loggerService.log('End - Handle remove function request');

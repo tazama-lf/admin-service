@@ -24,6 +24,7 @@ import {
   getConfigsByVersionHandler,
   writeConfigHandler,
   writeConfigUpdateHandler,
+  rawQueryHandler,
 } from './handlers/config.handler';
 import { addMappingHandler, updateMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
 import { addFunctionHandler, updateFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
@@ -97,6 +98,7 @@ const routePrivilege = {
   postTcsConfigWrite: 'editor',
   putTcsConfigWrite: 'editor',
   deleteTcsConfigWrite: 'editor',
+  postTcsRawQuery: 'publisher',
   postTcsConfigMapping: 'editor',
   putTcsConfigMapping: 'editor',
   deleteTcsConfigMapping: 'editor',
@@ -482,6 +484,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
+  });
+
+  fastify.post('/v1/admin/tcs/raw-query', {
+    ...SetOptionsBodyAndParams(rawQueryHandler, routePrivilege.postTcsRawQuery),
   });
 
   fastify.patch('/v1/admin/tcs/config/:id/publishing-status', {

@@ -31,10 +31,10 @@ export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyRe
       config,
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to get config',
+      message: errorMessage,
     });
   }
 };
@@ -65,10 +65,10 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to get configs',
+      message: errorMessage,
     });
   }
 };
@@ -103,10 +103,10 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
       },
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs by transaction type';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to get configs by transaction type',
+      message: errorMessage,
     });
   }
 };
@@ -157,10 +157,10 @@ export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: Fas
       },
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config by endpoint';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to get config by endpoint',
+      message: errorMessage,
     });
   }
 };
@@ -191,10 +191,10 @@ export const getActiveConfigsHandler = async (req: FastifyRequest, reply: Fastif
       },
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get pending approvals';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to get pending approvals',
+      message: errorMessage,
     });
   }
 };
@@ -238,8 +238,8 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         status: 'SUCCESS',
       });
     } catch (auditError: unknown) {
-      const err = auditError as Error;
-      loggerService.error(`Failed to log audit entry: ${err.message}`, 'createConfigHandler');
+      const errorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
+      loggerService.error(`Failed to log audit entry: ${errorMessage}`, 'createConfigHandler');
     }
 
     return await reply.code(201).send({
@@ -248,7 +248,6 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       config: { ...newConfig, id: configId },
     });
   } catch (error: unknown) {
-    const err = error as Error;
     const body = req.body as Record<string, unknown>;
 
     // Extract field values for better error messages
@@ -259,26 +258,27 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to create configuration. Please check your input and try again.';
     let statusCode = 500;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (
-      err.message?.includes('duplicate key value') ||
-      err.message?.includes('unique constraint') ||
-      err.message?.includes('already exists')
+      errorMessage.includes('duplicate key value') ||
+      errorMessage.includes('unique constraint') ||
+      errorMessage.includes('already exists')
     ) {
       userMessage = `A configuration with Message Family '${msgFam}', Transaction Type '${transactionType}', and Version '${version}' already exists. Please use different values.`;
       statusCode = 400; // Bad Request for duplicate
-    } else if (err.message?.includes('validation')) {
-      userMessage = `Validation error: ${err.message}`;
+    } else if (errorMessage.includes('validation')) {
+      userMessage = `Validation error: ${errorMessage}`;
       statusCode = 400;
-    } else if (err.message?.includes('required')) {
-      userMessage = `Missing required field: ${err.message}`;
+    } else if (errorMessage.includes('required')) {
+      userMessage = `Missing required field: ${errorMessage}`;
       statusCode = 400;
-    } else if (err.message) {
+    } else if (error instanceof Error) {
       // Use the error message if it's already user-friendly
-      userMessage = err.message;
+      userMessage = errorMessage;
     }
 
-    loggerService.error(`Failed to create config: ${err.message}`, 'createConfigHandler');
+    loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
 
     // Audit log: Config creation failed
     try {
@@ -288,13 +288,13 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         actor: userId,
         tenantId,
         details: `Failed to create config: ${msgFam} / ${transactionType} / ${version}`,
-        errorMessage: err.message,
+        errorMessage,
         severity: 'HIGH',
         status: 'FAILURE',
       });
     } catch (auditError: unknown) {
-      const auditErr = auditError as Error;
-      loggerService.error(`Failed to log audit entry: ${auditErr.message}`, 'createConfigHandler');
+      const auditErrorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
+      loggerService.error(`Failed to log audit entry: ${auditErrorMessage}`, 'createConfigHandler');
     }
 
     return await reply.code(statusCode).send({
@@ -349,8 +349,8 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         status: 'SUCCESS',
       });
     } catch (auditError: unknown) {
-      const err = auditError as Error;
-      loggerService.error(`Failed to log audit entry: ${err.message}`, 'updateConfigHandler');
+      const errorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
+      loggerService.error(`Failed to log audit entry: ${errorMessage}`, 'updateConfigHandler');
     }
 
     return await reply.code(200).send({
@@ -359,7 +359,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const err = error as Error;
     const updateData = req.body as Record<string, unknown>;
 
     // Extract field values for better error messages
@@ -370,25 +369,26 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to update configuration. Please check your input and try again.';
     let statusCode = 500;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (
-      err.message?.includes('duplicate key value') ||
-      err.message?.includes('unique constraint') ||
-      err.message?.includes('already exists')
+      errorMessage.includes('duplicate key value') ||
+      errorMessage.includes('unique constraint') ||
+      errorMessage.includes('already exists')
     ) {
       userMessage = `A configuration with Message Family '${msgFam}', Transaction Type '${transactionType}', and Version '${version}' already exists. Please use different values.`;
       statusCode = 400;
-    } else if (err.message?.includes('validation')) {
-      userMessage = `Validation error: ${err.message}`;
+    } else if (errorMessage.includes('validation')) {
+      userMessage = `Validation error: ${errorMessage}`;
       statusCode = 400;
-    } else if (err.message?.includes('not found')) {
-      userMessage = err.message;
+    } else if (errorMessage.includes('not found')) {
+      userMessage = errorMessage;
       statusCode = 404;
-    } else if (err.message) {
-      userMessage = err.message;
+    } else if (error instanceof Error) {
+      userMessage = errorMessage;
     }
 
-    loggerService.error(`Failed to update config: ${err.message}`, 'updateConfigHandler');
+    loggerService.error(`Failed to update config: ${errorMessage}`, 'updateConfigHandler');
 
     // Audit log: Config update failed
     try {
@@ -398,13 +398,13 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
         entityId: id,
         actor: userId,
         tenantId,
-        errorMessage: err.message,
+        errorMessage,
         severity: 'HIGH',
         status: 'FAILURE',
       });
     } catch (auditError: unknown) {
-      const auditErr = auditError as Error;
-      loggerService.error(`Failed to log audit entry: ${auditErr.message}`, 'updateConfigHandler');
+      const auditErrorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
+      loggerService.error(`Failed to log audit entry: ${auditErrorMessage}`, 'updateConfigHandler');
     }
 
     return await reply.code(statusCode).send({
@@ -456,7 +456,6 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       config: { ...clonedConfig, id: configId },
     });
   } catch (error: unknown) {
-    const err = error as Error;
     const { newTransactionType, newVersion } = req.body as {
       sourceConfigId: number;
       newTransactionType?: string;
@@ -467,11 +466,12 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
     // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to clone configuration. Please check your input and try again.';
     let statusCode = 500;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (
-      err.message?.includes('duplicate key value') ||
-      err.message?.includes('unique constraint') ||
-      err.message?.includes('already exists')
+      errorMessage.includes('duplicate key value') ||
+      errorMessage.includes('unique constraint') ||
+      errorMessage.includes('already exists')
     ) {
       if (newTransactionType !== undefined && newVersion !== undefined) {
         userMessage = `A configuration with Transaction Type '${newTransactionType}' and Version '${newVersion}' already exists. Please use different values.`;
@@ -481,14 +481,14 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
         userMessage = 'This configuration already exists. Please use a different transaction type or version.';
       }
       statusCode = 400;
-    } else if (err.message?.includes('not found')) {
-      userMessage = err.message;
+    } else if (errorMessage.includes('not found')) {
+      userMessage = errorMessage;
       statusCode = 404;
-    } else if (err.message) {
-      userMessage = err.message;
+    } else if (error instanceof Error) {
+      userMessage = errorMessage;
     }
 
-    loggerService.error(`Failed to clone config: ${err.message}`, 'cloneConfigHandler');
+    loggerService.error(`Failed to clone config: ${errorMessage}`, 'cloneConfigHandler');
 
     return await reply.code(statusCode).send({
       success: false,
@@ -518,10 +518,10 @@ export const deleteConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       message: 'Config deleted successfully',
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete config';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to delete config',
+      message: errorMessage,
     });
   }
 };
@@ -557,10 +557,10 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       config: { ...newConfig, id: configId },
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to write config';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to write config',
+      message: errorMessage,
     });
   }
 };
@@ -588,10 +588,10 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const err = error as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to update config',
+      message: errorMessage,
     });
   }
 };
@@ -642,11 +642,42 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const err = error as Error;
-    loggerService.error(`Failed to update publishing status: ${err.message}`, 'updatePublishingStatusHandler');
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';
+    loggerService.error(`Failed to update publishing status: ${errorMessage}`, 'updatePublishingStatusHandler');
     return await reply.code(500).send({
       success: false,
-      message: err.message || 'Failed to update publishing status',
+      message: errorMessage,
+    });
+  }
+};
+
+export const rawQueryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { query } = req.body as { query: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    if (!query) {
+      return await reply.code(400).send({
+        success: false,
+        message: 'Query is required',
+      });
+    }
+
+    loggerService.log(`Executing raw query for tenant ${tenantId}`, 'rawQueryHandler');
+
+    const result = await databaseService.runRawQuery(query, tenantId);
+
+    return await reply.code(200).send({
+      success: true,
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to execute raw query';
+    loggerService.error(`Failed to execute raw query: ${errorMessage}`, 'rawQueryHandler');
+    return await reply.code(500).send({
+      success: false,
+      message: errorMessage,
     });
   }
 };

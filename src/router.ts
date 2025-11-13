@@ -147,7 +147,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createPullJobHandler, routePrivilege.createPullJob),
   });
 
-  fastify.get('/v1/admin/tcs/job/get/all', {
+  fastify.post('/v1/admin/tcs/job/get/all', {
     ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
   });
 
@@ -188,7 +188,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateScheduleHandler, routePrivilege.updateSchedule),
   });
 
-  fastify.get('/v1/admin/tcs/schedule/get/all', {
+  fastify.post('/v1/admin/tcs/schedule/get/all', {
     ...SetOptionsBodyAndParams(getAllScheduleHandler, routePrivilege.getAllSchedules),
   });
 

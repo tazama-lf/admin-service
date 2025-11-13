@@ -1,6 +1,7 @@
 import type { JobStatus, Schedule } from '@tazama-lf/tcs-lib';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '../index';
+import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const createScheduleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
@@ -63,13 +64,15 @@ export const updateScheduleHandler = async (req: FastifyRequest, reply: FastifyR
 
 export const getAllScheduleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
-    const { tenantId, page, limit } = req.query as {
-      tenantId: string;
-      page: number;
-      limit: number;
-    };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = (authReq.body as Record<string, string>) ?? {};
 
-    const schedules = await databaseService.getAllSchedule(tenantId, page, limit);
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const schedules = await databaseService.getAllSchedule(parsedLimit, parsedOffset, body, tenantId);
 
     return await reply.code(200).send(schedules);
   } catch (error) {

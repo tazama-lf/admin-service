@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '..';
 import type { ConfigType, Job, JobStatus } from '@tazama-lf/tcs-lib';
+import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
@@ -34,15 +35,24 @@ export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyRe
 
 export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
-    const { tenantId, page, limit } = req.query as {
-      tenantId: string;
-      page: number;
-      limit: number;
-    };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = (authReq.body as Record<string, string>) ?? {};
 
-    const jobs = await databaseService.getAllJobs(tenantId, page, limit);
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
 
-    return await reply.code(200).send(jobs);
+    const result = await databaseService.getAllJobs(parsedLimit, parsedOffset, body, tenantId);
+
+    return await reply.code(200).send({
+      success: true,
+      jobs: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
   } catch (error) {
     const err = error as Error;
     return await reply.code(500).send({

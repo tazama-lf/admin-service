@@ -13,10 +13,15 @@ interface KeycloakConfig {
 interface KeycloakUser {
   id: string;
   username: string;
-  email: string;
+  email?: string; // Email is optional - may be stored in username instead
   firstName?: string;
   lastName?: string;
   enabled: boolean;
+  attributes?: {
+    tenant_id?: string[];
+    tenantId?: string[];
+    [key: string]: string[] | undefined;
+  };
 }
 
 class KeycloakService {
@@ -97,9 +102,79 @@ class KeycloakService {
     }
   }
 
-  async getEmailsByRole(roleName: string): Promise<string[]> {
+  async getEmailsByRole(roleName: string, tenantId?: string): Promise<string[]> {
     const users = await this.getUsersByRole(roleName);
-    return users.filter((user) => user.email && user.enabled).map((user) => user.email);
+
+    loggerService.log(`Retrieved ${users.length} users with role '${roleName}' from Keycloak`);
+
+    // If tenant filtering is required, we need to fetch full user details to get attributes
+    if (tenantId) {
+      const token = await this.getAdminToken();
+      const tenantUsers: KeycloakUser[] = [];
+
+      loggerService.log(`Filtering users for tenant: '${tenantId}'`);
+
+      for (const user of users) {
+        try {
+          // Fetch full user details to get attributes
+          const userUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/users/${user.id}`;
+          const userResponse = await axios.get(userUrl, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const fullUser = userResponse.data as KeycloakUser;
+          let userTenantId = fullUser.attributes?.tenant_id?.[0] ?? fullUser.attributes?.tenantId?.[0];
+
+          // FALLBACK: If no tenant_id attribute, extract from username
+          // Format: pslfrms+t001_role@gmail.com or pslfrms+tenant-001_role@gmail.com or pslfrms+tenant_001_role@gmail.com
+          if (!userTenantId && fullUser.username) {
+            const usernameMatch = /\+?(t\d{3}|tenant[-_]\d{3})/i.exec(fullUser.username);
+            if (usernameMatch) {
+              const extractedTenant = usernameMatch[1];
+              // Normalize to tenant_XXX format (with underscore)
+              if (extractedTenant.startsWith('t') && extractedTenant.length === 4) {
+                // t001 → tenant_001
+                userTenantId = `tenant_${extractedTenant.substring(1)}`;
+              } else if (extractedTenant.includes('-')) {
+                // tenant-001 → tenant_001
+                userTenantId = extractedTenant.replace('-', '_');
+              } else {
+                // tenant_001 → tenant_001 (already correct)
+                userTenantId = extractedTenant;
+              }
+              loggerService.log(`  Extracted tenant from username: '${userTenantId}'`);
+            }
+          }
+
+          loggerService.log(`  User: ${fullUser.username}, tenant_id: '${userTenantId}', enabled: ${fullUser.enabled}`);
+
+          if (userTenantId === tenantId) {
+            tenantUsers.push(fullUser);
+            loggerService.log('    ✓ MATCHED - Added to tenant users');
+          } else {
+            loggerService.log(`    ✗ NOT MATCHED - Expected '${tenantId}', got '${userTenantId}'`);
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          loggerService.warn(`Failed to get details for user ${user.id}: ${err.message}`);
+        }
+      }
+
+      loggerService.log(`After tenant filtering: ${tenantUsers.length} users for tenant '${tenantId}'`);
+
+      return tenantUsers
+        .filter((user) => user.enabled)
+        .map((user) => user.email ?? user.username)
+        .filter((email): email is string => !!email && email.includes('@'));
+    }
+
+    // No tenant filtering - return all users
+    return users
+      .filter((user) => user.enabled)
+      .map((user) => user.email ?? user.username)
+      .filter((email): email is string => !!email && email.includes('@'));
   }
 
   async getApprovers(): Promise<KeycloakUser[]> {
@@ -289,7 +364,7 @@ class KeycloakService {
       loggerService.log(`Found ${members.length} member(s) in subgroup '${parentGroupName}/${subgroupName}'`);
 
       members.forEach((member) => {
-        loggerService.log(`  User: ${member.username} (Email: ${member.email || member.username}, Enabled: ${member.enabled})`);
+        loggerService.log(`  User: ${member.username} (Email: ${member.email ?? member.username}, Enabled: ${member.enabled})`);
       });
 
       return members;
@@ -308,9 +383,61 @@ class KeycloakService {
     }
   }
 
-  async getEmailsByGroup(groupName: string): Promise<string[]> {
+  async getEmailsByGroup(groupName: string, tenantId?: string): Promise<string[]> {
     const users = await this.getUsersByGroup(groupName);
-    return users.filter((user) => user.email && user.enabled).map((user) => user.email);
+
+    // If tenant filtering is required, we need to fetch full user details to get attributes
+    if (tenantId) {
+      const token = await this.getAdminToken();
+      const tenantUsers: KeycloakUser[] = [];
+
+      for (const user of users) {
+        try {
+          // Fetch full user details to get attributes
+          const userUrl = `${this.config.authUrl}/admin/realms/${this.config.realm}/users/${user.id}`;
+          const userResponse = await axios.get(userUrl, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const fullUser = userResponse.data as KeycloakUser;
+          let userTenantId = fullUser.attributes?.tenant_id?.[0] ?? fullUser.attributes?.tenantId?.[0];
+
+          // FALLBACK: If no tenant_id attribute, extract from username
+          if (!userTenantId && fullUser.username) {
+            const usernameMatch = /\+?(t\d{3}|tenant-\d{3})/i.exec(fullUser.username);
+            if (usernameMatch) {
+              const extractedTenant = usernameMatch[1];
+              // Normalize: t001 → tenant-001
+              if (extractedTenant.startsWith('t') && extractedTenant.length === 4) {
+                userTenantId = `tenant-${extractedTenant.substring(1)}`;
+              } else {
+                userTenantId = extractedTenant;
+              }
+            }
+          }
+
+          if (userTenantId === tenantId) {
+            tenantUsers.push(fullUser);
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          loggerService.warn(`Failed to get details for user ${user.id}: ${err.message}`);
+        }
+      }
+
+      return tenantUsers
+        .filter((user) => user.enabled)
+        .map((user) => user.email ?? user.username)
+        .filter((email): email is string => !!email && email.includes('@'));
+    }
+
+    // No tenant filtering - return all users
+    return users
+      .filter((user) => user.enabled)
+      .map((user) => user.email ?? user.username)
+      .filter((email): email is string => !!email && email.includes('@'));
   }
 
   async getApproversByGroup(groupName: string): Promise<KeycloakUser[]> {
@@ -364,7 +491,7 @@ class KeycloakService {
     const emails = approvers
       .filter((user) => user.enabled)
       .map((user) => {
-        const email = user.email || user.username;
+        const email = user.email ?? user.username;
         loggerService.log(` Approver email: ${email} (from ${user.email ? 'email field' : 'username'})`);
         return email;
       })
@@ -532,6 +659,33 @@ class KeycloakService {
       loggerService.error(`Failed to get approver group for tenant ${tenantId}: ${err.message}`);
       return null;
     }
+  }
+
+  /**
+   * Get all user emails for a specific tenant (across all roles)
+   * @param tenantId - The tenant ID to filter users by
+   * @returns Array of email addresses
+   */
+  async getAllEmailsForTenant(tenantId: string): Promise<string[]> {
+    const roles = ['editor', 'approver', 'exporter', 'publisher', 'admin'];
+    const emailSet = new Set<string>();
+
+    loggerService.log(`Fetching all user emails for tenant: ${tenantId}`);
+
+    for (const role of roles) {
+      try {
+        const emails = await this.getEmailsByRole(role, tenantId);
+        emails.forEach((email) => emailSet.add(email));
+        loggerService.log(`  Found ${emails.length} emails with role '${role}' for tenant ${tenantId}`);
+      } catch (error: unknown) {
+        const err = error as Error;
+        loggerService.warn(`Failed to get emails for role '${role}': ${err.message}`);
+      }
+    }
+
+    const allEmails = Array.from(emailSet);
+    loggerService.log(`Total unique emails for tenant ${tenantId}: ${allEmails.length}`);
+    return allEmails;
   }
 }
 

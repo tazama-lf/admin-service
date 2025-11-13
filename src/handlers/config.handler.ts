@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ConfigStatus, ContentType, type Config, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
 import { databaseService, loggerService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
+import jwt from 'jsonwebtoken';
 
 export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -42,8 +43,8 @@ export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyRe
 export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    // const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const body = (authReq.body as Record<string, unknown>) ?? {};
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = (authReq.body as Record<string, string>) ?? {};
     //if body.endpoint_pth ()
 
     // Extract pagination params from path parameters
@@ -54,7 +55,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     // TODO: Apply filters when database service supports filtering
     // const filters = req.body as Record<string, unknown> | undefined;
 
-    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body);
+    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body, tenantId);
 
     return await reply.code(200).send({
       success: true,
@@ -165,39 +166,39 @@ export const getConfigsByVersionHandler = async (req: FastifyRequest, reply: Fas
   }
 };
 
-export const getActiveConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+// export const getActiveConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const authReq = req as AuthenticatedRequest;
+//     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    // Extract pagination params from path parameters
-    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
+//     // Extract pagination params from path parameters
+//     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+//     const parsedLimit = parseInt(limit, 10);
+//     const parsedOffset = parseInt(offset, 10);
 
-    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, {
-      status: ConfigStatus.UNDER_REVIEW,
-      tenantId,
-    });
+//     const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, {
+//       status: ConfigStatus.UNDER_REVIEW,
+//       tenantId,
+//     });
 
-    return await reply.code(200).send({
-      success: true,
-      configs: result.data,
-      pagination: {
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-        pages: Math.ceil(result.total / result.limit),
-      },
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get pending approvals';
-    return await reply.code(500).send({
-      success: false,
-      message: errorMessage,
-    });
-  }
-};
+//     return await reply.code(200).send({
+//       success: true,
+//       configs: result.data,
+//       pagination: {
+//         total: result.total,
+//         limit: result.limit,
+//         offset: result.offset,
+//         pages: Math.ceil(result.total / result.limit),
+//       },
+//     });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to get pending approvals';
+//     return await reply.code(500).send({
+//       success: false,
+//       message: errorMessage,
+//     });
+//   }
+// };
 
 export const createConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
@@ -625,16 +626,71 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
 
     const existingConfig = await databaseService.findConfigById(configId, tenantId);
     if (!existingConfig) {
+      loggerService.warn(
+        `[${tenantId}] Config ${id} NOT FOUND - either doesn't exist or belongs to different tenant`,
+        'updatePublishingStatusHandler',
+      );
       return await reply.code(404).send({
         success: false,
-        message: `Config with id ${id} not found`,
+        message: `Config ${id} not found. Publishers can only manage configs from their own tenant (${tenantId}).`,
       });
     }
 
     await databaseService.updateConfig(configId, tenantId, { publishing_status: publishingStatus });
     const updatedConfig = await databaseService.findConfigById(configId, tenantId);
 
-    loggerService.log(`Publishing status updated to ${publishingStatus} for config ${id}`, 'updatePublishingStatusHandler');
+    loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`, 'updatePublishingStatusHandler');
+
+    try {
+      const axios = (await import('axios')).default;
+      const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
+      const notificationEndpoint = `${connectionStudioUrl}/notifications/publishing-status`;
+      const getUserEmail = (): string => {
+        try {
+          const authHeader = req.headers.authorization;
+          if (!authHeader?.startsWith('Bearer ')) return 'system@unknown';
+          const [, token] = authHeader.split(' ');
+          const decoded = jwt.decode(token) as { preferred_username?: string; email?: string } | null;
+          return decoded?.preferred_username ?? decoded?.email ?? 'system@unknown';
+        } catch {
+          return 'system@unknown';
+        }
+      };
+
+      const getUserName = (): string => {
+        try {
+          const authHeader = req.headers.authorization;
+          if (!authHeader?.startsWith('Bearer ')) return 'System User';
+          const [, token] = authHeader.split(' ');
+          const decoded = jwt.decode(token) as { name?: string; given_name?: string; preferred_username?: string } | null;
+          return decoded?.name ?? decoded?.given_name ?? decoded?.preferred_username ?? 'System User';
+        } catch {
+          return 'System User';
+        }
+      };
+
+      const payload = {
+        configId,
+        config: updatedConfig,
+        tenantId,
+        publishingStatus,
+        actorEmail: getUserEmail(),
+        actorName: getUserName(),
+      };
+
+      loggerService.log(`[${tenantId}] Sending publishing status notification for config ${id} (${publishingStatus})`);
+
+      await axios.post(notificationEndpoint, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      });
+
+      loggerService.log(`[${tenantId}] Publishing status notification sent successfully for config ${id}`);
+    } catch (notifError: unknown) {
+      const error = notifError as Error;
+      loggerService.warn(`[${tenantId}] Failed to send email notification for config ${id}: ${error.message}`);
+      // Don't fail the whole operation if email fails
+    }
 
     return await reply.code(200).send({
       success: true,

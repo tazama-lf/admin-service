@@ -19,7 +19,7 @@ import {
   updatePublishingStatusHandler,
   cloneConfigHandler,
   deleteConfigHandler,
-  getActiveConfigsHandler,
+  // getActiveConfigsHandler,
   getConfigByTransactionTypeHandler,
   getConfigsByVersionHandler,
   writeConfigHandler,
@@ -32,8 +32,8 @@ import {
   submitForApprovalHandler,
   approveConfigHandler,
   rejectConfigHandler,
-  deployConfigHandler,
-  exportConfigHandler,
+  genericExportConfigHandler,
+  genericDeployConfigHandler,
   returnToProgressHandler,
   getWorkflowStatusHandler,
 } from './handlers/workflow.handler';
@@ -54,7 +54,9 @@ import {
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import { validateTenantMiddleware } from './middleware/tenantMiddleware';
-import { loggerService, configuration } from './index';
+import { loggerService, configuration, userEmailCache } from './index';
+import type { DecodedToken } from './interface/DecodedToken';
+import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
 import {
   createScheduleHandler,
   findScheduleByIdHandler,
@@ -74,6 +76,7 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
+import { keycloakService } from './services/keycloak.service.js';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -450,9 +453,29 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
 
-  fastify.get('/v1/admin/tcs/config/pending-approvals/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getActiveConfigsHandler, routePrivilege.getTcsPendingApprovals),
+  fastify.get('/v1/admin/users/tenant/:tenantId/all-emails', async (req, reply) => {
+    const { tenantId } = req.params as { tenantId: string };
+
+    try {
+      const emails = await keycloakService.getAllEmailsForTenant(tenantId);
+      return await reply.status(200).send({
+        tenantId,
+        emails,
+        count: emails.length,
+      });
+    } catch (error: unknown) {
+      const err = error as Error;
+      loggerService.error(`Failed to get all emails for tenant ${tenantId}: ${err.message}`);
+      return await reply.status(500).send({
+        error: 'Failed to fetch user emails',
+        message: err.message,
+      });
+    }
   });
+
+  // fastify.get('/v1/admin/tcs/config/pending-approvals/:offset/:limit', {
+  //   ...SetOptionsBodyAndParams(getActiveConfigsHandler, routePrivilege.getTcsPendingApprovals),
+  // });
 
   fastify.get('/v1/admin/tcs/config/transaction/:transactionType/:offset/:limit', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
@@ -479,7 +502,64 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.post('/v1/admin/tcs/config/write', {
-    ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
+    preHandler: configuration.AUTHENTICATED
+      ? [
+          validateTenantMiddleware,
+          async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+            const authHeader = request.headers.authorization;
+            if (!authHeader?.startsWith('Bearer ')) {
+              loggerService.error('No Bearer token in authorization header for POST /config/write');
+              reply.code(401).send({ error: 'Unauthorized', message: 'No Bearer token provided' });
+              return;
+            }
+            try {
+              const [, token] = authHeader.split(' ');
+              const { validateTokenAndClaims } = await import('@tazama-lf/auth-lib');
+              // Allow both editor (for normal config creation) and publisher (for deployment)
+              const validation = validateTokenAndClaims(token, ['editor', 'publisher']);
+              if (!validation.editor && !validation.publisher) {
+                loggerService.error('Token validation failed: missing editor or publisher claims');
+                reply.code(401).send({ error: 'Unauthorized', message: 'Insufficient permissions - requires editor or publisher role' });
+                return;
+              }
+
+              // Decode token to extract user info
+              const jwt = await import('jsonwebtoken');
+              const decoded = jwt.default.decode(token) as DecodedToken | null;
+              if (decoded) {
+                const claims = decoded.claims ?? decoded.realm_access?.roles ?? [];
+                const tenantId = decoded.tenantId ?? decoded.tenant_id;
+                const userId = decoded.clientId ?? decoded.sub;
+                const email = decoded.preferred_username ?? decoded.email;
+
+                const authReq = request as AuthenticatedRequest;
+                authReq.user = {
+                  claims: Array.isArray(claims) ? claims : [],
+                  clientId: userId,
+                  tenantId,
+                };
+
+                if (tenantId && userId && email) {
+                  const rolesArray = Array.isArray(claims) ? claims : [];
+                  try {
+                    userEmailCache.cacheUser(tenantId, userId, email, rolesArray);
+                    loggerService.log(`User cached for writeConfig: ${email} (tenant: ${tenantId}, userId: ${userId})`);
+                  } catch (err) {
+                    const error = err as Error;
+                    loggerService.error(`Failed to cache user email: ${error.message}`);
+                  }
+                }
+              }
+
+              loggerService.log('POST /config/write authentication successful (editor or publisher)');
+            } catch (error) {
+              loggerService.error(`Token validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              reply.code(401).send({ error: 'Unauthorized', message: 'Token validation failed' });
+            }
+          },
+        ]
+      : [validateTenantMiddleware],
+    handler: writeConfigHandler,
   });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
@@ -620,10 +700,10 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/deploy', {
-    ...SetOptionsBodyAndParams(deployConfigHandler, routePrivilege.postTcsWorkflowDeploy),
+    ...SetOptionsBodyAndParams(genericDeployConfigHandler, routePrivilege.postTcsWorkflowDeploy),
   });
   fastify.post('/v1/admin/tcs/config/:id/workflow/export', {
-    ...SetOptionsBodyAndParams(exportConfigHandler, routePrivilege.postTcsWorkflowExport),
+    ...SetOptionsBodyAndParams(genericExportConfigHandler, routePrivilege.postTcsWorkflowExport),
   });
 
   fastify.post('/v1/admin/tcs/config/:id/workflow/return-to-progress', {

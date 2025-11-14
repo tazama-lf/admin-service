@@ -19,11 +19,11 @@ export let databaseService: DatabaseService;
 
 export const dbInit = async (): Promise<void> => {
   await DatabaseFactory.initializeDatabase({
-    host: process.env.TCS_DB_HOST ?? 'localhost',
+    host: process.env.TCS_DB_HOST ?? '10.10.80.37',
     port: parseInt(process.env.TCS_DB_PORT ?? '5432', 10),
     database: process.env.TCS_DB_NAME ?? 'tcs',
     user: process.env.TCS_DB_USER ?? 'postgres',
-    password: process.env.TCS_DB_PASSWORD ?? 'password',
+    password: process.env.TCS_DB_PASSWORD ?? 'postgres',
   });
   loggerService.log('TCS DatabaseFactory initialized');
 

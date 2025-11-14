@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import {
   getAccountConditionsHandler,
   getEntityConditionHandler,
@@ -22,6 +22,7 @@ import {
   // getActiveConfigsHandler,
   getConfigByTransactionTypeHandler,
   getConfigsByVersionHandler,
+  updateConfigByStatusHandler,
   writeConfigHandler,
   writeConfigUpdateHandler,
   rawQueryHandler,
@@ -53,10 +54,7 @@ import {
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
-import { validateTenantMiddleware } from './middleware/tenantMiddleware';
-import { loggerService, configuration, userEmailCache } from './index';
-import type { DecodedToken } from './interface/DecodedToken';
-import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
+import { loggerService } from './index';
 import {
   createScheduleHandler,
   findScheduleByIdHandler,
@@ -449,6 +447,9 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/config/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
   });
+  fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
+    ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
+  });
   fastify.post('/v1/admin/tcs/config', {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
@@ -502,64 +503,7 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.post('/v1/admin/tcs/config/write', {
-    preHandler: configuration.AUTHENTICATED
-      ? [
-          validateTenantMiddleware,
-          async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-            const authHeader = request.headers.authorization;
-            if (!authHeader?.startsWith('Bearer ')) {
-              loggerService.error('No Bearer token in authorization header for POST /config/write');
-              reply.code(401).send({ error: 'Unauthorized', message: 'No Bearer token provided' });
-              return;
-            }
-            try {
-              const [, token] = authHeader.split(' ');
-              const { validateTokenAndClaims } = await import('@tazama-lf/auth-lib');
-              // Allow both editor (for normal config creation) and publisher (for deployment)
-              const validation = validateTokenAndClaims(token, ['editor', 'publisher']);
-              if (!validation.editor && !validation.publisher) {
-                loggerService.error('Token validation failed: missing editor or publisher claims');
-                reply.code(401).send({ error: 'Unauthorized', message: 'Insufficient permissions - requires editor or publisher role' });
-                return;
-              }
-
-              // Decode token to extract user info
-              const jwt = await import('jsonwebtoken');
-              const decoded = jwt.default.decode(token) as DecodedToken | null;
-              if (decoded) {
-                const claims = decoded.claims ?? decoded.realm_access?.roles ?? [];
-                const tenantId = decoded.tenantId ?? decoded.tenant_id;
-                const userId = decoded.clientId ?? decoded.sub;
-                const email = decoded.preferred_username ?? decoded.email;
-
-                const authReq = request as AuthenticatedRequest;
-                authReq.user = {
-                  claims: Array.isArray(claims) ? claims : [],
-                  clientId: userId,
-                  tenantId,
-                };
-
-                if (tenantId && userId && email) {
-                  const rolesArray = Array.isArray(claims) ? claims : [];
-                  try {
-                    userEmailCache.cacheUser(tenantId, userId, email, rolesArray);
-                    loggerService.log(`User cached for writeConfig: ${email} (tenant: ${tenantId}, userId: ${userId})`);
-                  } catch (err) {
-                    const error = err as Error;
-                    loggerService.error(`Failed to cache user email: ${error.message}`);
-                  }
-                }
-              }
-
-              loggerService.log('POST /config/write authentication successful (editor or publisher)');
-            } catch (error) {
-              loggerService.error(`Token validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              reply.code(401).send({ error: 'Unauthorized', message: 'Token validation failed' });
-            }
-          },
-        ]
-      : [validateTenantMiddleware],
-    handler: writeConfigHandler,
+    ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
   });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
@@ -575,35 +519,7 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.patch('/v1/admin/tcs/config/:id/status', {
-    preHandler: configuration.AUTHENTICATED
-      ? [
-          validateTenantMiddleware,
-          async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-            const authHeader = request.headers.authorization;
-            if (!authHeader?.startsWith('Bearer ')) {
-              loggerService.error('No Bearer token in authorization header for PATCH /status');
-              reply.code(401).send({ error: 'Unauthorized', message: 'No Bearer token provided' });
-              return;
-            }
-            try {
-              const [, token] = authHeader.split(' ');
-              const { validateTokenAndClaims } = await import('@tazama-lf/auth-lib');
-              // Check if user has either exporter or publisher claims
-              const validation = validateTokenAndClaims(token, ['exporter', 'publisher']);
-              if (!validation.exporter && !validation.publisher) {
-                loggerService.error('Token validation failed: missing exporter or publisher claims');
-                reply.code(401).send({ error: 'Unauthorized', message: 'Insufficient permissions' });
-                return;
-              }
-              loggerService.log('PATCH /status authentication successful');
-            } catch (error) {
-              loggerService.error(`Token validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              reply.code(401).send({ error: 'Unauthorized', message: 'Token validation failed' });
-            }
-          },
-        ]
-      : [validateTenantMiddleware],
-    handler: writeConfigUpdateHandler,
+    ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
   });
   fastify.post('/v1/admin/tcs/config/:id/mapping', {
     ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),

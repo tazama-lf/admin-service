@@ -11,7 +11,7 @@ interface AuthenticatedRequest extends FastifyRequest {
 export const tokenHandler =
   (claim: string) =>
   async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const logContext = 'tokenHandler()';
+    const logContext = 'tokenHandler';
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Bearer ') || !claim) {
       reply.code(401).send({ error: 'Unauthorized' });
@@ -37,15 +37,6 @@ export const tokenHandler =
       const tenantId = decoded.tenantId ?? decoded.tenant_id;
       const userId = decoded.clientId ?? decoded.sub;
       const email = decoded.preferred_username ?? decoded.email;
-
-      loggerService.log(' Extracted email from JWT token:', logContext);
-      loggerService.log(`   - preferred_username: ${decoded.preferred_username ?? 'N/A'}`, logContext);
-      loggerService.log(`   - email field: ${decoded.email ?? 'N/A'}`, logContext);
-      loggerService.log(`   - Final email used: ${email}`, logContext);
-      loggerService.log(`   - User ID: ${userId}`, logContext);
-      loggerService.log(`   - Tenant ID: ${tenantId}`, logContext);
-      loggerService.log(`   - Roles: ${JSON.stringify(Array.isArray(claims) ? claims : [])}`, logContext);
-
       const authReq = request as AuthenticatedRequest;
       authReq.user = {
         claims: Array.isArray(claims) ? claims : [],

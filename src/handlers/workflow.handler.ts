@@ -368,123 +368,10 @@ interface GenericNotificationParams {
   comment?: string;
 }
 
-async function getRoleEmails(tenantId: string, role: 'editor' | 'approver' | 'exporter' | 'publisher'): Promise<string[]> {
-  try {
-    const cachedEmails = userEmailCache.getEmailsByRole(tenantId, role);
-    if (cachedEmails.length > 0) {
-      loggerService.log(`Using cached ${role} emails (${cachedEmails.length}) for tenant '${tenantId}'`);
-      return cachedEmails;
-    }
-
-    loggerService.log(`Querying Keycloak for ${role} emails in tenant '${tenantId}'...`);
-    const emails = await keycloakService.getEmailsByRole(role, tenantId); // ← PASS tenantId to filter by tenant!
-
-    if (emails.length > 0) {
-      loggerService.log(`Found ${emails.length} ${role}(s) for tenant '${tenantId}'`);
-    }
-
-    return emails;
-  } catch (error) {
-    loggerService.error(
-      `Failed to get ${role} emails for tenant '${tenantId}': ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-    return [];
-  }
-}
-
-async function getAllRoleEmails(tenantId: string): Promise<string[]> {
-  const roles: Array<'editor' | 'approver' | 'exporter' | 'publisher'> = ['editor', 'approver', 'exporter', 'publisher'];
-  const allEmailsMap = new Map<string, boolean>();
-
-  for (const role of roles) {
-    const emails = await getRoleEmails(tenantId, role);
-    emails.forEach((email) => allEmailsMap.set(email, true));
-  }
-
-  const uniqueEmails = Array.from(allEmailsMap.keys());
-  loggerService.log(`Total unique emails across all roles for tenant '${tenantId}': ${uniqueEmails.length}`);
-
-  return uniqueEmails;
-}
-
-async function sendGenericNotification(params: GenericNotificationParams): Promise<void> {
-  const { event, configId, config, tenantId, actorEmail, actorName, comment } = params;
-
-  try {
-    let recipientEmails: string[] = [];
-
-    switch (event) {
-      case NotificationEvent.EDITOR_SUBMIT:
-        loggerService.log(`[Generic Notification] Editor submitted config ${configId} → notifying approvers`);
-        recipientEmails = await getRoleEmails(tenantId, 'approver');
-        break;
-
-      case NotificationEvent.APPROVER_APPROVE:
-        loggerService.log(`[Generic Notification] Approver approved config ${configId} → notifying exporters`);
-        recipientEmails = await getRoleEmails(tenantId, 'exporter');
-
-        break;
-
-      case NotificationEvent.EXPORTER_EXPORT:
-        loggerService.log(`[Generic Notification] Exporter exported config ${configId} → notifying publishers`);
-        recipientEmails = await getRoleEmails(tenantId, 'publisher');
-
-        break;
-
-      case NotificationEvent.PUBLISHER_DEPLOY:
-        loggerService.log(`[Generic Notification] Publisher deployed config ${configId} → notifying all roles`);
-        recipientEmails = await getAllRoleEmails(tenantId);
-        break;
-
-      case NotificationEvent.PUBLISHER_ACTIVATE:
-        loggerService.log(`[Generic Notification] Publisher activated config ${configId} → notifying all users`);
-        recipientEmails = await getAllRoleEmails(tenantId);
-        break;
-
-      case NotificationEvent.PUBLISHER_DEACTIVATE:
-        loggerService.log(`[Generic Notification] Publisher deactivated config ${configId} → notifying all users`);
-        recipientEmails = await getAllRoleEmails(tenantId);
-        break;
-    }
-
-    if (recipientEmails.length === 0) {
-      loggerService.warn(`[Generic Notification] No recipients found for event '${event}' in tenant '${tenantId}'`);
-      return;
-    }
-
-    loggerService.log(`[Generic Notification] Sending to ${recipientEmails.length} recipient(s): ${recipientEmails.join(', ')}`);
-
-    const axios = (await import('axios')).default;
-    const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
-    const notificationEndpoint = `${connectionStudioUrl}/notifications/generic-workflow`;
-
-    const payload = {
-      event,
-      configId,
-      config,
-      tenantId,
-      actorEmail,
-      actorName,
-      comment,
-      recipientEmails, // ← ADD THIS: Send the recipient emails to the backend
-    };
-
-    loggerService.log(`[Generic Notification] Calling endpoint: ${notificationEndpoint}`);
-    const response = await axios.post(notificationEndpoint, payload, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 100000,
-    });
-
-    const responseData = response.data as { success: boolean; recipients?: number; message?: string };
-    if (responseData.success) {
-      loggerService.log(`[Generic Notification] Successfully sent to ${responseData.recipients ?? recipientEmails.length} recipient(s)`);
-    } else {
-      loggerService.warn(`[Generic Notification] ${responseData.message ?? 'Unknown error'}`);
-    }
-  } catch (error) {
-    loggerService.error(`[Generic Notification] Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    loggerService.warn('[Generic Notification] Email notification not sent - check if connection-studio is running');
-  }
+async function sendGenericNotification(_params: GenericNotificationParams): Promise<void> {
+  // TODO: Implement generic notification logic
+  // Currently a no-op placeholder for future notification system
+  await Promise.resolve();
 }
 
 function validateStatusTransition(fromStatus: ConfigStatus, toStatus: ConfigStatus): { isValid: boolean; message?: string } {
@@ -615,35 +502,17 @@ function canEditConfig(currentStatus: ConfigStatus): { canEdit: boolean; message
   return { canEdit: true };
 }
 
-// ============================================================================
-// GENERIC WORKFLOW TRANSITION HANDLER
-// ============================================================================
-// This function handles all workflow state transitions in a generic way
-// Supports: Editor Submit, Approver Approve, Exporter Export, Publisher Deploy
-// ============================================================================
-
 interface GenericWorkflowTransitionParams {
-  // The config ID being transitioned
   configId: string;
-  // The tenant ID for multi-tenancy
   tenantId: string;
-  // The request object to extract user info
   req: FastifyRequest;
-  // The reply object to send response
   reply: FastifyReply;
-  // The new status to transition to (e.g., UNDER_REVIEW, APPROVED, EXPORTED, DEPLOYED)
   newStatus: ConfigStatus;
-  // The workflow action being performed (e.g., 'submit_for_approval', 'approve', 'export', 'deploy')
   action: WorkflowAction;
-  // The notification event to trigger (e.g., EDITOR_SUBMIT, APPROVER_APPROVE, etc.)
   notificationEvent: NotificationEvent;
-  // Optional comment/notes from the user
   comment?: string;
-  // Optional: Should we create a database table? (for approver/publisher)
   shouldCreateTable?: boolean;
-  // Optional: Additional fields to update in config
   additionalUpdates?: Record<string, unknown>;
-  // Success message to return
   successMessage: string;
 }
 
@@ -663,7 +532,6 @@ async function handleGenericWorkflowTransition(params: GenericWorkflowTransition
   } = params;
 
   try {
-    // STEP 1: Extract user claims and authentication
     const authReq = req as AuthenticatedRequest;
     const userClaims = authReq.user?.claims ?? [];
     const userEmail = getUserEmailFromRequest(req);
@@ -671,7 +539,6 @@ async function handleGenericWorkflowTransition(params: GenericWorkflowTransition
 
     loggerService.log(`[Generic Workflow] ${action} for config ${configId} by ${userEmail ?? 'unknown'}`);
 
-    // STEP 2: Find the config
     const config = await databaseService.findConfigById(Number(configId), tenantId);
     if (!config) {
       reply.status(404).send({
@@ -683,7 +550,6 @@ async function handleGenericWorkflowTransition(params: GenericWorkflowTransition
 
     const currentStatus = config.status!;
 
-    // STEP 3: Validate user permissions
     const permissionValidation = validateUserPermissions(userClaims, currentStatus, action);
     if (!permissionValidation.canPerform) {
       reply.status(403).send({
@@ -695,7 +561,6 @@ async function handleGenericWorkflowTransition(params: GenericWorkflowTransition
 
     loggerService.log(`[Generic Workflow] Status transition: ${currentStatus} → ${newStatus} for config ${configId}`);
 
-    // STEP 4: Validate status transition
     const transitionValidation = validateStatusTransition(currentStatus, newStatus);
     if (!transitionValidation.isValid) {
       reply.status(400).send({
@@ -705,13 +570,11 @@ async function handleGenericWorkflowTransition(params: GenericWorkflowTransition
       return;
     }
 
-    // STEP 5: Update config status (+ any additional fields like publishing_status)
     await databaseService.updateConfig(Number(configId), tenantId, {
       status: newStatus,
       ...additionalUpdates,
     });
 
-    // STEP 6: Create database table if needed (for approver/publisher)
     if (shouldCreateTable) {
       try {
         const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
@@ -736,10 +599,8 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
       }
     }
 
-    // STEP 7: Get updated config
     const updatedConfig = await databaseService.findConfigById(Number(configId), tenantId);
 
-    // STEP 8: Send generic notification to appropriate roles
     const genericNotificationPromise = sendGenericNotification({
       event: notificationEvent,
       configId: Number(configId),
@@ -754,10 +615,8 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
       loggerService.error(`[Generic Notification] Error: ${error.message}`);
     });
 
-    // STEP 9: Log success
     loggerService.log(`[Generic Workflow] Config ${configId}: ${currentStatus} → ${newStatus}${comment ? ` - Comment: ${comment}` : ''}`);
 
-    // STEP 10: Send success response
     reply.status(200).send({
       success: true,
       message: successMessage,
@@ -772,13 +631,6 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
     });
   }
 }
-
-// ============================================================================
-// INDIVIDUAL WORKFLOW HANDLERS
-// ============================================================================
-// These handlers use the generic function above for consistency
-// Each handler is specific to one role: Editor, Approver, Exporter, Publisher
-// ============================================================================
 
 export const submitForApprovalHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle submit for approval request');
@@ -867,7 +719,6 @@ export const submitForApprovalHandler = async (req: FastifyRequest, reply: Fasti
     loggerService.log(`   - Editor email (config creator): ${editorEmail ?? 'NOT FOUND'}`);
     loggerService.log(`   - Requester email (who clicked submit): ${userEmail ?? 'NOT FOUND'}`);
 
-    // Send generic notification to approvers (NEW system - replaces old sendNotificationAsync)
     const genericNotificationPromise = sendGenericNotification({
       event: NotificationEvent.EDITOR_SUBMIT,
       configId: Number(id),
@@ -928,10 +779,8 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
 
     const currentStatus = config.status!;
 
-    // generic ar\\part
     const newStatus: ConfigStatus = CS.APPROVED;
     const action: WorkflowAction = 'approve';
-    // maker event generic here
 
     const permissionValidation = validateUserPermissions(userClaims, currentStatus, action);
     if (!permissionValidation.canPerform) {
@@ -959,8 +808,6 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
       const transactionType = config.transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
       const tableName = transactionType;
 
-      // ----------------- only for approver (start) ---------------------
-      // transition status to be approved
       const createTableQuery = `
 CREATE TABLE IF NOT EXISTS "${tableName}" (
   id SERIAL PRIMARY KEY,
@@ -978,18 +825,13 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
         client.release();
       }
 
-      // ----------------- only for approver (start) ---------------------
-
       loggerService.log(` CREATE TABLE query stored in config ${id}`);
     } catch (tableError: unknown) {
       const error = tableError as Error;
       loggerService.error(` Failed to create table for config ${id}: ${error.message}`);
     }
 
-    // const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
-
     const userEmail = getUserEmailFromRequest(req);
-    // const userName = getUserNameFromRequest(req);
 
     const genericNotificationPromise = sendGenericNotification({
       event: NotificationEvent.APPROVER_APPROVE,
@@ -1475,17 +1317,6 @@ export const getWorkflowStatusHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
-// ============================================================================
-// SIMPLIFIED GENERIC HANDLERS - USAGE EXAMPLES
-// ============================================================================
-// These are simplified versions of the handlers above using the generic function
-// You can replace the old handlers with these for cleaner code
-// ============================================================================
-
-/**
- * EXAMPLE 1: Editor submits config for approval
- * Uses: handleGenericWorkflowTransition with EDITOR_SUBMIT notification
- */
 export const genericSubmitForApprovalHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Generic submit for approval');
   const { id } = req.params as { id: string };
@@ -1497,21 +1328,17 @@ export const genericSubmitForApprovalHandler = async (req: FastifyRequest, reply
     tenantId,
     req,
     reply,
-    newStatus: CS.UNDER_REVIEW, // Editor submits → UNDER_REVIEW
-    action: 'submit_for_approval', // Action name for permission check
-    notificationEvent: NotificationEvent.EDITOR_SUBMIT, // Notify all approvers
+    newStatus: CS.UNDER_REVIEW,
+    action: 'submit_for_approval',
+    notificationEvent: NotificationEvent.EDITOR_SUBMIT,
     comment: dto.comment,
-    shouldCreateTable: false, // Editors don't create tables
+    shouldCreateTable: false,
     successMessage: 'Configuration submitted for approval successfully',
   });
 
   loggerService.log('End - Generic submit for approval');
 };
 
-/**
- * EXAMPLE 2: Approver approves config
- * Uses: handleGenericWorkflowTransition with APPROVER_APPROVE notification
- */
 export const genericApproveConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Generic approve config');
   const { id } = req.params as { id: string };
@@ -1523,21 +1350,17 @@ export const genericApproveConfigHandler = async (req: FastifyRequest, reply: Fa
     tenantId,
     req,
     reply,
-    newStatus: CS.APPROVED, // Approver approves → APPROVED
-    action: 'approve', // Action name for permission check
-    notificationEvent: NotificationEvent.APPROVER_APPROVE, // Notify all exporters
+    newStatus: CS.APPROVED,
+    action: 'approve',
+    notificationEvent: NotificationEvent.APPROVER_APPROVE,
     comment: dto.comment ?? dto.approvalNotes,
-    shouldCreateTable: true, // Approvers CREATE table when approving
+    shouldCreateTable: true,
     successMessage: 'Configuration approved successfully',
   });
 
   loggerService.log('End - Generic approve config');
 };
 
-/**
- * EXAMPLE 3: Exporter exports config
- * Uses: handleGenericWorkflowTransition with EXPORTER_EXPORT notification
- */
 export const genericExportConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Generic export config');
   const { id } = req.params as { id: string };
@@ -1549,21 +1372,17 @@ export const genericExportConfigHandler = async (req: FastifyRequest, reply: Fas
     tenantId,
     req,
     reply,
-    newStatus: CS.EXPORTED, // Exporter exports → EXPORTED
-    action: 'export', // Action name for permission check
-    notificationEvent: NotificationEvent.EXPORTER_EXPORT, // Notify all publishers
+    newStatus: CS.EXPORTED,
+    action: 'export',
+    notificationEvent: NotificationEvent.EXPORTER_EXPORT,
     comment: dto.comment,
-    shouldCreateTable: false, // Exporters don't create tables
+    shouldCreateTable: false,
     successMessage: 'Configuration exported successfully. Ready for publishing.',
   });
 
   loggerService.log('End - Generic export config');
 };
 
-/**
- * EXAMPLE 4: Publisher deploys config to production
- * Uses: handleGenericWorkflowTransition with PUBLISHER_DEPLOY notification
- */
 export const genericDeployConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Generic deploy config');
   const { id } = req.params as { id: string };
@@ -1575,48 +1394,16 @@ export const genericDeployConfigHandler = async (req: FastifyRequest, reply: Fas
     tenantId,
     req,
     reply,
-    newStatus: CS.DEPLOYED, // Publisher deploys → DEPLOYED (FINAL)
-    action: 'deploy', // Action name for permission check
-    notificationEvent: NotificationEvent.PUBLISHER_DEPLOY, // Notify EVERYONE (all 4 roles)
+    newStatus: CS.DEPLOYED,
+    action: 'deploy',
+    notificationEvent: NotificationEvent.PUBLISHER_DEPLOY,
     comment: dto.deploymentNotes,
-    shouldCreateTable: true, // Publishers CREATE table on deployment
+    shouldCreateTable: true,
     additionalUpdates: {
-      publishing_status: 'active', // Set publishing_status to active
+      publishing_status: 'active',
     },
     successMessage: 'Configuration deployed successfully. This configuration is now read-only.',
   });
 
   loggerService.log('End - Generic deploy config');
 };
-
-// ============================================================================
-// USAGE NOTES:
-// ============================================================================
-// To use these generic handlers in your router:
-//
-// 1. Replace old handlers with generic ones:
-//    - Replace submitForApprovalHandler → genericSubmitForApprovalHandler
-//    - Replace approveConfigHandler → genericApproveConfigHandler
-//    - Replace exportConfigHandler → genericExportConfigHandler
-//    - Replace deployConfigHandler → genericDeployConfigHandler
-//
-// 2. The generic function handles ALL common logic:
-//    ✓ User authentication & permission checks
-//    ✓ Status transition validation
-//    ✓ Database updates
-//    ✓ Table creation (when needed)
-//    ✓ Generic notifications to correct roles
-//    ✓ Error handling
-//    ✓ Logging
-//
-// 3. Notification routing:
-//    - EDITOR_SUBMIT → Sends email to all APPROVERS
-//    - APPROVER_APPROVE → Sends email to all EXPORTERS
-//    - EXPORTER_EXPORT → Sends email to all PUBLISHERS
-//    - PUBLISHER_DEPLOY → Sends email to EVERYONE (all 4 roles)
-//
-// 4. Table creation logic:
-//    - Approvers: shouldCreateTable = true (creates table on approve)
-//    - Publishers: shouldCreateTable = true (creates table on deploy)
-//    - Editors & Exporters: shouldCreateTable = false (no table creation)
-// ============================================================================

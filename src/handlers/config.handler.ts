@@ -47,13 +47,9 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const body = (authReq.body as Record<string, string>) ?? {};
     //if body.endpoint_pth ()
 
-    // Extract pagination params from path parameters
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
-
-    // TODO: Apply filters when database service supports filtering
-    // const filters = req.body as Record<string, unknown> | undefined;
 
     const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body, tenantId);
 
@@ -251,12 +247,9 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   } catch (error: unknown) {
     const body = req.body as Record<string, unknown>;
 
-    // Extract field values for better error messages
     const msgFam = (body.msgFam as string | undefined) ?? 'unknown';
     const transactionType = (body.transactionType as string | undefined) ?? 'unknown';
     const version = (body.version as string | undefined) ?? 'v1';
-
-    // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to create configuration. Please check your input and try again.';
     let statusCode = 500;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -267,7 +260,7 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       errorMessage.includes('already exists')
     ) {
       userMessage = `A configuration with Message Family '${msgFam}', Transaction Type '${transactionType}', and Version '${version}' already exists. Please use different values.`;
-      statusCode = 400; // Bad Request for duplicate
+      statusCode = 400;
     } else if (errorMessage.includes('validation')) {
       userMessage = `Validation error: ${errorMessage}`;
       statusCode = 400;
@@ -275,13 +268,11 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       userMessage = `Missing required field: ${errorMessage}`;
       statusCode = 400;
     } else if (error instanceof Error) {
-      // Use the error message if it's already user-friendly
       userMessage = errorMessage;
     }
 
     loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
 
-    // Audit log: Config creation failed
     try {
       await databaseService.logAction({
         action: 'CONFIG_CREATE_FAILED',
@@ -322,7 +313,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       });
     }
 
-    // Capture old values for audit
     const oldValues = {
       msgFam: existingConfig.msgFam,
       transactionType: existingConfig.transactionType,
@@ -333,7 +323,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
 
-    // Audit log: Config updated
     try {
       await databaseService.logAction({
         action: 'CONFIG_UPDATED',
@@ -362,12 +351,10 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   } catch (error: unknown) {
     const updateData = req.body as Record<string, unknown>;
 
-    // Extract field values for better error messages
     const msgFam = (updateData.msgFam as string | undefined) ?? 'unknown';
     const transactionType = (updateData.transactionType as string | undefined) ?? 'unknown';
     const version = (updateData.version as string | undefined) ?? 'v1';
 
-    // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to update configuration. Please check your input and try again.';
     let statusCode = 500;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -391,7 +378,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     loggerService.error(`Failed to update config: ${errorMessage}`, 'updateConfigHandler');
 
-    // Audit log: Config update failed
     try {
       await databaseService.logAction({
         action: 'CONFIG_UPDATE_FAILED',
@@ -464,7 +450,6 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       newMsgFam?: string;
     };
 
-    // Convert technical database errors to user-friendly messages
     let userMessage = 'Failed to clone configuration. Please check your input and try again.';
     let statusCode = 500;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -597,11 +582,6 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
-/**
- * @route PATCH /v1/admin/tcs/config/:id/publishing-status
- * @access Requires 'publisher' claim
- * @returns 200 with updated config on success, 400/404/500 on error
- */
 export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
@@ -689,7 +669,6 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
     } catch (notifError: unknown) {
       const error = notifError as Error;
       loggerService.warn(`[${tenantId}] Failed to send email notification for config ${id}: ${error.message}`);
-      // Don't fail the whole operation if email fails
     }
 
     return await reply.code(200).send({
@@ -734,6 +713,26 @@ export const rawQueryHandler = async (req: FastifyRequest, reply: FastifyReply):
     return await reply.code(500).send({
       success: false,
       message: errorMessage,
+    });
+  }
+};
+
+export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { status } = req.body as { status?: string };
+
+    const updatedCount = await databaseService.updateConfigByStatus(id, status);
+
+    return await reply.code(200).send({
+      success: true,
+      message: `Job publishing status updated successfully (${updatedCount} row(s) affected).`,
+    });
+  } catch (error) {
+    const err = error as Error;
+    return await reply.code(500).send({
+      success: false,
+      message: err.message || 'Failed to update job publishing status',
     });
   }
 };

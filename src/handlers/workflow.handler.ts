@@ -369,8 +369,6 @@ interface GenericNotificationParams {
 }
 
 async function sendGenericNotification(_params: GenericNotificationParams): Promise<void> {
-  // TODO: Implement generic notification logic
-  // Currently a no-op placeholder for future notification system
   await Promise.resolve();
 }
 

@@ -301,7 +301,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
   const { id } = req.params as { id: string };
-
   try {
     const updateData = req.body as Record<string, unknown>;
 

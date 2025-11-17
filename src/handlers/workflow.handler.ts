@@ -879,10 +879,12 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     loggerService.log(`Rejecting config ${id} by user ${dto.userId}`);
 
-    if (!dto.rejectionReason?.trim()) {
+    loggerService.log(`Validating rejection reason... ${JSON.stringify(dto)}`);
+
+    if (!dto.comment?.trim()) {
       reply.status(400).send({
         success: false,
-        message: 'Rejection reason is required',
+        message: 'Rejection reason is required xx',
       });
       return;
     }

@@ -74,7 +74,7 @@ export const getAllScheduleHandler = async (req: FastifyRequest, reply: FastifyR
 
     const schedules = await databaseService.getAllSchedule(parsedLimit, parsedOffset, body, tenantId);
 
-    return await reply.code(200).send(schedules);
+    return await reply.code(200).send({ ...schedules, pages: Math.ceil(schedules.total / schedules.limit) });
   } catch (error) {
     const err = error as Error;
     return await reply.code(500).send({

@@ -39,7 +39,7 @@ export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const body = (authReq.body as Record<string, string>) ?? {};
 
-    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const { offset = '0', limit = '10' } = req.query as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 

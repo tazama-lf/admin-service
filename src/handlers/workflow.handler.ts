@@ -403,10 +403,10 @@ function validateUserPermissions(
           message: 'Only editors can submit configurations for approval',
         };
       }
-      if (currentStatus !== CS.IN_PROGRESS) {
+      if (currentStatus !== CS.IN_PROGRESS && currentStatus !== CS.REJECTED) {
         return {
           canPerform: false,
-          message: 'Can only submit configurations in IN_PROGRESS status',
+          message: 'Can only submit configurations in IN_PROGRESS or REJECTED status',
         };
       }
       break;

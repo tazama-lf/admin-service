@@ -566,11 +566,11 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     }
 
     await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
-    const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
+    // const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
-      config: updatedConfig,
+      config: { ...existingConfig, status: updateData.status ?? existingConfig.status },
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update config';

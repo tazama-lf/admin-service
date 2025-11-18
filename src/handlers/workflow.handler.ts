@@ -25,7 +25,7 @@ const VALID_TRANSITIONS: Record<ConfigStatus, ConfigStatus[]> = {
   [CS.EXPORTED]: [CS.READY_FOR_DEPLOYMENT, CS.DEPLOYED],
   [CS.READY_FOR_DEPLOYMENT]: [CS.DEPLOYED],
   [CS.DEPLOYED]: [],
-  [CS.REJECTED]: [CS.IN_PROGRESS],
+  [CS.REJECTED]: [CS.IN_PROGRESS, CS.UNDER_REVIEW],
 };
 
 const EDITABLE_STATUSES: ConfigStatus[] = [CS.IN_PROGRESS, CS.REJECTED];
@@ -923,7 +923,7 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
-      comments: dto.rejectionReason,
+      comments: dto.comment ?? null,
     });
 
     const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);

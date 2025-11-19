@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '..';
-import type { ConfigType, Job, JobStatus } from '@tazama-lf/tcs-lib';
+import type { ConfigType, Job, JobStatus, ScheduleStatus } from '@tazama-lf/tcs-lib';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
@@ -125,7 +125,7 @@ export const getJobsByStatusHandler = async (req: FastifyRequest, reply: Fastify
 export const updateJobActivationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
     const { id } = req.params as { id: string };
-    const { status, tableName } = req.body as { status: JobStatus; tableName: string };
+    const { status, tableName } = req.body as { status: ScheduleStatus; tableName: string };
 
     const updatedCount = await databaseService.updateJobActivation(id, status, tableName);
 

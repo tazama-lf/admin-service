@@ -127,11 +127,12 @@ export const updateJobActivationHandler = async (req: FastifyRequest, reply: Fas
     const { id } = req.params as { id: string };
     const { status, tableName } = req.body as { status: ScheduleStatus; tableName: string };
 
-    const updatedCount = await databaseService.updateJobActivation(id, status, tableName);
+    const updatedJob = (await databaseService.updateJobActivation(id, status, tableName)) as Job[];
 
     return await reply.code(200).send({
       success: true,
-      message: `Job publishing status updated successfully (${updatedCount.length} row(s) affected).`,
+      message: `Job publishing status updated successfully (${updatedJob.length} row(s) affected).`,
+      data: updatedJob[0],
     });
   } catch (error) {
     const err = error as Error;

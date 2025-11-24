@@ -2,7 +2,6 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ConfigStatus, ContentType, type Config, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
 import { databaseService, loggerService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
-import jwt from 'jsonwebtoken';
 
 export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -205,9 +204,9 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const configData = req.body as Record<string, unknown>;
 
     const newConfig = {
-      msgFam: (configData.msgFam as string) ?? '',
-      transactionType: (configData.transactionType as string) ?? '',
-      endpointPath: (configData.endpointPath as string) ?? '',
+      msgFam: configData.msgFam as string,
+      transactionType: configData.transactionType as string,
+      endpointPath: configData.endpointPath as string,
       version: configData.version as string,
       contentType: (configData.contentType as ContentType | undefined) ?? ContentType.JSON,
       schema: configData.schema as JSONSchema,
@@ -584,7 +583,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
 export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
-    const { publishing_status: publishingStatus } = req.body as { publishing_status: 'active' | 'inactive' };
+    const { publishing_status: publishingStatus } = req.body as { publishing_status?: 'active' | 'inactive' };
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
@@ -596,7 +595,7 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
       });
     }
 
-    if (!publishingStatus || (publishingStatus !== 'active' && publishingStatus !== 'inactive')) {
+    if (!publishingStatus) {
       return await reply.code(400).send({
         success: false,
         message: 'publishing_status must be either "active" or "inactive"',
@@ -616,64 +615,14 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
     }
 
     await databaseService.updateConfig(configId, tenantId, { publishing_status: publishingStatus });
-    const updatedConfig = await databaseService.findConfigById(configId, tenantId);
+    // const updatedConfig = await databaseService.findConfigById(configId, tenantId);
 
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`, 'updatePublishingStatusHandler');
-
-    try {
-      const axios = (await import('axios')).default;
-      const connectionStudioUrl = process.env.CONNECTION_STUDIO_URL ?? 'http://localhost:3000';
-      const notificationEndpoint = `${connectionStudioUrl}/notifications/publishing-status`;
-      const getUserEmail = (): string => {
-        try {
-          const authHeader = req.headers.authorization;
-          if (!authHeader?.startsWith('Bearer ')) return 'system@unknown';
-          const [, token] = authHeader.split(' ');
-          const decoded = jwt.decode(token) as { preferred_username?: string; email?: string } | null;
-          return decoded?.preferred_username ?? decoded?.email ?? 'system@unknown';
-        } catch {
-          return 'system@unknown';
-        }
-      };
-
-      const getUserName = (): string => {
-        try {
-          const authHeader = req.headers.authorization;
-          if (!authHeader?.startsWith('Bearer ')) return 'System User';
-          const [, token] = authHeader.split(' ');
-          const decoded = jwt.decode(token) as { name?: string; given_name?: string; preferred_username?: string } | null;
-          return decoded?.name ?? decoded?.given_name ?? decoded?.preferred_username ?? 'System User';
-        } catch {
-          return 'System User';
-        }
-      };
-
-      const payload = {
-        configId,
-        config: updatedConfig,
-        tenantId,
-        publishingStatus,
-        actorEmail: getUserEmail(),
-        actorName: getUserName(),
-      };
-
-      loggerService.log(`[${tenantId}] Sending publishing status notification for config ${id} (${publishingStatus})`);
-
-      await axios.post(notificationEndpoint, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000,
-      });
-
-      loggerService.log(`[${tenantId}] Publishing status notification sent successfully for config ${id}`);
-    } catch (notifError: unknown) {
-      const error = notifError as Error;
-      loggerService.warn(`[${tenantId}] Failed to send email notification for config ${id}: ${error.message}`);
-    }
 
     return await reply.code(200).send({
       success: true,
       message: `Publishing status updated to ${publishingStatus}`,
-      config: updatedConfig,
+      config: { ...existingConfig, publishing_status: publishingStatus },
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';

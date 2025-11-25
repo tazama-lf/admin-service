@@ -17,7 +17,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
         text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
         values: [filter.field, filter.value, sort, offset, limit, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rows.length > 0
@@ -31,7 +31,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
         text: 'SELECT configuration FROM network_map WHERE configuration->>name = $1, configuration->>cfg = $2 AND tenantId = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rows.length > 0 ? queryRes.rows[0].configuration : null;
@@ -44,7 +44,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
         text: 'INSERT INTO network_map (configuration) VALUES ($1) RETURNING configuration',
         values: [payload],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rows[0].configuration;
   },
@@ -55,7 +55,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
         text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
         values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
@@ -65,7 +65,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
         text: 'DELETE FROM network_map WHERE configuration->>name = $1 AND configuration->>cfg = $2 AND tenantId = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? true : false;
   },

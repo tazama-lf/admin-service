@@ -18,7 +18,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
         values: [filter.field, filter.value, sort, offset, limit, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rows.length > 0
@@ -32,7 +32,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
@@ -45,7 +45,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration;',
         values: [payload],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rows[0].configuration;
   },
@@ -56,7 +56,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',
         values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
@@ -67,7 +67,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? true : false;
   },

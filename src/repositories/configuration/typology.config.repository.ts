@@ -18,7 +18,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         text: `SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 ${order} OFFSET $3 LIMIT $4;`,
         values: [filter.field, filter.value, offset, limit, sort, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rows.length > 0
@@ -32,7 +32,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         text: 'SELECT configuration FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
@@ -45,7 +45,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         text: 'INSERT INTO typology (configuration) VALUES ($1) RETURNING configuration',
         values: [payload],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rows[0].configuration;
   },
@@ -56,7 +56,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 AND typologycfg = $3 AND tenantid = $4 RETURNING configuration',
         values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
@@ -67,7 +67,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         text: 'DELETE FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
         values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? true : false;
   },

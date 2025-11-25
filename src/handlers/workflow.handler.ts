@@ -669,10 +669,10 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       return;
     }
 
-    await databaseService.updateConfig(Number(id), tenantId, {
-      status: newStatus,
-      comments: dto.comment ?? null,
-    });
+    // await databaseService.updateConfig(Number(id), tenantId, {
+    //   status: newStatus,
+    //   comments: dto.comment ?? null,
+    // });
 
     loggerService.log(`Config ${id} rejected. Status: ${currentStatus} → ${newStatus} - Reason: ${dto.comment}`);
 

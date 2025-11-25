@@ -545,6 +545,7 @@ export const approveConfigHandler = async (req: FastifyRequest, reply: FastifyRe
 
     await databaseService.updateConfig(Number(id), tenantId, {
       status: newStatus,
+      comments: dto.comment,
     });
 
     try {
@@ -574,24 +575,26 @@ CREATE TABLE IF NOT EXISTS "${tableName}" (
       loggerService.error(` Failed to create table for config ${id}: ${error.message}`);
     }
 
-    const userEmail = getUserEmailFromRequest(req);
+    // const userEmail = getUserEmailFromRequest(req);
 
-    const genericNotificationPromise = sendGenericNotification({
-      event: NotificationEvent.APPROVER_APPROVE,
-      configId: Number(id),
-      config,
-      tenantId,
-      actorEmail: userEmail ?? 'system@unknown',
-      actorName: 'System User',
-      comment: dto.comment ?? dto.approvalNotes,
-    });
-    genericNotificationPromise.catch((err: unknown) => {
-      const error = err as Error;
-      loggerService.error(`[Generic Notification] Error: ${error.message}`);
-    });
+    // loggerService.log(` Fetched emails: ${userEmail}`);
+
+    // const genericNotificationPromise = sendGenericNotification({
+    //   event: NotificationEvent.APPROVER_APPROVE,
+    //   configId: Number(id),
+    //   config,
+    //   tenantId,
+    //   actorEmail: userEmail ?? 'system@unknown',
+    //   actorName: 'System User',
+    //   comment: dto.comment ?? dto.approvalNotes,
+    // });
+    // genericNotificationPromise.catch((err: unknown) => {
+    //   const error = err as Error;
+    //   loggerService.error(`[Generic Notification] Error: ${error.message}`);
+    // });
 
     loggerService.log(
-      `Config ${id} approved. Status: ${currentStatus} → ${newStatus}${(dto.comment ?? dto.approvalNotes ?? '') ? ` - Notes: ${dto.comment ?? dto.approvalNotes ?? ''}` : ''}`,
+      `Config ${id} approved. Status: ${currentStatus} → ${newStatus}${(dto.comment ?? '') ? ` - Notes: ${dto.comment ?? ''}` : ''}`,
     );
 
     reply.status(200).send({
@@ -629,7 +632,7 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     if (!dto.comment?.trim()) {
       reply.status(400).send({
         success: false,
-        message: 'Rejection reason is required xx',
+        message: 'Rejection reason is required',
       });
       return;
     }
@@ -671,7 +674,7 @@ export const rejectConfigHandler = async (req: FastifyRequest, reply: FastifyRep
       comments: dto.comment ?? null,
     });
 
-    loggerService.log(`Config ${id} rejected. Status: ${currentStatus} → ${newStatus} - Reason: ${dto.rejectionReason}`);
+    loggerService.log(`Config ${id} rejected. Status: ${currentStatus} → ${newStatus} - Reason: ${dto.comment}`);
 
     reply.status(200).send({
       success: true,
@@ -1047,7 +1050,7 @@ export const genericApproveConfigHandler = async (req: FastifyRequest, reply: Fa
     newStatus: CS.APPROVED,
     action: 'approve',
     notificationEvent: NotificationEvent.APPROVER_APPROVE,
-    comment: dto.comment ?? dto.approvalNotes,
+    comment: dto.comment,
     shouldCreateTable: true,
     successMessage: 'Configuration approved successfully',
   });

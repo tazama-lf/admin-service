@@ -68,6 +68,7 @@ import {
   createPushJobHandler,
   findJobByIdHandler,
   getAllJobsHandler,
+  getAllJobsHistoryHandler,
   getJobsByStatusHandler,
   updateJobActivationHandler,
   updateJobByStatusHandler,
@@ -123,6 +124,7 @@ const routePrivilege = {
   createPushJob: 'view-profile',
   createPullJob: 'view-profile',
   getAllJobs: 'view-profile',
+  getAllJobsHistory: 'view-profile',
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
   updateJobActivation: 'publisher',
@@ -147,6 +149,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/tcs/job/get/all', {
     ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
+  });
+
+  fastify.post('/v1/admin/tcs/job/get/history', {
+    ...SetOptionsBodyAndParams(getAllJobsHistoryHandler, routePrivilege.getAllJobsHistory),
   });
 
   fastify.get('/v1/admin/tcs/job/get/:id', {

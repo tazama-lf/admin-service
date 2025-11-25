@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '..';
-import type { ConfigType, Job, JobStatus, ScheduleStatus } from '@tazama-lf/tcs-lib';
+import type { ConfigType, Job, JobStatus, PaginatedResult, ScheduleStatus } from '@tazama-lf/tcs-lib';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
@@ -37,13 +37,13 @@ export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const body = (authReq.body as Record<string, string>) ?? {};
+    const body = (authReq.body as Record<string, string> | undefined) ?? {};
 
     const { offset = '0', limit = '10' } = req.query as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 
-    const result = await databaseService.getAllJobs(parsedLimit, parsedOffset, body, tenantId);
+    const result = (await databaseService.getAllJobs(parsedLimit, parsedOffset, body, tenantId)) as PaginatedResult<Job>;
 
     return await reply.code(200).send({
       success: true,
@@ -62,13 +62,42 @@ export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
+export const getAllJobsHistoryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = (authReq.body as Record<string, string> | undefined) ?? {};
+
+    const { offset = '0', limit = '10' } = req.query as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = (await databaseService.getJobHistory(parsedLimit, parsedOffset, tenantId, body)) as PaginatedResult<Job>;
+
+    return await reply.code(200).send({
+      success: true,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error) {
+    const err = error as Error;
+    return await reply.code(500).send({
+      success: false,
+      message: err.message || 'Failed to fetch jobs',
+    });
+  }
+};
+
 export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
     const { id } = req.params as { id: string };
     const { tableName } = req.query as { tableName: string };
-    const job = (await databaseService.findJobById(id, tableName)) as Job;
+    const job = (await databaseService.findJobById(id, tableName)) as Job | null;
 
-    if (!job) {
+    if (job === null) {
       return await reply.code(404).send({
         success: false,
         message: `Job with ID ${id} not found.`,

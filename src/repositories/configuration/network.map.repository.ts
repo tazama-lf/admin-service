@@ -14,8 +14,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     }
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit, tenantId],
+        text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
+        values: [filter.field, filter.value, sort, offset, limit],
       } satisfies PgQueryConfig,
       tenantId,
     );
@@ -28,8 +28,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   get: async function ({ id, cfg, tenantId }): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>name = $1, configuration->>cfg = $2 AND tenantId = $3;',
-        values: [id, cfg, tenantId],
+        text: 'SELECT configuration FROM network_map WHERE configuration->>name = $1, configuration->>cfg = $2;',
+        values: [id, cfg],
       } satisfies PgQueryConfig,
       tenantId,
     );
@@ -52,8 +52,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   update: async function ({ id, cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
-        values: [payload, id, cfg, tenantId],
+        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 RETURNING configuration;',
+        values: [payload, id, cfg],
       } satisfies PgQueryConfig,
       tenantId,
     );
@@ -62,8 +62,8 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'DELETE FROM network_map WHERE configuration->>name = $1 AND configuration->>cfg = $2 AND tenantId = $3;',
-        values: [id, cfg, tenantId],
+        text: 'DELETE FROM network_map WHERE configuration->>name = $1 AND configuration->>cfg = $2;',
+        values: [id, cfg],
       } satisfies PgQueryConfig,
       tenantId,
     );

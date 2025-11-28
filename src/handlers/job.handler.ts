@@ -1,14 +1,14 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '..';
-import type { ConfigType, Job, JobStatus, PaginatedResult, ScheduleStatus } from '@tazama-lf/tcs-lib';
+import type { ConfigType, ISuccess, Job, JobStatus, PaginatedResult, ScheduleStatus } from '@tazama-lf/tcs-lib';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
-    const job = req.body as Record<string, unknown>;
-    const jobId = await databaseService.createPushJob(job);
+    const job = req.body as Partial<Job>;
+    const result = (await databaseService.createPushJob(job)) as ISuccess;
 
-    return await reply.code(201).send({ id: jobId });
+    return await reply.code(201).send(result);
   } catch (error) {
     const err = error as Error;
     return await reply.code(500).send({
@@ -21,9 +21,9 @@ export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyRe
 export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
     const job = req.body as Record<string, unknown>;
-    const jobId = await databaseService.createPullJob(job);
+    const result = (await databaseService.createPullJob(job)) as ISuccess;
 
-    return await reply.code(201).send({ id: jobId });
+    return await reply.code(201).send(result);
   } catch (error) {
     const err = error as Error;
     return await reply.code(500).send({

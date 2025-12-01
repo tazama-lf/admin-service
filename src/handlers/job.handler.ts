@@ -154,9 +154,9 @@ export const getJobsByStatusHandler = async (req: FastifyRequest, reply: Fastify
 export const updateJobActivationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
     const { id } = req.params as { id: string };
-    const { status, tableName } = req.body as { status: ScheduleStatus; tableName: string };
+    const { status, type } = req.body as { status: ScheduleStatus; type: ConfigType };
 
-    const updatedJob = (await databaseService.updateJobActivation(id, status, tableName)) as Job[];
+    const updatedJob = (await databaseService.updateJobActivation(id, status, type)) as Job[];
 
     return await reply.code(200).send({
       success: true,

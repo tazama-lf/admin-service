@@ -107,10 +107,10 @@ export const getScheduleByStatusHandler = async (req: FastifyRequest, reply: Fas
 export const updateScheduleByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {
     const { id } = req.params as { id: string };
-    const { reason, tenantId } = req.body as { reason?: string; tenantId: string };
+    const { reason } = req.body as { reason?: string };
     const { status } = req.query as { status: JobStatus };
 
-    const updatedCount = await databaseService.updateScheduleByStatus(status, id, tenantId, reason);
+    const updatedCount = await databaseService.updateScheduleByStatus(status, id, reason);
 
     return await reply.code(200).send({
       success: true,

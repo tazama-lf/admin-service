@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'reflect-metadata';
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
-import { DatabaseFactory, DatabaseService, userEmailCache } from '@tazama-lf/tcs-lib';
+import { DatabaseFactory, DatabaseService } from '@tazama-lf/tcs-lib';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
@@ -10,7 +10,6 @@ import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
 import * as util from 'node:util';
 
 export const loggerService: LoggerService = new LoggerService(processorConfig);
-export { userEmailCache };
 
 let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
 let configuration: Configuration;

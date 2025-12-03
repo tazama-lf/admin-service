@@ -24,15 +24,7 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
       return;
     }
 
-    if (!mappingDto.destination && !mappingDto.destinations) {
-      reply.status(400).send({
-        success: false,
-        message: 'Mapping must have at least one destination field',
-      });
-      return;
-    }
-
-    const newMapping = createMappingFromDto(mappingDto);
+    const newMapping: FieldMapping = mappingDto as FieldMapping;
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
@@ -90,15 +82,7 @@ export const updateMappingHandler = async (req: FastifyRequest, reply: FastifyRe
       return;
     }
 
-    if (!mappingDto.destination && !mappingDto.destinations) {
-      reply.status(400).send({
-        success: false,
-        message: 'Mapping must have at least one destination field',
-      });
-      return;
-    }
-
-    const updatedMapping = createMappingFromDto(mappingDto);
+    const updatedMapping: FieldMapping = mappingDto as FieldMapping;
 
     const updatedMappings = [...config.mapping];
     updatedMappings[mappingIndex] = updatedMapping;
@@ -182,84 +166,3 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
     loggerService.log('End - Handle remove mapping request');
   }
 };
-
-function createMappingFromDto(dto: AddMappingDto): FieldMapping {
-  if (dto.sources && dto.sources.length > 0) {
-    if (dto.sources.length < 2) {
-      throw new Error('Concat mapping requires at least 2 source fields');
-    }
-    if (!dto.destination) {
-      throw new Error('Concat mapping requires a destination field');
-    }
-    const mapping: FieldMapping = {
-      source: dto.sources,
-      destination: dto.destination,
-      transformation: 'CONCAT' as const,
-      delimiter: dto.delimiter ?? ' ',
-    };
-    if (dto.prefix !== undefined) {
-      mapping.prefix = dto.prefix;
-    }
-    return mapping;
-  }
-
-  if (dto.sumFields && dto.sumFields.length > 0) {
-    if (dto.sumFields.length < 2) {
-      throw new Error('Sum mapping requires at least 2 source fields');
-    }
-    if (!dto.destination) {
-      throw new Error('Sum mapping requires a destination field');
-    }
-    const mapping: FieldMapping = {
-      source: dto.sumFields,
-      destination: dto.destination,
-      transformation: 'SUM' as const,
-    };
-    if (dto.prefix !== undefined) {
-      mapping.prefix = dto.prefix;
-    }
-    return mapping;
-  }
-
-  if (dto.source && dto.destinations && dto.destinations.length > 0) {
-    const mapping: FieldMapping = {
-      source: [dto.source],
-      destination: dto.destinations,
-      transformation: 'SPLIT' as const,
-      delimiter: dto.delimiter ?? ',',
-    };
-    if (dto.prefix !== undefined) {
-      mapping.prefix = dto.prefix;
-    }
-    return mapping;
-  }
-
-  if (dto.source && dto.destination) {
-    const mapping: FieldMapping = {
-      source: [dto.source],
-      destination: dto.destination,
-      transformation: 'NONE' as const,
-    };
-    if (dto.prefix !== undefined) {
-      mapping.prefix = dto.prefix;
-    }
-    return mapping;
-  }
-
-  if (dto.constantValue !== undefined && dto.destination) {
-    const mapping: FieldMapping = {
-      destination: dto.destination,
-      transformation: 'CONSTANT' as const,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- constantValue type is defined as any in FieldMapping interface from tcs-lib
-      constantValue: dto.constantValue,
-    };
-    if (dto.prefix !== undefined) {
-      mapping.prefix = dto.prefix;
-    }
-    return mapping;
-  }
-
-  throw new Error(
-    'Invalid mapping: provide (source, destination), (sources[], destination), (source, destinations[]), or (constantValue, destination)',
-  );
-}

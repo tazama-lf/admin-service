@@ -47,7 +47,6 @@ describe('validateTenantMiddleware', () => {
     await validateTenantMiddleware(mockRequest as FastifyRequest, mockReply as FastifyReply);
     // Debug log
     // eslint-disable-next-line no-console
-    console.log('Request after middleware:', mockRequest);
     expect(Object.prototype.hasOwnProperty.call(mockRequest, 'tenantId')).toBe(true);
     expect((mockRequest as any).tenantId).toBe('tenant123');
     expect(mockReply.code).not.toHaveBeenCalled();

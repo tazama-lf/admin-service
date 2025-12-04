@@ -59,7 +59,6 @@ const routePrivilege = {
   patchTcsConfigPublishingStatus: 'publisher',
   deleteTcsConfig: 'editor',
   postTcsConfigClone: 'editor',
-  getTcsPendingApprovals: 'view-profile',
   getTcsConfigByTransaction: 'view-profile',
   getTcsConfigByEndpoint: 'view-profile',
   postTcsConfigWrite: 'editor',
@@ -240,10 +239,6 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
 
-  // fastify.get('/v1/admin/tcs/config/transaction/:transactionType/:offset/:limit', {
-  //   ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
-  // });
-
   fastify.get('/v1/admin/tcs/config/:id', {
     ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
   });
@@ -276,9 +271,6 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updatePublishingStatusHandler, routePrivilege.patchTcsConfigPublishingStatus),
   });
 
-  // fastify.patch('/v1/admin/tcs/config/:id/status', {
-  //   ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
-  // });
   fastify.post('/v1/admin/tcs/config/:id/mapping', {
     ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),
     schema: {

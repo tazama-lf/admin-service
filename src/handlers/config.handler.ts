@@ -69,44 +69,6 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-// export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-//   try {
-//     const {
-//       transactionType,
-//       offset = '0',
-//       limit = '10',
-//     } = req.params as {
-//       transactionType: string;
-//       offset?: string;
-//       limit?: string;
-//     };
-//     const authReq = req as AuthenticatedRequest;
-//     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-
-//     const parsedLimit = parseInt(limit, 10);
-//     const parsedOffset = parseInt(offset, 10);
-
-//     const result = await databaseService.findConfigsByTransactionType(transactionType, tenantId, parsedLimit, parsedOffset);
-
-//     return await reply.code(200).send({
-//       success: true,
-//       configs: result.data,
-//       pagination: {
-//         total: result.total,
-//         limit: result.limit,
-//         offset: result.offset,
-//         pages: Math.ceil(result.total / result.limit),
-//       },
-//     });
-//   } catch (error: unknown) {
-//     const errorMessage = error instanceof Error ? error.message : 'Failed to get configs by transaction type';
-//     return await reply.code(500).send({
-//       success: false,
-//       message: errorMessage,
-//     });
-//   }
-// };
-
 export const createConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
   const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
@@ -131,25 +93,6 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
 
     const configId = await databaseService.createConfig(newConfig);
 
-    // try {
-    //   await databaseService.logAction({
-    //     action: 'CONFIG_CREATED',
-    //     entityType: 'CONFIG',
-    //     entityId: configId.toString(),
-    //     actor: userId,
-    //     tenantId,
-    //     endpointName: newConfig.endpointPath,
-    //     version: newConfig.version,
-    //     details: `Created config: ${newConfig.msgFam} / ${newConfig.transactionType} / ${newConfig.version}`,
-    //     newValues: { msgFam: newConfig.msgFam, transactionType: newConfig.transactionType, version: newConfig.version },
-    //     severity: 'MEDIUM',
-    //     status: 'SUCCESS',
-    //   });
-    // } catch (auditError: unknown) {
-    //   const errorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
-    //   loggerService.error(`Failed to log audit entry: ${errorMessage}`, 'createConfigHandler');
-    // }
-
     return await reply.code(201).send({
       success: true,
       message: 'Config created successfully',
@@ -158,22 +101,6 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
     loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
-
-    // try {
-    //   await databaseService.logAction({
-    //     action: 'CONFIG_CREATE_FAILED',
-    //     entityType: 'CONFIG',
-    //     actor: userId,
-    //     tenantId,
-    //     details: `Failed to create config`,
-    //     errorMessage,
-    //     severity: 'HIGH',
-    //     status: 'FAILURE',
-    //   });
-    // } catch (auditError: unknown) {
-    //   const auditErrorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
-    //   loggerService.error(`Failed to log audit entry: ${auditErrorMessage}`, 'createConfigHandler');
-    // }
 
     return await reply.code(500).send({
       success: false,
@@ -200,26 +127,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
 
-    // try {
-    //   await databaseService.logAction({
-    //     action: 'CONFIG_UPDATED',
-    //     entityType: 'CONFIG',
-    //     entityId: id,
-    //     actor: userId,
-    //     tenantId,
-    //     endpointName: updatedConfig?.endpointPath,
-    //     version: updatedConfig?.version,
-    //     details: `Updated config ${id}`,
-    //     oldValues,
-    //     newValues: updateData,
-    //     severity: 'MEDIUM',
-    //     status: 'SUCCESS',
-    //   });
-    // } catch (auditError: unknown) {
-    //   const errorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
-    //   loggerService.error(`Failed to log audit entry: ${errorMessage}`, 'updateConfigHandler');
-    // }
-
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
@@ -228,22 +135,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
     loggerService.error(`Failed to update config: ${errorMessage}`, 'updateConfigHandler');
-
-    // try {
-    //   await databaseService.logAction({
-    //     action: 'CONFIG_UPDATE_FAILED',
-    //     entityType: 'CONFIG',
-    //     entityId: id,
-    //     actor: userId,
-    //     tenantId,
-    //     errorMessage,
-    //     severity: 'HIGH',
-    //     status: 'FAILURE',
-    //   });
-    // } catch (auditError: unknown) {
-    //   const auditErrorMessage = auditError instanceof Error ? auditError.message : 'Unknown error';
-    //   loggerService.error(`Failed to log audit entry: ${auditErrorMessage}`, 'updateConfigHandler');
-    // }
 
     return await reply.code(500).send({
       success: false,

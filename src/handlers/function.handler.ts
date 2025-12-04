@@ -26,7 +26,9 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
 
     const newFunction: FunctionDefinition = {
       functionName: functionDto.functionName,
-      params: functionDto.params,
+      params: functionDto.params ?? [],
+      tableName: functionDto.tableName ?? '',
+      columns: functionDto.columns ?? [],
     };
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
@@ -88,7 +90,9 @@ export const updateFunctionHandler = async (req: FastifyRequest, reply: FastifyR
 
     const updatedFunction: FunctionDefinition = {
       functionName: functionDto.functionName,
-      params: functionDto.params,
+      params: functionDto.params ?? [],
+      tableName: functionDto.tableName ?? '',
+      columns: functionDto.columns ?? [],
     };
 
     const updatedFunctions = [...config.functions];

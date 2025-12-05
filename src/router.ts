@@ -9,7 +9,8 @@ import {
   updatePublishingStatusHandler,
   cloneConfigHandler,
   deleteConfigHandler,
-  // getConfigByTransactionTypeHandler,
+  createTransactionTypeTableHandler,
+  createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
   writeConfigHandler,
   writeConfigUpdateHandler,
@@ -105,6 +106,8 @@ const routePrivilege = {
   postTcsDataModelDestinationType: 'editor',
   getTcsDataModelDestinationTypeExists: 'view-profile',
   postTcsDataModelDestinationTypeField: 'editor',
+  postTcsDataModelTransactionTypeTable: 'editor',
+  postTcsDataModelTable: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -283,97 +286,30 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/tcs/config/:id/mapping', {
     ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-        },
-        required: ['id'],
-      },
-    },
   });
 
   fastify.put('/v1/admin/tcs/config/:id/mapping/:index', {
     ...SetOptionsBodyAndParams(updateMappingHandler, routePrivilege.putTcsConfigMapping),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-          index: { type: 'number' },
-        },
-        required: ['id', 'index'],
-      },
-    },
   });
 
   fastify.delete('/v1/admin/tcs/config/:id/mapping/:index', {
     ...SetOptionsBodyAndParams(removeMappingHandler, routePrivilege.deleteTcsConfigMapping),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-          index: { type: 'number' },
-        },
-        required: ['id', 'index'],
-      },
-    },
   });
 
   fastify.post('/v1/admin/tcs/config/:id/function', {
     ...SetOptionsBodyAndParams(addFunctionHandler, routePrivilege.postTcsConfigFunction),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-        },
-        required: ['id'],
-      },
-    },
   });
 
   fastify.put('/v1/admin/tcs/config/:id/function/:index', {
     ...SetOptionsBodyAndParams(updateFunctionHandler, routePrivilege.putTcsConfigFunction),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-          index: { type: 'number' },
-        },
-        required: ['id', 'index'],
-      },
-    },
   });
 
   fastify.delete('/v1/admin/tcs/config/:id/function/:index', {
     ...SetOptionsBodyAndParams(removeFunctionHandler, routePrivilege.deleteTcsConfigFunction),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          id: { type: 'number' },
-          index: { type: 'number' },
-        },
-        required: ['id', 'index'],
-      },
-    },
   });
 
   fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
     ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          tenantId: { type: 'string' },
-        },
-        required: ['tenantId'],
-      },
-    },
   });
 
   fastify.post('/v1/admin/tcs/data-model/destination-types', {
@@ -382,28 +318,18 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/exists', {
     ...SetOptionsBodyAndParams(destinationTypeExistsHandler, routePrivilege.getTcsDataModelDestinationTypeExists),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          destinationTypeId: { type: 'string' },
-        },
-        required: ['destinationTypeId'],
-      },
-    },
   });
 
   fastify.post('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/fields', {
     ...SetOptionsBodyAndParams(addFieldToDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationTypeField),
-    schema: {
-      params: {
-        type: 'object',
-        properties: {
-          destinationTypeId: { type: 'string' },
-        },
-        required: ['destinationTypeId'],
-      },
-    },
+  });
+
+  fastify.post('/v1/admin/tcs/deploy/transaction-type-table', {
+    ...SetOptionsBodyAndParams(createTransactionTypeTableHandler, routePrivilege.postTcsDataModelTransactionTypeTable),
+  });
+
+  fastify.post('/v1/admin/tcs/data-model/table', {
+    ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
 }
 

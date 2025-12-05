@@ -294,6 +294,65 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
+export async function createTransactionTypeTableHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  try {
+    const { transactionType } = request.body as { transactionType: string };
+
+    if (!transactionType) {
+      await reply.status(400).send({
+        success: false,
+        message: 'Transaction type is required',
+      });
+      return;
+    }
+
+    await databaseService.createTransactionTypeTable(transactionType);
+
+    await reply.status(201).send({
+      success: true,
+      message: `Table for transaction type '${transactionType}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    request.log.error(`Failed to create transaction type table: ${errorMessage}`);
+    await reply.status(500).send({
+      success: false,
+      message: errorMessage,
+    });
+  }
+}
+
+export async function createTazamaDataModelTableHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  try {
+    const { tableName, columns } = request.body as {
+      tableName: string;
+      columns: Array<{ name: string; type: string; isPrimaryKey?: boolean | string; param?: string }>;
+    };
+
+    if (!tableName || !columns || !Array.isArray(columns)) {
+      await reply.status(400).send({
+        success: false,
+        message: 'Table name and columns array are required',
+      });
+      return;
+    }
+
+    await databaseService.createTazamaDataModelTable(tableName, columns);
+
+    await reply.status(201).send({
+      success: true,
+      message: `Table '${tableName}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    request.log.error(`Failed to create Tazama data model table: ${errorMessage}`);
+    await reply.status(500).send({
+      success: false,
+      message: errorMessage,
+    });
+  }
+}
+
 export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };

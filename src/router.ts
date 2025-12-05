@@ -8,16 +8,14 @@ import {
   updateConfigHandler,
   updatePublishingStatusHandler,
   cloneConfigHandler,
-  deleteConfigHandler,
   createTransactionTypeTableHandler,
   createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
   writeConfigHandler,
   writeConfigUpdateHandler,
-  rawQueryHandler,
 } from './handlers/config.handler';
-import { addMappingHandler, updateMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
-import { addFunctionHandler, updateFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
+import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
+import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import { ExpireAccountConditionSchema, ExpireDateTimeSchema, NetworkMapSchema, RuleSchema, TypologySchema } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
@@ -264,10 +262,6 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(cloneConfigHandler, routePrivilege.postTcsConfigClone),
   });
 
-  fastify.delete('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(deleteConfigHandler, routePrivilege.deleteTcsConfig),
-  });
-
   fastify.post('/v1/admin/tcs/config/write', {
     ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
   });
@@ -276,9 +270,9 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
   });
 
-  fastify.post('/v1/admin/tcs/raw-query', {
-    ...SetOptionsBodyAndParams(rawQueryHandler, routePrivilege.postTcsRawQuery),
-  });
+  // fastify.post('/v1/admin/tcs/raw-query', {
+  //   ...SetOptionsBodyAndParams(rawQueryHandler, routePrivilege.postTcsRawQuery),
+  // });
 
   fastify.patch('/v1/admin/tcs/config/:id/publishing-status', {
     ...SetOptionsBodyAndParams(updatePublishingStatusHandler, routePrivilege.patchTcsConfigPublishingStatus),
@@ -288,20 +282,12 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),
   });
 
-  fastify.put('/v1/admin/tcs/config/:id/mapping/:index', {
-    ...SetOptionsBodyAndParams(updateMappingHandler, routePrivilege.putTcsConfigMapping),
-  });
-
   fastify.delete('/v1/admin/tcs/config/:id/mapping/:index', {
     ...SetOptionsBodyAndParams(removeMappingHandler, routePrivilege.deleteTcsConfigMapping),
   });
 
   fastify.post('/v1/admin/tcs/config/:id/function', {
     ...SetOptionsBodyAndParams(addFunctionHandler, routePrivilege.postTcsConfigFunction),
-  });
-
-  fastify.put('/v1/admin/tcs/config/:id/function/:index', {
-    ...SetOptionsBodyAndParams(updateFunctionHandler, routePrivilege.putTcsConfigFunction),
   });
 
   fastify.delete('/v1/admin/tcs/config/:id/function/:index', {

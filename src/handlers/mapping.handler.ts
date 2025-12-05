@@ -5,14 +5,14 @@ import type { ITenantRequest } from '../interface/ITenantRequest';
 import type { FieldMapping, AddMappingDto } from '@tazama-lf/tcs-lib';
 
 export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle add mapping request');
+  // loggerService.log('Start - Handle add mapping request');
 
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
     const mappingDto = req.body as AddMappingDto;
 
-    loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
+    // loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
 
     const config = await databaseService.findConfigById(Number(id), tenantId);
 
@@ -28,13 +28,13 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
-    await databaseService.updateConfig(Number(id), tenantId, {
+    const updatedConfig = await databaseService.updateConfig(Number(id), tenantId, {
       mapping: updatedMappings,
     });
 
-    const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
+    // const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 
-    loggerService.log(`Successfully added mapping to config ${id}`);
+    // loggerService.log(`Successfully added mapping to config ${id}`);
 
     reply.status(200).send({
       success: true,
@@ -48,70 +48,8 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
       success: false,
       message: `Failed to add mapping: ${error.message}`,
     });
-  } finally {
-    loggerService.log('End - Handle add mapping request');
   }
 };
-
-export const updateMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle update mapping request');
-
-  try {
-    const { id, index } = req.params as { id: string; index: string };
-    const { tenantId } = req as ITenantRequest;
-    const mappingDto = req.body as AddMappingDto;
-    const mappingIndex = Number(index);
-
-    loggerService.log(`Updating mapping at index ${mappingIndex} in config ${id} for tenant ${tenantId}`);
-
-    const config = await databaseService.findConfigById(Number(id), tenantId);
-
-    if (!config) {
-      reply.status(404).send({
-        success: false,
-        message: 'Config not found',
-      });
-      return;
-    }
-
-    if (!config.mapping || mappingIndex < 0 || mappingIndex >= config.mapping.length) {
-      reply.status(400).send({
-        success: false,
-        message: 'Invalid mapping index',
-      });
-      return;
-    }
-
-    const updatedMapping: FieldMapping = mappingDto as FieldMapping;
-
-    const updatedMappings = [...config.mapping];
-    updatedMappings[mappingIndex] = updatedMapping;
-
-    await databaseService.updateConfig(Number(id), tenantId, {
-      mapping: updatedMappings,
-    });
-
-    const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
-
-    loggerService.log(`Successfully updated mapping at index ${mappingIndex} in config ${id}`);
-
-    reply.status(200).send({
-      success: true,
-      message: 'Mapping updated successfully',
-      config: updatedConfig,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    loggerService.error(`Failed to update mapping: ${error.message}`, error.stack ?? '');
-    reply.status(500).send({
-      success: false,
-      message: `Failed to update mapping: ${error.message}`,
-    });
-  } finally {
-    loggerService.log('End - Handle update mapping request');
-  }
-};
-
 export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle remove mapping request');
 
@@ -146,14 +84,13 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
       mapping: updatedMappings.length > 0 ? updatedMappings : [],
     });
 
-    const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
+    // const updatedConfig = await databaseService.findConfigById(Number(id), tenantId);
 
     loggerService.log(`Successfully removed mapping at index ${mappingIndex} from config ${id}`);
 
     reply.status(200).send({
       success: true,
       message: 'Mapping removed successfully',
-      config: updatedConfig,
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -162,7 +99,5 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
       success: false,
       message: `Failed to remove mapping: ${error.message}`,
     });
-  } finally {
-    loggerService.log('End - Handle remove mapping request');
   }
 };

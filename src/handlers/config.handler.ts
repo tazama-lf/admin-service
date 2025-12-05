@@ -195,35 +195,6 @@ export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
   }
 };
 
-export const deleteConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { id } = req.params as { id: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-
-    const existingConfig = await databaseService.findConfigById(parseInt(id), tenantId);
-    if (!existingConfig) {
-      return await reply.code(404).send({
-        success: false,
-        message: `Config with id ${id} not found`,
-      });
-    }
-
-    await databaseService.deleteConfig(parseInt(id), tenantId);
-
-    return await reply.code(200).send({
-      success: true,
-      message: 'Config deleted successfully',
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to delete config';
-    return await reply.code(500).send({
-      success: false,
-      message: errorMessage,
-    });
-  }
-};
-
 export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     loggerService.log('[ADMIN-SERVICE] writeConfigHandler called', 'ConfigHandler');
@@ -271,19 +242,19 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
     const existingConfig = await databaseService.findConfigById(parseInt(id), tenantId);
-    if (!existingConfig) {
-      return await reply.code(404).send({
-        success: false,
-        message: `Config with id ${id} not found`,
-      });
-    }
+    // if (!existingConfig) {
+    //   return await reply.code(404).send({
+    //     success: false,
+    //     message: `Config with id ${id} not found`,
+    //   });
+    // }
 
     await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     // const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
-      config: { ...existingConfig, status: updateData.status ?? existingConfig.status },
+      config: { ...existingConfig, status: updateData.status },
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
@@ -407,36 +378,36 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
   }
 };
 
-export const rawQueryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { query } = req.body as { query: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+// export const rawQueryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const { query } = req.body as { query: string };
+//     const authReq = req as AuthenticatedRequest;
+//     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    if (!query) {
-      return await reply.code(400).send({
-        success: false,
-        message: 'Query is required',
-      });
-    }
+//     if (!query) {
+//       return await reply.code(400).send({
+//         success: false,
+//         message: 'Query is required',
+//       });
+//     }
 
-    loggerService.log(`Executing raw query for tenant ${tenantId}`, 'rawQueryHandler');
+//     loggerService.log(`Executing raw query for tenant ${tenantId}`, 'rawQueryHandler');
 
-    const result = await databaseService.runRawQuery(query, tenantId);
+//     const result = await databaseService.runRawQuery(query, tenantId);
 
-    return await reply.code(200).send({
-      success: true,
-      data: result,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to execute raw query';
-    loggerService.error(`Failed to execute raw query: ${errorMessage}`, 'rawQueryHandler');
-    return await reply.code(500).send({
-      success: false,
-      message: errorMessage,
-    });
-  }
-};
+//     return await reply.code(200).send({
+//       success: true,
+//       data: result,
+//     });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to execute raw query';
+//     loggerService.error(`Failed to execute raw query: ${errorMessage}`, 'rawQueryHandler');
+//     return await reply.code(500).send({
+//       success: false,
+//       message: errorMessage,
+//     });
+//   }
+// };
 
 export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
   try {

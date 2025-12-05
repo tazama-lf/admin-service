@@ -41,6 +41,12 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
+import {
+  getAllCollectionsHandler,
+  createDestinationTypeHandler,
+  destinationTypeExistsHandler,
+  addFieldToDestinationTypeHandler,
+} from './handlers/data-model.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -95,6 +101,10 @@ const routePrivilege = {
   updateJobStatus: 'view-profile',
   updateJob: 'editor',
   validateTable: 'view-profile',
+  getTcsDataModelCollections: 'view-profile',
+  postTcsDataModelDestinationType: 'editor',
+  getTcsDataModelDestinationTypeExists: 'view-profile',
+  postTcsDataModelDestinationTypeField: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -349,6 +359,49 @@ function Routes(fastify: FastifyInstance): void {
           index: { type: 'number' },
         },
         required: ['id', 'index'],
+      },
+    },
+  });
+
+  fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
+    ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          tenantId: { type: 'string' },
+        },
+        required: ['tenantId'],
+      },
+    },
+  });
+
+  fastify.post('/v1/admin/tcs/data-model/destination-types', {
+    ...SetOptionsBodyAndParams(createDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationType),
+  });
+
+  fastify.get('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/exists', {
+    ...SetOptionsBodyAndParams(destinationTypeExistsHandler, routePrivilege.getTcsDataModelDestinationTypeExists),
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          destinationTypeId: { type: 'string' },
+        },
+        required: ['destinationTypeId'],
+      },
+    },
+  });
+
+  fastify.post('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/fields', {
+    ...SetOptionsBodyAndParams(addFieldToDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationTypeField),
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          destinationTypeId: { type: 'string' },
+        },
+        required: ['destinationTypeId'],
       },
     },
   });

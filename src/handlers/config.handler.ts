@@ -241,20 +241,14 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    const existingConfig = await databaseService.findConfigById(parseInt(id), tenantId);
-    // if (!existingConfig) {
-    //   return await reply.code(404).send({
-    //     success: false,
-    //     message: `Config with id ${id} not found`,
-    //   });
-    // }
+    // const existingConfig = await databaseService.findConfigById(parseInt(id), tenantId);
 
     await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
-    // const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
+    const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
     return await reply.code(200).send({
       success: true,
       message: 'Config updated successfully',
-      config: { ...existingConfig, status: updateData.status },
+      config: updatedConfig,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update config';

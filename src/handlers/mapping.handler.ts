@@ -22,7 +22,16 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
       return;
     }
 
-    const newMapping: FieldMapping = mappingDto as FieldMapping;
+    const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
+
+    const normalizedDestination = Array.isArray(mappingDto.destination) ? mappingDto.destination : [mappingDto.destination!];
+
+    const newMapping: FieldMapping = {
+      ...mappingDto,
+      source: normalizedSource,
+      destination: normalizedDestination,
+    };
+
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
     const updatedConfig = await databaseService.updateConfig(Number(id), tenantId, {

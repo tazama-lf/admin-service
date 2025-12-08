@@ -144,12 +144,10 @@ describe('handlePostConditionEntity', () => {
     const result = await handlePostConditionEntity(conditionDebtor as EntityCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...conditionDebtor,
-        creDtTm: nowDateTime,
-      }),
-    );
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith({
+      ...conditionDebtor,
+      creDtTm: nowDateTime,
+    });
     const entityId = `${conditionDebtor.ntty.id}${conditionDebtor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsDebtorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionDebtor);
     expect(result).toEqual({

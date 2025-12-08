@@ -157,8 +157,9 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       status: configData.status as ConfigStatus,
       tenantId,
       createdBy: userId,
+      publishing_status: ((configData.publishingStatus as string) || 'inactive') as 'active' | 'inactive',
     };
-    const configId = await databaseService.createConfig(newConfig);
+    const configId = await databaseService.createConfig(newConfig, configData.id as number | undefined);
     reply.code(201).send({ success: true, message: 'Config written successfully', config: { ...newConfig, id: configId } });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to write config';

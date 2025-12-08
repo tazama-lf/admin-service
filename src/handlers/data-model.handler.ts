@@ -23,7 +23,7 @@ export async function getAllCollectionsHandler(req: FastifyRequest, reply: Fasti
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const result = (await databaseService.getAllCollections()) as CollectionRow[];
+    const result = (await databaseService.getAllCollections(tenantId)) as CollectionRow[];
     const collections = await Promise.all(
       result.map(async (row) => ({
         name: row.collection_name,
@@ -89,15 +89,17 @@ async function getCollectionFields(collectionId: number, tenantId: string): Prom
   return fields;
 }
 
-export async function createDestinationTypeHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function createDestinationTypeHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const { collection_type: collectionType, name, description, destination_id: destinationId } = request.body as CreateDestinationTypeBody;
-
+    const { collection_type: collectionType, name, description, destination_id: destinationId } = req.body as CreateDestinationTypeBody;
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const result = (await databaseService.createDestinationType(
       collectionType,
       name,
       description ?? null,
       destinationId,
+      tenantId,
     )) as DestinationTypeResult;
 
     reply.status(201).send({
@@ -107,35 +109,37 @@ export async function createDestinationTypeHandler(request: FastifyRequest, repl
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    request.log.error(`Failed to create destination type: ${errorMessage}`);
+    req.log.error(`Failed to create destination type: ${errorMessage}`);
     sendError(reply, 500, errorMessage, null);
   }
 }
 
-export async function destinationTypeExistsHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function destinationTypeExistsHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const { destinationTypeId } = request.params as DestinationTypeParams;
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'default';
+    const { destinationTypeId } = req.params as DestinationTypeParams;
     const destinationTypeIdNum = Number.parseInt(destinationTypeId, 10);
-    const exists = await databaseService.destinationTypeExists(destinationTypeIdNum);
-
+    const exists = await databaseService.destinationTypeExists(destinationTypeIdNum, tenantId);
     reply.status(200).send({
       success: true,
       exists,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    request.log.error(`Failed to check destination type: ${errorMessage}`);
+    req.log.error(`Failed to check destination type: ${errorMessage}`);
     sendError(reply, 500, errorMessage);
   }
 }
-export async function addFieldToDestinationTypeHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function addFieldToDestinationTypeHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const { destinationTypeId } = request.params as DestinationTypeParams;
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { destinationTypeId } = req.params as DestinationTypeParams;
     const destinationTypeIdNum = Number.parseInt(destinationTypeId, 10);
-    const { name, field_type: fieldType, parent_id: parentId, is_active: isActive, serial_no: serialNo } = request.body as AddFieldBody;
+    const { name, field_type: fieldType, parent_id: parentId, serial_no: serialNo } = req.body as AddFieldBody;
 
-    const exists = await databaseService.destinationTypeExists(destinationTypeIdNum);
-
+    const exists = await databaseService.destinationTypeExists(destinationTypeIdNum, tenantId);
     if (!exists) {
       sendError(reply, 404, `Destination type with ID ${destinationTypeIdNum} not found`, null);
       return;
@@ -150,7 +154,7 @@ export async function addFieldToDestinationTypeHandler(request: FastifyRequest, 
       name,
       fieldType,
       parentId ?? null,
-      isActive ?? true,
+      tenantId,
       finalSerialNo ?? null,
       destinationTypeIdNum,
     )) as FieldResult;
@@ -162,7 +166,7 @@ export async function addFieldToDestinationTypeHandler(request: FastifyRequest, 
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    request.log.error(`Failed to add field: ${errorMessage}`);
+    req.log.error(`Failed to add field: ${errorMessage}`);
     sendError(reply, 500, errorMessage, null);
   }
 }

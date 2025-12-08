@@ -28,7 +28,6 @@ export async function getAllCollectionsHandler(req: FastifyRequest, reply: Fasti
       result.map(async (row) => ({
         name: row.collection_name,
         type: row.collection_type,
-        description: row.collection_description,
         collection_id: row.destination_type_id,
         fields: await getCollectionFields(row.destination_type_id, tenantId),
       })),

@@ -91,16 +91,10 @@ async function getCollectionFields(collectionId: number, tenantId: string): Prom
 
 export async function createDestinationTypeHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const { collection_type: collectionType, name, description, destination_id: destinationId } = req.body as CreateDestinationTypeBody;
+    const { collection_type: collectionType, name, destination_id: destinationId } = req.body as CreateDestinationTypeBody;
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const result = (await databaseService.createDestinationType(
-      collectionType,
-      name,
-      description ?? null,
-      destinationId,
-      tenantId,
-    )) as DestinationTypeResult;
+    const result = (await databaseService.createDestinationType(collectionType, name, destinationId, tenantId)) as DestinationTypeResult;
 
     reply.status(201).send({
       success: true,

@@ -24,12 +24,10 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
 
     const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
 
-    const normalizedDestination = Array.isArray(mappingDto.destination) ? mappingDto.destination : [mappingDto.destination!];
-
     const newMapping: FieldMapping = {
       ...mappingDto,
       source: normalizedSource,
-      destination: normalizedDestination,
+      destination: mappingDto.destination as string | string[],
     };
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];

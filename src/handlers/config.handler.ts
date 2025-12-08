@@ -199,15 +199,11 @@ export const createTransactionTypeTableHandler = async (req: FastifyRequest, rep
 
 export const createTazamaDataModelTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { tableName, columns } = req.body as {
+    const { tableName } = req.body as {
       tableName: string;
-      columns: Array<{ name: string; type: string; isPrimaryKey?: boolean | string; param?: string }>;
     };
-    if (!tableName || !columns || !Array.isArray(columns)) {
-      sendError(reply, 400, 'Table name and columns array are required');
-      return;
-    }
-    await databaseService.createTazamaDataModelTable(tableName, columns);
+
+    await databaseService.createTazamaDataModelTable(tableName);
     reply.code(201).send({ success: true, message: `Table '${tableName}' created successfully` });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -242,13 +238,11 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
     }
     await databaseService.updateConfig(configId, tenantId, { publishing_status: publishingStatus });
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`, 'updatePublishingStatusHandler');
-    reply
-      .code(200)
-      .send({
-        success: true,
-        message: `Publishing status updated to ${publishingStatus}`,
-        config: { ...existingConfig, publishing_status: publishingStatus },
-      });
+    reply.code(200).send({
+      success: true,
+      message: `Publishing status updated to ${publishingStatus}`,
+      config: { ...existingConfig, publishing_status: publishingStatus },
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';
     loggerService.error(`Failed to update publishing status: ${errorMessage}`, 'updatePublishingStatusHandler');

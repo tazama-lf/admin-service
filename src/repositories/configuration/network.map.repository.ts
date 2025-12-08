@@ -3,6 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
+import { server } from '../..';
 
 export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   list: async function ({ limit, offset, sort, order, filters, tenantId }): Promise<{ data: NetworkMap[]; total: number }> {
@@ -57,7 +58,12 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
       } satisfies PgQueryConfig,
       'configuration',
     );
-    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+    const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
+
+    if (server.handleResponseCommandChannel && result) {
+      await server.handleResponseCommandChannel(result, ['network-map'], [{ key: 'config-type', value: 'network-map' }]);
+    }
+    return result;
   },
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(

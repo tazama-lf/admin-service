@@ -3,6 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { RuleConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
+import { server } from '../..';
 
 export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   list: async function ({ offset, limit, filters, order, sort, tenantId }): Promise<{ data: RuleConfig[]; total: number }> {
@@ -58,7 +59,12 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
       } satisfies PgQueryConfig,
       'configuration',
     );
-    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+    const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
+
+    if (server.handleResponseCommandChannel && result) {
+      await server.handleResponseCommandChannel(result, ['rule-config'], [{ key: 'config-type', value: 'rule-configuration' }]);
+    }
+    return result;
   },
 
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {

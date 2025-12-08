@@ -3,6 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
+import { server } from '../..';
 
 export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   list: async function ({ filters, limit, offset, order, sort, tenantId }): Promise<{ data: TypologyConfig[]; total: number }> {
@@ -58,7 +59,12 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
       } satisfies PgQueryConfig,
       'configuration',
     );
-    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+    const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
+
+    if (server.handleResponseCommandChannel && result) {
+      await server.handleResponseCommandChannel(result, ['typology-config'], [{ key: 'config-type', value: 'typology-configuration' }]);
+    }
+    return result;
   },
 
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {

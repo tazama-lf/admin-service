@@ -66,7 +66,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
       }
       return result;
     } catch (error) {
-      loggerService.error('Error in NetworkMapRepo.update while sending command channel message', error);
+      loggerService.error('Error in TypologyRepo.update while sending command channel message', error);
       throw error;
     }
   },

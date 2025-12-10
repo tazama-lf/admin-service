@@ -67,7 +67,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
       }
       return result;
     } catch (error) {
-      loggerService.error('Error in NetworkMapRepo.update while sending command channel message', error);
+      loggerService.error('Error in RuleRepo.update while sending command channel message', error);
       throw error;
     }
   },

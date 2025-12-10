@@ -463,12 +463,10 @@ describe('handlePostConditionAccount', () => {
     const result = await handlePostConditionAccount(conditionCreditor as AccountCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...conditionCreditor,
-        creDtTm: nowDateTime,
-      }),
-    );
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith({
+      ...conditionCreditor,
+      creDtTm: nowDateTime,
+    });
     const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
 
     expect(databaseManager.saveGovernedAsCreditorAccountByEdge).toHaveBeenCalledWith('cond123', accountId, conditionCreditor);

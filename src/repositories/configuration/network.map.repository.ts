@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { loggerService, server } from '../..';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
 
@@ -52,12 +53,22 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   update: async function ({ id, cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 RETURNING configuration;',
-        values: [payload, id, cfg],
+        text: "UPDATE network_map SET configuration = $1::jsonb WHERE configuration->>'cfg' = $2 RETURNING configuration;",
+        values: [payload, cfg],
       } satisfies PgQueryConfig,
       tenantId,
     );
-    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+
+    try {
+      const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
+      if (server.handleResponseCommandChannel && result) {
+        await server.handleResponseCommandChannel(result, ['command-channel.subject'], [{ key: 'config-type', value: 'network-map' }]);
+      }
+      return result;
+    } catch (error) {
+      loggerService.error('Error in NetworkMapRepo.update while sending command channel message', error);
+      throw error;
+    }
   },
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(

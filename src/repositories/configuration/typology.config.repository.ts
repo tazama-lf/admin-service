@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
+import { loggerService, server } from '../..';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
 
@@ -58,7 +59,16 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
       } satisfies PgQueryConfig,
       tenantId,
     );
-    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+    try {
+      const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
+      if (server.handleResponseCommandChannel && result) {
+        await server.handleResponseCommandChannel(result, ['command-channel.subject'], [{ key: 'config-type', value: 'typology-config' }]);
+      }
+      return result;
+    } catch (error) {
+      loggerService.error('Error in NetworkMapRepo.update while sending command channel message', error);
+      throw error;
+    }
   },
 
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {

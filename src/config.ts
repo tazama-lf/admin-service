@@ -20,6 +20,10 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  STARTUP_TYPE: string;
+  SERVER_URL: string;
+  COMMAND_CHANNEL_STREAM_SUBJECT: string;
+  COMMAND_CHANNEL_PRODUCER_STREAM: string;
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -42,6 +46,26 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
     name: 'CORS_POLICY',
     type: 'string',
     optional: true,
+  },
+  {
+    name: 'STARTUP_TYPE',
+    type: 'string',
+    optional: false,
+  },
+  {
+    name: 'SERVER_URL',
+    type: 'string',
+    optional: false,
+  },
+  {
+    name: 'COMMAND_CHANNEL_STREAM_SUBJECT',
+    type: 'string',
+    optional: false,
+  },
+  {
+    name: 'COMMAND_CHANNEL_PRODUCER_STREAM',
+    type: 'string',
+    optional: false,
   },
 ];
 

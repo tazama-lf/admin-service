@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
-import { loggerService, server } from '../..';
+import { configuration, loggerService, server } from '../..';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
 
@@ -62,7 +62,11 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     try {
       const result = queryRes.rowCount ? queryRes.rows[0].configuration : null;
       if (server.handleResponseCommandChannel && result) {
-        await server.handleResponseCommandChannel(result, ['command-channel.subject'], [{ key: 'config-type', value: 'typology-config' }]);
+        await server.handleResponseCommandChannel(
+          result,
+          [configuration.COMMAND_CHANNEL_STREAM_SUBJECT],
+          [{ key: 'config-type', value: 'typology-config' }],
+        );
       }
       return result;
     } catch (error) {

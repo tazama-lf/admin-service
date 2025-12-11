@@ -70,6 +70,13 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
       }
       return result;
     } catch (error) {
+      const NatsErr = error as Error & { code?: string };
+      if (NatsErr instanceof Error && NatsErr.code === '503') {
+        loggerService.warn(
+          `NetworkMapRepo.update Receiver not available, no ${configuration.COMMAND_CHANNEL_STREAM_SUBJECT} consumer found`,
+        );
+        return queryRes.rowCount ? queryRes.rows[0].configuration : null;
+      }
       loggerService.error('Error in NetworkMapRepo.update while sending command channel message', error);
       throw error;
     }

@@ -7,7 +7,6 @@ import {
   getAllConfigsHandler,
   updateConfigHandler,
   updatePublishingStatusHandler,
-  cloneConfigHandler,
   createTransactionTypeTableHandler,
   createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
@@ -63,7 +62,6 @@ const routePrivilege = {
   putTcsConfig: 'editor',
   patchTcsConfigPublishingStatus: 'publisher',
   deleteTcsConfig: 'editor',
-  postTcsConfigClone: 'editor',
   getTcsConfigByTransaction: 'view-profile',
   getTcsConfigByEndpoint: 'view-profile',
   postTcsConfigWrite: 'editor',
@@ -256,10 +254,6 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/tcs/config/:id', {
     ...SetOptionsBodyAndParams(updateConfigHandler, routePrivilege.putTcsConfig),
-  });
-
-  fastify.post('/v1/admin/tcs/config/clone', {
-    ...SetOptionsBodyAndParams(cloneConfigHandler, routePrivilege.postTcsConfigClone),
   });
 
   fastify.post('/v1/admin/tcs/config/write', {

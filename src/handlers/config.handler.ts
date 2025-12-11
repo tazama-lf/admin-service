@@ -101,44 +101,6 @@ export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyRep
   }
 };
 
-export const cloneConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { sourceConfigId, newTransactionType, newVersion, newMsgFam } = req.body as {
-      sourceConfigId: number;
-      newTransactionType?: string;
-      newVersion?: string;
-      newMsgFam?: string;
-    };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const userId = authReq.user?.clientId ?? 'system';
-    const sourceConfig = await databaseService.findConfigById(sourceConfigId, tenantId);
-    if (!sourceConfig) {
-      sendError(reply, 404, `Source config with id ${sourceConfigId} not found`);
-      return;
-    }
-    const clonedConfig = {
-      msgFam: newMsgFam ?? sourceConfig.msgFam,
-      transactionType: newTransactionType ?? sourceConfig.transactionType,
-      endpointPath: sourceConfig.endpointPath,
-      version: newVersion ?? sourceConfig.version,
-      contentType: sourceConfig.contentType,
-      schema: sourceConfig.schema,
-      mapping: sourceConfig.mapping,
-      functions: sourceConfig.functions,
-      status: ConfigStatus.IN_PROGRESS,
-      tenantId,
-      createdBy: userId,
-    };
-    const configId = await databaseService.createConfig(clonedConfig);
-    reply.code(201).send({ success: true, message: 'Config cloned successfully', config: { ...clonedConfig, id: configId } });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to clone config';
-    loggerService.error(`Failed to clone config: ${errorMessage}`, 'cloneConfigHandler');
-    sendError(reply, 500, errorMessage);
-  }
-};
-
 export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const configData = req.body as Record<string, unknown>;
@@ -255,7 +217,7 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
     const { id } = req.params as { id: string };
     const { status } = req.body as { status?: string };
     const updatedCount = await databaseService.updateConfigByStatus(id, status);
-    reply.code(200).send({ success: true, message: `Job publishing status updated successfully (${updatedCount} row(s) affected).` });
+    reply.code(200).send({ success: true, message: ` publishing status updated successfully (${updatedCount} row(s) affected).` });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update job publishing status';
     sendError(reply, 500, errorMessage);

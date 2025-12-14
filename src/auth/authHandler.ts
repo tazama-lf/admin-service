@@ -1,4 +1,3 @@
-// import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { loggerService } from '..';
 import jwt from 'jsonwebtoken';

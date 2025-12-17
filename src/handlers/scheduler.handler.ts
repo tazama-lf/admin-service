@@ -1,4 +1,4 @@
-import type { JobStatus, Schedule } from '@tazama-lf/tcs-lib';
+import type { JobStatus, PaginatedResult, Schedule } from '@tazama-lf/tcs-lib';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
@@ -66,13 +66,13 @@ export const getAllScheduleHandler = async (req: FastifyRequest, reply: FastifyR
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const body = (authReq.body as Record<string, string>) ?? {};
+    const body = (authReq.body as Record<string, string> | undefined) ?? {};
 
     const { offset = '0', limit = '10' } = req.query as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 
-    const schedules = await databaseService.getAllSchedule(parsedLimit, parsedOffset, body, tenantId);
+    const schedules = (await databaseService.getAllSchedule(parsedLimit, parsedOffset, body, tenantId)) as PaginatedResult<Schedule>;
 
     return await reply.code(200).send({ ...schedules, pages: Math.ceil(schedules.total / schedules.limit) });
   } catch (error) {

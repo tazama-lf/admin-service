@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'reflect-metadata';
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
-import { DatabaseFactory, DatabaseService } from '@tazama-lf/tcs-lib';
+import { initializeDatabase, DatabaseService } from '@tazama-lf/tcs-lib';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
@@ -17,14 +17,14 @@ let configuration: Configuration;
 export let databaseService: DatabaseService;
 
 export const dbInit = async (): Promise<void> => {
-  await DatabaseFactory.initializeDatabase({
+  await initializeDatabase({
     host: process.env.TCS_DB_HOST ?? 'localhost',
     port: parseInt(process.env.TCS_DB_PORT ?? '5432', 10),
     database: process.env.TCS_DB_NAME ?? 'tcs',
     user: process.env.TCS_DB_USER ?? 'postgres',
     password: process.env.TCS_DB_PASSWORD ?? 'postgres',
   });
-  loggerService.log('TCS DatabaseFactory initialized');
+  loggerService.log('TCS Database initialized');
 
   databaseService = new DatabaseService();
   loggerService.log('TCS DatabaseService initialized');

@@ -21,8 +21,7 @@ function sendError(reply: FastifyReply, status: number, message: string, data: u
 
 export async function getAllCollectionsHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req.params as { tenantId: string };
     const result = (await databaseService.getAllCollections(tenantId)) as CollectionRow[];
     const collections = await Promise.all(
       result.map(async (row) => ({

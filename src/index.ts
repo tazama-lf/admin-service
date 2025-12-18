@@ -30,18 +30,13 @@ export const dbInit = async (): Promise<void> => {
   loggerService.log('TCS DatabaseService initialized');
 
   configuration = processorConfig;
-
-  if (process.env.ENABLE_FRMS_DATABASES === 'true') {
-    const { db, config } = await CreateStorageManager(
-      [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
-      processorConfig.nodeEnv === 'production',
-    );
-    databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
-    configuration = { ...config, ...processorConfig };
-    loggerService.log(util.inspect(databaseManager.isReadyCheck()));
-  } else {
-    loggerService.log('FRMS databases disabled - Connection Studio mode');
-  }
+  const { db, config } = await CreateStorageManager(
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
+    processorConfig.nodeEnv === 'production',
+  );
+  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  configuration = { ...config, ...processorConfig };
+  loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };
 
 const connect = async (): Promise<void> => {

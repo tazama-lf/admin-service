@@ -28,6 +28,7 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
       ...mappingDto,
       source: normalizedSource,
       destination: mappingDto.destination as string | string[],
+      type: mappingDto.type,
     };
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];

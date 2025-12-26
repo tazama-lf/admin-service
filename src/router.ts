@@ -38,6 +38,7 @@ import {
   writeConfigHandler,
   writeConfigUpdateHandler,
 } from './handlers/config.handler';
+import { getAllRulesHandler, getRulesByIdHandler, countRulesByStatusHandler } from './handlers/rules.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
 import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -126,6 +127,7 @@ const routePrivilege = {
   postTcsDataModelDestinationTypeField: 'editor',
   postTcsDataModelTransactionTypeTable: 'editor',
   postTcsDataModelTable: 'editor',
+  getTrsRules: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -268,6 +270,16 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/tcs/data-model/table', {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
+  });
+  // ====================  RULES OPERATIONS ====================
+  fastify.post('/v1/admin/trs/rules/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllRulesHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rules/:id', {
+    ...SetOptionsBodyAndParams(getRulesByIdHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rules/count', {
+    ...SetOptionsBodyAndParams(countRulesByStatusHandler, routePrivilege.getTrsRules),
   });
   // ====================  ADMIN SERVICE OPERATIONS ====================
 

@@ -38,7 +38,7 @@ import {
   writeConfigHandler,
   writeConfigUpdateHandler,
 } from './handlers/config.handler';
-import { getAllRulesHandler, getRulesByIdHandler, countRulesByStatusHandler } from './handlers/rules.handler';
+import { getAllRulesHandler, getRulesByIdHandler } from './handlers/rules.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
 import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -277,9 +277,6 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/trs/rules/:id', {
     ...SetOptionsBodyAndParams(getRulesByIdHandler, routePrivilege.getTrsRules),
-  });
-  fastify.get('/v1/admin/trs/rules/count', {
-    ...SetOptionsBodyAndParams(countRulesByStatusHandler, routePrivilege.getTrsRules),
   });
   // ====================  ADMIN SERVICE OPERATIONS ====================
 

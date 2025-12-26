@@ -39,27 +39,16 @@ export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyRep
       sendError(reply, 400, `Invalid rules ID: ${id}. Must be a valid number.`);
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- RuleEntity type not exported from tcs-lib
     const rules = await databaseService.findRuleById(rulesId, tenantId);
     if (!rules) {
       sendError(reply, 404, `Rules with id ${id} not found`);
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- RuleEntity type not exported from tcs-lib
     reply.code(200).send({ success: true, rules });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to get rules';
-    sendError(reply, 500, errorMessage);
-  }
-};
-
-export const countRulesByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-
-    const count = await databaseService.countRulesByStatus(tenantId);
-    reply.code(200).send({ success: true, count });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to count rules';
     sendError(reply, 500, errorMessage);
   }
 };

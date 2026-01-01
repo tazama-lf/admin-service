@@ -47,6 +47,7 @@ import {
   getRuleConfigurationHandler,
   updateRuleHandler,
 } from './handlers/rules.handler';
+import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
 import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -138,6 +139,7 @@ const routePrivilege = {
   getTrsRules: 'view-profile',
   postTrsRule: 'editor',
   putTrsRule: 'editor',
+  getActiveNetworkMap: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -303,6 +305,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.put('/v1/admin/trs/rule/:ruleId', {
     ...SetOptionsBodyAndParams(updateRuleHandler, routePrivilege.putTrsRule),
+  });
+  fastify.get('/v1/admin/network-map/active', {
+    ...SetOptionsBodyAndParams(getActiveNetworkMapHandler, routePrivilege.getActiveNetworkMap),
   });
   // ====================  ADMIN SERVICE OPERATIONS ====================
 

@@ -114,6 +114,7 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       endpointPath: configData.endpointPath as string,
       version: configData.version as string,
       contentType: configData.contentType as ContentType,
+      payload: configData.payload as JSONSchema,
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],

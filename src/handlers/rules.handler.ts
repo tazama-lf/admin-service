@@ -52,3 +52,104 @@ export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyRep
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+  try {
+    const ruleData = req.body as Record<string, unknown>;
+    const newRule = {
+      rule_id: ruleData.rule_id as string,
+      rule_name: ruleData.rule_name as string,
+      description: ruleData.description as string,
+      tenant_id: tenantId,
+      txtp: ruleData.txtp as string,
+      version: ruleData.version as string,
+      status: ruleData.status as string,
+      publishing_status: ruleData.publishing_status as string,
+      updated_by: userId,
+      rule_type: ruleData.rule_type as string,
+      updated_at: new Date(),
+      created_at: new Date(),
+    };
+    const createdRule: unknown = await databaseService.createRule(newRule);
+    reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create rule';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
+export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const ruleIds = await databaseService.findAllRuleIds(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      ruleIds,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule IDs';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
+export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { ruleId } = req.params as { ruleId: string };
+
+    const configuration: unknown = await databaseService.findRuleConfiguration(ruleId, tenantId);
+
+    if (!configuration) {
+      sendError(reply, 404, `Configuration not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      ruleId,
+      configuration,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule configuration';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
+export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const { ruleId } = req.params as { ruleId: string };
+    const updateData = req.body as Record<string, unknown>;
+
+    // Add updated_by and updated_at to the update data
+    const enrichedUpdateData = {
+      ...updateData,
+      updated_by: userId,
+    };
+
+    const updatedRule: unknown = await databaseService.updateRule(ruleId, tenantId, enrichedUpdateData);
+
+    if (!updatedRule) {
+      sendError(reply, 404, `Rule with id ${ruleId} not found`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule updated successfully',
+      rule: updatedRule,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule';
+    sendError(reply, 500, errorMessage);
+  }
+};

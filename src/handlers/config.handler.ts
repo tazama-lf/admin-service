@@ -37,6 +37,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
+
     const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body, tenantId);
     reply.code(200).send({
       success: true,
@@ -220,6 +221,23 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
     reply.code(200).send({ success: true, message: ` publishing status updated successfully (${updatedCount} row(s) affected).` });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to update job publishing status';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
+export const getTransactionTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const transactionTypes = await databaseService.findAllTransactionTypes(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      transactionTypes,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get transaction types';
     sendError(reply, 500, errorMessage);
   }
 };

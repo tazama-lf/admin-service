@@ -37,8 +37,16 @@ import {
   updateConfigByStatusHandler,
   writeConfigHandler,
   writeConfigUpdateHandler,
+  getTransactionTypesHandler,
 } from './handlers/config.handler';
-import { getAllRulesHandler, getRulesByIdHandler } from './handlers/rules.handler';
+import {
+  getAllRulesHandler,
+  getRulesByIdHandler,
+  createRuleHandler,
+  getRuleIdsHandler,
+  getRuleConfigurationHandler,
+  updateRuleHandler,
+} from './handlers/rules.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
 import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -128,6 +136,8 @@ const routePrivilege = {
   postTcsDataModelTransactionTypeTable: 'editor',
   postTcsDataModelTable: 'editor',
   getTrsRules: 'view-profile',
+  postTrsRule: 'editor',
+  putTrsRule: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -216,6 +226,10 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
   });
 
+  fastify.get('/v1/admin/config/transaction-types', {
+    ...SetOptionsBodyAndParams(getTransactionTypesHandler, routePrivilege.getTcsConfigs),
+  });
+
   fastify.put('/v1/admin/tcs/config/:id', {
     ...SetOptionsBodyAndParams(updateConfigHandler, routePrivilege.putTcsConfig),
   });
@@ -272,11 +286,23 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
   // ====================  RULES OPERATIONS ====================
+  fastify.post('/v1/admin/trs/rule', {
+    ...SetOptionsBodyAndParams(createRuleHandler, routePrivilege.postTrsRule),
+  });
   fastify.post('/v1/admin/trs/rules/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllRulesHandler, routePrivilege.getTrsRules),
   });
   fastify.get('/v1/admin/trs/rules/:id', {
     ...SetOptionsBodyAndParams(getRulesByIdHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rule-ids', {
+    ...SetOptionsBodyAndParams(getRuleIdsHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rule-configuration/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleConfigurationHandler, routePrivilege.getTrsRules),
+  });
+  fastify.put('/v1/admin/trs/rule/:ruleId', {
+    ...SetOptionsBodyAndParams(updateRuleHandler, routePrivilege.putTrsRule),
   });
   // ====================  ADMIN SERVICE OPERATIONS ====================
 

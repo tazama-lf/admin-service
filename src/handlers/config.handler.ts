@@ -242,3 +242,33 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { transactionType } = req.params as { transactionType: string };
+
+    if (!transactionType) {
+      sendError(reply, 400, 'Transaction type is required');
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Payload is JSONB from database
+    const payload = await databaseService.getPayloadByTransactionType(transactionType, tenantId);
+
+    if (!payload) {
+      sendError(reply, 404, `No payload found for transaction type: ${transactionType}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      transactionType,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Payload is JSONB from database
+      payload,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get payload by transaction type';
+    sendError(reply, 500, errorMessage);
+  }
+};

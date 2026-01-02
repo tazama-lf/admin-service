@@ -38,6 +38,7 @@ import {
   writeConfigHandler,
   writeConfigUpdateHandler,
   getTransactionTypesHandler,
+  getPayloadByTransactionTypeHandler,
 } from './handlers/config.handler';
 import {
   getAllRulesHandler,
@@ -230,6 +231,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/config/transaction-types', {
     ...SetOptionsBodyAndParams(getTransactionTypesHandler, routePrivilege.getTcsConfigs),
+  });
+
+  fastify.get('/v1/admin/config/payload/:transactionType', {
+    ...SetOptionsBodyAndParams(getPayloadByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
 
   fastify.put('/v1/admin/tcs/config/:id', {

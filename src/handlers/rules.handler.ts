@@ -70,6 +70,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       publishing_status: 'STATUS_01_IN_PROGRESS',
       updated_by: userId,
       rule_type: ruleData.rule_type as string,
+      rule_config_id: ruleData.rule_config_id as string | undefined,
       updated_at: new Date(),
       created_at: new Date(),
     };

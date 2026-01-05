@@ -249,6 +249,8 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const { transactionType } = req.params as { transactionType: string };
 
+    loggerService.log(`Fetching config payload for transaction type: ${transactionType}, tenant: ${tenantId}`);
+
     if (!transactionType) {
       sendError(reply, 400, 'Transaction type is required');
       return;
@@ -257,18 +259,61 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
     const payload = await databaseService.getPayloadByTransactionType(transactionType, tenantId);
 
     if (!payload) {
+      loggerService.warn(`No config payload found for transaction type: ${transactionType}, tenant: ${tenantId}`);
       sendError(reply, 404, `No payload found for transaction type: ${transactionType}`);
       return;
     }
 
+    loggerService.log(`Successfully retrieved config payload for transaction type: ${transactionType}`);
+
     reply.code(200).send({
       success: true,
       transactionType,
+      tenantId,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Payload is JSONB from database
       payload,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to get payload by transaction type';
+    loggerService.error(`Error in getPayloadByTransactionTypeHandler: ${errorMessage}`);
+    sendError(reply, 500, errorMessage);
+  }
+};
+
+export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { transactionType } = req.params as { transactionType: string };
+
+    loggerService.log(`Fetching full config for transaction type: ${transactionType}, tenant: ${tenantId}`);
+
+    if (!transactionType) {
+      sendError(reply, 400, 'Transaction type is required');
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Config is from database
+    const config = await databaseService.getSchemaByTransactionType(transactionType, tenantId);
+
+    if (!config) {
+      loggerService.warn(`No config found for transaction type: ${transactionType}, tenant: ${tenantId}`);
+      sendError(reply, 404, `No config found for transaction type: ${transactionType}`);
+      return;
+    }
+
+    loggerService.log(`Successfully retrieved config for transaction type: ${transactionType}`);
+
+    reply.code(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Config is from database
+      config,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config by transaction type';
+    loggerService.error(`Error in getConfigByTransactionTypeHandler: ${errorMessage}`);
     sendError(reply, 500, errorMessage);
   }
 };

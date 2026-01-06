@@ -386,7 +386,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
   });
 
-  fastify.post('/v1/admin/nodes', {
+  fastify.post('/v1/admin/nodes/create', {
     ...SetOptionsBodyAndParams(createNodeHandler, routePrivilege.postNodes),
   });
 }

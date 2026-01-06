@@ -3,16 +3,16 @@ import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
 interface NodeInput {
-  name?: string;
-  description?: string;
-  type?: string;
-  color?: string;
-  label?: string;
+  tenant_id: string;
+  created_by: string;
+  name: string;
+  description: string;
+  type: string;
+  color: string;
+  label: string;
   category: string;
-  code_template?: string;
-  default_data?: Record<string, unknown> | null;
-  tenant_id?: string;
-  created_by?: string;
+  code_template: string;
+  default_data?: Record<string, unknown>;
 }
 
 const sendError = (reply: FastifyReply, status: number, message: string): void => {
@@ -31,14 +31,14 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
       return;
     }
 
-    const nodes = rawBody as Array<Record<string, unknown>>;
-    const dataToInsert = nodes.map((node: Record<string, unknown>) => ({
+    const nodes = rawBody as NodeInput[];
+    const dataToInsert = nodes.map((node: NodeInput) => ({
       ...node,
       tenant_id: tenantId,
       created_by: userId,
     }));
 
-    const result: unknown = await databaseService.createNode(dataToInsert as unknown as NodeInput[]);
+    const result: unknown = await databaseService.createNode(dataToInsert);
 
     const resultArray = Array.isArray(result) ? (result as unknown[]) : [result];
 

@@ -78,6 +78,7 @@ import {
   destinationTypeExistsHandler,
   addFieldToDestinationTypeHandler,
 } from './handlers/data-model.handler';
+import { createNodeHandler, getNodeHandler } from './handlers/nodes.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -141,6 +142,8 @@ const routePrivilege = {
   postTrsRule: 'editor',
   putTrsRule: 'editor',
   getActiveNetworkMap: 'view-profile',
+  getNodes: 'view-profile',
+  postNodes: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -373,6 +376,14 @@ function Routes(fastify: FastifyInstance): void {
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
     }),
   );
+
+  fastify.get('/v1/admin/nodes', {
+    ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
+  });
+
+  fastify.post('/v1/admin/nodes', {
+    ...SetOptionsBodyAndParams(createNodeHandler, routePrivilege.postNodes),
+  });
 }
 
 export default Routes;

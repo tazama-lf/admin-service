@@ -60,7 +60,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   try {
     const ruleData = req.body as Record<string, unknown>;
     const newRule = {
-      rule_id: ruleData.rule_id as string,
+      // rule_id: ruleData.rule_id as string,
       rule_name: ruleData.rule_name as string,
       description: ruleData.description as string,
       tenant_id: tenantId,

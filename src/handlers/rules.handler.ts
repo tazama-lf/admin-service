@@ -155,6 +155,31 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
+export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database method returns untyped result
+    const ruleFlow = await databaseService.findRuleFlow(ruleId);
+
+    if (!ruleFlow) {
+      sendError(reply, 404, `Rule flow not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- Database result fields are not typed
+      rule_id: ruleFlow.rule_id,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- Database result fields are not typed
+      flow: ruleFlow.flow_json,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule configuration';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
 export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };

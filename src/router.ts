@@ -47,6 +47,7 @@ import {
   createRuleHandler,
   getRuleIdsHandler,
   getRuleConfigurationHandler,
+  getRuleFlowHandler,
   updateRuleHandler,
   createRuleFlowHandler,
 } from './handlers/rules.handler';
@@ -327,6 +328,11 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(createRuleFlowHandler, routePrivilege.postTrsRuleFlow),
   });
+
+  fastify.get('/v1/admin/trs/rule-flow/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleFlowHandler, routePrivilege.getTrsRules),
+  });
+
   // ====================  ADMIN SERVICE OPERATIONS ====================
 
   fastify.get('/v1/admin/reports/getreportbymsgid', {

@@ -48,6 +48,7 @@ import {
   getRuleIdsHandler,
   getRuleConfigurationHandler,
   updateRuleHandler,
+  createRuleFlowHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -145,6 +146,7 @@ const routePrivilege = {
   getActiveNetworkMap: 'view-profile',
   getNodes: 'view-profile',
   postNodes: 'editor',
+  postTrsRuleFlow: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -321,6 +323,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/network-map/active', {
     ...SetOptionsBodyAndParams(getActiveNetworkMapHandler, routePrivilege.getActiveNetworkMap),
+  });
+  fastify.post('/v1/admin/trs/rule-flow/:id', {
+    ...SetOptionsBodyAndParams(createRuleFlowHandler, routePrivilege.postTrsRuleFlow),
   });
   // ====================  ADMIN SERVICE OPERATIONS ====================
 

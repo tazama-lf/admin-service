@@ -154,3 +154,19 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const flowData = req.body as Record<string, unknown>;
+    const result: unknown = await databaseService.createRuleFlow({ rule_id: id, flow_json: flowData });
+    reply.code(201).send({
+      success: true,
+      message: 'Rule flow created successfully',
+      flow: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create rule flow';
+    sendError(reply, 500, errorMessage);
+  }
+};

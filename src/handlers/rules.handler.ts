@@ -195,3 +195,25 @@ export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const flowData = req.body as Record<string, unknown>;
+    const result: unknown = await databaseService.updateRuleFlow(id, flowData);
+
+    if (!result) {
+      sendError(reply, 404, `Rule flow not found for rule ${id}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule flow updated successfully',
+      flow: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule flow';
+    sendError(reply, 500, errorMessage);
+  }
+};

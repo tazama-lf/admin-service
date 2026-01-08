@@ -82,6 +82,25 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
+export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { transactionType } = req.params as { transactionType: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const versions: string[] = await databaseService.getVersionsOfTransactionType(transactionType, tenantId);
+
+    reply.code(200).send({
+      success: true,
+      transactionType,
+      versions,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get versions';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
 export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;

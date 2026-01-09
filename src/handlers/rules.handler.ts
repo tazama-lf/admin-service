@@ -65,7 +65,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       description: ruleData.description as string,
       tenant_id: tenantId,
       txtp: ruleData.txtp as string,
-      txtp_version: ruleData.txtpVersion as string, // Changed property name and made required
+      txtp_version: ruleData.txtpVersion as string,
       version: ruleData.version as string,
       status: 'ACTIVE',
       publishing_status: 'STATUS_01_IN_PROGRESS',
@@ -76,6 +76,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       created_at: new Date(),
     };
     const createdRule: unknown = await databaseService.createRule(newRule);
+    // at this posotion all logs of tcs lib will come
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to create rule';

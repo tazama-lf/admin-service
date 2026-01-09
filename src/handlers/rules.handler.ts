@@ -65,6 +65,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       description: ruleData.description as string,
       tenant_id: tenantId,
       txtp: ruleData.txtp as string,
+      txtp_version: ruleData.txtpVersion as string, // Changed property name and made required
       version: ruleData.version as string,
       status: 'ACTIVE',
       publishing_status: 'STATUS_01_IN_PROGRESS',

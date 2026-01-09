@@ -310,7 +310,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/config/versions/:transactionType', {
     ...SetOptionsBodyAndParams(getTxTpVersionsByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
   });
-  fastify.get('/v1/admin/trs/saveRuleRequest', {
+  fastify.post('/v1/admin/trs/saveRuleRequest', {
     ...SetOptionsBodyAndParams(saveRuleRequestHandler, routePrivilege.getTrsRules),
   });
   fastify.post('/v1/admin/trs/rule', {

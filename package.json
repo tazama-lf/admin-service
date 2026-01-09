@@ -39,7 +39,7 @@
     "@tazama-lf/auth-lib": "2.2.0-rc.1",
     "@tazama-lf/frms-coe-lib": "6.0.0-postgres.alpha.12",
     "@tazama-lf/frms-coe-startup-lib": "3.0.0-rc.1",
-    "@tazama-lf/tcs-lib": "^1.0.107",
+    "@tazama-lf/tcs-lib": "^1.0.108",
     "ajv": "^8.17.1",
     "axios": "^1.13.1",
     "dotenv": "^17.2.0",

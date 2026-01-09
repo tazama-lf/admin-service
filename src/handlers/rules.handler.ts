@@ -84,6 +84,25 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
+export const saveRuleRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { txTp, ruleRequest } = req.body as { txTp: string; ruleRequest: Record<string, unknown> };
+
+    // this goes to tcs-lib and saves the RR into db table
+    await databaseService.saveRuleRequest(txTp, tenantId, ruleRequest);
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule request saved successfully',
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to save rule request';
+    sendError(reply, 500, errorMessage);
+  }
+};
+
 export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { transactionType } = req.params as { transactionType: string };

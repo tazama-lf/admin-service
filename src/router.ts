@@ -52,6 +52,7 @@ import {
   createRuleFlowHandler,
   updateRuleFlowHandler,
   getTxTpVersionsByTransactionTypeHandler,
+  saveRuleRequestHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -308,6 +309,9 @@ function Routes(fastify: FastifyInstance): void {
   // ====================  RULES OPERATIONS ====================
   fastify.get('/v1/admin/config/versions/:transactionType', {
     ...SetOptionsBodyAndParams(getTxTpVersionsByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
+  });
+  fastify.get('/v1/admin/trs/saveRuleRequest', {
+    ...SetOptionsBodyAndParams(saveRuleRequestHandler, routePrivilege.getTrsRules),
   });
   fastify.post('/v1/admin/trs/rule', {
     ...SetOptionsBodyAndParams(createRuleHandler, routePrivilege.postTrsRule),

@@ -257,3 +257,39 @@ export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId, tenantId } = req.params as { ruleId: string; tenantId: string };
+
+    const globalVariables = await databaseService.getGlobalVariables(ruleId, tenantId);
+
+    if (!globalVariables?.ruleRequest || !globalVariables?.configuration) {
+      sendError(reply, 404, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
+      return;
+    }
+
+    const RuleRequest: unknown = globalVariables.ruleRequest;
+    const RuleConfig: unknown = globalVariables.configuration;
+
+    const RuleResult = {
+      id: ruleId,
+      tenantId,
+      cfg: '',
+      subRuleRef: '.err',
+      reason: 'Unhandled rule result outcome',
+      prcgTm: -1,
+      indpdntVarbl: 0,
+    };
+
+    reply.code(200).send({
+      success: true,
+      RuleRequest,
+      RuleConfig,
+      RuleResult,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get global variables';
+    sendError(reply, 500, errorMessage);
+  }
+};

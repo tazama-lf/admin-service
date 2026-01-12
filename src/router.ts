@@ -53,6 +53,7 @@ import {
   updateRuleFlowHandler,
   getTxTpVersionsByTransactionTypeHandler,
   saveRuleRequestHandler,
+  getGlobalVariablesHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -344,6 +345,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
+  });
+
+  fastify.get('/v1/admin/trs/global-variables/:ruleId/:tenantId', {
+    ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

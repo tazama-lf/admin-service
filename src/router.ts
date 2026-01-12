@@ -54,6 +54,7 @@ import {
   getTxTpVersionsByTransactionTypeHandler,
   saveRuleRequestHandler,
   getGlobalVariablesHandler,
+  cloneRuleHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -308,6 +309,12 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
   // ====================  RULES OPERATIONS ====================
+
+  // route for cloning a rule
+  fastify.post('/v1/admin/trs/rule/clone/:ruleId', {
+    ...SetOptionsBodyAndParams(cloneRuleHandler, routePrivilege.postTrsRule),
+  });
+
   fastify.get('/v1/admin/config/versions/:transactionType', {
     ...SetOptionsBodyAndParams(getTxTpVersionsByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
   });

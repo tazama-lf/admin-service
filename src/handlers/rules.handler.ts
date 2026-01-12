@@ -293,3 +293,22 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    // const { ruleId } = req.params as { ruleId: string };
+    const authReq = req as AuthenticatedRequest;
+    const token = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const clonedRule = databaseService.cloneRule(12, token);
+
+    reply.code(201).send({
+      success: true,
+      message: 'Rule cloned successfully',
+      rule: clonedRule,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to clone rule';
+    sendError(reply, 500, errorMessage);
+  }
+};

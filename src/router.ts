@@ -55,6 +55,7 @@ import {
   saveRuleRequestHandler,
   getGlobalVariablesHandler,
   cloneRuleHandler,
+  updateRuleStatusHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -313,6 +314,11 @@ function Routes(fastify: FastifyInstance): void {
   // route for cloning a rule
   fastify.post('/v1/admin/trs/rule/clone/:ruleId', {
     ...SetOptionsBodyAndParams(cloneRuleHandler, routePrivilege.postTrsRule),
+  });
+
+  // route for updating status of a rule
+  fastify.put('/v1/admin/trs/rule/updateStatus/:ruleId', {
+    ...SetOptionsBodyAndParams(updateRuleStatusHandler, routePrivilege.putTrsRule),
   });
 
   fastify.get('/v1/admin/config/versions/:transactionType', {

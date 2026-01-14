@@ -312,3 +312,23 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     sendError(reply, 500, errorMessage);
   }
 };
+
+export const updateRuleStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+    const { status } = req.body as { status: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const updatedRule = await databaseService.updateRuleStatus(ruleId, tenantId, status);
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule status updated successfully',
+      rule: updatedRule,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule status';
+    sendError(reply, 500, errorMessage);
+  }
+};

@@ -2,32 +2,6 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
-interface NodeInput {
-  tenant_id: string;
-  created_by: string;
-  name: string;
-  description: string;
-  node_type: string;
-  handles: {
-    source: boolean;
-    target: boolean;
-  };
-  inputs: Array<{
-    key: string;
-    label: string;
-    type: string;
-    defaultValue?: string;
-    required: boolean;
-    placeholder?: string;
-  }>;
-  type: string;
-  color: string;
-  label: string;
-  category: string;
-  code_template: string;
-  default_data?: Record<string, unknown>;
-}
-
 const sendError = (reply: FastifyReply, status: number, message: string): void => {
   reply.code(status).send({ success: false, message });
 };
@@ -44,19 +18,9 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
       return;
     }
 
-    const nodes = rawBody as NodeInput[];
-    const dataToInsert = nodes.map((node: NodeInput) => ({
-      name: node.name,
-      description: node.description ?? '',
-      type: node.type,
-      label: node.label,
-      color: node.color,
-      category: node.category,
-      code_template: node.code_template ?? '',
-      handles: node.handles,
-      inputs: node.inputs,
-      default_data: node.default_data ?? {},
-      node_type: node.node_type,
+    const nodes = rawBody as Array<Record<string, unknown>>;
+    const dataToInsert = nodes.map((node: Record<string, unknown>) => ({
+      node_json: node,
       tenant_id: tenantId,
       created_by: userId,
     }));
@@ -81,12 +45,14 @@ export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): 
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const queryParams = req.query as { type?: string; category?: string };
+    const queryParams = req.query as { type?: string; category?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' };
 
     const nodes = await databaseService.findAllNodes({
       tenantId,
       type: queryParams.type,
       category: queryParams.category,
+      sortBy: queryParams.sortBy,
+      sortOrder: queryParams.sortOrder,
     });
     reply.code(200).send({
       success: true,

@@ -316,11 +316,11 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
 export const updateRuleStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { ruleId } = req.params as { ruleId: string };
-    const { status } = req.body as { status: string };
+    const { status, reason } = req.body as { status: string; reason: string };
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
-    const updatedRule = await databaseService.updateRuleStatus(ruleId, tenantId, status);
+    const updatedRule = await databaseService.updateRuleStatus(ruleId, tenantId, status, reason);
 
     reply.code(200).send({
       success: true,

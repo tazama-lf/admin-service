@@ -1,10 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
-
-const sendError = (reply: FastifyReply, status: number, message: string): void => {
-  reply.code(status).send({ success: false, message });
-};
+import { ErrorHandler } from './errorHandler';
 
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -24,8 +21,7 @@ export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyRepl
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get rules');
   }
 };
 
@@ -36,20 +32,19 @@ export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyRep
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const rulesId = parseInt(id);
     if (isNaN(rulesId)) {
-      sendError(reply, 400, `Invalid rules ID: ${id}. Must be a valid number.`);
+      ErrorHandler.sendError(reply, { status: 400 }, `Invalid rules ID: ${id}. Must be a valid number.`);
       return;
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- RuleEntity type not exported from tcs-lib
     const rules = await databaseService.findRuleById(rulesId, tenantId);
     if (!rules) {
-      sendError(reply, 404, `Rules with id ${id} not found`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Rules with id ${id} not found`);
       return;
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- RuleEntity type not exported from tcs-lib
     reply.code(200).send({ success: true, rules });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get rules';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get rules');
   }
 };
 
@@ -79,8 +74,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     // at this posotion all logs of tcs lib will come
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create rule';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to create rule');
   }
 };
 
@@ -98,8 +92,7 @@ export const saveRuleRequestHandler = async (req: FastifyRequest, reply: Fastify
       message: 'Rule request saved successfully',
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to save rule request';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to save rule request');
   }
 };
 
@@ -117,8 +110,7 @@ export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyReques
       versions,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get versions';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get versions');
   }
 };
 
@@ -134,8 +126,7 @@ export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply
       ruleIds,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule IDs';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get rule IDs');
   }
 };
 
@@ -148,7 +139,7 @@ export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: Fa
     const configuration: unknown = await databaseService.findRuleConfiguration(ruleId, tenantId);
 
     if (!configuration) {
-      sendError(reply, 404, `Configuration not found for rule ${ruleId}`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Configuration not found for rule ${ruleId}`);
       return;
     }
 
@@ -158,8 +149,7 @@ export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: Fa
       configuration,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule configuration';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
   }
 };
 
@@ -180,7 +170,7 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     const updatedRule: unknown = await databaseService.updateRule(ruleId, tenantId, enrichedUpdateData);
 
     if (!updatedRule) {
-      sendError(reply, 404, `Rule with id ${ruleId} not found`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule with id ${ruleId} not found`);
       return;
     }
 
@@ -190,8 +180,7 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       rule: updatedRule,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to update rule');
   }
 };
 
@@ -203,7 +192,7 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
     const ruleFlow = await databaseService.findRuleFlow(ruleId);
 
     if (!ruleFlow) {
-      sendError(reply, 404, `Rule flow not found for rule ${ruleId}`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
       return;
     }
 
@@ -215,8 +204,7 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
       flow: ruleFlow.flow_json,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get rule configuration';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
   }
 };
 
@@ -231,19 +219,18 @@ export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
       flow: result,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create rule flow';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to create rule flow');
   }
 };
 
 export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
-    const flowData = req.body as Record<string, unknown>;
-    const result: unknown = await databaseService.updateRuleFlow(id, flowData);
+    const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string };
+    const result: unknown = await databaseService.updateRuleFlow(id, payload);
 
     if (!result) {
-      sendError(reply, 404, `Rule flow not found for rule ${id}`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);
       return;
     }
 
@@ -253,8 +240,7 @@ export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
       flow: result,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule flow';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to update rule flow');
   }
 };
 
@@ -265,7 +251,7 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
     const globalVariables = await databaseService.getGlobalVariables(ruleId, tenantId);
 
     if (!globalVariables?.ruleRequest || !globalVariables?.configuration) {
-      sendError(reply, 404, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
       return;
     }
 
@@ -289,8 +275,7 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
       RuleResult,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get global variables';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get global variables');
   }
 };
 
@@ -308,8 +293,7 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
       rule: clonedRule,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to clone rule';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to clone rule');
   }
 };
 
@@ -328,7 +312,6 @@ export const updateRuleStatusHandler = async (req: FastifyRequest, reply: Fastif
       rule: updatedRule,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update rule status';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to update rule status');
   }
 };

@@ -1,10 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
-
-const sendError = (reply: FastifyReply, status: number, message: string): void => {
-  reply.code(status).send({ success: false, message });
-};
+import { ErrorHandler } from './errorHandler';
 
 export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
@@ -14,15 +11,16 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
   try {
     const rawBody = req.body;
     if (!Array.isArray(rawBody)) {
-      sendError(reply, 400, 'Request body must be an array of nodes');
+      ErrorHandler.sendError(reply, { status: 400 }, 'Request body must be an array of nodes');
       return;
     }
 
     const nodes = rawBody as Array<Record<string, unknown>>;
     const dataToInsert = nodes.map((node: Record<string, unknown>) => ({
-      node_json: node,
+      node_json: node.node_json as Record<string, unknown>,
       tenant_id: tenantId,
       created_by: userId,
+      order: (node.order as number) ?? 0,
     }));
 
     const result: unknown = await databaseService.createNode(dataToInsert);
@@ -36,8 +34,7 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
       count: resultArray.length,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create node';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to create nodes');
   }
 };
 
@@ -61,8 +58,7 @@ export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): 
       count: nodes.length,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to retrieve nodes';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to retrieve nodes');
   }
 };
 
@@ -78,7 +74,6 @@ export const deleteNodeById = async (req: FastifyRequest, reply: FastifyReply): 
       message: 'Node deleted successfully',
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to delete node';
-    sendError(reply, 500, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to delete node');
   }
 };

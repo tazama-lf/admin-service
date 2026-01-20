@@ -15,10 +15,10 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit, tenantId],
+        text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
+        values: [filter.field, filter.value, sort, offset, limit],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rows.length > 0
@@ -29,10 +29,10 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   get: async function ({ id, cfg, tenantId }): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
-        values: [id, cfg, tenantId],
+        text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2',
+        values: [id, cfg],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
 
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
@@ -45,7 +45,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
         text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration;',
         values: [payload],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rows[0].configuration;
   },
@@ -53,10 +53,10 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',
-        values: [payload, id, cfg, tenantId],
+        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 RETURNING configuration;',
+        values: [payload, id, cfg],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
@@ -64,10 +64,10 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
-        values: [id, cfg, tenantId],
+        text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2',
+        values: [id, cfg],
       } satisfies PgQueryConfig,
-      'configuration',
+      tenantId,
     );
     return queryRes.rowCount ? true : false;
   },

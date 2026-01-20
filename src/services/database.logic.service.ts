@@ -7,16 +7,27 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
   queryConfig: PgQueryConfig,
   tenantId: string,
 ): Promise<QueryResult<T>> => {
+  let inTransaction = false;
+  const client = await databaseManager._configuration.connect();
   try {
     loggerService.log('Started handling execution of the sql statement');
-
-    await databaseManager._configuration.query('BEGIN');
-    await databaseManager._configuration.query('SELECT public.set_tenant_id($1)', [tenantId]);
-    const result = await databaseManager._configuration.query<T>(queryConfig.text, queryConfig.values);
-    await databaseManager._configuration.query('COMMIT');
+    await client.query('BEGIN');
+    inTransaction = true;
+    await client.query('SELECT public.set_tenant_id($1)', [tenantId]);
+    const result = await client.query<T>(queryConfig.text, queryConfig.values);
+    await client.query('COMMIT');
+    inTransaction = false;
     return result;
   } catch (error) {
-    await databaseManager._configuration.query('ROLLBACK');
+    if (inTransaction) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        const rollbackErrorMessage = rollbackError as { message: string };
+        loggerService.log(`Failed rolling back the transaction: ${rollbackErrorMessage.message}`, 'handlePostExecuteSqlStatement()');
+        throw rollbackError;
+      }
+    }
     const errorMessage = error as { message: string };
     loggerService.log(
       `Failed executing the query from database service with error message: ${errorMessage.message}`,
@@ -25,5 +36,6 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
     throw new Error(errorMessage.message);
   } finally {
     loggerService.log('Completed handling execution of the query from database service');
+    client.release();
   }
 };

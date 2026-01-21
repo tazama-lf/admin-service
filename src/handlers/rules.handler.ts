@@ -54,9 +54,10 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
   try {
     const ruleData = req.body as Record<string, unknown>;
+    // console.log('Received rule creation request with data:', ruleData);
     const newRule = {
       // rule_id: ruleData.rule_id as string,
-      rule_name: ruleData.rule_name as string,
+      rule_name: ruleData.rule_name ? (ruleData.rule_name as string) : undefined,
       description: ruleData.description as string,
       tenant_id: tenantId,
       txtp: ruleData.txtp as string,
@@ -70,7 +71,9 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       updated_at: new Date(),
       created_at: new Date(),
     };
+    // console.log('Creating rule with data:', newRule);
     const createdRule: unknown = await databaseService.createRule(newRule);
+    // console.log('Created rule:', createdRule);
     // at this posotion all logs of tcs lib will come
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
   } catch (error: unknown) {

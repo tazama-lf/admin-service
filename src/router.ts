@@ -87,7 +87,7 @@ import {
   destinationTypeExistsHandler,
   addFieldToDestinationTypeHandler,
 } from './handlers/data-model.handler';
-import { createNodeHandler, getNodeHandler } from './handlers/nodes.handler';
+import { createNodeHandler, deleteNodeByIdHandler, getNodeHandler } from './handlers/nodes.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -153,6 +153,7 @@ const routePrivilege = {
   getActiveNetworkMap: 'view-profile',
   getNodes: 'view-profile',
   postNodes: 'editor',
+  deleteNodes: 'editor',
   postTrsRuleFlow: 'view-profile',
 };
 
@@ -430,6 +431,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/nodes/create', {
     ...SetOptionsBodyAndParams(createNodeHandler, routePrivilege.postNodes),
+  });
+
+  fastify.delete('/v1/admin/nodes/:nodeId', {
+    ...SetOptionsBodyAndParams(deleteNodeByIdHandler, routePrivilege.deleteNodes),
   });
 }
 

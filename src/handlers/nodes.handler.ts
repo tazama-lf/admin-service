@@ -62,12 +62,11 @@ export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): 
   }
 };
 
-export const deleteNodeById = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const queryParams = req.query as { nodeId?: string };
-
+    const queryParams = req.params as { nodeId?: string };
     await databaseService.deleteNodeById(Number(queryParams.nodeId), tenantId);
     reply.code(200).send({
       success: true,

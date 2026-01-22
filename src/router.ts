@@ -87,7 +87,7 @@ import {
   destinationTypeExistsHandler,
   addFieldToDestinationTypeHandler,
 } from './handlers/data-model.handler';
-import { createNodeHandler, deleteNodeByIdHandler, getNodeHandler } from './handlers/nodes.handler';
+import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -155,6 +155,7 @@ const routePrivilege = {
   postNodes: 'editor',
   deleteNodes: 'editor',
   postTrsRuleFlow: 'view-profile',
+  executeQueryNode: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -435,6 +436,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.delete('/v1/admin/nodes/:nodeId', {
     ...SetOptionsBodyAndParams(deleteNodeByIdHandler, routePrivilege.deleteNodes),
+  });
+
+  fastify.post('/v1/admin/nodes/query', {
+    ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
   });
 }
 

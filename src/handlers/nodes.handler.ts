@@ -76,3 +76,25 @@ export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyR
     ErrorHandler.sendError(reply, error, 'Failed to delete node');
   }
 };
+
+export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = req.body as { query: string; params?: unknown[] };
+
+    if (!body.query) {
+      ErrorHandler.sendError(reply, { status: 400 }, 'Query parameter is required');
+      return;
+    }
+
+    const result = await databaseService.executeSelectQuery(body.query, tenantId, body.params);
+    reply.code(200).send({
+      success: true,
+      message: 'Query executed successfully',
+      result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to execute query');
+  }
+};

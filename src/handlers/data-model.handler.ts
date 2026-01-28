@@ -22,7 +22,7 @@ function sendError(reply: FastifyReply, status: number, message: string, data: u
 export async function getAllCollectionsHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
     const { tenantId } = req.params as { tenantId: string };
-    const result = (await databaseService.getAllCollections(tenantId)) as CollectionRow[];
+    const result = (await databaseService.getAllCollections(tenantId)) as unknown as CollectionRow[];
     const collections = await Promise.all(
       result.map(async (row) => ({
         name: row.collection_name,
@@ -43,7 +43,7 @@ export async function getAllCollectionsHandler(req: FastifyRequest, reply: Fasti
 }
 
 async function getCollectionFields(collectionId: number, tenantId: string): Promise<TazamaField[]> {
-  const result = (await databaseService.getCollectionFields(collectionId, tenantId)) as FieldRow[];
+  const result = (await databaseService.getCollectionFields(collectionId, tenantId)) as unknown as FieldRow[];
 
   const rootFields: FieldRow[] = [];
   const nestedFieldsMap = new Map<number, FieldRow[]>();
@@ -92,7 +92,12 @@ export async function createDestinationTypeHandler(req: FastifyRequest, reply: F
     const { collection_type: collectionType, name, destination_id: destinationId } = req.body as CreateDestinationTypeBody;
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const result = (await databaseService.createDestinationType(collectionType, name, destinationId, tenantId)) as DestinationTypeResult;
+    const result = (await databaseService.createDestinationType(
+      collectionType,
+      name,
+      destinationId,
+      tenantId,
+    )) as unknown as DestinationTypeResult;
 
     reply.status(201).send({
       success: true,
@@ -149,7 +154,7 @@ export async function addFieldToDestinationTypeHandler(req: FastifyRequest, repl
       tenantId,
       finalSerialNo ?? null,
       destinationTypeIdNum,
-    )) as FieldResult;
+    )) as unknown as FieldResult;
 
     reply.status(201).send({
       success: true,

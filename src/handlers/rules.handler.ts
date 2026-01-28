@@ -191,7 +191,6 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
   try {
     const { ruleId } = req.params as { ruleId: string };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database method returns untyped result
     const ruleFlow = await databaseService.findRuleFlow(ruleId);
 
     if (!ruleFlow) {
@@ -201,9 +200,9 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
 
     reply.code(200).send({
       success: true,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- Database result fields are not typed
+
       rule_id: ruleFlow.rule_id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- Database result fields are not typed
+
       flow: ruleFlow.flow_json,
     });
   } catch (error: unknown) {
@@ -287,8 +286,10 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     // const { ruleId } = req.params as { ruleId: string };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
+    // const payload = req.body as any;
+    // console.log('Payload received for cloning rule:', payload);
 
-    const clonedRule = databaseService.cloneRule(12, token);
+    const clonedRule = databaseService.cloneRule(12, 'tmeporoary delete this ', 'created by rahim delete it', token);
 
     reply.code(201).send({
       success: true,

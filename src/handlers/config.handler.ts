@@ -114,7 +114,7 @@ export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyRepl
       endpointPath: configData.endpointPath as string,
       version: configData.version as string,
       contentType: configData.contentType as ContentType,
-      payload: configData.payload as JSONSchema,
+      payload: configData.payload as string | Record<string, unknown>,
       schema: configData.schema as JSONSchema,
       mapping: configData.mapping as FieldMapping[],
       functions: configData.functions as FunctionDefinition[],
@@ -255,7 +255,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
       sendError(reply, 400, 'Transaction type is required');
       return;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Payload is JSONB from database
+
     const payload = await databaseService.getPayloadByTransactionType(transactionType, tenantId);
 
     if (!payload) {
@@ -270,7 +270,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
       success: true,
       transactionType,
       tenantId,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Payload is JSONB from database
+
       payload,
     });
   } catch (error: unknown) {
@@ -293,7 +293,6 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Config is from database
     const config = await databaseService.getSchemaByTransactionType(transactionType, tenantId);
 
     if (!config) {
@@ -308,7 +307,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
       success: true,
       transactionType,
       tenantId,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Config is from database
+
       config,
     });
   } catch (error: unknown) {

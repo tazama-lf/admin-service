@@ -283,12 +283,11 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
 
 export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    // const { ruleId } = req.params as { ruleId: string };
+    const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
     const payload = req.body as {
       description: string;
-      rule_id: number;
       status: string;
       publishing_status: string;
       rule_config_id: string;
@@ -299,7 +298,7 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     // console.log('Payload received for cloning rule:', payload);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-    const clonedRule = await databaseService.cloneRule(payload.rule_id, 'need to fix', payload.updated_by, token);
+    const clonedRule = await databaseService.cloneRule(ruleId, 'need to fix', payload.updated_by, token);
 
     // console.log('Cloned rule:', clonedRule);
 

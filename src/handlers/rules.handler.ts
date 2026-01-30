@@ -252,7 +252,7 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
 
     const globalVariables = await databaseService.getGlobalVariables(ruleId, tenantId);
 
-    if (!globalVariables?.ruleRequest || !globalVariables?.configuration) {
+    if (!globalVariables?.ruleRequest || !globalVariables.configuration) {
       ErrorHandler.sendError(reply, { status: 404 }, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
       return;
     }
@@ -286,14 +286,27 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     // const { ruleId } = req.params as { ruleId: string };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
-    // const payload = req.body as any;
+    const payload = req.body as {
+      description: string;
+      rule_id: number;
+      status: string;
+      publishing_status: string;
+      rule_config_id: string;
+      updated_by: string;
+      txtp: string;
+      version: string;
+    };
     // console.log('Payload received for cloning rule:', payload);
 
-    const clonedRule = databaseService.cloneRule(12, 'tmeporoary delete this ', 'created by rahim delete it', token);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
+    const clonedRule = await databaseService.cloneRule(payload.rule_id, 'need to fix', payload.updated_by, token);
+
+    // console.log('Cloned rule:', clonedRule);
 
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
       rule: clonedRule,
     });
   } catch (error: unknown) {

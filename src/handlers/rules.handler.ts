@@ -54,7 +54,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
   try {
     const ruleData = req.body as Record<string, unknown>;
-    // console.log('Received rule creation request with data:', ruleData);
+
     const newRule = {
       // rule_id: ruleData.rule_id as string,
       ruleName: ruleData.ruleName as string,
@@ -71,9 +71,9 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       updated_at: new Date(),
       created_at: new Date(),
     };
-    // console.log('Creating rule with data:', newRule);
+
     const createdRule: unknown = await databaseService.createRule(newRule);
-    // console.log('Created rule:', createdRule);
+
     // at this posotion all logs of tcs lib will come
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
   } catch (error: unknown) {
@@ -189,9 +189,12 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId;
     const { ruleId } = req.params as { ruleId: string };
+    const query = req.query as { category?: string };
 
-    const ruleFlow = await databaseService.findRuleFlow(ruleId);
+    const ruleFlow = await databaseService.findRuleFlow(ruleId, tenantId ?? '', query);
 
     if (!ruleFlow) {
       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
@@ -213,8 +216,14 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
 export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
+    const tenantId = (req as AuthenticatedRequest).user?.tenantId ?? 'DEFAULT';
     const flowData = req.body as Record<string, unknown>;
-    const result: unknown = await databaseService.createRuleFlow({ rule_id: id, flow_json: flowData });
+    const result: unknown = await databaseService.createRuleFlow({
+      rule_id: id,
+      flow_json: flowData.flow_json as Record<string, unknown>,
+      tenantId,
+      category: (flowData.category as string) || 'rule_builder',
+    });
     reply.code(201).send({
       success: true,
       message: 'Rule flow created successfully',
@@ -227,9 +236,11 @@ export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
 
 export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
+    const request = req as AuthenticatedRequest;
+    const tenantId = request.user?.tenantId;
     const { id } = req.params as { id: string };
     const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string };
-    const result: unknown = await databaseService.updateRuleFlow(id, payload);
+    const result: unknown = await databaseService.updateRuleFlow(id, payload, tenantId ?? '', 'rule_builder');
 
     if (!result) {
       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);
@@ -287,12 +298,8 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
 
-    // console.log('Payload received fo`r cloning rule:', payload);
-
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
     const clonedRule = await databaseService.cloneRule(ruleId, 'need to fix', authReq.user?.clientId ?? 'default', token);
-
-    // console.log('Cloned rule:', clonedRule);
 
     reply.code(201).send({
       success: true,

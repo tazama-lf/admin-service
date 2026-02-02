@@ -57,7 +57,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     // console.log('Received rule creation request with data:', ruleData);
     const newRule = {
       // rule_id: ruleData.rule_id as string,
-      ruleName: ruleData.ruleName ? (ruleData.ruleName as string) : undefined,
+      ruleName: ruleData.ruleName as string,
       description: ruleData.description as string,
       tenant_id: tenantId,
       txtp: ruleData.txtp as string,
@@ -286,19 +286,11 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
-    const payload = req.body as {
-      description: string;
-      status: string;
-      publishing_status: string;
-      rule_config_id: string;
-      updated_by: string;
-      txtp: string;
-      version: string;
-    };
-    // console.log('Payload received for cloning rule:', payload);
+
+    // console.log('Payload received fo`r cloning rule:', payload);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-    const clonedRule = await databaseService.cloneRule(ruleId, 'need to fix', payload.updated_by, token);
+    const clonedRule = await databaseService.cloneRule(ruleId, 'need to fix', authReq.user?.clientId ?? 'default', token);
 
     // console.log('Cloned rule:', clonedRule);
 

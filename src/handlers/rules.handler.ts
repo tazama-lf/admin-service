@@ -57,7 +57,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     // console.log('Received rule creation request with data:', ruleData);
     const newRule = {
       // rule_id: ruleData.rule_id as string,
-      rule_name: ruleData.rule_name ? (ruleData.rule_name as string) : undefined,
+      ruleName: ruleData.ruleName ? (ruleData.ruleName as string) : undefined,
       description: ruleData.description as string,
       tenant_id: tenantId,
       txtp: ruleData.txtp as string,

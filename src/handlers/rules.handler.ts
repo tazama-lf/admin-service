@@ -240,7 +240,7 @@ export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
     const tenantId = request.user?.tenantId;
     const { id } = req.params as { id: string };
     const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string };
-    const result: unknown = await databaseService.updateRuleFlow(id, payload, tenantId ?? '', 'rule_builder');
+    const result: unknown = await databaseService.updateRuleFlow(id, payload, tenantId ?? '');
 
     if (!result) {
       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);

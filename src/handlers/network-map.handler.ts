@@ -11,6 +11,8 @@ export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: Fas
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
+    // console.log('Handler: Getting active network map for tenant:', tenantId);
+
     const networkMap: unknown = await databaseService.findActiveNetworkMap(tenantId);
 
     if (!networkMap) {

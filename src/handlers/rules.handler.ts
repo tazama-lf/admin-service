@@ -194,7 +194,11 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
     const { ruleId } = req.params as { ruleId: string };
     const query = req.query as { category?: string };
 
-    const ruleFlow = await databaseService.findRuleFlow(ruleId, tenantId ?? '', query);
+    const ruleFlow = await databaseService.findRuleFlow(
+      ruleId,
+      tenantId ?? '',
+      query.category && query.category !== 'undefined' ? { category: query.category } : undefined,
+    );
 
     if (!ruleFlow) {
       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
@@ -203,10 +207,7 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
 
     reply.code(200).send({
       success: true,
-
-      rule_id: ruleFlow.rule_id,
-
-      flow: ruleFlow.flow_json,
+      result: ruleFlow,
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
@@ -217,12 +218,11 @@ export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
   try {
     const { id } = req.params as { id: string };
     const tenantId = (req as AuthenticatedRequest).user?.tenantId ?? 'DEFAULT';
-    const flowData = req.body as Record<string, unknown>;
+    const flowData = req.body as { flow_json_rule_builder: Record<string, unknown>; flow_json_test_case: Record<string, unknown> };
     const result: unknown = await databaseService.createRuleFlow({
       rule_id: id,
-      flow_json: flowData.flow_json as Record<string, unknown>,
+      flowData,
       tenantId,
-      category: (flowData.category as string) || 'rule_builder',
     });
     reply.code(201).send({
       success: true,
@@ -240,7 +240,15 @@ export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
     const tenantId = request.user?.tenantId;
     const { id } = req.params as { id: string };
     const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string };
-    const result: unknown = await databaseService.updateRuleFlow(id, payload, tenantId ?? '');
+    const result: unknown = await databaseService.updateRuleFlow(
+      id,
+      {
+        flowJson: payload.flow_json,
+        tsFileBase64: payload.ts_file_base64,
+        category: payload.category,
+      },
+      tenantId ?? '',
+    );
 
     if (!result) {
       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);

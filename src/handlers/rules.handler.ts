@@ -3,6 +3,55 @@ import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 import { ErrorHandler } from './errorHandler';
 
+// Type definitions for rule creation
+interface RuleData {
+  ruleName: string;
+  description: string;
+  txtp: string;
+  version: string;
+  txtpVersion: string;
+  status: string;
+  publishing_status: string;
+  rule_type: string;
+  rule_config_id: string;
+  userID: string;
+}
+
+interface Transaction {
+  CstmrCdtTrfInitn: {
+    GrpHdr: Record<string, unknown>;
+    PmtInf: Record<string, unknown>;
+  };
+  TxTp: string;
+  TenantId: string;
+}
+
+interface NetworkMap {
+  cfg: string;
+  active: boolean;
+  messages: Array<Record<string, unknown>>;
+  tenantId: string;
+}
+
+interface MetaData {
+  correlationId: string;
+  timestamp: string;
+  tenantId: string;
+  transactionType: string;
+}
+
+interface RuleRequest {
+  transaction: Transaction;
+  networkMap: NetworkMap;
+  DataCache: Record<string, unknown>;
+  metaData: MetaData;
+}
+
+interface CreateRuleHandlerReqBody {
+  ruleData: RuleData;
+  ruleRequest: RuleRequest;
+}
+
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
@@ -53,26 +102,34 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
   try {
-    const ruleData = req.body as Record<string, unknown>;
+    // const requestBody = req.body as Record<string, unknown>;
+    // const ruleData = requestBody.ruleData as any;
+    // const ruleRequest = requestBody.ruleRequest as any;
+
+    const { ruleData, ruleRequest } = req.body as CreateRuleHandlerReqBody;
+
+    // console.log('I have reached rules handler', requestBody);
+    // console.log('Rule data received for creation:', ruleData);
+    // console.log('Rule request received for creation:', ruleRequest);
 
     const newRule = {
       // rule_id: ruleData.rule_id as string,
-      ruleName: ruleData.ruleName as string,
-      description: ruleData.description as string,
+      ruleName: ruleData.ruleName,
+      description: ruleData.description,
       tenant_id: tenantId,
-      txtp: ruleData.txtp as string,
-      txtp_version: ruleData.txtpVersion as string,
-      version: ruleData.version as string,
+      txtp: ruleData.txtp,
+      txtp_version: ruleData.txtpVersion,
+      version: ruleData.version,
       status: 'STATUS_01_IN_PROGRESS',
       publishing_status: 'ACTIVE',
       updated_by: userId,
-      rule_type: ruleData.rule_type as string,
-      rule_config_id: ruleData.rule_config_id as string | undefined,
+      rule_type: ruleData.rule_type,
+      rule_config_id: ruleData.rule_config_id,
       updated_at: new Date(),
       created_at: new Date(),
     };
 
-    const createdRule: unknown = await databaseService.createRule(newRule);
+    const createdRule: unknown = await databaseService.createRule(newRule, ruleRequest);
 
     // at this posotion all logs of tcs lib will come
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });

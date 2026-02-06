@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { ConfigStatus, ContentType, type Config, type JSONSchema, type FieldMapping, type FunctionDefinition } from '@tazama-lf/tcs-lib';
+import type { ConfigStatus, ContentType, Config, JSONSchema, FieldMapping, FunctionDefinition } from '@tazama-lf/tcs-lib';
 import { databaseService, loggerService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 
@@ -7,27 +7,27 @@ const sendError = (reply: FastifyReply, status: number, message: string): void =
   reply.code(status).send({ success: false, message });
 };
 
-export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { id } = req.params as { id: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const configId = parseInt(id);
-    if (isNaN(configId)) {
-      sendError(reply, 400, `Invalid config ID: ${id}. Must be a valid number.`);
-      return;
-    }
-    const config = await databaseService.findConfigById(configId, tenantId);
-    if (!config) {
-      sendError(reply, 404, `Config with id ${id} not found`);
-      return;
-    }
-    reply.code(200).send({ success: true, config });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
-    sendError(reply, 500, errorMessage);
-  }
-};
+// export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const { id } = req.params as { id: string };
+//     const authReq = req as AuthenticatedRequest;
+//     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+//     const configId = parseInt(id);
+//     if (isNaN(configId)) {
+//       sendError(reply, 400, `Invalid config ID: ${id}. Must be a valid number.`);
+//       return;
+//     }
+//     const config = await databaseService.findConfigById(configId, tenantId);
+//     if (!config) {
+//       sendError(reply, 404, `Config with id ${id} not found`);
+//       return;
+//     }
+//     reply.code(200).send({ success: true, config });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
+//     sendError(reply, 500, errorMessage);
+//   }
+// };
 
 export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -53,33 +53,34 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
   }
 };
 
-export const createConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  const authReq = req as AuthenticatedRequest;
-  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-  const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
-  try {
-    const configData = req.body as Record<string, unknown>;
-    const newConfig = {
-      msgFam: configData.msgFam as string,
-      transactionType: configData.transactionType as string,
-      endpointPath: configData.endpointPath as string,
-      version: configData.version as string,
-      contentType: (configData.contentType as ContentType | undefined) ?? ContentType.JSON,
-      schema: configData.schema as JSONSchema,
-      mapping: configData.mapping as FieldMapping[],
-      functions: configData.functions as FunctionDefinition[],
-      status: ConfigStatus.IN_PROGRESS,
-      tenantId,
-      createdBy: userId,
-    };
-    const configId = await databaseService.createConfig(newConfig);
-    reply.code(201).send({ success: true, message: 'Config created successfully', config: { ...newConfig, id: configId } });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
-    loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
-    sendError(reply, 500, errorMessage);
-  }
-};
+// export const createConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//     console.log(req);
+//   const authReq = req as AuthenticatedRequest;
+//   const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+//   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+//   try {
+//     const configData = req.body as Record<string, unknown>;
+//     const newConfig = {
+//       msgFam: configData.msgFam as string,
+//       transactionType: configData.transactionType as string,
+//       endpointPath: configData.endpointPath as string,
+//       version: configData.version as string,
+//       contentType: (configData.contentType as ContentType | undefined) ?? ContentType.JSON,
+//       schema: configData.schema as JSONSchema,
+//       mapping: configData.mapping as FieldMapping[],
+//       functions: configData.functions as FunctionDefinition[],
+//       status: ConfigStatus.IN_PROGRESS,
+//       tenantId,
+//       createdBy: userId,
+//     };
+//     const configId = await databaseService.createConfig(newConfig);
+//     reply.code(201).send({ success: true, message: 'Config created successfully', config: { ...newConfig, id: configId } });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
+//     loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
+//     sendError(reply, 500, errorMessage);
+//   }
+// };
 
 export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
+  createConfigHandler,
+  // getConfigByIdHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -27,15 +29,15 @@ import {
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import {
-  createConfigHandler,
-  getConfigByIdHandler,
+  // createConfigHandler,
+  // getConfigByIdHandler,
   getAllConfigsHandler,
   updateConfigHandler,
   updatePublishingStatusHandler,
   createTransactionTypeTableHandler,
   createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
-  writeConfigHandler,
+  // writeConfigHandler,
   writeConfigUpdateHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
@@ -233,15 +235,9 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/config/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
   });
+
   fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
     ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
-  });
-  fastify.post('/v1/admin/tcs/config', {
-    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
-  });
-
-  fastify.get('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
   });
 
   fastify.get('/v1/admin/config/transaction-types', {
@@ -260,9 +256,9 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateConfigHandler, routePrivilege.putTcsConfig),
   });
 
-  fastify.post('/v1/admin/tcs/config/write', {
-    ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
-  });
+  // fastify.post('/v1/admin/tcs/config/write', {
+  //   ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
+  // });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
@@ -426,6 +422,15 @@ function Routes(fastify: FastifyInstance): void {
     }),
   );
 
+  // admin-service way for tcs
+  fastify.post('/v1/admin/tcs/config/write', {
+    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
+  });
+  //   fastify.get('/v1/admin/tcs/config/:id', {
+  //   ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
+  // });
+
+  //nodes
   fastify.get('/v1/admin/nodes', {
     ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
   });

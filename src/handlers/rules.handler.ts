@@ -142,7 +142,7 @@ export const saveRuleRequestHandler = async (req: FastifyRequest, reply: Fastify
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const { txTp, ruleRequest } = req.body as { txTp: string; ruleRequest: Record<string, unknown> };
+    const { txTp, ruleRequest } = req.body as { txTp: string; ruleRequest: RuleRequest };
 
     // this goes to tcs-lib and saves the RR into db table
     await databaseService.saveRuleRequest(txTp, tenantId, ruleRequest);

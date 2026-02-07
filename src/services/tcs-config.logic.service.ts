@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
+import {
+  ConfigStatus,
+  ContentType,
+  type FieldMapping,
+  type FunctionDefinition,
+  type JSONSchema,
+  type Config,
+  type AddMappingDto,
+  type AddFunctionDto,
+} from '@tazama-lf/tcs-lib';
 import { loggerService } from '..';
 import {
   createConfig,
@@ -9,6 +18,10 @@ import {
   createTransactionTypeTable as repoCreateTransactionTypeTable,
   createTazamaDataModelTable as repoCreateTazamaDataModelTable,
   updateConfigByStatus as repoUpdateConfigByStatus,
+  addMappingToConfig,
+  removeMappingFromConfig,
+  addFunctionToConfig,
+  removeFunctionFromConfig,
 } from '../repositories/configuration/tcs.config.repository';
 
 export interface ConfigRequest {
@@ -162,12 +175,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error(`Config with id ${id} not found`);
     }
 
-    await updateConfig(id, tenantId, updates);
-    const updatedConfig = await findConfigById(id, tenantId);
-
-    if (!updatedConfig) {
-      throw new Error('Failed to retrieve updated config');
-    }
+    const updatedConfig = await updateConfig(id, tenantId, updates);
 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
@@ -191,11 +199,11 @@ export const handleUpdatePublishingStatus = async (
       throw new Error(`Config ${id} not found. Publishers can only manage configs from their own tenant (${tenantId}).`);
     }
 
-    await updateConfig(id, tenantId, { publishing_status: publishingStatus });
+    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus });
 
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
 
-    return { ...existingConfig, publishing_status: publishingStatus };
+    return updatedConfig;
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating publishing status with error message: ${errorMessage.message}`, 'handleUpdatePublishingStatus');
@@ -251,6 +259,82 @@ export const handleUpdateConfigByStatus = async (id: string, status?: string): P
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error updating config by status: ${errorMessage.message}`, 'handleUpdateConfigByStatus');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleAddMapping = async (id: number, tenantId: string, mappingDto: AddMappingDto): Promise<Config> => {
+  try {
+    loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
+
+    const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
+
+    const newMapping: FieldMapping = {
+      ...mappingDto,
+      source: normalizedSource,
+      destination: mappingDto.destination as string | string[],
+      type: mappingDto.type,
+    };
+
+    const updatedConfig = await addMappingToConfig(id, tenantId, newMapping);
+
+    loggerService.log(`Successfully added mapping to config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error adding mapping: ${errorMessage.message}`, 'handleAddMapping');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleRemoveMapping = async (id: number, tenantId: string, mappingIndex: number): Promise<Config> => {
+  try {
+    loggerService.log(`Removing mapping at index ${mappingIndex} from config ${id} for tenant ${tenantId}`);
+
+    const updatedConfig = await removeMappingFromConfig(id, tenantId, mappingIndex);
+
+    loggerService.log(`Successfully removed mapping from config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleAddFunction = async (id: number, tenantId: string, functionDto: AddFunctionDto): Promise<Config> => {
+  try {
+    loggerService.log(`Adding function to config ${id} for tenant ${tenantId}`);
+
+    const newFunction: FunctionDefinition = {
+      functionName: functionDto.functionName,
+      params: functionDto.params ?? [],
+      tableName: functionDto.tableName ?? '',
+      columns: functionDto.columns ?? [],
+    };
+
+    const updatedConfig = await addFunctionToConfig(id, tenantId, newFunction);
+
+    loggerService.log(`Successfully added function to config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleRemoveFunction = async (id: number, tenantId: string, functionIndex: number): Promise<Config> => {
+  try {
+    loggerService.log(`Removing function at index ${functionIndex} from config ${id} for tenant ${tenantId}`);
+
+    const updatedConfig = await removeFunctionFromConfig(id, tenantId, functionIndex);
+
+    loggerService.log(`Successfully removed function from config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
     throw new Error(errorMessage.message);
   }
 };

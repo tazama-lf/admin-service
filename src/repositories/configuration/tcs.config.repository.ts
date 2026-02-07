@@ -100,7 +100,7 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comments
+      payload_xml, payload_json, created_at, updated_at, comment, comments
     FROM tcs_config
     WHERE id = $1 AND tenant_id = $2
   `;
@@ -206,27 +206,62 @@ export const findConfigsByStatus = async (
   };
 };
 
-export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<void> => {
+export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
 
-  // Build dynamic SET clause
-  for (const [key, value] of Object.entries(updates)) {
-    if (value !== undefined) {
-      setClauses.push(`${key} = $${paramIndex}`);
-      // Handle JSON fields
-      if (typeof value === 'object' && value !== null) {
-        values.push(JSON.stringify(value));
-      } else {
-        values.push(value);
-      }
-      paramIndex++;
+  // Field-by-field updates with proper type handling
+  if (updates.msgFam !== undefined) {
+    setClauses.push(`msg_fam = $${paramIndex++}`);
+    values.push(updates.msgFam);
+  }
+  if (updates.transactionType !== undefined) {
+    setClauses.push(`transaction_type = $${paramIndex++}`);
+    values.push(updates.transactionType);
+  }
+  if (updates.contentType !== undefined) {
+    setClauses.push(`content_type = $${paramIndex++}`);
+    values.push(updates.contentType);
+
+    // Handle payload based on content type
+    if (updates.contentType === ContentType.XML && updates.payload !== undefined) {
+      setClauses.push(`payload_xml = $${paramIndex++}::xml`);
+      values.push(updates.payload as string);
+      setClauses.push('payload_json = NULL');
+    } else if (updates.payload !== undefined) {
+      setClauses.push(`payload_json = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.payload));
+      setClauses.push('payload_xml = NULL');
     }
+  } else if (updates.payload !== undefined) {
+    // Payload update without content type change - default to JSON
+    setClauses.push(`payload_json = $${paramIndex++}`);
+    values.push(JSON.stringify(updates.payload));
+  }
+  if (updates.comments !== undefined) {
+    setClauses.push(`comments = $${paramIndex++}`);
+    values.push(updates.comments);
+  }
+  if (updates.publishing_status !== undefined) {
+    setClauses.push(`publishing_status = $${paramIndex++}`);
+    values.push(updates.publishing_status);
+  }
+  if (updates.mapping !== undefined) {
+    setClauses.push(`mapping = $${paramIndex++}`);
+    values.push(JSON.stringify(updates.mapping));
+  }
+  if (updates.functions !== undefined) {
+    setClauses.push(`functions = $${paramIndex++}`);
+    values.push(JSON.stringify(updates.functions));
+  }
+  if (updates.status !== undefined) {
+    setClauses.push(`status = $${paramIndex++}`);
+    values.push(updates.status);
   }
 
   if (setClauses.length === 0) {
-    return; // No updates to perform
+    throw new Error('No fields to update');
   }
 
   // Add updated_at timestamp
@@ -236,11 +271,61 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     UPDATE tcs_config
     SET ${setClauses.join(', ')}
     WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
+    RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
+              schema, payload_xml, payload_json, comments, comment, mapping, functions,
+              status, publishing_status, created_at, updated_at, tenant_id, created_by
   `;
 
   values.push(id, tenantId);
 
-  await handlePostExecuteSqlStatement({ text: query, values } satisfies PgQueryConfig, 'configuration');
+  interface UpdateConfigRow {
+    id: number;
+    msg_fam: string;
+    transaction_type: string;
+    endpoint_path: string;
+    version: string;
+    content_type: ContentType;
+    schema: JSONSchema;
+    payload_xml: string | null;
+    payload_json: Record<string, unknown> | null;
+    comments: string;
+    comment: string;
+    mapping: FieldMapping[];
+    functions: FunctionDefinition[];
+    status: ConfigStatus;
+    publishing_status: 'active' | 'inactive';
+    created_at: string;
+    updated_at: string;
+    tenant_id: string;
+    created_by: string;
+  }
+
+  const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
+
+  if (result.rows.length === 0) {
+    throw new Error(`Config with id ${id} not found or not authorized`);
+  }
+
+  const [row] = result.rows;
+  return {
+    id: row.id,
+    msgFam: row.msg_fam,
+    transactionType: row.transaction_type,
+    endpointPath: row.endpoint_path,
+    version: row.version,
+    contentType: row.content_type,
+    schema: row.schema,
+    payload: (row.content_type === ContentType.XML ? row.payload_xml : row.payload_json)!,
+    comments: row.comments,
+    mapping: row.mapping,
+    functions: row.functions,
+    status: row.status,
+    publishing_status: row.publishing_status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    tenantId: row.tenant_id,
+    createdBy: row.created_by,
+  };
 };
 
 export const findAllTransactionTypes = async (tenantId: string): Promise<string[]> => {
@@ -306,4 +391,60 @@ export const updateConfigByStatus = async (id: string, status?: string): Promise
   }
 
   return result.rows.length;
+};
+
+export const addMappingToConfig = async (id: number, tenantId: string, newMapping: FieldMapping): Promise<Config> => {
+  const config = await findConfigById(id, tenantId);
+
+  if (!config) {
+    throw new Error('Config not found');
+  }
+
+  const updatedMappings = [...(config.mapping ?? []), newMapping];
+
+  return await updateConfig(id, tenantId, { mapping: updatedMappings });
+};
+
+export const removeMappingFromConfig = async (id: number, tenantId: string, mappingIndex: number): Promise<Config> => {
+  const config = await findConfigById(id, tenantId);
+
+  if (!config) {
+    throw new Error('Config not found');
+  }
+
+  if (!config.mapping || mappingIndex < 0 || mappingIndex >= config.mapping.length) {
+    throw new Error('Invalid mapping index');
+  }
+
+  const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
+
+  return await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+};
+
+export const addFunctionToConfig = async (id: number, tenantId: string, newFunction: FunctionDefinition): Promise<Config> => {
+  const config = await findConfigById(id, tenantId);
+
+  if (!config) {
+    throw new Error('Config not found');
+  }
+
+  const updatedFunctions = [...(config.functions ?? []), newFunction];
+
+  return await updateConfig(id, tenantId, { functions: updatedFunctions });
+};
+
+export const removeFunctionFromConfig = async (id: number, tenantId: string, functionIndex: number): Promise<Config> => {
+  const config = await findConfigById(id, tenantId);
+
+  if (!config) {
+    throw new Error('Config not found');
+  }
+
+  if (!config.functions || functionIndex < 0 || functionIndex >= config.functions.length) {
+    throw new Error('Invalid function index');
+  }
+
+  const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
+
+  return await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
 };

@@ -1,6 +1,6 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Config } from '@tazama-lf/tcs-lib';
+import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import * as util from 'node:util';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
@@ -23,6 +23,10 @@ import {
   handleCreateTransactionTypeTable,
   handleCreateTazamaDataModelTable,
   handleUpdateConfigByStatus,
+  handleAddMapping,
+  handleRemoveMapping,
+  handleAddFunction,
+  handleRemoveFunction,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
@@ -343,5 +347,97 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle update config by status request');
+  }
+};
+
+export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle add mapping request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const mappingDto = req.body as AddMappingDto;
+
+    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Mapping added successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add mapping';
+    loggerService.error(`Failed to add mapping: ${errorMessage}`, 'addMappingHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle add mapping request');
+  }
+};
+
+export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle remove mapping request');
+  try {
+    const { id, index } = req.params as { id: string; index: string };
+    const { tenantId } = req as ITenantRequest;
+    const mappingIndex = Number(index);
+
+    const updatedConfig = await handleRemoveMapping(Number(id), tenantId, mappingIndex);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Mapping removed successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove mapping';
+    loggerService.error(`Failed to remove mapping: ${errorMessage}`, 'removeMappingHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle remove mapping request');
+  }
+};
+
+export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle add function request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const functionDto = req.body as AddFunctionDto;
+
+    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Function added successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add function';
+    loggerService.error(`Failed to add function: ${errorMessage}`, 'addFunctionHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle add function request');
+  }
+};
+
+export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle remove function request');
+  try {
+    const { id, index } = req.params as { id: string; index: string };
+    const { tenantId } = req as ITenantRequest;
+    const functionIndex = Number(index);
+
+    const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Function removed successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove function';
+    loggerService.error(`Failed to remove function: ${errorMessage}`, 'removeFunctionHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle remove function request');
   }
 };

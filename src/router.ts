@@ -9,6 +9,10 @@ import {
   createTransactionTypeTableHandler,
   createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
+  addMappingHandler,
+  removeMappingHandler,
+  addFunctionHandler,
+  removeFunctionHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -66,8 +70,6 @@ import {
   updateRuleStatusHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
-import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
-import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import {
   createScheduleHandler,

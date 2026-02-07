@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { loggerService } from '..';
-import { createConfig, findConfigById, findConfigsByStatus } from '../repositories/configuration/tcs.config.repository';
+import { createConfig, findConfigById, findConfigsByStatus, updateConfig } from '../repositories/configuration/tcs.config.repository';
 
 export interface ConfigRequest {
   msgFam: string;
@@ -141,6 +141,56 @@ export const handleGetAllConfigs = async (
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error: getting all configs with error message: ${errorMessage.message}`, 'handleGetAllConfigs');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+  try {
+    loggerService.log(`Started handling update config request for ID: ${id}, tenant: ${tenantId}`);
+
+    const existingConfig = await findConfigById(id, tenantId);
+    if (!existingConfig) {
+      throw new Error(`Config with id ${id} not found`);
+    }
+
+    await updateConfig(id, tenantId, updates);
+    const updatedConfig = await findConfigById(id, tenantId);
+
+    if (!updatedConfig) {
+      throw new Error('Failed to retrieve updated config');
+    }
+
+    loggerService.log(`Successfully updated config ID: ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdatePublishingStatus = async (
+  id: number,
+  tenantId: string,
+  publishingStatus: 'active' | 'inactive',
+): Promise<Config> => {
+  try {
+    loggerService.log(`[${tenantId}] Started updating publishing status to '${publishingStatus}' for config ${id}`);
+
+    const existingConfig = await findConfigById(id, tenantId);
+    if (!existingConfig) {
+      throw new Error(`Config ${id} not found. Publishers can only manage configs from their own tenant (${tenantId}).`);
+    }
+
+    await updateConfig(id, tenantId, { publishing_status: publishingStatus });
+
+    loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
+
+    return { ...existingConfig, publishing_status: publishingStatus };
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: updating publishing status with error message: ${errorMessage.message}`, 'handleUpdatePublishingStatus');
     throw new Error(errorMessage.message);
   }
 };

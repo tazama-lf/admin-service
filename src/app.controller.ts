@@ -1,5 +1,6 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { Config } from '@tazama-lf/tcs-lib';
 import * as util from 'node:util';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
@@ -13,7 +14,13 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import { handlePostConfig, handleFindConfigByID, handleGetAllConfigs } from './services/tcs-config.logic.service';
+import {
+  handlePostConfig,
+  handleFindConfigByID,
+  handleGetAllConfigs,
+  handleUpdateConfig,
+  handleUpdatePublishingStatus,
+} from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 // import { ConfigStatus, ContentType, FieldMapping, FunctionDefinition, JSONSchema } from '@tazama-lf/tcs-lib';
@@ -211,5 +218,56 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
     loggerService.error(`Failed to get configs: ${errorMessage}`, 'getAllConfigsHandler');
     reply.code(500).send({ success: false, message: errorMessage });
+  }
+};
+
+export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle write config update request');
+  try {
+    const { id } = req.params as { id: string };
+    const updateData = req.body as Record<string, unknown>;
+    const { tenantId } = req as ITenantRequest;
+
+    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
+    reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
+    loggerService.error(`Failed to update config: ${errorMessage}`, 'writeConfigUpdateHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle write config update request');
+  }
+};
+
+export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update publishing status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { publishing_status: publishingStatus } = req.body as { publishing_status?: 'active' | 'inactive' };
+    const { tenantId } = req as ITenantRequest;
+    const configId = parseInt(id);
+
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: `Invalid config ID: ${id}. Must be a valid number.` });
+      return;
+    }
+
+    if (!publishingStatus) {
+      reply.status(400).send({ success: false, message: 'publishing_status must be either "active" or "inactive"' });
+      return;
+    }
+
+    const updatedConfig = await handleUpdatePublishingStatus(configId, tenantId, publishingStatus);
+    reply.code(200).send({
+      success: true,
+      message: `Publishing status updated to ${publishingStatus}`,
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';
+    loggerService.error(`Failed to update publishing status: ${errorMessage}`, 'updatePublishingStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update publishing status request');
   }
 };

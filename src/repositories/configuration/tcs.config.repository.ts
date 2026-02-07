@@ -100,7 +100,7 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comment, comments
+      payload_xml, payload_json, created_at, updated_at, comments
     FROM tcs_config
     WHERE id = $1 AND tenant_id = $2
   `;
@@ -183,7 +183,7 @@ export const findConfigsByStatus = async (
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comment, comments
+      payload_xml, payload_json, created_at, updated_at, comments
     FROM tcs_config
     WHERE ${whereClause}
     ORDER BY updated_at DESC
@@ -204,4 +204,57 @@ export const findConfigsByStatus = async (
     limit,
     offset,
   };
+};
+
+export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<void> => {
+  const setClauses: string[] = [];
+  const values: Array<string | number | object> = [];
+  let paramIndex = 1;
+
+  // Build dynamic SET clause
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) {
+      setClauses.push(`${key} = $${paramIndex}`);
+      // Handle JSON fields
+      if (typeof value === 'object' && value !== null) {
+        values.push(JSON.stringify(value));
+      } else {
+        values.push(value);
+      }
+      paramIndex++;
+    }
+  }
+
+  if (setClauses.length === 0) {
+    return; // No updates to perform
+  }
+
+  // Add updated_at timestamp
+  setClauses.push('updated_at = NOW()');
+
+  const query = `
+    UPDATE tcs_config
+    SET ${setClauses.join(', ')}
+    WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
+  `;
+
+  values.push(id, tenantId);
+
+  await handlePostExecuteSqlStatement({ text: query, values } satisfies PgQueryConfig, 'configuration');
+};
+
+export const findAllTransactionTypes = async (tenantId: string): Promise<string[]> => {
+  const query = `
+    SELECT DISTINCT transaction_type
+    FROM tcs_config
+    WHERE tenant_id = $1
+    ORDER BY transaction_type
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{ transaction_type: string }>(
+    { text: query, values: [tenantId] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return result.rows.map((row) => row.transaction_type);
 };

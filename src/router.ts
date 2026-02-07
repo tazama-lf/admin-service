@@ -4,6 +4,8 @@ import {
   createConfigHandler,
   getConfigByIdHandler,
   getAllConfigsHandler,
+  updatePublishingStatusHandler,
+  writeConfigUpdateHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -33,13 +35,13 @@ import {
   // createConfigHandler,
   // getConfigByIdHandler,
   // getAllConfigsHandler,
-  updateConfigHandler,
-  updatePublishingStatusHandler,
+  // updateConfigHandler,
+  // updatePublishingStatusHandler,
   createTransactionTypeTableHandler,
   createTazamaDataModelTableHandler,
   updateConfigByStatusHandler,
   // writeConfigHandler,
-  writeConfigUpdateHandler,
+  // writeConfigUpdateHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
@@ -249,14 +251,6 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/config/:transactionType', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
-
-  fastify.put('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(updateConfigHandler, routePrivilege.putTcsConfig),
-  });
-
-  // fastify.post('/v1/admin/tcs/config/write', {
-  //   ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
-  // });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
     ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),

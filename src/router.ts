@@ -13,6 +13,10 @@ import {
   removeMappingHandler,
   addFunctionHandler,
   removeFunctionHandler,
+  getAllCollectionsHandler,
+  createDestinationTypeHandler,
+  destinationTypeExistsHandler,
+  addFieldToDestinationTypeHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -91,12 +95,6 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
-import {
-  getAllCollectionsHandler,
-  createDestinationTypeHandler,
-  destinationTypeExistsHandler,
-  addFieldToDestinationTypeHandler,
-} from './handlers/data-model.handler';
 import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 
 const routePrivilege = {

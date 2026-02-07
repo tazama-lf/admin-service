@@ -258,3 +258,52 @@ export const findAllTransactionTypes = async (tenantId: string): Promise<string[
 
   return result.rows.map((row) => row.transaction_type);
 };
+
+export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS "${transactionType}" (
+      document JSONB NOT NULL,
+      creDtTm TEXT,
+      messageId TEXT,
+      endToEndId TEXT,
+      debtorAccountId TEXT,
+      creditorAccountId TEXT,
+      tenantId TEXT
+    );
+  `;
+
+  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'raw_history');
+};
+
+export const createTazamaDataModelTable = async (tableName: string): Promise<void> => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS "${tableName}" (
+      _key text PRIMARY KEY,
+      data jsonb NOT NULL,
+      tenantId text,
+      creDtTm text
+    );
+  `;
+
+  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
+};
+
+export const updateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+  const query = `
+    UPDATE tcs_config
+    SET status = $1, updated_at = NOW()
+    WHERE id = $2
+    RETURNING id;
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{ id: number }>(
+    { text: query, values: [status, id] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`No config found with id: ${id}`);
+  }
+
+  return result.rows.length;
+};

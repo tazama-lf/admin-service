@@ -32,7 +32,7 @@ export const dbInit = async (): Promise<void> => {
   configuration = processorConfig;
   if (process.env.ENABLE_FRMS_DATABASES === 'true') {
     const { db, config } = await CreateStorageManager(
-      [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
+      [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Cache.DISTRIBUTED],
       processorConfig.nodeEnv === 'production',
     );
     databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;

@@ -20,6 +20,9 @@ import {
   handleGetAllConfigs,
   handleUpdateConfig,
   handleUpdatePublishingStatus,
+  handleCreateTransactionTypeTable,
+  handleCreateTazamaDataModelTable,
+  handleUpdateConfigByStatus,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
@@ -269,5 +272,76 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle update publishing status request');
+  }
+};
+
+export const createTransactionTypeTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create transaction type table request');
+  try {
+    const { transactionType } = req.body as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    await handleCreateTransactionTypeTable(transactionType);
+
+    reply.code(201).send({
+      success: true,
+      message: `Table for transaction type '${transactionType}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create transaction type table';
+    loggerService.error(`Failed to create transaction type table: ${errorMessage}`, 'createTransactionTypeTableHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create transaction type table request');
+  }
+};
+
+export const createTazamaDataModelTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create Tazama data model table request');
+  try {
+    const { tableName } = req.body as { tableName: string };
+
+    if (!tableName) {
+      reply.status(400).send({ success: false, message: 'Table name is required' });
+      return;
+    }
+
+    await handleCreateTazamaDataModelTable(tableName);
+
+    reply.code(201).send({
+      success: true,
+      message: `Table '${tableName}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create Tazama data model table';
+    loggerService.error(`Failed to create Tazama data model table: ${errorMessage}`, 'createTazamaDataModelTableHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create Tazama data model table request');
+  }
+};
+
+export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update config by status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { status } = req.body as { status?: string };
+
+    const updatedCount = await handleUpdateConfigByStatus(id, status);
+
+    reply.code(200).send({
+      success: true,
+      message: `Publishing status updated successfully (${updatedCount} row(s) affected).`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update config publishing status';
+    loggerService.error(`Failed to update config by status: ${errorMessage}`, 'updateConfigByStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update config by status request');
   }
 };

@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { loggerService } from '..';
-import { createConfig, findConfigById, findConfigsByStatus, updateConfig } from '../repositories/configuration/tcs.config.repository';
+import {
+  createConfig,
+  findConfigById,
+  findConfigsByStatus,
+  updateConfig,
+  createTransactionTypeTable as repoCreateTransactionTypeTable,
+  createTazamaDataModelTable as repoCreateTazamaDataModelTable,
+  updateConfigByStatus as repoUpdateConfigByStatus,
+} from '../repositories/configuration/tcs.config.repository';
 
 export interface ConfigRequest {
   msgFam: string;
@@ -191,6 +199,58 @@ export const handleUpdatePublishingStatus = async (
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating publishing status with error message: ${errorMessage.message}`, 'handleUpdatePublishingStatus');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleCreateTransactionTypeTable = async (transactionType: string): Promise<void> => {
+  try {
+    loggerService.log(`Creating table for transaction type: ${transactionType}`);
+
+    if (!transactionType) {
+      throw new Error('Transaction type is required');
+    }
+
+    await repoCreateTransactionTypeTable(transactionType);
+
+    loggerService.log(`Successfully created table for transaction type: ${transactionType}`);
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error creating transaction type table: ${errorMessage.message}`, 'handleCreateTransactionTypeTable');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleCreateTazamaDataModelTable = async (tableName: string): Promise<void> => {
+  try {
+    loggerService.log(`Creating Tazama data model table: ${tableName}`);
+
+    if (!tableName) {
+      throw new Error('Table name is required');
+    }
+
+    await repoCreateTazamaDataModelTable(tableName);
+
+    loggerService.log(`Successfully created Tazama data model table: ${tableName}`);
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error creating Tazama data model table: ${errorMessage.message}`, 'handleCreateTazamaDataModelTable');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+  try {
+    loggerService.log(`Updating config ${id} status to: ${status}`);
+
+    const updatedCount = await repoUpdateConfigByStatus(id, status);
+
+    loggerService.log(`Successfully updated config ${id} status`);
+
+    return updatedCount;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error updating config by status: ${errorMessage.message}`, 'handleUpdateConfigByStatus');
     throw new Error(errorMessage.message);
   }
 };

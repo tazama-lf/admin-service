@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema } from '@tazama-lf/tcs-lib';
+import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { loggerService } from '..';
-import { createConfig } from '../repositories/configuration/tcs.config.repository';
+import { createConfig, findConfigById, findConfigsByStatus } from '../repositories/configuration/tcs.config.repository';
 
 export interface ConfigRequest {
   msgFam: string;
@@ -97,11 +97,50 @@ export const handlePostConfig = async (
     throw new Error(errorMessage.message);
   }
 };
-// export const handleFindConfigByID = async (
-//   configId: number,
-//   tenantId: string,
-// ): Promise<ConfigResponse | null> => {
-//   try {
-//     loggerService.log(`Started handling get request for config ID: ${configId} for tenant: ${tenantId}.`);
-//   }
-//   }
+export const handleFindConfigByID = async (id: string, tenantId: string): Promise<ConfigResponse> => {
+  try {
+    const configId = parseInt(id);
+
+    loggerService.log(`Started handling get request for config ID: ${configId} for tenant: ${tenantId}.`);
+
+    const config = await findConfigById(configId, tenantId);
+
+    if (!config) {
+      throw new Error('Failed to get config - no config found');
+    }
+
+    loggerService.log('Config was retrieved successfully.');
+
+    return config as ConfigResponse;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: getting config with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetAllConfigs = async (
+  limit: number,
+  offset: number,
+  filters: Record<string, string>,
+  tenantId: string,
+): Promise<{
+  data: Config[];
+  total: number;
+  limit: number;
+  offset: number;
+}> => {
+  try {
+    loggerService.log(`Started handling get all configs request for tenant: ${tenantId} with limit: ${limit}, offset: ${offset}`);
+
+    const result = await findConfigsByStatus(limit, offset, filters, tenantId);
+
+    loggerService.log(`Successfully retrieved ${result.data.length} configs out of ${result.total} total`);
+
+    return result;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: getting all configs with error message: ${errorMessage.message}`, 'handleGetAllConfigs');
+    throw new Error(errorMessage.message);
+  }
+};

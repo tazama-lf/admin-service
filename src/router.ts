@@ -2,7 +2,8 @@
 import type { FastifyInstance } from 'fastify';
 import {
   createConfigHandler,
-  // getConfigByIdHandler,
+  getConfigByIdHandler,
+  getAllConfigsHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -31,7 +32,7 @@ import { buildCrudPlugin } from './utils/crud-schema';
 import {
   // createConfigHandler,
   // getConfigByIdHandler,
-  getAllConfigsHandler,
+  // getAllConfigsHandler,
   updateConfigHandler,
   updatePublishingStatusHandler,
   createTransactionTypeTableHandler,
@@ -232,9 +233,6 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   // ==================== TCS OPERATIONS ====================
-  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
-  });
 
   fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
     ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
@@ -426,9 +424,12 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/config/write', {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
-  //   fastify.get('/v1/admin/tcs/config/:id', {
-  //   ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
-  // });
+  fastify.get('/v1/admin/tcs/config/:id', {
+    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
+  });
+  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
+  });
 
   //nodes
   fastify.get('/v1/admin/nodes', {

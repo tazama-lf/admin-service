@@ -13,10 +13,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import {
-  handlePostConfig,
-  //  handleFindConfigByID
-} from './services/tcs-config.logic.service';
+import { handlePostConfig, handleFindConfigByID, handleGetAllConfigs } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 // import { ConfigStatus, ContentType, FieldMapping, FunctionDefinition, JSONSchema } from '@tazama-lf/tcs-lib';
@@ -174,27 +171,45 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
     loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
     reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create config request');
   }
 };
-// export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-//   loggerService.log('Start - Handle get config by id request');
-//   try {
-//     const { id } = req.params as { id: string };
-//     const tenantId = (req as ITenantRequest).tenantId ?? 'DEFAULT';
-//     const configId = parseInt(id);
-//     // const config = await handleFindConfigByID(configId, tenantId);
-//     if (isNaN(configId)) {
-//       reply.status(400).send({ success: false, message: `Invalid config ID: ${id}. Must be a valid number.` });
-//       return;
-//     }
-//     if (!config) {
-//       reply.status(404).send({ success: false, message: `Config with id ${id} not found` });
-//       return;
-//     }
-//     reply.code(200).send({ success: true, config });
-//   } catch (error: unknown) {
-//     const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
-//     loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
-//     reply.status(500).send({ success: false, message: errorMessage });
-//   }
-// };
+export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by id request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const config = await handleFindConfigByID(id, tenantId);
+    reply.code(200).send({ success: true, config });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
+    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get config by id request');
+  }
+};
+export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await handleGetAllConfigs(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      configs: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
+    loggerService.error(`Failed to get configs: ${errorMessage}`, 'getAllConfigsHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  }
+};

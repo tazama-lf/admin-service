@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
-import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema } from '@tazama-lf/tcs-lib';
+import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 
 export interface ConfigData {
@@ -93,4 +93,115 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
   );
 
   return result.rows[0].id;
+};
+
+export const findConfigById = async (id: number, tenantId: string): Promise<Config | null> => {
+  const query = `
+    SELECT
+      id, msg_fam, transaction_type, endpoint_path, version, content_type,
+      schema, mapping, functions, status, tenant_id, created_by, publishing_status,
+      payload_xml, payload_json, created_at, updated_at, comment, comments
+    FROM tcs_config
+    WHERE id = $1 AND tenant_id = $2
+  `;
+
+  const values = [id, tenantId];
+
+  const result = await handlePostExecuteSqlStatement<Config>(
+    {
+      text: query,
+      values,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0];
+};
+
+export const findConfigsByStatus = async (
+  limit: number,
+  offset: number,
+  filters: Record<string, string>,
+  tenantId: string,
+): Promise<{
+  data: Config[];
+  total: number;
+  limit: number;
+  offset: number;
+}> => {
+  const { status, endpointPath, createdAt } = filters;
+
+  // Build dynamic WHERE clauses
+  const whereClauses: string[] = ['tenant_id = $1'];
+  const queryParams: Array<string | string[]> = [tenantId];
+  let paramIndex = 2;
+
+  if (status) {
+    const statusArray = status.split(',').map((s) => s.trim());
+    whereClauses.push(`status = ANY($${paramIndex})`);
+    queryParams.push(statusArray);
+    paramIndex += 1;
+  }
+
+  if (endpointPath) {
+    whereClauses.push(`endpoint_path LIKE $${paramIndex}`);
+    queryParams.push(`%${endpointPath}%`);
+    paramIndex += 1;
+  }
+
+  if (createdAt) {
+    whereClauses.push(`DATE(created_at) = $${paramIndex}`);
+    queryParams.push(createdAt);
+    paramIndex += 1;
+  }
+
+  const whereClause = whereClauses.join(' AND ');
+
+  // Count query
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM tcs_config
+    WHERE ${whereClause}
+  `;
+
+  const countResult = await handlePostExecuteSqlStatement<{ total: string }>(
+    {
+      text: countQuery,
+      values: queryParams,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  const total = parseInt(countResult.rows[0].total, 10);
+
+  // Data query with pagination
+  const dataQuery = `
+    SELECT
+      id, msg_fam, transaction_type, endpoint_path, version, content_type,
+      schema, mapping, functions, status, tenant_id, created_by, publishing_status,
+      payload_xml, payload_json, created_at, updated_at, comment, comments
+    FROM tcs_config
+    WHERE ${whereClause}
+    ORDER BY updated_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  const dataResult = await handlePostExecuteSqlStatement<Config>(
+    {
+      text: dataQuery,
+      values: [...queryParams, limit, offset] as Array<string | string[] | number>,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return {
+    data: dataResult.rows,
+    total,
+    limit,
+    offset,
+  };
 };

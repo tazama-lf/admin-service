@@ -312,7 +312,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     SET ${setClauses.join(', ')}
     WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
     RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
-              schema, payload_xml, payload_json, comments, comment, mapping, functions,
+              schema, payload_xml, payload_json, comments, mapping, functions,
               status, publishing_status, created_at, updated_at, tenant_id, created_by
   `;
 
@@ -329,7 +329,6 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     payload_xml: string | null;
     payload_json: Record<string, unknown> | null;
     comments: string;
-    comment: string;
     mapping: FieldMapping[];
     functions: FunctionDefinition[];
     status: ConfigStatus;

@@ -73,40 +73,42 @@ export const handleGetAllCollections = async (tenantId: string): Promise<Collect
 const buildCollectionFields = async (collectionId: number, tenantId: string): Promise<TazamaField[]> => {
   const fields = await DataModelRepository.getCollectionFields(collectionId, tenantId);
 
-  const rootFields: FieldRow[] = [];
-  const nestedFieldsMap = new Map<number, FieldRow[]>();
+  // Build a map of field_id to child fields for object types
+  const childFieldsMap = new Map<number, FieldRow[]>();
 
   for (const row of fields) {
-    if (row.parent_id === null) {
-      rootFields.push(row);
-    } else {
-      if (!nestedFieldsMap.has(row.parent_id)) {
-        nestedFieldsMap.set(row.parent_id, []);
+    if (row.parent_id !== null) {
+      if (!childFieldsMap.has(row.parent_id)) {
+        childFieldsMap.set(row.parent_id, []);
       }
-      nestedFieldsMap.get(row.parent_id)!.push(row);
+      childFieldsMap.get(row.parent_id)!.push(row);
     }
   }
 
-  const tazamaFields: TazamaField[] = rootFields.map((rootField) => {
+  // Transform all fields to TazamaField format
+  const tazamaFields: TazamaField[] = fields.map((field) => {
     const tazamaField: TazamaField = {
-      name: rootField.field_name,
-      type: rootField.field_type,
+      name: field.field_name,
+      type: field.field_type,
       required: false,
-      parent_id: rootField.parent_id,
-      serial_no: rootField.serial_no,
-      collection_id: rootField.collection_id,
+      parent_id: field.parent_id,
+      serial_no: field.serial_no,
+      collection_id: field.collection_id,
     };
 
-    if (rootField.field_type === 'object') {
-      const nestedFields = nestedFieldsMap.get(rootField.serial_no) ?? [];
-      tazamaField.properties = nestedFields.map((nf) => ({
-        name: nf.field_name,
-        type: nf.field_type,
-        required: false,
-        parent_id: nf.parent_id,
-        serial_no: nf.serial_no,
-        collection_id: nf.collection_id,
-      }));
+    // If this is an object type field, add its properties
+    if (field.field_type.toLowerCase() === 'object') {
+      const childFields = childFieldsMap.get(field.field_id) ?? [];
+      if (childFields.length > 0) {
+        tazamaField.properties = childFields.map((nf) => ({
+          name: nf.field_name,
+          type: nf.field_type,
+          required: false,
+          parent_id: nf.parent_id,
+          serial_no: nf.serial_no,
+          collection_id: nf.collection_id,
+        }));
+      }
     }
 
     return tazamaField;

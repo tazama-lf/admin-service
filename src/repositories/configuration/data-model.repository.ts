@@ -49,8 +49,8 @@ export const getAllCollections = async (tenantId: string): Promise<CollectionRow
       dt.collection_type,
       dt.destination_type_id as destination_type_id,
       dt.destination_id as destination_id
-    FROM destination_type dt
-    LEFT JOIN destination d ON d.destination_id = dt.destination_id
+    FROM tcs_destination_type dt
+    LEFT JOIN tcs_destination d ON d.destination_id = dt.destination_id
     WHERE LOWER(dt.tenant_id) = LOWER($1) OR LOWER(dt.tenant_id) = 'default'
     ORDER BY dt.name
   `;
@@ -73,7 +73,7 @@ export const getCollectionFields = async (collectionId: number, tenantId: string
       dtf.serial_no,
       dtf.collection_id,
       dtf.tenant_id
-    FROM destination_type_fields dtf
+    FROM tcs_destination_type_fields dtf
     WHERE dtf.collection_id = $1 AND (LOWER(dtf.tenant_id) = LOWER($2) OR LOWER(dtf.tenant_id) = 'default')
     ORDER BY dtf.serial_no, dtf.field_id
   `;
@@ -93,7 +93,7 @@ export const createDestinationType = async (
   tenantId: string,
 ): Promise<DestinationTypeRow> => {
   const query = `
-    INSERT INTO destination_type (collection_type, name, destination_id, tenant_id, created_at, updated_at)
+    INSERT INTO tcs_destination_type (collection_type, name, destination_id, tenant_id, created_at, updated_at)
     VALUES ($1, $2, $3, $4, NOW(), NOW())
     RETURNING destination_type_id, collection_type, name, destination_id, tenant_id, created_at
   `;
@@ -112,7 +112,7 @@ export const createDestinationType = async (
 
 export const destinationTypeExists = async (destinationTypeId: number, tenantId: string): Promise<boolean> => {
   const query =
-    "SELECT destination_type_id FROM destination_type WHERE destination_type_id = $1 AND (LOWER(tenant_id) = LOWER($2) OR LOWER(tenant_id) = 'default')";
+    "SELECT destination_type_id FROM tcs_destination_type WHERE destination_type_id = $1 AND (LOWER(tenant_id) = LOWER($2) OR LOWER(tenant_id) = 'default')";
 
   const result = await handlePostExecuteSqlStatement<{ destination_type_id: number }>(
     { text: query, values: [destinationTypeId, tenantId] } satisfies PgQueryConfig,
@@ -125,7 +125,7 @@ export const destinationTypeExists = async (destinationTypeId: number, tenantId:
 export const getNextSerialNumber = async (destinationTypeId: number): Promise<number> => {
   const query = `
     SELECT COALESCE(MAX(serial_no), 0) + 1 as next_serial
-    FROM destination_type_fields
+    FROM tcs_destination_type_fields
     WHERE collection_id = $1 AND parent_id IS NULL
   `;
 
@@ -153,7 +153,7 @@ interface AddFieldOptions {
 export const addFieldToDestinationType = async (options: AddFieldOptions): Promise<FieldResultRow> => {
   const { name, fieldType, parentId, tenantId, serialNo, collectionId } = options;
   const query = `
-    INSERT INTO destination_type_fields (name, field_type, parent_id, tenant_id, serial_no, collection_id)
+    INSERT INTO tcs_destination_type_fields (name, field_type, parent_id, tenant_id, serial_no, collection_id)
     VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING field_id, name as field_name, field_type, parent_id, tenant_id, serial_no, collection_id
   `;

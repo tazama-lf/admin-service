@@ -13,10 +13,10 @@ import {
   removeMappingHandler,
   addFunctionHandler,
   removeFunctionHandler,
-  getAllCollectionsHandler,
-  createDestinationTypeHandler,
-  destinationTypeExistsHandler,
-  addFieldToDestinationTypeHandler,
+  // getAllCollectionsHandler,
+  // createDestinationTypeHandler,
+  // destinationTypeExistsHandler,
+  // addFieldToDestinationTypeHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -96,6 +96,12 @@ import {
   validateTableHandler,
 } from './handlers/job.handler';
 import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
+import {
+  getAllCollectionsHandler,
+  createDestinationTypeHandler,
+  destinationTypeExistsHandler,
+  addFieldToDestinationTypeHandler,
+} from './handlers/data-model.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',

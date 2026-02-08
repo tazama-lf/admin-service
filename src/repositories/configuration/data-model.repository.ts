@@ -141,14 +141,17 @@ export const getNextSerialNumber = async (destinationTypeId: number): Promise<nu
   return result.rows[0].next_serial;
 };
 
-export const addFieldToDestinationType = async (
-  name: string,
-  fieldType: string,
-  parentId: number | null,
-  tenantId: string,
-  serialNo: number | null,
-  collectionId: number,
-): Promise<FieldResultRow> => {
+interface AddFieldOptions {
+  name: string;
+  fieldType: string;
+  parentId: number | null;
+  tenantId: string;
+  serialNo: number | null;
+  collectionId: number;
+}
+
+export const addFieldToDestinationType = async (options: AddFieldOptions): Promise<FieldResultRow> => {
+  const { name, fieldType, parentId, tenantId, serialNo, collectionId } = options;
   const query = `
     INSERT INTO destination_type_fields (name, field_type, parent_id, tenant_id, serial_no, collection_id)
     VALUES ($1, $2, $3, $4, $5, $6)

@@ -21,7 +21,52 @@ export interface ConfigData {
   creDtTm?: string;
 }
 
+interface ConfigRow {
+  id: number;
+  msg_fam: string;
+  transaction_type: string;
+  endpoint_path: string;
+  version: string;
+  content_type: ContentType;
+  schema: string | JSONSchema;
+  mapping?: string | FieldMapping[];
+  functions?: string | FunctionDefinition[];
+  status: string;
+  tenant_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  comments: string;
+  publishing_status: 'active' | 'inactive';
+  payload_xml?: string;
+  payload_json?: Record<string, unknown>;
+}
+
 const convertStatusToDatabase = (status: ConfigStatus): string => status.toLowerCase().replace('_', '-');
+
+const mapRowToConfig = (row: ConfigRow): Config => ({
+  id: row.id,
+  msgFam: row.msg_fam,
+  transactionType: row.transaction_type,
+  endpointPath: row.endpoint_path,
+  version: row.version,
+  contentType: row.content_type,
+  schema: typeof row.schema === 'string' ? (JSON.parse(row.schema) as JSONSchema) : row.schema,
+  mapping: row.mapping ? (typeof row.mapping === 'string' ? (JSON.parse(row.mapping) as FieldMapping[]) : row.mapping) : undefined,
+  functions: row.functions
+    ? typeof row.functions === 'string'
+      ? (JSON.parse(row.functions) as FunctionDefinition[])
+      : row.functions
+    : undefined,
+  status: row.status.toUpperCase().replace('-', '_') as ConfigStatus,
+  tenantId: row.tenant_id,
+  createdBy: row.created_by,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  comments: row.comments,
+  publishing_status: row.publishing_status,
+  payload: row.content_type === ContentType.XML ? row.payload_xml : row.payload_json,
+});
 
 export const createConfig = async (config: ConfigData, id?: number): Promise<number> => {
   const isXml = config.contentType === ContentType.XML;
@@ -100,14 +145,14 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comment, comments
+      payload_xml, payload_json, created_at, updated_at, comments
     FROM tcs_config
     WHERE id = $1 AND tenant_id = $2
   `;
 
   const values = [id, tenantId];
 
-  const result = await handlePostExecuteSqlStatement<Config>(
+  const result = await handlePostExecuteSqlStatement<ConfigRow>(
     {
       text: query,
       values,
@@ -119,7 +164,7 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     return null;
   }
 
-  return result.rows[0];
+  return mapRowToConfig(result.rows[0]);
 };
 
 export const findConfigsByStatus = async (
@@ -161,7 +206,6 @@ export const findConfigsByStatus = async (
 
   const whereClause = whereClauses.join(' AND ');
 
-  // Count query
   const countQuery = `
     SELECT COUNT(*) as total
     FROM tcs_config
@@ -190,7 +234,7 @@ export const findConfigsByStatus = async (
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
 
-  const dataResult = await handlePostExecuteSqlStatement<Config>(
+  const dataResult = await handlePostExecuteSqlStatement<ConfigRow>(
     {
       text: dataQuery,
       values: [...queryParams, limit, offset] as Array<string | string[] | number>,
@@ -199,7 +243,7 @@ export const findConfigsByStatus = async (
   );
 
   return {
-    data: dataResult.rows,
+    data: dataResult.rows.map(mapRowToConfig),
     total,
     limit,
     offset,
@@ -211,7 +255,6 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
 
-  // Field-by-field updates with proper type handling
   if (updates.msgFam !== undefined) {
     setClauses.push(`msg_fam = $${paramIndex++}`);
     values.push(updates.msgFam);
@@ -224,7 +267,6 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     setClauses.push(`content_type = $${paramIndex++}`);
     values.push(updates.contentType);
 
-    // Handle payload based on content type
     if (updates.contentType === ContentType.XML && updates.payload !== undefined) {
       setClauses.push(`payload_xml = $${paramIndex++}::xml`);
       values.push(updates.payload as string);
@@ -235,7 +277,6 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
       setClauses.push('payload_xml = NULL');
     }
   } else if (updates.payload !== undefined) {
-    // Payload update without content type change - default to JSON
     setClauses.push(`payload_json = $${paramIndex++}`);
     values.push(JSON.stringify(updates.payload));
   }
@@ -264,7 +305,6 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     throw new Error('No fields to update');
   }
 
-  // Add updated_at timestamp
   setClauses.push('updated_at = NOW()');
 
   const query = `

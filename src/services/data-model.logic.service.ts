@@ -173,14 +173,14 @@ export const handleAddFieldToDestinationType = async (
       finalSerialNo = await DataModelRepository.getNextSerialNumber(destinationTypeId);
     }
 
-    const result = await DataModelRepository.addFieldToDestinationType(
+    const result = await DataModelRepository.addFieldToDestinationType({
       name,
       fieldType,
       parentId,
       tenantId,
-      finalSerialNo,
-      destinationTypeId,
-    );
+      serialNo: finalSerialNo,
+      collectionId: destinationTypeId,
+    });
 
     loggerService.log(`Successfully added field with ID: ${result.field_id}`);
     return result;

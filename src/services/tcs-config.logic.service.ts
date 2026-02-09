@@ -1,64 +1,51 @@
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema } from '@tazama-lf/tcs-lib';
 import { loggerService } from '..';
-import { createConfig } from '../repositories/configuration/tcs.config.repository';
+import {
+  type Config,
+  type AddMappingDto,
+  type AddFunctionDto,
+  ConfigStatus,
+  ContentType,
+  type FieldMapping,
+  type FunctionDefinition,
+} from '@tazama-lf/tcs-lib';
+import {
+  createConfig,
+  findConfigById,
+  findConfigsByStatus,
+  updateConfig,
+  createTransactionTypeTable,
+  createTazamaDataModelTable,
+  updateConfigByStatus,
+} from '../repositories/configuration/tcs.config.repository';
+import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
-export interface ConfigRequest {
-  msgFam: string;
-  transactionType: string;
-  endpointPath: string;
-  version: string;
-  contentType?: ContentType;
-  schema: JSONSchema;
-  mapping?: FieldMapping[];
-  functions?: FunctionDefinition[];
-  createdBy: string;
-  publishing_status?: string;
-  payload?: string | object;
-}
-
-export interface ConfigResponse {
-  id: number;
-  msgFam: string;
-  transactionType: string;
-  endpointPath: string;
-  version: string;
-  contentType: ContentType;
-  schema: JSONSchema;
-  mapping?: FieldMapping[];
-  functions?: FunctionDefinition[];
-  status: ConfigStatus;
-  tenantId: string;
-  createdBy: string;
-  creDtTm: string;
-  publishing_status: string;
-}
-
-export const handlePostConfig = async (
-  config: Record<string, unknown>,
-  tenantId: string,
-): Promise<{ message: string; result: ConfigResponse }> => {
+export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
-    const userId = (config.createdBy as string) || 'system';
+    const userId = config.createdBy ?? 'system';
 
     loggerService.log(`Started handling post request of config executed by ${userId}.`);
 
     const nowDateTime = new Date().toISOString();
 
-    const newConfig = {
-      msgFam: config.msgFam as string,
-      transactionType: config.transactionType as string,
-      endpointPath: config.endpointPath as string,
-      version: config.version as string,
-      contentType: (config.contentType as ContentType) ?? ContentType.JSON,
-      schema: config.schema as JSONSchema,
-      mapping: config.mapping as FieldMapping[] | undefined,
-      functions: config.functions as FunctionDefinition[] | undefined,
+    if (!config.msgFam || !config.transactionType || !config.endpointPath || !config.version || !config.schema) {
+      throw new Error('Missing required fields: msgFam, transactionType, endpointPath, version, or schema');
+    }
+
+    const newConfig: ConfigData = {
+      msgFam: config.msgFam,
+      transactionType: config.transactionType,
+      endpointPath: config.endpointPath,
+      version: config.version,
+      contentType: config.contentType ?? ContentType.JSON,
+      schema: config.schema,
+      mapping: config.mapping,
+      functions: config.functions,
       status: ConfigStatus.IN_PROGRESS,
       tenantId,
       createdBy: userId,
-      publishing_status: (config.publishing_status as string) ?? 'inactive',
-      payload: config.payload as string | object | undefined,
+      publishing_status: config.publishing_status ?? 'inactive',
+      payload: config.payload,
       creDtTm: nowDateTime,
     };
 
@@ -78,11 +65,10 @@ export const handlePostConfig = async (
       schema: newConfig.schema,
       mapping: newConfig.mapping,
       functions: newConfig.functions,
-      status: newConfig.status,
+      status: newConfig.status ?? ConfigStatus.IN_PROGRESS,
       tenantId: newConfig.tenantId,
       createdBy: newConfig.createdBy,
-      creDtTm: newConfig.creDtTm,
-      publishing_status: newConfig.publishing_status,
+      publishing_status: (newConfig.publishing_status ?? 'inactive') as 'active' | 'inactive',
     };
 
     loggerService.log('New config was saved successfully.');
@@ -97,11 +83,262 @@ export const handlePostConfig = async (
     throw new Error(errorMessage.message);
   }
 };
-// export const handleFindConfigByID = async (
-//   configId: number,
-//   tenantId: string,
-// ): Promise<ConfigResponse | null> => {
-//   try {
-//     loggerService.log(`Started handling get request for config ID: ${configId} for tenant: ${tenantId}.`);
-//   }
-//   }
+export const handleFindConfigByID = async (id: string, tenantId: string): Promise<ConfigResponse> => {
+  try {
+    const configId = parseInt(id);
+
+    loggerService.log(`Started handling get request for config ID: ${configId} for tenant: ${tenantId}.`);
+
+    const config = await findConfigById(configId, tenantId);
+
+    if (!config) {
+      throw new Error('Failed to get config - no config found');
+    }
+
+    loggerService.log('Config was retrieved successfully.');
+
+    return config;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: getting config with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetAllConfigs = async (
+  limit: number,
+  offset: number,
+  filters: Record<string, string>,
+  tenantId: string,
+): Promise<{
+  data: Config[];
+  total: number;
+  limit: number;
+  offset: number;
+}> => {
+  try {
+    loggerService.log(`Started handling get all configs request for tenant: ${tenantId} with limit: ${limit}, offset: ${offset}`);
+
+    const result = await findConfigsByStatus(limit, offset, filters, tenantId);
+
+    loggerService.log(`Successfully retrieved ${result.data.length} configs out of ${result.total} total`);
+
+    return result;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: getting all configs with error message: ${errorMessage.message}`, 'handleGetAllConfigs');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+  try {
+    loggerService.log(`Started handling update config request for ID: ${id}, tenant: ${tenantId}`);
+
+    const existingConfig = await findConfigById(id, tenantId);
+    if (!existingConfig) {
+      throw new Error(`Config with id ${id} not found`);
+    }
+
+    const updatedConfig = await updateConfig(id, tenantId, updates);
+
+    loggerService.log(`Successfully updated config ID: ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdatePublishingStatus = async (
+  id: number,
+  tenantId: string,
+  publishingStatus: 'active' | 'inactive',
+): Promise<Config> => {
+  try {
+    loggerService.log(`[${tenantId}] Started updating publishing status to '${publishingStatus}' for config ${id}`);
+
+    const existingConfig = await findConfigById(id, tenantId);
+    if (!existingConfig) {
+      throw new Error(`Config ${id} not found. Publishers can only manage configs from their own tenant (${tenantId}).`);
+    }
+
+    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus });
+
+    loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
+
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: updating publishing status with error message: ${errorMessage.message}`, 'handleUpdatePublishingStatus');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleCreateTransactionTypeTable = async (transactionType: string): Promise<void> => {
+  try {
+    loggerService.log(`Creating table for transaction type: ${transactionType}`);
+
+    if (!transactionType) {
+      throw new Error('Transaction type is required');
+    }
+
+    await createTransactionTypeTable(transactionType);
+
+    loggerService.log(`Successfully created table for transaction type: ${transactionType}`);
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error creating transaction type table: ${errorMessage.message}`, 'handleCreateTransactionTypeTable');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleCreateTazamaDataModelTable = async (tableName: string): Promise<void> => {
+  try {
+    loggerService.log(`Creating Tazama data model table: ${tableName}`);
+
+    if (!tableName) {
+      throw new Error('Table name is required');
+    }
+
+    await createTazamaDataModelTable(tableName);
+
+    loggerService.log(`Successfully created Tazama data model table: ${tableName}`);
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error creating Tazama data model table: ${errorMessage.message}`, 'handleCreateTazamaDataModelTable');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleUpdateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+  try {
+    loggerService.log(`Updating config ${id} status to: ${status}`);
+
+    const updatedCount = await updateConfigByStatus(id, status);
+    loggerService.log(`Successfully updated config ${id} status`);
+
+    return updatedCount;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error updating config by status: ${errorMessage.message}`, 'handleUpdateConfigByStatus');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleAddMapping = async (id: number, tenantId: string, mappingDto: AddMappingDto): Promise<Config> => {
+  try {
+    loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
+
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
+
+    const newMapping: FieldMapping = {
+      ...mappingDto,
+      source: normalizedSource,
+      destination: mappingDto.destination as string | string[],
+      type: mappingDto.type,
+    };
+
+    const updatedMappings = [...(config.mapping ?? []), newMapping];
+
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
+
+    loggerService.log(`Successfully added mapping to config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error adding mapping: ${errorMessage.message}`, 'handleAddMapping');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleRemoveMapping = async (id: number, tenantId: string, mappingIndex: number): Promise<Config> => {
+  try {
+    loggerService.log(`Removing mapping at index ${mappingIndex} from config ${id} for tenant ${tenantId}`);
+
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    if (!config.mapping || mappingIndex < 0 || mappingIndex >= config.mapping.length) {
+      throw new Error('Invalid mapping index');
+    }
+
+    const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
+
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+
+    loggerService.log(`Successfully removed mapping from config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleAddFunction = async (id: number, tenantId: string, functionDto: AddFunctionDto): Promise<Config> => {
+  try {
+    loggerService.log(`Adding function to config ${id} for tenant ${tenantId}`);
+
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    const newFunction: FunctionDefinition = {
+      functionName: functionDto.functionName,
+      params: functionDto.params ?? [],
+      tableName: functionDto.tableName ?? '',
+      columns: functionDto.columns ?? [],
+    };
+
+    const updatedFunctions = [...(config.functions ?? []), newFunction];
+
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
+
+    loggerService.log(`Successfully added function to config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleRemoveFunction = async (id: number, tenantId: string, functionIndex: number): Promise<Config> => {
+  try {
+    loggerService.log(`Removing function at index ${functionIndex} from config ${id} for tenant ${tenantId}`);
+
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    if (!config.functions || functionIndex < 0 || functionIndex >= config.functions.length) {
+      throw new Error('Invalid function index');
+    }
+
+    const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
+
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+
+    loggerService.log(`Successfully removed function from config ${id}`);
+    return updatedConfig;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
+    throw new Error(errorMessage.message);
+  }
+};

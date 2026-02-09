@@ -1,5 +1,6 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import * as util from 'node:util';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
@@ -15,11 +16,28 @@ import {
 } from './services/event-flow.logic.service';
 import {
   handlePostConfig,
-  //  handleFindConfigByID
+  handleFindConfigByID,
+  handleGetAllConfigs,
+  handleUpdateConfig,
+  handleUpdatePublishingStatus,
+  handleCreateTransactionTypeTable,
+  handleCreateTazamaDataModelTable,
+  handleUpdateConfigByStatus,
+  handleAddMapping,
+  handleRemoveMapping,
+  handleAddFunction,
+  handleRemoveFunction,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
-// import { ConfigStatus, ContentType, FieldMapping, FunctionDefinition, JSONSchema } from '@tazama-lf/tcs-lib';
+
+import {
+  handleGetAllCollections,
+  handleGetCollectionFields,
+  handleCreateDestinationType,
+  handleDestinationTypeExists,
+  handleAddFieldToDestinationType,
+} from './services/data-model.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -174,27 +192,365 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
     loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
     reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create config request');
   }
 };
-// export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-//   loggerService.log('Start - Handle get config by id request');
-//   try {
-//     const { id } = req.params as { id: string };
-//     const tenantId = (req as ITenantRequest).tenantId ?? 'DEFAULT';
-//     const configId = parseInt(id);
-//     // const config = await handleFindConfigByID(configId, tenantId);
-//     if (isNaN(configId)) {
-//       reply.status(400).send({ success: false, message: `Invalid config ID: ${id}. Must be a valid number.` });
-//       return;
-//     }
-//     if (!config) {
-//       reply.status(404).send({ success: false, message: `Config with id ${id} not found` });
-//       return;
-//     }
-//     reply.code(200).send({ success: true, config });
-//   } catch (error: unknown) {
-//     const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
-//     loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
-//     reply.status(500).send({ success: false, message: errorMessage });
-//   }
-// };
+export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by id request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const config = await handleFindConfigByID(id, tenantId);
+    reply.code(200).send({ success: true, config });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
+    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get config by id request');
+  }
+};
+export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await handleGetAllConfigs(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      configs: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
+    loggerService.error(`Failed to get configs: ${errorMessage}`, 'getAllConfigsHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  }
+};
+
+export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle write config update request');
+  try {
+    const { id } = req.params as { id: string };
+    const updateData = req.body as Record<string, unknown>;
+    const { tenantId } = req as ITenantRequest;
+
+    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
+    reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
+    loggerService.error(`Failed to update config: ${errorMessage}`, 'writeConfigUpdateHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle write config update request');
+  }
+};
+
+export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update publishing status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { publishing_status: publishingStatus } = req.body as { publishing_status?: 'active' | 'inactive' };
+    const { tenantId } = req as ITenantRequest;
+    const configId = parseInt(id);
+
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: `Invalid config ID: ${id}. Must be a valid number.` });
+      return;
+    }
+
+    if (!publishingStatus) {
+      reply.status(400).send({ success: false, message: 'publishing_status must be either "active" or "inactive"' });
+      return;
+    }
+
+    const updatedConfig = await handleUpdatePublishingStatus(configId, tenantId, publishingStatus);
+    reply.code(200).send({
+      success: true,
+      message: `Publishing status updated to ${publishingStatus}`,
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';
+    loggerService.error(`Failed to update publishing status: ${errorMessage}`, 'updatePublishingStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update publishing status request');
+  }
+};
+
+export const createTransactionTypeTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create transaction type table request');
+  try {
+    const { transactionType } = req.body as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    await handleCreateTransactionTypeTable(transactionType);
+
+    reply.code(201).send({
+      success: true,
+      message: `Table for transaction type '${transactionType}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create transaction type table';
+    loggerService.error(`Failed to create transaction type table: ${errorMessage}`, 'createTransactionTypeTableHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create transaction type table request');
+  }
+};
+
+export const createTazamaDataModelTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create Tazama data model table request');
+  try {
+    const { tableName } = req.body as { tableName: string };
+
+    if (!tableName) {
+      reply.status(400).send({ success: false, message: 'Table name is required' });
+      return;
+    }
+
+    await handleCreateTazamaDataModelTable(tableName);
+
+    reply.code(201).send({
+      success: true,
+      message: `Table '${tableName}' created successfully`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create Tazama data model table';
+    loggerService.error(`Failed to create Tazama data model table: ${errorMessage}`, 'createTazamaDataModelTableHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create Tazama data model table request');
+  }
+};
+
+export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update config by status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { status } = req.body as { status?: string };
+
+    const updatedCount = await handleUpdateConfigByStatus(id, status);
+
+    reply.code(200).send({
+      success: true,
+      message: `Publishing status updated successfully (${updatedCount} row(s) affected).`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update config publishing status';
+    loggerService.error(`Failed to update config by status: ${errorMessage}`, 'updateConfigByStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update config by status request');
+  }
+};
+
+export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle add mapping request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const mappingDto = req.body as AddMappingDto;
+
+    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Mapping added successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add mapping';
+    loggerService.error(`Failed to add mapping: ${errorMessage}`, 'addMappingHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle add mapping request');
+  }
+};
+
+export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle remove mapping request');
+  try {
+    const { id, index } = req.params as { id: string; index: string };
+    const { tenantId } = req as ITenantRequest;
+    const mappingIndex = Number(index);
+
+    const updatedConfig = await handleRemoveMapping(Number(id), tenantId, mappingIndex);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Mapping removed successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove mapping';
+    loggerService.error(`Failed to remove mapping: ${errorMessage}`, 'removeMappingHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle remove mapping request');
+  }
+};
+
+export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle add function request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const functionDto = req.body as AddFunctionDto;
+
+    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Function added successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add function';
+    loggerService.error(`Failed to add function: ${errorMessage}`, 'addFunctionHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle add function request');
+  }
+};
+
+export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle remove function request');
+  try {
+    const { id, index } = req.params as { id: string; index: string };
+    const { tenantId } = req as ITenantRequest;
+    const functionIndex = Number(index);
+
+    const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Function removed successfully',
+      config: updatedConfig,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove function';
+    loggerService.error(`Failed to remove function: ${errorMessage}`, 'removeFunctionHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle remove function request');
+  }
+};
+
+// ==================== DATA MODEL HANDLERS ====================
+
+export const getAllCollectionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all collections request');
+  try {
+    const { tenantId } = req.params as { tenantId: string };
+    const collections = await handleGetAllCollections(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      data: collections,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get collections';
+    loggerService.error(`Failed to get collections: ${errorMessage}`, 'getAllCollectionsHandler');
+    reply.status(500).send({ success: false, message: errorMessage, data: [] });
+  } finally {
+    loggerService.log('End - Handle get all collections request');
+  }
+};
+
+export const getCollectionFieldsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get collection fields request');
+  try {
+    const { collectionId, tenantId } = req.params as { collectionId: string; tenantId: string };
+    const fields = await handleGetCollectionFields(Number(collectionId), tenantId);
+
+    reply.status(200).send({
+      success: true,
+      data: fields,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get collection fields';
+    loggerService.error(`Failed to get collection fields: ${errorMessage}`, 'getCollectionFieldsHandler');
+    reply.status(500).send({ success: false, message: errorMessage, data: [] });
+  } finally {
+    loggerService.log('End - Handle get collection fields request');
+  }
+};
+
+export const createDestinationTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create destination type request');
+  try {
+    const body = req.body as { collection_type: string; name: string; destination_id: number };
+    const { tenantId } = req as ITenantRequest;
+
+    const result = await handleCreateDestinationType(body, tenantId);
+
+    reply.status(201).send({
+      success: true,
+      message: 'Destination type created successfully',
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create destination type';
+    loggerService.error(`Failed to create destination type: ${errorMessage}`, 'createDestinationTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create destination type request');
+  }
+};
+
+export const destinationTypeExistsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle check destination type exists request');
+  try {
+    const { destinationTypeId } = req.params as { destinationTypeId: string };
+    const { tenantId } = req as ITenantRequest;
+
+    const exists = await handleDestinationTypeExists(Number(destinationTypeId), tenantId);
+
+    reply.status(200).send({
+      success: true,
+      exists,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to check destination type';
+    loggerService.error(`Failed to check destination type: ${errorMessage}`, 'destinationTypeExistsHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle check destination type exists request');
+  }
+};
+
+export const addFieldToDestinationTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle add field to destination type request');
+  try {
+    const { destinationTypeId } = req.params as { destinationTypeId: string };
+    const body = req.body as { name: string; field_type: string; parent_id?: number; serial_no?: number };
+    const { tenantId } = req as ITenantRequest;
+
+    const result = await handleAddFieldToDestinationType(Number(destinationTypeId), body, tenantId);
+
+    reply.status(201).send({
+      success: true,
+      message: 'Field added successfully',
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add field';
+    loggerService.error(`Failed to add field: ${errorMessage}`, 'addFieldToDestinationTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle add field to destination type request');
+  }
+};

@@ -29,29 +29,29 @@ const sendError = (reply: FastifyReply, status: number, message: string): void =
 //   }
 // };
 
-export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const body = authReq.body as Record<string, string>;
-    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
+// export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const authReq = req as AuthenticatedRequest;
+//     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+//     const body = authReq.body as Record<string, string>;
+//     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+//     const parsedLimit = parseInt(limit, 10);
+//     const parsedOffset = parseInt(offset, 10);
 
-    const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body, tenantId);
-    reply.code(200).send({
-      success: true,
-      configs: result.data,
-      total: result.total,
-      limit: result.limit,
-      offset: result.offset,
-      pages: Math.ceil(result.total / result.limit),
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
-    sendError(reply, 500, errorMessage);
-  }
-};
+//     const result = await databaseService.findConfigsByStatus(parsedLimit, parsedOffset, body, tenantId);
+//     reply.code(200).send({
+//       success: true,
+//       configs: result.data,
+//       total: result.total,
+//       limit: result.limit,
+//       offset: result.offset,
+//       pages: Math.ceil(result.total / result.limit),
+//     });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
+//     sendError(reply, 500, errorMessage);
+//   }
+// };
 
 // export const createConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
 //     console.log(req);
@@ -81,27 +81,6 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
 //     sendError(reply, 500, errorMessage);
 //   }
 // };
-
-export const updateConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  const authReq = req as AuthenticatedRequest;
-  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-  const { id } = req.params as { id: string };
-  try {
-    const updateData = req.body as Record<string, unknown>;
-    const existingConfig = await databaseService.findConfigById(parseInt(id), tenantId);
-    if (!existingConfig) {
-      sendError(reply, 404, `Config with id ${id} not found`);
-      return;
-    }
-    await databaseService.updateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
-    const updatedConfig = await databaseService.findConfigById(parseInt(id), tenantId);
-    reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
-    loggerService.error(`Failed to update config: ${errorMessage}`, 'updateConfigHandler');
-    sendError(reply, 500, errorMessage);
-  }
-};
 
 export const writeConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {

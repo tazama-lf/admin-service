@@ -11,7 +11,9 @@ dotenv.config({
 });
 
 // Just we don't want everything, just what we are configuring, add more fields accordingly
-export type AppDatabaseServices = Required<Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration'>>;
+export type AppDatabaseServices = Required<
+  Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration' | 'rawHistory'>
+>;
 
 export type Configuration = ProcessorConfig & AppDatabaseServices & IConfig;
 

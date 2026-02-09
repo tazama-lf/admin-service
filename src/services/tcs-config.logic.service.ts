@@ -14,13 +14,9 @@ import {
   findConfigById,
   findConfigsByStatus,
   updateConfig,
-  createTransactionTypeTable as repoCreateTransactionTypeTable,
-  createTazamaDataModelTable as repoCreateTazamaDataModelTable,
-  updateConfigByStatus as repoUpdateConfigByStatus,
-  addMappingToConfig,
-  removeMappingFromConfig,
-  addFunctionToConfig,
-  removeFunctionFromConfig,
+  createTransactionTypeTable,
+  createTazamaDataModelTable,
+  updateConfigByStatus,
   type ConfigData,
 } from '../repositories/configuration/tcs.config.repository';
 
@@ -191,7 +187,7 @@ export const handleCreateTransactionTypeTable = async (transactionType: string):
       throw new Error('Transaction type is required');
     }
 
-    await repoCreateTransactionTypeTable(transactionType);
+    await createTransactionTypeTable(transactionType);
 
     loggerService.log(`Successfully created table for transaction type: ${transactionType}`);
   } catch (error) {
@@ -209,7 +205,7 @@ export const handleCreateTazamaDataModelTable = async (tableName: string): Promi
       throw new Error('Table name is required');
     }
 
-    await repoCreateTazamaDataModelTable(tableName);
+    await createTazamaDataModelTable(tableName);
 
     loggerService.log(`Successfully created Tazama data model table: ${tableName}`);
   } catch (error) {
@@ -223,8 +219,7 @@ export const handleUpdateConfigByStatus = async (id: string, status?: string): P
   try {
     loggerService.log(`Updating config ${id} status to: ${status}`);
 
-    const updatedCount = await repoUpdateConfigByStatus(id, status);
-
+    const updatedCount = await updateConfigByStatus(id, status);
     loggerService.log(`Successfully updated config ${id} status`);
 
     return updatedCount;
@@ -239,6 +234,12 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
   try {
     loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
 
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
     const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
 
     const newMapping: FieldMapping = {
@@ -248,7 +249,9 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
       type: mappingDto.type,
     };
 
-    const updatedConfig = await addMappingToConfig(id, tenantId, newMapping);
+    const updatedMappings = [...(config.mapping ?? []), newMapping];
+
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
 
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
@@ -263,7 +266,19 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
   try {
     loggerService.log(`Removing mapping at index ${mappingIndex} from config ${id} for tenant ${tenantId}`);
 
-    const updatedConfig = await removeMappingFromConfig(id, tenantId, mappingIndex);
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    if (!config.mapping || mappingIndex < 0 || mappingIndex >= config.mapping.length) {
+      throw new Error('Invalid mapping index');
+    }
+
+    const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
+
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
@@ -278,6 +293,12 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
   try {
     loggerService.log(`Adding function to config ${id} for tenant ${tenantId}`);
 
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
     const newFunction: FunctionDefinition = {
       functionName: functionDto.functionName,
       params: functionDto.params ?? [],
@@ -285,7 +306,9 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
       columns: functionDto.columns ?? [],
     };
 
-    const updatedConfig = await addFunctionToConfig(id, tenantId, newFunction);
+    const updatedFunctions = [...(config.functions ?? []), newFunction];
+
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
@@ -300,7 +323,19 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
   try {
     loggerService.log(`Removing function at index ${functionIndex} from config ${id} for tenant ${tenantId}`);
 
-    const updatedConfig = await removeFunctionFromConfig(id, tenantId, functionIndex);
+    const config = await findConfigById(id, tenantId);
+
+    if (!config) {
+      throw new Error('Config not found');
+    }
+
+    if (!config.functions || functionIndex < 0 || functionIndex >= config.functions.length) {
+      throw new Error('Invalid function index');
+    }
+
+    const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
+
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
 
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;

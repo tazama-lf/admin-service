@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
+import { loggerService } from '..';
 import {
+  type Config,
+  type AddMappingDto,
+  type AddFunctionDto,
   ConfigStatus,
   ContentType,
   type FieldMapping,
   type FunctionDefinition,
-  type JSONSchema,
-  type Config,
-  type AddMappingDto,
-  type AddFunctionDto,
 } from '@tazama-lf/tcs-lib';
-import { loggerService } from '..';
 import {
   createConfig,
   findConfigById,
@@ -22,64 +21,38 @@ import {
   removeMappingFromConfig,
   addFunctionToConfig,
   removeFunctionFromConfig,
+  type ConfigData,
 } from '../repositories/configuration/tcs.config.repository';
 
-export interface ConfigRequest {
-  msgFam: string;
-  transactionType: string;
-  endpointPath: string;
-  version: string;
-  contentType?: ContentType;
-  schema: JSONSchema;
-  mapping?: FieldMapping[];
-  functions?: FunctionDefinition[];
-  createdBy: string;
-  publishing_status?: string;
-  payload?: string | object;
-}
+type ConfigInput = Partial<ConfigData>;
+type ConfigResponse = Config;
 
-export interface ConfigResponse {
-  id: number;
-  msgFam: string;
-  transactionType: string;
-  endpointPath: string;
-  version: string;
-  contentType: ContentType;
-  schema: JSONSchema;
-  mapping?: FieldMapping[];
-  functions?: FunctionDefinition[];
-  status: ConfigStatus;
-  tenantId: string;
-  createdBy: string;
-  creDtTm: string;
-  publishing_status: string;
-}
-
-export const handlePostConfig = async (
-  config: Record<string, unknown>,
-  tenantId: string,
-): Promise<{ message: string; result: ConfigResponse }> => {
+export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
-    const userId = (config.createdBy as string) || 'system';
+    const userId = config.createdBy ?? 'system';
 
     loggerService.log(`Started handling post request of config executed by ${userId}.`);
 
     const nowDateTime = new Date().toISOString();
 
-    const newConfig = {
-      msgFam: config.msgFam as string,
-      transactionType: config.transactionType as string,
-      endpointPath: config.endpointPath as string,
-      version: config.version as string,
-      contentType: (config.contentType as ContentType) ?? ContentType.JSON,
-      schema: config.schema as JSONSchema,
-      mapping: config.mapping as FieldMapping[] | undefined,
-      functions: config.functions as FunctionDefinition[] | undefined,
+    if (!config.msgFam || !config.transactionType || !config.endpointPath || !config.version || !config.schema) {
+      throw new Error('Missing required fields: msgFam, transactionType, endpointPath, version, or schema');
+    }
+
+    const newConfig: ConfigData = {
+      msgFam: config.msgFam,
+      transactionType: config.transactionType,
+      endpointPath: config.endpointPath,
+      version: config.version,
+      contentType: config.contentType ?? ContentType.JSON,
+      schema: config.schema,
+      mapping: config.mapping,
+      functions: config.functions,
       status: ConfigStatus.IN_PROGRESS,
       tenantId,
       createdBy: userId,
-      publishing_status: (config.publishing_status as string) ?? 'inactive',
-      payload: config.payload as string | object | undefined,
+      publishing_status: config.publishing_status ?? 'inactive',
+      payload: config.payload,
       creDtTm: nowDateTime,
     };
 
@@ -99,11 +72,10 @@ export const handlePostConfig = async (
       schema: newConfig.schema,
       mapping: newConfig.mapping,
       functions: newConfig.functions,
-      status: newConfig.status,
+      status: newConfig.status ?? ConfigStatus.IN_PROGRESS,
       tenantId: newConfig.tenantId,
       createdBy: newConfig.createdBy,
-      creDtTm: newConfig.creDtTm,
-      publishing_status: newConfig.publishing_status,
+      publishing_status: (newConfig.publishing_status ?? 'inactive') as 'active' | 'inactive',
     };
 
     loggerService.log('New config was saved successfully.');
@@ -132,7 +104,7 @@ export const handleFindConfigByID = async (id: string, tenantId: string): Promis
 
     loggerService.log('Config was retrieved successfully.');
 
-    return config as ConfigResponse;
+    return config;
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(`Error: getting config with error message: ${errorMessage.message}`);

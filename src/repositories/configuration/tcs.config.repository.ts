@@ -42,8 +42,6 @@ interface ConfigRow {
   payload_json?: Record<string, unknown>;
 }
 
-const convertStatusToDatabase = (status: ConfigStatus): string => status.toLowerCase().replace('_', '-');
-
 const mapRowToConfig = (row: ConfigRow): Config => ({
   id: row.id,
   msgFam: row.msg_fam,
@@ -58,7 +56,7 @@ const mapRowToConfig = (row: ConfigRow): Config => ({
       ? (JSON.parse(row.functions) as FunctionDefinition[])
       : row.functions
     : undefined,
-  status: row.status.toUpperCase().replace('-', '_') as ConfigStatus,
+  status: row.status as ConfigStatus,
   tenantId: row.tenant_id,
   createdBy: row.created_by,
   createdAt: row.created_at,
@@ -107,7 +105,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         JSON.stringify(config.schema),
         config.mapping ? JSON.stringify(config.mapping) : null,
         config.functions ? JSON.stringify(config.functions) : null,
-        convertStatusToDatabase(config.status ?? ConfigStatus.IN_PROGRESS),
+        config.status ?? ConfigStatus.IN_PROGRESS,
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
@@ -122,7 +120,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         JSON.stringify(config.schema),
         config.mapping ? JSON.stringify(config.mapping) : null,
         config.functions ? JSON.stringify(config.functions) : null,
-        convertStatusToDatabase(config.status ?? ConfigStatus.IN_PROGRESS),
+        config.status ?? ConfigStatus.IN_PROGRESS,
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
@@ -422,7 +420,7 @@ export const updateConfigByStatus = async (id: string, status?: string): Promise
 
   const result = await handlePostExecuteSqlStatement<{ id: number }>(
     { text: query, values: [status, id] } satisfies PgQueryConfig,
-    'configuration',
+    'event_history',
   );
 
   if (result.rows.length === 0) {

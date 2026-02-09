@@ -13,10 +13,11 @@ import {
   removeMappingHandler,
   addFunctionHandler,
   removeFunctionHandler,
-  // getAllCollectionsHandler,
-  // createDestinationTypeHandler,
-  // destinationTypeExistsHandler,
-  // addFieldToDestinationTypeHandler,
+  getAllCollectionsHandler,
+  getCollectionFieldsHandler,
+  createDestinationTypeHandler,
+  destinationTypeExistsHandler,
+  addFieldToDestinationTypeHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -96,12 +97,6 @@ import {
   validateTableHandler,
 } from './handlers/job.handler';
 import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
-import {
-  getAllCollectionsHandler,
-  createDestinationTypeHandler,
-  destinationTypeExistsHandler,
-  addFieldToDestinationTypeHandler,
-} from './handlers/data-model.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -156,6 +151,7 @@ const routePrivilege = {
   updateJob: 'editor',
   validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
+  getTcsDataModelCollectionFields: 'view-profile',
   postTcsDataModelDestinationType: 'editor',
   getTcsDataModelDestinationTypeExists: 'view-profile',
   postTcsDataModelDestinationTypeField: 'editor',
@@ -287,6 +283,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
     ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
+  });
+
+  fastify.get('/v1/admin/tcs/data-model/collections/:collectionId/fields/:tenantId', {
+    ...SetOptionsBodyAndParams(getCollectionFieldsHandler, routePrivilege.getTcsDataModelCollectionFields),
   });
 
   fastify.post('/v1/admin/tcs/data-model/destination-types', {

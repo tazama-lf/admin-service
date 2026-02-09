@@ -2,45 +2,9 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import type { ConfigData, ConfigRow } from '../../interface/config.interface';
 
-export interface ConfigData {
-  id?: number;
-  msgFam: string;
-  transactionType: string;
-  endpointPath: string;
-  version: string;
-  contentType: ContentType;
-  schema: JSONSchema;
-  mapping?: FieldMapping[];
-  functions?: FunctionDefinition[];
-  status?: ConfigStatus;
-  tenantId: string;
-  createdBy: string;
-  publishing_status?: string;
-  payload?: string | object;
-  creDtTm?: string;
-}
-
-interface ConfigRow {
-  id: number;
-  msg_fam: string;
-  transaction_type: string;
-  endpoint_path: string;
-  version: string;
-  content_type: ContentType;
-  schema: string | JSONSchema;
-  mapping?: string | FieldMapping[];
-  functions?: string | FunctionDefinition[];
-  status: string;
-  tenant_id: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  comments: string;
-  publishing_status: 'active' | 'inactive';
-  payload_xml?: string;
-  payload_json?: Record<string, unknown>;
-}
+export type { ConfigData, ConfigRow };
 
 const mapRowToConfig = (row: ConfigRow): Config => ({
   id: row.id,
@@ -420,7 +384,7 @@ export const updateConfigByStatus = async (id: string, status?: string): Promise
 
   const result = await handlePostExecuteSqlStatement<{ id: number }>(
     { text: query, values: [status, id] } satisfies PgQueryConfig,
-    'event_history',
+    'configuration',
   );
 
   if (result.rows.length === 0) {

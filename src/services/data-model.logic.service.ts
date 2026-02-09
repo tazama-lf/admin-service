@@ -8,13 +8,7 @@ import {
   checkDestinationTypeExists,
   addFieldToDestinationType,
 } from '../repositories';
-
-interface CollectionWithFields {
-  name: string;
-  type: string;
-  collection_id: number;
-  fields: TazamaField[];
-}
+import type { CollectionWithFields } from '../interface/data-model.interface';
 
 export const handleGetAllCollections = async (tenantId: string): Promise<CollectionWithFields[]> => {
   try {

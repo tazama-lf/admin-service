@@ -17,11 +17,8 @@ import {
   createTransactionTypeTable,
   createTazamaDataModelTable,
   updateConfigByStatus,
-  type ConfigData,
 } from '../repositories/configuration/tcs.config.repository';
-
-type ConfigInput = Partial<ConfigData>;
-type ConfigResponse = Config;
+import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {

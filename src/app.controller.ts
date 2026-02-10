@@ -38,6 +38,11 @@ import {
   handleDestinationTypeExists,
   handleAddFieldToDestinationType,
 } from './services/data-model.logic.service';
+import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
+import { ErrorHandler } from './handlers/errorHandler';
+import { createNode, deleteNodeById, executeSelectQuery, findAllNodes } from './services/node.logic.service';
+import { findRuleFlow, getGlobalVariables } from './services/rule-flow.logic.service';
+import { updateRuleStatus } from './services/rule.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -552,5 +557,217 @@ export const addFieldToDestinationTypeHandler = async (req: FastifyRequest, repl
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle add field to destination type request');
+  }
+};
+
+// ==================== TRS ====================
+export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+
+  try {
+    const rawBody = req.body;
+    if (!Array.isArray(rawBody)) {
+      ErrorHandler.sendError(reply, { status: 400 }, 'Request body must be an array of nodes');
+      return;
+    }
+
+    const nodes = rawBody as Array<Record<string, unknown>>;
+    const dataToInsert = nodes.map((node: Record<string, unknown>) => ({
+      node_json: node.node_json as Record<string, unknown>,
+      tenant_id: tenantId,
+      created_by: userId,
+      order: (node.order as number) ?? 0,
+    }));
+
+    const result: unknown = await createNode(dataToInsert);
+
+    const resultArray = Array.isArray(result) ? (result as unknown[]) : [result];
+
+    reply.code(201).send({
+      success: true,
+      message: `${resultArray.length} node(s) created successfully`,
+      nodes: resultArray,
+      count: resultArray.length,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create nodes');
+  } finally {
+    loggerService.log('End - Create Node Handler');
+  }
+};
+
+export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const queryParams = req.query as { type?: string; category?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' };
+
+    const nodes = await findAllNodes(tenantId, queryParams);
+    reply.code(200).send({
+      success: true,
+      message: 'Nodes retrieved successfully',
+      nodes,
+      count: nodes.length,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to retrieve nodes');
+  } finally {
+    loggerService.log('End - Get Node Handler');
+  }
+};
+
+export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const queryParams = req.params as { nodeId?: string };
+    await deleteNodeById(Number(queryParams.nodeId), tenantId);
+    reply.code(200).send({
+      success: true,
+      message: 'Node deleted successfully',
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to delete node');
+  } finally {
+    loggerService.log('End - Delete Node By ID Handler');
+  }
+};
+
+export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = req.body as { query: string; dbName: string; params?: unknown[] };
+
+    if (!body.query) {
+      ErrorHandler.sendError(reply, { status: 400 }, 'Query parameter is required');
+      return;
+    }
+
+    const result = await executeSelectQuery(body, tenantId);
+    reply.code(200).send({
+      success: true,
+      message: 'Query executed successfully',
+      result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to execute query');
+  } finally {
+    loggerService.log('End - Execute Query Node Handler');
+  }
+};
+
+export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId, tenantId } = req.params as { ruleId: string; tenantId: string };
+
+    const globalVariables = await getGlobalVariables(ruleId, tenantId);
+
+    if (!globalVariables?.ruleRequest || !globalVariables.configuration) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
+      return;
+    }
+
+    const RuleRequest: unknown = globalVariables.ruleRequest;
+    const RuleConfig: unknown = globalVariables.configuration;
+
+    const RuleResult = {
+      id: ruleId,
+      tenantId,
+      cfg: '',
+      subRuleRef: '.err',
+      reason: 'Unhandled rule result outcome',
+      prcgTm: -1,
+      indpdntVarbl: 0,
+    };
+
+    reply.code(200).send({
+      success: true,
+      RuleRequest,
+      RuleConfig,
+      RuleResult,
+    });
+  } catch (error) {
+    ErrorHandler.sendError(reply, error, 'Failed to get global variables');
+  }
+};
+
+export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+    const { tenantId } = req as ITenantRequest;
+
+    const ruleFlow = await findRuleFlow(ruleId, tenantId);
+
+    if (!ruleFlow) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      rule_id: ruleFlow.rule_id,
+      flow: ruleFlow.flow_json,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
+  }
+};
+
+// export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const { id } = req.params as { id: string };
+//     const { tenantId } = req as ITenantRequest;
+//     const flowData = req.body as Record<string, unknown>;
+//     const result: unknown = await createRuleFlow(id, tenantId, flowData);
+//     reply.code(201).send({
+//       success: true,
+//       message: 'Rule flow created successfully',
+//       flow: result,
+//     });
+//   } catch (error: unknown) {
+//     ErrorHandler.sendError(reply, error, 'Failed to create rule flow');
+//   }
+// };
+
+// export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   try {
+//     const { id } = req.params as { id: string };
+//     const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string };
+//     const result: unknown = await updateRuleFlow(id, payload);
+
+//     if (!result) {
+//       ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);
+//       return;
+//     }
+
+//     reply.code(200).send({
+//       success: true,
+//       message: 'Rule flow updated successfully',
+//       flow: result,
+//     });
+//   } catch (error: unknown) {
+//     ErrorHandler.sendError(reply, error, 'Failed to update rule flow');
+//   }
+// };
+
+export const updateRuleStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+    const { status, reason } = req.body as { status: string; reason: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const updatedRule = await updateRuleStatus(ruleId, tenantId, status, reason);
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule status updated successfully',
+      rule: updatedRule,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to update rule status');
   }
 };

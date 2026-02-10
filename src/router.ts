@@ -27,6 +27,10 @@ import {
   reportRequestHandler,
   updateAccountConditionExpiryDateHandler,
   updateEntityConditionExpiryDateHandler,
+  getNodeHandler,
+  createNodeHandler,
+  deleteNodeByIdHandler,
+  executeQueryNode,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -96,7 +100,6 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
-import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',

@@ -38,6 +38,15 @@ import {
   handleDestinationTypeExists,
   handleAddFieldToDestinationType,
 } from './services/data-model.logic.service';
+import {
+  handlePostCron,
+  handleGetCronById,
+  handleUpdateCron,
+  handleGetAllCrons,
+  handleGetCronByStatus,
+  handleUpdateCronStatus,
+} from './services/cron.logic.service';
+import type { JobStatus } from './interface/data-enrichment.interface';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -552,5 +561,157 @@ export const addFieldToDestinationTypeHandler = async (req: FastifyRequest, repl
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle add field to destination type request');
+  }
+};
+// export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+//   loggerService.log('Start - Handle get config by id request');
+//   try {
+//     const { id } = req.params as { id: string };
+//     const tenantId = (req as ITenantRequest).tenantId ?? 'DEFAULT';
+//     const configId = parseInt(id);
+//     // const config = await handleFindConfigByID(configId, tenantId);
+//     if (isNaN(configId)) {
+//       reply.status(400).send({ success: false, message: `Invalid config ID: ${id}. Must be a valid number.` });
+//       return;
+//     }
+//     if (!config) {
+//       reply.status(404).send({ success: false, message: `Config with id ${id} not found` });
+//       return;
+//     }
+//     reply.code(200).send({ success: true, config });
+//   } catch (error: unknown) {
+//     const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
+//     loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
+//     reply.status(500).send({ success: false, message: errorMessage });
+//   }
+// };
+
+// ==================== CRON JOB OPERATIONS ====================
+
+export const createCronJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create cron job request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const configData = req.body as Record<string, unknown>;
+    const response = await handlePostCron(configData, tenantId);
+    reply.code(201).send({ success: true, message: response.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create cron job';
+    loggerService.error(`Failed to create cron job: ${errorMessage}`, 'createCronJobHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create cron job request');
+  }
+};
+
+export const getCronJobByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get cron job by id request');
+  try {
+    const { id } = req.params as { id: string };
+    const cronJob = await handleGetCronById(id);
+
+    if (!cronJob) {
+      reply.status(404).send({ success: false, message: `Cron job with id ${id} not found` });
+      return;
+    }
+
+    reply.code(200).send({ ...cronJob });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron job';
+    loggerService.error(`Failed to get cron job: ${errorMessage}`, 'getCronJobByIdHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get cron job by id request');
+  }
+};
+
+export const updateCronJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update cron job request');
+  try {
+    const { id } = req.params as { id: string };
+    const updateData = req.body as Record<string, unknown>;
+
+    const response = await handleUpdateCron(id, updateData);
+    reply.code(200).send({ success: true, message: response.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update cron job';
+    loggerService.error(`Failed to update cron job: ${errorMessage}`, 'updateCronJobHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update cron job request');
+  }
+};
+
+export const getAllCronJobsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all cron jobs request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await handleGetAllCrons(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron jobs';
+    loggerService.error(`Failed to get cron jobs: ${errorMessage}`, 'getAllCronJobsHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get all cron jobs request');
+  }
+};
+
+export const getCronJobByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get cron job by status request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { status } = req.params as { status: JobStatus };
+    const { page = '1', limit = '10' } = req.query as { page?: string; limit?: string };
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = parseInt(limit, 10);
+
+    const cronJobs = await handleGetCronByStatus(tenantId, status, parsedPage, parsedLimit);
+    reply.code(200).send({
+      success: true,
+      data: cronJobs,
+      count: cronJobs.length,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron jobs by status';
+    loggerService.error(`Failed to get cron jobs by status: ${errorMessage}`, 'getCronJobByStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get cron job by status request');
+  }
+};
+
+export const updateCronJobStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update cron job status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { reason } = req.body as { reason?: string };
+    const { status } = req.query as { status?: JobStatus };
+
+    if (!status) {
+      reply.status(400).send({ success: false, message: 'Status is required' });
+      return;
+    }
+
+    const response = await handleUpdateCronStatus(status, id, reason);
+    reply.code(200).send({ success: true, message: response.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update cron job status';
+    loggerService.error(`Failed to update cron job status: ${errorMessage}`, 'updateCronJobStatusHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update cron job status request');
   }
 };

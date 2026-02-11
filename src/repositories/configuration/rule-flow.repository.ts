@@ -95,4 +95,25 @@ export const findRuleFlowFromDB = async (
   return result.rows[0];
 };
 
-// export const
+export const updateRuleFlowInDB = async (
+  setClause: string,
+  returningClause: string,
+  ruleId: string,
+  flowData: { flowJson: Record<string, unknown>; tsFileBase64: string },
+  tenantId: string,
+): Promise<RuleFlowResponse | null> => {
+  const query = `UPDATE trs_rule_flow SET ${setClause} updated_at = NOW() WHERE rule_id = $1 AND tenant_id = $4 RETURNING ${returningClause};`;
+  const result = await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: [ruleId, JSON.stringify(flowData.flowJson), flowData.tsFileBase64, tenantId],
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0] as RuleFlowResponse;
+};

@@ -5,7 +5,9 @@ import {
   findRuleFlowFromDB,
   getRuleConfigById,
   getRuleRequestByRuleId,
+  updateRuleFlowInDB,
 } from '../repositories/configuration/rule-flow.repository';
+import { HttpException, HttpStatus } from '../utils/error';
 
 export const getGlobalVariables = async (
   ruleId: string,
@@ -60,69 +62,46 @@ export const findRuleFlow = async (
   return result;
 };
 
-// export const updateRuleFlow = async (
-//     ruleId: string,
-//     flowData: { flowJson: Record<string, unknown>; tsFileBase64?: string; category: string },
-//     tenantId: string,
-// ): Promise<
-//     | Array<{
-//         id: number;
-//         rule_id: string;
-//         flow_json: Record<string, unknown>;
-//         ts_file_base64?: string;
-//         tenant_id: string;
-//         created_at: Date;
-//         updated_at: Date;
-//     }>
-//     | []
-// > => {
-//     const { category, flowJson, tsFileBase64 } = flowData;
+export const updateRuleFlow = async (
+  ruleId: string,
+  flowData: { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string },
+  tenantId: string,
+): Promise<RuleFlowResponse | null> => {
+  const { category } = flowData;
 
-//     let setClause: string;
-//     let returningClause: string;
+  let setClause: string;
+  let returningClause: string;
 
-//     if (category === 'rule_builder') {
-//         setClause = `
-//         flow_json_rule_builder = $2,
-//         ts_file_base64_rule_builder = $3,
-//       `;
-//         returningClause = `
-//         id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, tenant_id, created_at, updated_at
-//       `;
-//     } else if (category === 'test_case_generation') {
-//         setClause = `
-//         flow_json_test_case = $2,
-//         ts_file_base64_test_case = $3,
-//       `;
-//         returningClause = `
-//         id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, tenant_id, created_at, updated_at
-//       `;
-//     } else {
-//         throw new HttpException(
-//             `Invalid category for updating rule flow: ${category}`,
-//             HttpStatus.BAD_REQUEST,
-//         );
-//     }
+  if (category === 'rule_builder') {
+    setClause = `
+        flow_json_rule_builder = $2,
+        ts_file_base64_rule_builder = $3,
+      `;
+    returningClause = `
+        id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, tenant_id, created_at, updated_at
+      `;
+  } else if (category === 'test_case_generation') {
+    setClause = `
+        flow_json_test_case = $2,
+        ts_file_base64_test_case = $3,
+      `;
+    returningClause = `
+        id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, tenant_id, created_at, updated_at
+      `;
+  } else {
+    throw new HttpException(`Invalid category for updating rule flow: ${category}`, HttpStatus.BAD_REQUEST);
+  }
 
-//     const query = `
-//       UPDATE trs_rule_flow
-//       SET
-//         ${setClause}
-//         updated_at = NOW()
-//       WHERE rule_id = $1 AND tenant_id = $4
-//       RETURNING ${returningClause};
-//     `;
+  const result = await updateRuleFlowInDB(
+    setClause,
+    returningClause,
+    ruleId,
+    {
+      flowJson: flowData.flow_json,
+      tsFileBase64: flowData.ts_file_base64 ?? '',
+    },
+    tenantId,
+  );
 
-//     const result = await this.dbClient.query(query, [
-//         ruleId,
-//         JSON.stringify(flowJson),
-//         tsFileBase64,
-//         tenantId,
-//     ]);
-
-//     if (result.rows.length === 0) {
-//         return [];
-//     }
-
-//     return result.rows;
-// }
+  return result;
+};

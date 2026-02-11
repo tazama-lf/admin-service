@@ -53,7 +53,7 @@ interface CreateRuleHandlerReqBody {
 }
 
 interface CloneRuleHandlerReqBody {
-  ruleData: {
+  payload: {
     rule_name: string;
     description: string;
     status: string;
@@ -357,11 +357,15 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
-    const { ruleData, ruleRequest } = req.body as CloneRuleHandlerReqBody;
+    // console.log('Received request to clone rule with ID:', req.body);
+    const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
+
+    // console.log('Cloning rule with ID:', ruleId);
+    // console.log('Rule data for cloning:', payload);
+    // console.log('Rule request for cloning:', ruleRequest);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-    const clonedRule = await databaseService.cloneRule(ruleId, ruleData.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
-
+    const clonedRule = await databaseService.cloneRule(ruleId, payload.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',

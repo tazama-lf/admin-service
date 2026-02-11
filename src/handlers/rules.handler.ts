@@ -52,6 +52,19 @@ interface CreateRuleHandlerReqBody {
   ruleRequest: RuleRequest;
 }
 
+interface CloneRuleHandlerReqBody {
+  ruleData: {
+    rule_name: string;
+    description: string;
+    status: string;
+    publishing_status: string;
+    rule_config_id: string;
+    txtp: string;
+    version: string;
+  };
+  ruleRequest: RuleRequest;
+}
+
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
@@ -135,24 +148,6 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create rule');
-  }
-};
-
-export const saveRuleRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const { txTp, ruleRequest } = req.body as { txTp: string; ruleRequest: RuleRequest };
-
-    // this goes to tcs-lib and saves the RR into db table
-    await databaseService.saveRuleRequest(txTp, tenantId, ruleRequest);
-
-    reply.code(200).send({
-      success: true,
-      message: 'Rule request saved successfully',
-    });
-  } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to save rule request');
   }
 };
 
@@ -362,9 +357,10 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
+    const { ruleData, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-    const clonedRule = await databaseService.cloneRule(ruleId, 'need to fix', authReq.user?.clientId ?? 'default', token);
+    const clonedRule = await databaseService.cloneRule(ruleId, ruleData.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
 
     reply.code(201).send({
       success: true,

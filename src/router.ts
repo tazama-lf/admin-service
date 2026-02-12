@@ -55,6 +55,7 @@ import {
   getGlobalVariablesHandler,
   cloneRuleHandler,
   updateRuleStatusHandler,
+  getRuleFlowStatusHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -353,6 +354,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/rule-flow/:ruleId', {
     ...SetOptionsBodyAndParams(getRuleFlowHandler, routePrivilege.getTrsRules),
+  });
+
+  fastify.get('/v1/admin/trs/rule-flow/status/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleFlowStatusHandler, routePrivilege.getTrsRules),
   });
 
   fastify.put('/v1/admin/trs/rule-flow/:id', {

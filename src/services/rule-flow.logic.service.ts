@@ -42,20 +42,17 @@ export const createRuleFlow = async (ruleFlowData: RuleFlowRequest): Promise<Rul
   return [result];
 };
 
-export const findRuleFlow = async (
-  ruleId: string,
-  tenantId: string,
-  filter?: { category: string },
-): Promise<Record<string, unknown> | null> => {
-  const category = filter?.category;
+export const findRuleFlow = async (ruleId: string, tenantId: string, category?: string): Promise<Record<string, unknown> | null> => {
   let selectClause = '*';
-
   if (category === 'rule_builder') {
     selectClause =
-      'id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, tenant_id, created_at, updated_at';
+      'id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, status_rule_builder as status, tenant_id, created_at, updated_at';
   } else if (category === 'test_case_generation') {
     selectClause =
-      'id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, tenant_id, created_at, updated_at';
+      'id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, status_test_case as status, tenant_id, created_at, updated_at';
+  } else {
+    selectClause =
+      'id, rule_id, flow_json_rule_builder, ts_file_base64_rule_builder, flow_json_test_case, ts_file_base64_test_case, tenant_id, status_rule_builder, status_test_case, created_at, updated_at';
   }
 
   const result = await findRuleFlowFromDB(ruleId, tenantId, selectClause);

@@ -50,6 +50,9 @@ export const createRule = async (
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {
   const result: RuleEntity = await createRuleInDB(ruleData);
+  const newRuleFlow = await cloneRuleFlowInDB(result.id!, 21);
+
+  await updateRuleInDB(result.id!, ruleData.tenant_id, { flow_id: newRuleFlow.id.toString() });
 
   await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
   return result;
@@ -82,8 +85,9 @@ export const findRuleConfiguration = async (ruleId: string, tenantId: string): P
   await findRuleConfigurationFromDB(ruleId, tenantId);
 
 export const findRuleById = async (id: number, tenantId: string): Promise<RuleEntity | null> => await findRuleByIdFromDB(id, tenantId);
+
 export const cloneRule = async (
-  ruleId: string,
+  ruleId: number,
   newRuleName: string,
   createdBy: string,
   tenantId: string,

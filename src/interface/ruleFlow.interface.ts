@@ -16,6 +16,9 @@ export interface RuleFlowResponse {
   ts_file_base64_rule_builder?: string;
   ts_file_base64_test_case?: string;
   ts_file_base64?: string;
+  status_rule_builder?: string;
+  status_test_case?: string;
+  status?: string;
   tenant_id: string;
   created_at: Date;
   updated_at: Date;

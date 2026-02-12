@@ -1,6 +1,7 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { RuleEntity, RuleRequest, UpdateRuleRequest } from '../../interface/rule.interface';
+import type { RuleFlowResponse } from '../../interface/ruleFlow.interface';
 
 export const updateRuleStatusInDB = async (
   ruleId: string,
@@ -276,7 +277,7 @@ export const saveRuleRequestInDB = async (txTp: string, tenantId: string, ruleRe
   );
 };
 
-export const cloneRuleInDB = async (newRuleName: string, createdBy: string, ruleId: string, tenantId: string): Promise<RuleEntity> => {
+export const cloneRuleInDB = async (newRuleName: string, createdBy: string, ruleId: number, tenantId: string): Promise<RuleEntity> => {
   const cloneRuleQuery = `
         INSERT INTO trs_rules (
           rule_name, description, tenant_id, txtp, txtp_version, version, status, 
@@ -314,7 +315,7 @@ export const cloneRuleInDB = async (newRuleName: string, createdBy: string, rule
   return cloneRuleResult.rows[0];
 };
 
-export const cloneRuleFlowInDB = async (newRuleId: string, oldRuleId: string): Promise<void> => {
+export const cloneRuleFlowInDB = async (newRuleId: string, oldRuleId: number): Promise<RuleFlowResponse> => {
   const cloneFlowQuery = `
         INSERT INTO trs_rule_flow (
           rule_id, flow_json_rule_builder, flow_json_test_case, ts_file_base64_rule_builder, ts_file_base64_test_case, created_at, updated_at
@@ -333,11 +334,12 @@ export const cloneRuleFlowInDB = async (newRuleId: string, oldRuleId: string): P
 
   const flowValues = [newRuleId, oldRuleId];
 
-  await handlePostExecuteSqlStatement(
+  const result = await handlePostExecuteSqlStatement<RuleFlowResponse>(
     {
       text: cloneFlowQuery,
       values: flowValues,
     } satisfies PgQueryConfig,
     'configuration',
   );
+  return result.rows[0];
 };

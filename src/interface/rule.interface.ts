@@ -69,6 +69,7 @@ export interface UpdateRuleRequest {
   updated_by?: string;
   rule_type?: string;
   rule_config_id?: string;
+  flow_id?: string;
 }
 
 export interface CreateRuleHandlerReqBody {
@@ -78,4 +79,16 @@ export interface CreateRuleHandlerReqBody {
 
 export interface ActiveNetworkMap {
   configuration: unknown;
+}
+export interface CloneRuleHandlerReqBody {
+  payload: {
+    rule_name: string;
+    description: string;
+    status: string;
+    publishing_status: string;
+    rule_config_id: string;
+    txtp: string;
+    version: string;
+  };
+  ruleRequest: RuleRequest;
 }

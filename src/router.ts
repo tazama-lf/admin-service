@@ -31,6 +31,19 @@ import {
   createNodeHandler,
   deleteNodeByIdHandler,
   executeQueryNode,
+  createRuleFlowHandler,
+  updateRuleFlowHandler,
+  getAllRulesHandler,
+  getRulesByIdHandler,
+  createRuleHandler,
+  getRuleIdsHandler,
+  getRuleConfigurationHandler,
+  getRuleFlowHandler,
+  updateRuleHandler,
+  getTxTpVersionsByTransactionTypeHandler,
+  getGlobalVariablesHandler,
+  cloneRuleHandler,
+  updateRuleStatusHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -62,22 +75,7 @@ import {
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
 } from './handlers/config.handler';
-import {
-  getAllRulesHandler,
-  getRulesByIdHandler,
-  createRuleHandler,
-  getRuleIdsHandler,
-  getRuleConfigurationHandler,
-  getRuleFlowHandler,
-  updateRuleHandler,
-  createRuleFlowHandler,
-  updateRuleFlowHandler,
-  getTxTpVersionsByTransactionTypeHandler,
-  saveRuleRequestHandler,
-  getGlobalVariablesHandler,
-  cloneRuleHandler,
-  updateRuleStatusHandler,
-} from './handlers/rules.handler';
+
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import {
@@ -100,6 +98,7 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
+import { saveRuleRequestHandler } from './handlers/rules.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',

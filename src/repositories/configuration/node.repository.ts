@@ -14,19 +14,18 @@ export const getNodeByName = async (nodeName: string, tenantId: string): Promise
 };
 
 export const insertNodesIntoDb = async (nodes: Node[]): Promise<Node[]> => {
-  const valuesPerNode = 3;
+  const valuesPerNode = 4;
   const valuePlaceholders = nodes
     .map((_, index) => {
       const offset = index * valuesPerNode;
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, NOW(), NOW())`;
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, NOW(), NOW())`;
     })
     .join(', ');
 
-  const values = nodes.flatMap((node) => [node.node_json, node.tenant_id, node.created_by]);
-
+  const values = nodes.flatMap((node) => [node.node_json, node.tenant_id, node.created_by, node.order]);
   const result: unknown = await handlePostExecuteSqlStatement(
     {
-      text: `INSERT INTO trs_nodes (node_json, tenant_id, created_by, order, updated_at, created_at) VALUES ${valuePlaceholders} RETURNING id, node_json, tenant_id, order, created_by, created_at, updated_at;`,
+      text: `INSERT INTO trs_nodes (node_json, tenant_id, created_by, "order", updated_at, created_at) VALUES ${valuePlaceholders} RETURNING id, node_json, tenant_id, "order", created_by, created_at, updated_at;`,
       values,
     } satisfies PgQueryConfig,
     'configuration',

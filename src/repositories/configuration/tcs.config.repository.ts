@@ -334,6 +334,11 @@ export const findAllTransactionTypes = async (tenantId: string): Promise<string[
     SELECT DISTINCT transaction_type
     FROM tcs_config
     WHERE tenant_id = $1
+      AND (
+        (status = 'STATUS_04_APPROVED') 
+        OR 
+        (status = 'STATUS_06_EXPORTED')
+      )
     ORDER BY transaction_type
   `;
 
@@ -343,6 +348,56 @@ export const findAllTransactionTypes = async (tenantId: string): Promise<string[
   );
 
   return result.rows.map((row) => row.transaction_type);
+};
+
+export const getPayloadByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
+  if (!transactionType || !tenantId) {
+    throw new Error('Transaction type and tenant ID are required');
+  }
+
+  const query = `
+    SELECT payload_json
+    FROM tcs_config
+    WHERE transaction_type = $1 AND tenant_id = $2
+    LIMIT 1
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{ payload_json: unknown }>(
+    { text: query, values: [transactionType, tenantId] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`No payload found for transaction type: ${transactionType}`);
+  }
+
+  return result.rows[0].payload_json;
+};
+
+export const getSchemaByTransactionType = async (
+  transactionType: string,
+  tenantId: string,
+): Promise<{ schema: unknown; mapping: unknown }> => {
+  if (!transactionType || !tenantId) {
+    throw new Error('Transaction type and tenant ID are required');
+  }
+
+  const query = `
+    SELECT schema, mapping
+    FROM tcs_config
+    WHERE transaction_type = $1 AND tenant_id = $2
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown }>(
+    { text: query, values: [transactionType, tenantId] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`No config found for transaction type: ${transactionType}`);
+  }
+
+  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping };
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {

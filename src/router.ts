@@ -44,6 +44,9 @@ import {
   getGlobalVariablesHandler,
   cloneRuleHandler,
   updateRuleStatusHandler,
+  getTransactionTypesHandler,
+  getPayloadByTransactionTypeHandler,
+  getConfigByTransactionTypeHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -60,22 +63,6 @@ import {
   TypologySchema,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
-import {
-  // createConfigHandler,
-  // getConfigByIdHandler,
-  // getAllConfigsHandler,
-  // updateConfigHandler,
-  // updatePublishingStatusHandler,
-  // createTransactionTypeTableHandler,
-  // createTazamaDataModelTableHandler,
-  // updateConfigByStatusHandler,
-  // writeConfigHandler,
-  // writeConfigUpdateHandler,
-  getTransactionTypesHandler,
-  getPayloadByTransactionTypeHandler,
-  getConfigByTransactionTypeHandler,
-} from './handlers/config.handler';
-
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import {

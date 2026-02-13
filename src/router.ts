@@ -88,6 +88,7 @@ import {
   addFieldToDestinationTypeHandler,
 } from './handlers/data-model.handler';
 import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
+import { getSimulationLogsHandler, insertSimulationLogsHandler } from './handlers/simulation-logs.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -156,6 +157,8 @@ const routePrivilege = {
   deleteNodes: 'editor',
   postTrsRuleFlow: 'view-profile',
   executeQueryNode: 'editor',
+  getSimulationLogs: 'view-profile',
+  postSimulationLogs: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -442,6 +445,12 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/nodes/query', {
     ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
+  });
+  fastify.post('/v1/admin/simulation-logs/insert', {
+    ...SetOptionsBodyAndParams(insertSimulationLogsHandler, routePrivilege.postSimulationLogs),
+  });
+  fastify.get('/v1/admin/simulation-logs/:ruleId', {
+    ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),
   });
 }
 

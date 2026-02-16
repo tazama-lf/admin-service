@@ -242,7 +242,7 @@ export const findRulesWithFiltersInDB = async (
 };
 
 export const getVersionsOfTransactionTypeFromDB = async (transactionType: string, tenantId: string): Promise<string[]> => {
-  const query = 'SELECT DISTINCT version FROM config WHERE transaction_type = $1 and tenant_id = $2;';
+  const query = 'SELECT DISTINCT version FROM tcs_config WHERE transaction_type = $1 and tenant_id = $2;';
 
   const result = await handlePostExecuteSqlStatement<{ version: string }>(
     {

@@ -44,6 +44,9 @@ import {
   getGlobalVariablesHandler,
   cloneRuleHandler,
   updateRuleStatusHandler,
+  getSimulationLogsHandler,
+  insertSimulationLogsHandler,
+  getRuleFlowStatusHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -168,6 +171,8 @@ const routePrivilege = {
   deleteNodes: 'editor',
   postTrsRuleFlow: 'view-profile',
   executeQueryNode: 'editor',
+  postSimulationLogs: 'editor',
+  getSimulationLogs: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -357,6 +362,10 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getRuleFlowHandler, routePrivilege.getTrsRules),
   });
 
+  fastify.get('/v1/admin/trs/rule-flow/status/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleFlowStatusHandler, routePrivilege.getTrsRules),
+  });
+
   fastify.put('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
   });
@@ -451,6 +460,12 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/nodes/query', {
     ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
+  });
+  fastify.post('/v1/admin/simulation-logs/insert', {
+    ...SetOptionsBodyAndParams(insertSimulationLogsHandler, routePrivilege.postSimulationLogs),
+  });
+  fastify.get('/v1/admin/simulation-logs/:ruleId', {
+    ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),
   });
 }
 

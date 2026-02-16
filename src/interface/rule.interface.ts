@@ -70,6 +70,12 @@ export interface UpdateRuleRequest {
   rule_type?: string;
   rule_config_id?: string;
   flow_id?: string;
+  metadata: {
+    sync: boolean;
+    deploy: boolean;
+    test: boolean;
+    simulation: boolean;
+  };
 }
 
 export interface CreateRuleHandlerReqBody {

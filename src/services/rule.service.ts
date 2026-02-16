@@ -50,11 +50,6 @@ export const createRule = async (
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {
   const result: RuleEntity = await createRuleInDB(ruleData);
-  const newRuleFlow = await cloneRuleFlowInDB(result.id!, 21);
-
-  await updateRuleInDB(result.id!, ruleData.tenant_id, { flow_id: newRuleFlow.id.toString() });
-
-  await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
   return result;
 };
 

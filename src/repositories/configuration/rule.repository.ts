@@ -330,6 +330,7 @@ export const cloneRuleFlowInDB = async (newRuleId: string, oldRuleId: number): P
           NOW() AS updated_at
         FROM trs_rule_flow
         WHERE rule_id = $2
+        RETURNING id, rule_id, flow_json_rule_builder, flow_json_test_case, ts_file_base64_rule_builder, ts_file_base64_test_case, tenant_id, created_at, updated_at
       `;
 
   const flowValues = [newRuleId, oldRuleId];

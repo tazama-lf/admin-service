@@ -725,7 +725,7 @@ export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyRepl
     reply.code(200).send({
       success: true,
       rule_id: ruleFlow.rule_id,
-      flow: category !== undefined ? ruleFlow.flow_json : ruleFlow,
+      result: ruleFlow,
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');

@@ -11,7 +11,7 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
     const payload = req.body as {
       rule_id: string;
       new_data: Record<string, unknown>;
-      old_data: Record<string, unknown>;
+      old_data?: Record<string, unknown>;
       description?: string;
       category: string;
     };
@@ -21,8 +21,8 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
       tenantId,
       ruleId: payload.rule_id,
       newData: payload.new_data,
-      oldData: payload.old_data,
-      description: payload.description,
+      oldData: payload?.old_data ?? {},
+      description: payload?.description,
       category: payload.category,
     };
 

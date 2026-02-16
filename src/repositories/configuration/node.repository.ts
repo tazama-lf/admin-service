@@ -5,6 +5,7 @@ import type { Node } from '../../interface/node.interface';
 export const getNodeByName = async (nodeName: string, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await handlePostExecuteSqlStatement<Node>(
     {
+      // eslint-disable-next-line @stylistic/quotes -- SQL string contains single quotes
       text: "SELECT id FROM trs_nodes WHERE (node_json->>'name') = $1 AND tenant_id = $2 LIMIT 1",
       values: [nodeName, tenantId],
     } satisfies PgQueryConfig,

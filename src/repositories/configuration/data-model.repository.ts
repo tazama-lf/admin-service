@@ -106,7 +106,6 @@ export const addFieldToDestinationType = async (
 ): Promise<{ field_id: number }> => {
   const { name, field_type: fieldType, parent_id: parentId, serial_no: serialNo } = body;
 
-  // Convert empty strings to null for integer fields (runtime safety for frontend sending empty strings)
   const sanitizedParentId = !parentId || (parentId as unknown) === '' ? null : parentId;
   const sanitizedSerialNo = !serialNo || (serialNo as unknown) === '' ? 0 : serialNo;
 

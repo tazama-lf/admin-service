@@ -27,6 +27,9 @@ import {
   handleRemoveMapping,
   handleAddFunction,
   handleRemoveFunction,
+  handleGetAllTransactionTypes,
+  handleGetPayloadByTransactionType,
+  handleGetConfigByTransactionType,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
@@ -1083,5 +1086,81 @@ export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: Fasti
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
+  }
+};
+
+export const getTransactionTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get transaction types request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const transactionTypes = await handleGetAllTransactionTypes(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionTypes,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get transaction types';
+    loggerService.error(`Failed to get transaction types: ${errorMessage}`, 'getTransactionTypesHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get transaction types request');
+  }
+};
+
+export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get payload by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { transactionType } = req.params as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    const payload = await handleGetPayloadByTransactionType(transactionType, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      payload,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get payload by transaction type';
+    loggerService.error(`Failed to get payload: ${errorMessage}`, 'getPayloadByTransactionTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get payload by transaction type request');
+  }
+};
+
+export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { transactionType } = req.params as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    const config = await handleGetConfigByTransactionType(transactionType, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      config,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config by transaction type';
+    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByTransactionTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get config by transaction type request');
   }
 };

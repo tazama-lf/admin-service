@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
+  createConfigHandler,
+  getConfigByIdHandler,
+  getAllConfigsHandler,
+  updatePublishingStatusHandler,
+  writeConfigUpdateHandler,
+  createTransactionTypeTableHandler,
+  createTazamaDataModelTableHandler,
+  updateConfigByStatusHandler,
+  addMappingHandler,
+  removeMappingHandler,
+  addFunctionHandler,
+  removeFunctionHandler,
+  getAllCollectionsHandler,
+  getCollectionFieldsHandler,
+  createDestinationTypeHandler,
+  destinationTypeExistsHandler,
+  addFieldToDestinationTypeHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -10,6 +27,26 @@ import {
   reportRequestHandler,
   updateAccountConditionExpiryDateHandler,
   updateEntityConditionExpiryDateHandler,
+  getNodeHandler,
+  createNodeHandler,
+  deleteNodeByIdHandler,
+  executeQueryNode,
+  createRuleFlowHandler,
+  updateRuleFlowHandler,
+  getAllRulesHandler,
+  getRulesByIdHandler,
+  createRuleHandler,
+  getRuleIdsHandler,
+  getRuleConfigurationHandler,
+  getRuleFlowHandler,
+  updateRuleHandler,
+  getTxTpVersionsByTransactionTypeHandler,
+  getGlobalVariablesHandler,
+  cloneRuleHandler,
+  updateRuleStatusHandler,
+  getTransactionTypesHandler,
+  getPayloadByTransactionTypeHandler,
+  getConfigByTransactionTypeHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -26,40 +63,9 @@ import {
   TypologySchema,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
-import {
-  createConfigHandler,
-  getConfigByIdHandler,
-  getAllConfigsHandler,
-  updateConfigHandler,
-  updatePublishingStatusHandler,
-  createTransactionTypeTableHandler,
-  createTazamaDataModelTableHandler,
-  updateConfigByStatusHandler,
-  writeConfigHandler,
-  writeConfigUpdateHandler,
-  getTransactionTypesHandler,
-  getPayloadByTransactionTypeHandler,
-  getConfigByTransactionTypeHandler,
-} from './handlers/config.handler';
-import {
-  getAllRulesHandler,
-  getRulesByIdHandler,
-  createRuleHandler,
-  getRuleIdsHandler,
-  getRuleConfigurationHandler,
-  getRuleFlowHandler,
-  updateRuleHandler,
-  createRuleFlowHandler,
-  updateRuleFlowHandler,
-  getTxTpVersionsByTransactionTypeHandler,
-  getGlobalVariablesHandler,
-  cloneRuleHandler,
-  updateRuleStatusHandler,
-  getRuleFlowStatusHandler,
-} from './handlers/rules.handler';
+
+import { getRuleFlowStatusHandler } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
-import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
-import { addFunctionHandler, removeFunctionHandler } from './handlers/function.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import {
   createScheduleHandler,
@@ -81,13 +87,6 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
-import {
-  getAllCollectionsHandler,
-  createDestinationTypeHandler,
-  destinationTypeExistsHandler,
-  addFieldToDestinationTypeHandler,
-} from './handlers/data-model.handler';
-import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 import { getSimulationLogsHandler, insertSimulationLogsHandler } from './handlers/simulation-logs.handler';
 
 const routePrivilege = {
@@ -143,6 +142,7 @@ const routePrivilege = {
   updateJob: 'editor',
   validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
+  getTcsDataModelCollectionFields: 'view-profile',
   postTcsDataModelDestinationType: 'editor',
   getTcsDataModelDestinationTypeExists: 'view-profile',
   postTcsDataModelDestinationTypeField: 'editor',
@@ -233,18 +233,9 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   // ==================== TCS OPERATIONS ====================
-  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
-  });
+
   fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
     ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
-  });
-  fastify.post('/v1/admin/tcs/config', {
-    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
-  });
-
-  fastify.get('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
   });
 
   fastify.get('/v1/admin/config/transaction-types', {
@@ -257,14 +248,6 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/config/:transactionType', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
-  });
-
-  fastify.put('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(updateConfigHandler, routePrivilege.putTcsConfig),
-  });
-
-  fastify.post('/v1/admin/tcs/config/write', {
-    ...SetOptionsBodyAndParams(writeConfigHandler, routePrivilege.postTcsConfigWrite),
   });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {
@@ -293,6 +276,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
     ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
+  });
+
+  fastify.get('/v1/admin/tcs/data-model/collections/:collectionId/fields/:tenantId', {
+    ...SetOptionsBodyAndParams(getCollectionFieldsHandler, routePrivilege.getTcsDataModelCollectionFields),
   });
 
   fastify.post('/v1/admin/tcs/data-model/destination-types', {
@@ -431,6 +418,18 @@ function Routes(fastify: FastifyInstance): void {
     }),
   );
 
+  // admin-service way for tcs
+  fastify.post('/v1/admin/tcs/config/write', {
+    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
+  });
+  fastify.get('/v1/admin/tcs/config/:id', {
+    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
+  });
+  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
+  });
+
+  //nodes
   fastify.get('/v1/admin/nodes', {
     ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
   });

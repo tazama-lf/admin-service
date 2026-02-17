@@ -9,8 +9,9 @@ export const insertSimulationLogs = async ({
   newData,
   description = '',
   category,
+  createdByEmail,
 }: SimulationLogRequest): Promise<void> => {
-  await insertSimulationLogToDB(userId, tenantId, ruleId, oldData, newData, description, category);
+  await insertSimulationLogToDB(userId, tenantId, ruleId, oldData, newData, description, category, createdByEmail);
 };
 
 export const getSimulationLogs = async (

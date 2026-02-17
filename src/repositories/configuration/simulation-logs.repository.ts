@@ -14,7 +14,7 @@ export const fetchSimulationLogs = async (options: {
   const { ruleId, tenantId, category, sortBy = 'created_at', sortOrder = 'desc', limit, offset } = options;
   const params: Array<string | number> = [ruleId, tenantId];
   let query = `
-      SELECT id, created_by, tenant_id, rule_id, old_data, new_data, description, category, created_at, updated_at
+      SELECT id, created_by, tenant_id, rule_id, old_data, new_data, description, category, created_by_email, created_at, updated_at
       FROM simulation_logs
       WHERE rule_id = $1 AND tenant_id = $2
     `;
@@ -55,6 +55,7 @@ export const insertSimulationLogToDB = async (
   newData: Record<string, unknown>,
   description: string,
   category: string,
+  createdByEmail?: string,
 ): Promise<void> => {
   const query = `
       INSERT INTO simulation_logs (
@@ -65,14 +66,24 @@ export const insertSimulationLogToDB = async (
         new_data,
         category,
         description,
+        created_by_email,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id, created_by, tenant_id, rule_id, old_data, new_data, category, description, created_at, updated_at;
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) RETURNING id, created_by, tenant_id, rule_id, old_data, new_data, category, description, created_by_email, created_at, updated_at;
     `;
   await handlePostExecuteSqlStatement(
     {
       text: query,
-      values: [userId, tenantId, parseInt(ruleId, 10), JSON.stringify(oldData), JSON.stringify(newData), category, description],
+      values: [
+        userId,
+        tenantId,
+        parseInt(ruleId, 10),
+        JSON.stringify(oldData),
+        JSON.stringify(newData),
+        category,
+        description,
+        createdByEmail,
+      ],
     } satisfies PgQueryConfig,
     'configuration',
   );

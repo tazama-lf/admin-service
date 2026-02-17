@@ -3,6 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
+import { loggerService } from '../../index';
 
 export type { ConfigData, ConfigRow };
 
@@ -203,7 +204,7 @@ export const findConfigsByStatus = async (
     } satisfies PgQueryConfig,
     'configuration',
   );
-
+  loggerService.log(`findConfigsByStatus - Found ${dataResult.rows.length} configs`, 'tcs.config.repository');
   return {
     data: dataResult.rows.map(mapRowToConfig),
     total,

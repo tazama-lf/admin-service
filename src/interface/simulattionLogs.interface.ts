@@ -22,3 +22,21 @@ export interface SimulationLogRequest {
   category: string;
   createdByEmail?: string;
 }
+
+export interface SimulationLogQueryOptions {
+  ruleId: string;
+  tenantId: string;
+  category?: string;
+  sortBy?: 'created_at' | 'updated_at';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface ISimulationBody {
+  rule_id: string;
+  new_data: Record<string, unknown>;
+  old_data?: Record<string, unknown>;
+  description?: string;
+  category: string;
+}

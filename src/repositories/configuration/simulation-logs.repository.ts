@@ -1,34 +1,46 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { SimulationLog } from '../../interface/simulattionLogs.interface';
+import type { SimulationLog, SimulationLogQueryOptions } from '../../interface/simulattionLogs.interface';
 
-export const fetchSimulationLogs = async (options: {
-  ruleId: string;
-  tenantId: string;
-  category?: string;
-  sortBy?: 'created_at' | 'updated_at';
-  sortOrder?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
-}): Promise<SimulationLog[]> => {
+type SortField = 'created_at' | 'updated_at';
+
+export const getSimulationLogsFromDb = async (options: SimulationLogQueryOptions): Promise<SimulationLog[]> => {
   const { ruleId, tenantId, category, sortBy = 'created_at', sortOrder = 'desc', limit, offset } = options;
-  const params: Array<string | number> = [ruleId, tenantId];
+  const params: Array<string | number> = [];
+  let paramIndex = 1;
+
+  const allowedSortFields: Record<SortField, string> = {
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+  };
+
+  const sortField = allowedSortFields[sortBy as SortField] ?? allowedSortFields.created_at;
+
+  const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
   let query = `
       SELECT id, created_by, tenant_id, rule_id, old_data, new_data, description, category, created_by_email, created_at, updated_at
       FROM simulation_logs
-      WHERE rule_id = $1 AND tenant_id = $2
+      WHERE rule_id = $${paramIndex++} AND tenant_id = $${paramIndex++}
     `;
+  params.push(ruleId, tenantId);
 
   if (category) {
-    query += ' AND category = $3';
+    query += ` AND category = $${paramIndex++}`;
     params.push(category);
   }
 
-  query += `
-      ORDER BY ${sortBy} ${sortOrder}
-      ${limit ? `LIMIT ${limit}` : ''}
-      ${offset ? `OFFSET ${offset}` : ''}
-    `;
+  query += ` ORDER BY ${sortField} ${order}`;
+
+  if (typeof limit === 'number') {
+    query += ` LIMIT $${paramIndex++}`;
+    params.push(limit);
+  }
+
+  if (typeof offset === 'number') {
+    query += ` OFFSET $${paramIndex++}`;
+    params.push(offset);
+  }
 
   const result = await handlePostExecuteSqlStatement<SimulationLog>(
     {
@@ -47,7 +59,7 @@ export const fetchSimulationLogs = async (options: {
   }));
 };
 
-export const insertSimulationLogToDB = async (
+export const createSimulationLogsInDb = async (
   userId: string,
   tenantId: string,
   ruleId: string,
@@ -57,33 +69,44 @@ export const insertSimulationLogToDB = async (
   category: string,
   createdByEmail?: string,
 ): Promise<void> => {
+  const columns = [
+    'created_by',
+    'tenant_id',
+    'rule_id',
+    'old_data',
+    'new_data',
+    'category',
+    'description',
+    'created_by_email',
+    'created_at',
+    'updated_at',
+  ];
+
+  const values = [
+    userId,
+    tenantId,
+    parseInt(ruleId, 10),
+    JSON.stringify(oldData),
+    JSON.stringify(newData),
+    category,
+    description,
+    createdByEmail,
+    'NOW()',
+    'NOW()',
+  ];
+
+  const valuePlaceholders = values.map((_, index) => (index < 8 ? `$${index + 1}` : `${values[index]}`)).join(', ');
+
   const query = `
-      INSERT INTO simulation_logs (
-        created_by,
-        tenant_id,
-        rule_id,
-        old_data,
-        new_data,
-        category,
-        description,
-        created_by_email,
-        created_at,
-        updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) RETURNING id, created_by, tenant_id, rule_id, old_data, new_data, category, description, created_by_email, created_at, updated_at;
+      INSERT INTO simulation_logs (${columns.join(', ')}) 
+      VALUES (${valuePlaceholders}) 
+      RETURNING id, created_by, tenant_id, rule_id, old_data, new_data, category, description, created_by_email, created_at, updated_at;
     `;
+
   await handlePostExecuteSqlStatement(
     {
       text: query,
-      values: [
-        userId,
-        tenantId,
-        parseInt(ruleId, 10),
-        JSON.stringify(oldData),
-        JSON.stringify(newData),
-        category,
-        description,
-        createdByEmail,
-      ],
+      values: values.slice(0, 8),
     } satisfies PgQueryConfig,
     'configuration',
   );

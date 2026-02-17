@@ -55,11 +55,12 @@ import {
   getVersionsOfTransactionType,
   updateRule,
   updateRuleStatus,
-} from './services/rule.service';
+} from './services/rule.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, insertSimulationLogs } from './services/simulation-logs.service';
+import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
+import type { ISimulationBody } from './interface/simulattionLogs.interface';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -1012,19 +1013,13 @@ export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: Fas
   }
 };
 
-export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const createSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
     const decodeToken = decodeInnerToken(req.headers.authorization ?? '');
-    const payload = req.body as {
-      rule_id: string;
-      new_data: Record<string, unknown>;
-      old_data?: Record<string, unknown>;
-      description?: string;
-      category: string;
-    };
+    const payload = req.body as ISimulationBody;
 
     const simulationLogs = {
       userId,
@@ -1037,7 +1032,7 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
       createdByEmail: decodeToken?.preferred_username,
     };
 
-    await insertSimulationLogs(simulationLogs);
+    await createSimulationLogs(simulationLogs);
     reply.code(201).send({
       success: true,
       message: 'Simulation logs inserted successfully',

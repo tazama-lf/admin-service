@@ -67,6 +67,12 @@ export const updateRule = async (
     rule_config_id: string;
     updated_by: string;
     flow_id: string;
+    metadata: {
+      sync: boolean;
+      deploy: boolean;
+      test: boolean;
+      simulation: boolean;
+    };
   }>,
 ): Promise<RuleEntity | null> => {
   const result = await updateRuleInDB(ruleId, tenantId, updateData);

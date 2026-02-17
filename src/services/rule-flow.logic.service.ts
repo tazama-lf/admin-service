@@ -62,7 +62,7 @@ export const findRuleFlow = async (ruleId: string, tenantId: string, category?: 
 
 export const updateRuleFlow = async (
   ruleId: string,
-  flowData: { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string },
+  flowData: { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string; status: string },
   tenantId: string,
 ): Promise<RuleFlowResponse | null> => {
   const { category } = flowData;
@@ -74,17 +74,19 @@ export const updateRuleFlow = async (
     setClause = `
         flow_json_rule_builder = $2,
         ts_file_base64_rule_builder = $3,
+        status_rule_builder = $4,
       `;
     returningClause = `
-        id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, tenant_id, created_at, updated_at
+        id, rule_id, flow_json_rule_builder as flow_json, ts_file_base64_rule_builder as ts_file_base64, status_rule_builder as status, tenant_id, created_at, updated_at
       `;
   } else if (category === 'test_case_generation') {
     setClause = `
         flow_json_test_case = $2,
         ts_file_base64_test_case = $3,
+        status_test_case = $4,
       `;
     returningClause = `
-        id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, tenant_id, created_at, updated_at
+        id, rule_id, flow_json_test_case as flow_json, ts_file_base64_test_case as ts_file_base64, status_test_case as status, tenant_id, created_at, updated_at
       `;
   } else {
     throw new HttpException(`Invalid category for updating rule flow: ${category}`, HttpStatus.BAD_REQUEST);
@@ -97,6 +99,7 @@ export const updateRuleFlow = async (
     {
       flowJson: flowData.flow_json,
       tsFileBase64: flowData.ts_file_base64 ?? '',
+      status: flowData.status,
     },
     tenantId,
   );

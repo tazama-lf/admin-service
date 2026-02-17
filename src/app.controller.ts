@@ -765,7 +765,7 @@ export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyR
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
-    const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string };
+    const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string; status: string };
     const result: unknown = await updateRuleFlow(id, payload, tenantId);
 
     if (!result) {

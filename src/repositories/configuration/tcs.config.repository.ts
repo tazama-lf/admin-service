@@ -204,7 +204,7 @@ export const findConfigsByStatus = async (
     } satisfies PgQueryConfig,
     'configuration',
   );
-  loggerService.log(`findConfigsByStatus - Found ${dataResult.rows.length} configs`, 'tcs.config.repository');
+  loggerService.log(`findConfigsByStatus - Found ${dataQuery},${countQuery} configs`, 'tcs.config.repository');
   return {
     data: dataResult.rows.map(mapRowToConfig),
     total,

@@ -2,12 +2,23 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 import { ErrorHandler } from './errorHandler';
+import type { DecodedToken } from '../interface/DecodedToken';
+import jwt from 'jsonwebtoken';
+
+const decodeInnerToken = (headerToken: string): DecodedToken | null => {
+  const token = headerToken?.split(' ')[1] ?? '';
+  const decodeOuterToken = (jwt.decode(token) as { tokenString: string })?.tokenString;
+  const decodeInnerToken = jwt.decode(decodeOuterToken);
+  return decodeInnerToken as DecodedToken | null;
+};
 
 export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const decodedToken = decodeInnerToken(req.headers.authorization ?? '');
+
     const payload = req.body as {
       rule_id: string;
       new_data: Record<string, unknown>;
@@ -24,6 +35,7 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
       oldData: payload?.old_data ?? {},
       description: payload?.description,
       category: payload.category,
+      createdByEmail: decodedToken?.preferred_username ?? userId,
     };
 
     await databaseService.insertSimulationLogs(simulationLogs);

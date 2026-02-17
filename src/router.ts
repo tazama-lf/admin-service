@@ -49,6 +49,7 @@ import {
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
   createSimulationLogsHandler,
+  getRuleFlowStatusHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -66,7 +67,6 @@ import {
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 
-import { getRuleFlowStatusHandler } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import {

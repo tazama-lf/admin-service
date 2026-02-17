@@ -7,6 +7,7 @@ export interface SimulationLog {
   new_data: Record<string, unknown>;
   description: string;
   category: string;
+  created_by_email?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,4 +20,5 @@ export interface SimulationLogRequest {
   newData: Record<string, unknown>;
   description?: string;
   category: string;
+  createdByEmail?: string;
 }

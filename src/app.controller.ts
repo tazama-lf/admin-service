@@ -59,6 +59,7 @@ import {
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, insertSimulationLogs } from './services/simulation-logs.service';
+import { decodeInnerToken } from './utils/decode-token';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -1016,6 +1017,7 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const decodeToken = decodeInnerToken(req.headers.authorization ?? '');
     const payload = req.body as {
       rule_id: string;
       new_data: Record<string, unknown>;
@@ -1032,6 +1034,7 @@ export const insertSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
       oldData: payload?.old_data ?? {},
       description: payload?.description,
       category: payload.category,
+      createdByEmail: decodeToken?.preferred_username,
     };
 
     await insertSimulationLogs(simulationLogs);

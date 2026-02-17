@@ -186,16 +186,22 @@ export const findConfigsByStatus = async (
   const total = parseInt(countResult.rows[0].total, 10);
 
   // Data query with pagination
-  const dataQuery = `
-    SELECT
-      id, msg_fam, transaction_type, endpoint_path, version, content_type,
-      schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comments
-    FROM tcs_config
-    WHERE ${whereClause}
-    ORDER BY updated_at DESC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-  `;
+  // const dataQuery = `
+  //   // SELECT
+  //   //   id, msg_fam, transaction_type, endpoint_path, version, content_type,
+  //   //   schema, mapping, functions, status, tenant_id, created_by, publishing_status,
+  //   //   payload_xml, payload_json, created_at, updated_at, comments
+  //   // FROM tcs_config
+  //   // WHERE ${whereClause}
+  //   // ORDER BY updated_at DESC
+  //   // LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  // `;
+  const dataQuery = ` SELECT id, msg_fam, transaction_type, endpoint_path, version, content_type,
+ schema, mapping, functions, status, tenant_id, created_by, publishing_status,
+   payload_xml, payload_json, created_at, updated_at, comments
+      FROM tcs_config WHERE tenant_id = 'cbe' AND status = 'STATUS_01_IN_PROGRESS'
+        ORDER BY updated_at DESC
+        LIMIT 10 OFFSET 0; `;
 
   const dataResult = await handlePostExecuteSqlStatement<ConfigRow>(
     {

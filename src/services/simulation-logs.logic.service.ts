@@ -1,7 +1,7 @@
 import type { SimulationLog, SimulationLogRequest } from '../interface/simulattionLogs.interface';
-import { fetchSimulationLogs, insertSimulationLogToDB } from '../repositories/configuration/simulation-logs.repository';
+import { createSimulationLogsInDb, getSimulationLogsFromDb } from '../repositories/configuration/simulation-logs.repository';
 
-export const insertSimulationLogs = async ({
+export const createSimulationLogs = async ({
   userId,
   tenantId,
   ruleId,
@@ -11,7 +11,7 @@ export const insertSimulationLogs = async ({
   category,
   createdByEmail,
 }: SimulationLogRequest): Promise<void> => {
-  await insertSimulationLogToDB(userId, tenantId, ruleId, oldData, newData, description, category, createdByEmail);
+  await createSimulationLogsInDb(userId, tenantId, ruleId, oldData, newData, description, category, createdByEmail);
 };
 
 export const getSimulationLogs = async (
@@ -22,4 +22,4 @@ export const getSimulationLogs = async (
   sortOrder: 'asc' | 'desc' = 'desc',
   limit?: number,
   offset?: number,
-): Promise<SimulationLog[]> => await fetchSimulationLogs({ ruleId, tenantId, category, sortBy, sortOrder, limit, offset });
+): Promise<SimulationLog[]> => await getSimulationLogsFromDb({ ruleId, tenantId, category, sortBy, sortOrder, limit, offset });

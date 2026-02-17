@@ -45,11 +45,11 @@ import {
   cloneRuleHandler,
   updateRuleStatusHandler,
   getSimulationLogsHandler,
-  insertSimulationLogsHandler,
   getRuleFlowStatusHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
+  createSimulationLogsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -449,7 +449,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
   });
   fastify.post('/v1/admin/simulation-logs/insert', {
-    ...SetOptionsBodyAndParams(insertSimulationLogsHandler, routePrivilege.postSimulationLogs),
+    ...SetOptionsBodyAndParams(createSimulationLogsHandler, routePrivilege.postSimulationLogs),
   });
   fastify.get('/v1/admin/simulation-logs/:ruleId', {
     ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),

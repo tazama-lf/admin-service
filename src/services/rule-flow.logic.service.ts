@@ -3,6 +3,7 @@ import type { RuleFlowRequest, RuleFlowResponse } from '../interface/ruleFlow.in
 import {
   createRuleFlowInDB,
   findRuleFlowFromDB,
+  findRuleFlowStatusFromDB,
   getRuleConfigById,
   getRuleRequestByRuleId,
   updateRuleFlowInDB,
@@ -101,4 +102,27 @@ export const updateRuleFlow = async (
   );
 
   return result;
+};
+
+export const getRuleFlowStatus = async (
+  ruleId: string,
+  tenantId: string,
+  filter?: { category: string },
+): Promise<Record<string, unknown> | null> => {
+  const category = filter?.category;
+  let selectClause = '*';
+  let fromTable = 'trs_rule_flow';
+
+  if (!category) {
+    selectClause = 'id, rule_id, status_rule_builder as status_rule_builder, status_test_case as status_test_case';
+    fromTable = 'trs_rule_flow';
+  } else if (category === 'rule_builder') {
+    selectClause = 'id, rule_id, status_rule_builder as status';
+    fromTable = 'trs_rule_flow';
+  } else if (category === 'test_case_generation') {
+    selectClause = 'id, rule_id, status_test_case as status';
+    fromTable = 'trs_rule_flow';
+  }
+
+  return await findRuleFlowStatusFromDB(ruleId, tenantId, selectClause, fromTable);
 };

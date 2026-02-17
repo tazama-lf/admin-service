@@ -117,3 +117,31 @@ export const updateRuleFlowInDB = async (
 
   return result.rows[0] as RuleFlowResponse;
 };
+
+export const findRuleFlowStatusFromDB = async (
+  ruleId: string,
+  tenantId: string,
+  selectClause: string,
+  fromTable: string,
+): Promise<Record<string, unknown> | null> => {
+  const query = `
+      SELECT ${selectClause}
+      FROM ${fromTable}
+      WHERE rule_id = $1 AND tenant_id = $2
+      LIMIT 1
+    `;
+
+  const queryParams = [ruleId, tenantId];
+  const result = await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: queryParams,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+  return result.rows[0];
+};

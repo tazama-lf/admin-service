@@ -44,9 +44,11 @@ import {
   getGlobalVariablesHandler,
   cloneRuleHandler,
   updateRuleStatusHandler,
+  getSimulationLogsHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
+  createSimulationLogsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -87,7 +89,6 @@ import {
   updateJobHandler,
   validateTableHandler,
 } from './handlers/job.handler';
-import { getSimulationLogsHandler, insertSimulationLogsHandler } from './handlers/simulation-logs.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -157,8 +158,8 @@ const routePrivilege = {
   deleteNodes: 'editor',
   postTrsRuleFlow: 'view-profile',
   executeQueryNode: 'editor',
-  getSimulationLogs: 'view-profile',
   postSimulationLogs: 'editor',
+  getSimulationLogs: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -446,7 +447,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
   });
   fastify.post('/v1/admin/simulation-logs/insert', {
-    ...SetOptionsBodyAndParams(insertSimulationLogsHandler, routePrivilege.postSimulationLogs),
+    ...SetOptionsBodyAndParams(createSimulationLogsHandler, routePrivilege.postSimulationLogs),
   });
   fastify.get('/v1/admin/simulation-logs/:ruleId', {
     ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),

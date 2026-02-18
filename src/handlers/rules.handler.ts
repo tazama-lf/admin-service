@@ -3,19 +3,22 @@ import { databaseService } from '../index';
 import type { AuthenticatedRequest } from '../interface/AuthenticatedRequest';
 import { ErrorHandler } from './errorHandler';
 
-// Type definitions for rule creation
+// Type definitions for rule creation with enhanced validation
 interface RuleData {
-  ruleName: string;
+  ruleName?: string; // Optional - can be generated
   description: string;
   txtp: string;
   version: string;
-  txtpVersion: string;
-  status: string;
-  publishing_status: string;
-  rule_type: string;
-  rule_config_id: string;
-  userID: string;
+  txtpVersion?: string; // Optional
+  status?: string; // Optional - defaults to STATUS_01_IN_PROGRESS
+  publishing_status?: string; // Optional - should default to INACTIVE
+  rule_type: string; // Required
+  rule_config_id?: string; // Conditional based on rule flow existence
+  userID?: string;
 }
+
+// Note: Validation is handled by the rule-studio backend service
+// This admin-service only provides data access endpoints
 
 interface Transaction {
   CstmrCdtTrfInitn: {
@@ -114,38 +117,53 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
   const authReq = req as AuthenticatedRequest;
   const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
-  try {
-    // const requestBody = req.body as Record<string, unknown>;
-    // const ruleData = requestBody.ruleData as any;
-    // const ruleRequest = requestBody.ruleRequest as any;
 
+  try {
     const { ruleData, ruleRequest } = req.body as CreateRuleHandlerReqBody;
 
-    // console.log('I have reached rules handler', requestBody);
-    // console.log('Rule data received for creation:', ruleData);
+    // Note: Validation is handled by rule-studio backend service
+    // This admin-service only handles data persistence
+
+    // Apply basic defaults if not provided
+    const processedRuleData = {
+      ...ruleData,
+      status: 'STATUS_01_IN_PROGRESS',
+      publishing_status: 'INACTIVE',
+    };
+
+    // Ensure rule name is generated if not provided
+    const ruleName =
+      processedRuleData.ruleName?.trim() ??
+      (processedRuleData.rule_config_id ? `${tenantId}-rule-${processedRuleData.rule_config_id.split('@')[0]}` : `${tenantId}-rule`);
+
+    // console.log('Rule data received for creation:', processedRuleData);
     // console.log('Rule request received for creation:', ruleRequest);
 
+    // Step 4: Prepare rule data for database
     const newRule = {
-      // rule_id: ruleData.rule_id as string,
-      ruleName: ruleData.ruleName,
-      description: ruleData.description,
+      ruleName,
+      description: processedRuleData.description,
       tenant_id: tenantId,
-      txtp: ruleData.txtp,
-      txtp_version: ruleData.txtpVersion,
-      version: ruleData.version,
-      status: 'STATUS_01_IN_PROGRESS',
-      publishing_status: 'ACTIVE',
+      txtp: processedRuleData.txtp,
+      txtp_version: processedRuleData.txtpVersion,
+      version: processedRuleData.version,
+      status: processedRuleData.status, // Already has default applied
+      publishing_status: processedRuleData.publishing_status, // Already has default applied
       updated_by: userId,
-      rule_type: ruleData.rule_type,
-      rule_config_id: ruleData.rule_config_id,
+      rule_type: processedRuleData.rule_type,
+      rule_config_id: processedRuleData.rule_config_id,
       updated_at: new Date(),
       created_at: new Date(),
     };
 
+    // Step 5: Create rule in database
     const createdRule: unknown = await databaseService.createRule(newRule, ruleRequest);
 
-    // at this posotion all logs of tcs lib will come
-    reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
+    reply.code(201).send({
+      success: true,
+      message: 'Rule created successfully',
+      rule: createdRule,
+    });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create rule');
   }

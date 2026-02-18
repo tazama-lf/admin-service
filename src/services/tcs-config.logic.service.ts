@@ -44,7 +44,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       schema: config.schema,
       mapping: config.mapping,
       functions: config.functions,
-      status: ConfigStatus.IN_PROGRESS,
+      status: config.status ?? ConfigStatus.IN_PROGRESS,
       tenantId,
       createdBy: userId,
       publishing_status: config.publishing_status ?? 'inactive',

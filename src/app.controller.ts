@@ -241,8 +241,8 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
-    loggerService.log(`getAllConfigsHandler-body--1: ${req.body}`);
-    
+    loggerService.log(`getAllConfigsHandler-body--1: ${JSON.stringify(req.body)}`);
+
     const result = await handleGetAllConfigs(parsedLimit, parsedOffset, body, tenantId);
     reply.code(200).send({
       success: true,

@@ -27,6 +27,9 @@ import {
   handleRemoveMapping,
   handleAddFunction,
   handleRemoveFunction,
+  handleGetAllTransactionTypes,
+  handleGetPayloadByTransactionType,
+  handleGetConfigByTransactionType,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
@@ -47,6 +50,26 @@ import {
   handleUpdateCronStatus,
 } from './services/cron.logic.service';
 import type { JobStatus } from './interface/data-enrichment.interface';
+import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
+import { ErrorHandler } from './handlers/errorHandler';
+import { createNode, deleteNodeById, executeSelectQuery, findAllNodes } from './services/node.logic.service';
+import { findRuleFlow, getGlobalVariables, createRuleFlow, updateRuleFlow, getRuleFlowStatus } from './services/rule-flow.logic.service';
+import {
+  cloneRule,
+  createRule,
+  findAllRuleIds,
+  findRuleById,
+  findRuleConfiguration,
+  findRulesWithFilters,
+  getVersionsOfTransactionType,
+  updateRule,
+  updateRuleStatus,
+} from './services/rule.logic.service';
+import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
+import { findActiveNetworkMap } from './services/network-map.service';
+import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import { decodeInnerToken } from './utils/decode-token';
+import type { ISimulationBody } from './interface/simulattionLogs.interface';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -713,5 +736,590 @@ export const updateCronJobStatusHandler = async (req: FastifyRequest, reply: Fas
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle update cron job status request');
+  }
+};
+
+// ==================== TRS ====================
+export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+
+  try {
+    const rawBody = req.body;
+    if (!Array.isArray(rawBody)) {
+      ErrorHandler.sendError(reply, { status: 400 }, 'Request body must be an array of nodes');
+      return;
+    }
+
+    const nodes = rawBody as Array<Record<string, unknown>>;
+    const dataToInsert = nodes.map((node: Record<string, unknown>) => ({
+      node_json: node.node_json as Record<string, unknown>,
+      tenant_id: tenantId,
+      created_by: userId,
+      order: (node.order as number) ?? 0,
+    }));
+
+    const result: unknown = await createNode(dataToInsert);
+
+    const resultArray = Array.isArray(result) ? (result as unknown[]) : [result];
+
+    reply.code(201).send({
+      success: true,
+      message: `${resultArray.length} node(s) created successfully`,
+      nodes: resultArray,
+      count: resultArray.length,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create nodes');
+  } finally {
+    loggerService.log('End - Create Node Handler');
+  }
+};
+
+export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const queryParams = req.query as { type?: string; category?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' };
+
+    const nodes = await findAllNodes(tenantId, queryParams);
+    reply.code(200).send({
+      success: true,
+      message: 'Nodes retrieved successfully',
+      nodes,
+      count: nodes.length,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to retrieve nodes');
+  } finally {
+    loggerService.log('End - Get Node Handler');
+  }
+};
+
+export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const queryParams = req.params as { nodeId?: string };
+    await deleteNodeById(Number(queryParams.nodeId), tenantId);
+    reply.code(200).send({
+      success: true,
+      message: 'Node deleted successfully',
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to delete node');
+  } finally {
+    loggerService.log('End - Delete Node By ID Handler');
+  }
+};
+
+export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = req.body as { query: string; dbName: string; params?: unknown[] };
+
+    if (!body.query) {
+      ErrorHandler.sendError(reply, { status: 400 }, 'Query parameter is required');
+      return;
+    }
+
+    const result = await executeSelectQuery(body, tenantId);
+    reply.code(200).send({
+      success: true,
+      message: 'Query executed successfully',
+      result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to execute query');
+  } finally {
+    loggerService.log('End - Execute Query Node Handler');
+  }
+};
+
+export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId, tenantId } = req.params as { ruleId: string; tenantId: string };
+
+    const globalVariables = await getGlobalVariables(ruleId, tenantId);
+
+    if (!globalVariables?.ruleRequest || !globalVariables.configuration) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Global variables not found for rule ${ruleId} and tenant ${tenantId}`);
+      return;
+    }
+
+    const RuleRequest: unknown = globalVariables.ruleRequest;
+    const RuleConfig: unknown = globalVariables.configuration;
+
+    const RuleResult = {
+      id: ruleId,
+      tenantId,
+      cfg: '',
+      subRuleRef: '.err',
+      reason: 'Unhandled rule result outcome',
+      prcgTm: -1,
+      indpdntVarbl: 0,
+    };
+
+    reply.code(200).send({
+      success: true,
+      RuleRequest,
+      RuleConfig,
+      RuleResult,
+    });
+  } catch (error) {
+    ErrorHandler.sendError(reply, error, 'Failed to get global variables');
+  }
+};
+
+export const getRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+    const { tenantId } = req as ITenantRequest;
+    const { category } = req.query as { category?: string };
+
+    const ruleFlow = await findRuleFlow(ruleId, tenantId, category);
+
+    if (!ruleFlow) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      rule_id: ruleFlow.rule_id,
+      flow: category !== undefined ? ruleFlow.flow_json : ruleFlow,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
+  }
+};
+
+export const createRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const flowData = req.body as {
+      flow_json_rule_builder: Record<string, unknown>;
+      flow_json_test_case: Record<string, unknown>;
+    };
+    const result: unknown = await createRuleFlow({
+      rule_id: id,
+      tenantId,
+      flowData: {
+        flow_json_rule_builder: flowData.flow_json_rule_builder,
+        flow_json_test_case: flowData.flow_json_test_case,
+      },
+    });
+    reply.code(201).send({
+      success: true,
+      message: 'Rule flow created successfully',
+      flow: result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create rule flow');
+  }
+};
+
+export const updateRuleFlowHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const { tenantId } = req as ITenantRequest;
+    const payload = req.body as { flow_json: Record<string, unknown>; ts_file_base64?: string; category: string };
+    const result: unknown = await updateRuleFlow(id, payload, tenantId);
+
+    if (!result) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${id}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule flow updated successfully',
+      flow: result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to update rule flow');
+  }
+};
+
+export const updateRuleStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: string };
+    const { status, reason } = req.body as { status: string; reason: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const updatedRule = await updateRuleStatus(ruleId, tenantId, status, reason);
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule status updated successfully',
+      rule: updatedRule,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to update rule status');
+  }
+};
+
+export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { ruleId } = req.params as { ruleId: number };
+    const authReq = req as AuthenticatedRequest;
+    const token = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
+
+    const clonedRule = await cloneRule(ruleId, payload.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    reply.code(201).send({
+      success: true,
+      message: 'Rule cloned successfully',
+
+      rule: clonedRule,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to clone rule');
+  }
+};
+
+export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const body = authReq.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const result = await findRulesWithFilters(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      rules: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rules');
+  }
+};
+
+export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { id } = req.params as { id: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const rulesId = parseInt(id);
+    if (isNaN(rulesId)) {
+      ErrorHandler.sendError(reply, { status: 400 }, `Invalid rules ID: ${id}. Must be a valid number.`);
+      return;
+    }
+
+    const rules = await findRuleById(rulesId, tenantId);
+    if (!rules) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rules with id ${id} not found`);
+      return;
+    }
+
+    reply.code(200).send({ success: true, rules });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rules');
+  }
+};
+
+export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+  try {
+    const { ruleData, ruleRequest } = req.body as CreateRuleHandlerReqBody;
+
+    const newRule = {
+      // rule_id: ruleData.rule_id as string,
+      ruleName: ruleData.ruleName,
+      description: ruleData.description,
+      tenant_id: tenantId,
+      txtp: ruleData.txtp,
+      txtp_version: ruleData.txtpVersion,
+      version: ruleData.version,
+      status: 'STATUS_01_IN_PROGRESS',
+      publishing_status: 'ACTIVE',
+      updated_by: userId,
+      rule_type: ruleData.rule_type,
+      rule_config_id: ruleData.rule_config_id,
+      updated_at: new Date(),
+      created_at: new Date(),
+    };
+
+    const createdRule: unknown = await createRule(newRule, ruleRequest);
+
+    reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create rule');
+  }
+};
+
+export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { transactionType } = req.params as { transactionType: string };
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const versions: string[] = await getVersionsOfTransactionType(transactionType, tenantId);
+
+    reply.code(200).send({
+      success: true,
+      transactionType,
+      versions,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get versions');
+  }
+};
+
+export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const ruleIds = await findAllRuleIds(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      ruleIds,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rule IDs');
+  }
+};
+
+export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { ruleId } = req.params as { ruleId: string };
+
+    const configuration: unknown = await findRuleConfiguration(ruleId, tenantId);
+
+    if (!configuration) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Configuration not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      ruleId,
+      configuration,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
+  }
+};
+
+export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const { ruleId } = req.params as { ruleId: string };
+    const updateData = req.body as Record<string, unknown>;
+
+    const enrichedUpdateData = {
+      ...updateData,
+      updated_by: userId,
+    };
+
+    const updatedRule: unknown = await updateRule(ruleId, tenantId, enrichedUpdateData);
+
+    if (!updatedRule) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule with id ${ruleId} not found`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule updated successfully',
+      rule: updatedRule,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to update rule');
+  }
+};
+
+export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+
+    const networkMap: unknown = await findActiveNetworkMap(tenantId);
+
+    if (!networkMap) {
+      ErrorHandler.sendError(reply, { status: 404 }, 'No active network map found for this tenant');
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      networkMap,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('Multiple active network maps')) {
+      ErrorHandler.sendError(reply, { status: 409 }, error.message);
+      return;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get active network map';
+    ErrorHandler.sendError(reply, { status: 500 }, errorMessage);
+  }
+};
+
+export const createSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const decodeToken = decodeInnerToken(req.headers.authorization ?? '');
+    const payload = req.body as ISimulationBody;
+
+    const simulationLogs = {
+      userId,
+      tenantId,
+      ruleId: payload.rule_id,
+      newData: payload.new_data,
+      oldData: payload?.old_data ?? {},
+      description: payload?.description,
+      category: payload.category,
+      createdByEmail: decodeToken?.preferred_username,
+    };
+
+    await createSimulationLogs(simulationLogs);
+    reply.code(201).send({
+      success: true,
+      message: 'Simulation logs inserted successfully',
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to insert simulation logs');
+  }
+};
+
+export const getSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { ruleId } = req.params as { ruleId: string };
+    const { category } = req.query as { category: string };
+
+    const result = await getSimulationLogs(ruleId, tenantId, category);
+    reply.code(200).send({
+      success: true,
+      message: 'Simulation logs retrieved successfully',
+      result,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation logs');
+  }
+};
+
+export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId;
+    const { ruleId } = req.params as { ruleId: string };
+    const query = req.query as { category?: string };
+
+    const ruleFlow = await getRuleFlowStatus(
+      ruleId,
+      tenantId ?? '',
+      query.category && query.category !== 'undefined' ? { category: query.category } : undefined,
+    );
+
+    if (!ruleFlow) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Rule flow not found for rule ${ruleId}`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      result: ruleFlow,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get rule configuration');
+  }
+};
+
+export const getTransactionTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get transaction types request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const transactionTypes = await handleGetAllTransactionTypes(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionTypes,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get transaction types';
+    loggerService.error(`Failed to get transaction types: ${errorMessage}`, 'getTransactionTypesHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get transaction types request');
+  }
+};
+
+export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get payload by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { transactionType } = req.params as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    const payload = await handleGetPayloadByTransactionType(transactionType, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      payload,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get payload by transaction type';
+    loggerService.error(`Failed to get payload: ${errorMessage}`, 'getPayloadByTransactionTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get payload by transaction type request');
+  }
+};
+
+export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { transactionType } = req.params as { transactionType: string };
+
+    if (!transactionType) {
+      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+      return;
+    }
+
+    const config = await handleGetConfigByTransactionType(transactionType, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      config,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get config by transaction type';
+    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByTransactionTypeHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get config by transaction type request');
   }
 };

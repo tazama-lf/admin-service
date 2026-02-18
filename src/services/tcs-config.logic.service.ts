@@ -17,6 +17,9 @@ import {
   createTransactionTypeTable,
   createTazamaDataModelTable,
   updateConfigByStatus,
+  findAllTransactionTypes,
+  getPayloadByTransactionType,
+  getSchemaByTransactionType,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
@@ -339,6 +342,51 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetAllTransactionTypes = async (tenantId: string): Promise<string[]> => {
+  try {
+    loggerService.log(`Getting all transaction types for tenant: ${tenantId}`);
+
+    const transactionTypes = await findAllTransactionTypes(tenantId);
+
+    loggerService.log(`Successfully retrieved ${transactionTypes.length} transaction types`);
+    return transactionTypes;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error getting transaction types: ${errorMessage.message}`, 'handleGetAllTransactionTypes');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetPayloadByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
+  try {
+    loggerService.log(`Getting payload for transaction type: ${transactionType}, tenant: ${tenantId}`);
+
+    const payload = await getPayloadByTransactionType(transactionType, tenantId);
+
+    loggerService.log(`Successfully retrieved payload for transaction type: ${transactionType}`);
+    return payload;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error getting payload by transaction type: ${errorMessage.message}`, 'handleGetPayloadByTransactionType');
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetConfigByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
+  try {
+    loggerService.log(`Getting config for transaction type: ${transactionType}, tenant: ${tenantId}`);
+
+    const config = await getSchemaByTransactionType(transactionType, tenantId);
+
+    loggerService.log(`Successfully retrieved config for transaction type: ${transactionType}`);
+    return config;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error getting config by transaction type: ${errorMessage.message}`, 'handleGetConfigByTransactionType');
     throw new Error(errorMessage.message);
   }
 };

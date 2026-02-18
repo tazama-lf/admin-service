@@ -56,6 +56,7 @@ import {
   cloneRuleHandler,
   updateRuleStatusHandler,
   getRuleFlowStatusHandler,
+  fetchRuleRequestHandler,
 } from './handlers/rules.handler';
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { addMappingHandler, removeMappingHandler } from './handlers/mapping.handler';
@@ -159,6 +160,7 @@ const routePrivilege = {
   executeQueryNode: 'editor',
   getSimulationLogs: 'view-profile',
   postSimulationLogs: 'editor',
+  fetchRuleRequest: 'view-profile',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -344,6 +346,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/trs/rule-configuration/:ruleId', {
     ...SetOptionsBodyAndParams(getRuleConfigurationHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/getRuleRequest', {
+    ...SetOptionsBodyAndParams(fetchRuleRequestHandler, routePrivilege.fetchRuleRequest),
   });
   fastify.put('/v1/admin/trs/rule/:ruleId', {
     ...SetOptionsBodyAndParams(updateRuleHandler, routePrivilege.putTrsRule),

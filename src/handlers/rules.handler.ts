@@ -441,3 +441,46 @@ export const updateRuleStatusHandler = async (req: FastifyRequest, reply: Fastif
     ErrorHandler.sendError(reply, error, 'Failed to update rule status');
   }
 };
+
+export const fetchRuleRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { RuleId, TenantId } = req.query as { RuleId?: string; TenantId?: string };
+
+    // console.log(`Fetching rule request for rule ID: ${RuleId} and tenant ID: ${TenantId}`);
+
+    if (!RuleId) {
+      reply.code(400).send({
+        success: false,
+        message: 'RuleId query parameter is required',
+      });
+      return;
+    }
+
+    if (!TenantId) {
+      reply.code(400).send({
+        success: false,
+        message: 'TenantId query parameter is required',
+      });
+      return;
+    }
+
+    // Fetch rule request data from database
+    const ruleRequest = await databaseService.getRuleRequestByRuleId(RuleId, TenantId);
+
+    if (!ruleRequest) {
+      reply.code(404).send({
+        success: false,
+        message: 'Rule request not found',
+      });
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      message: 'Rule request fetched successfully',
+      ruleRequest,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch rule request');
+  }
+};

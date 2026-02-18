@@ -3,3 +3,10 @@ import { NetworkMapRepo } from './configuration/network.map.repository';
 import { RuleConfigRepo } from './configuration/rule.config.repository';
 import { TypologyConfigRepo } from './configuration/typology.config.repository';
 export { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo };
+export {
+  getAllCollections,
+  getCollectionFields,
+  createDestinationType,
+  checkDestinationTypeExists,
+  addFieldToDestinationType,
+} from './configuration/data-model.repository';

@@ -88,13 +88,14 @@ export interface ActiveNetworkMap {
 }
 export interface CloneRuleHandlerReqBody {
   payload: {
-    rule_name: string;
+    ruleName: string;
     description: string;
-    status: string;
-    publishing_status: string;
+    // status: string;
+    // publishing_status: string;
     rule_config_id: string;
     txtp: string;
     version: string;
+    rule_type: string;
   };
   ruleRequest: RuleRequest;
 }

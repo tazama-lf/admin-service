@@ -807,11 +807,12 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
   try {
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
+    // const { tenantId } = req as ITenantRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
 
     const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
-    const clonedRule = await cloneRule(ruleId, payload.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', token, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',

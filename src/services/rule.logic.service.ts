@@ -1,4 +1,4 @@
-import type { RuleRequest, RuleEntity } from '../interface/rule.interface';
+import type { RuleRequest, RuleEntity, CloneRuleHandlerReqBody } from '../interface/rule.interface';
 import {
   countRulesWithFiltersInDB,
   createRuleInDB,
@@ -89,12 +89,12 @@ export const findRuleById = async (id: number, tenantId: string): Promise<RuleEn
 
 export const cloneRule = async (
   ruleId: number,
-  newRuleName: string,
+  payload: CloneRuleHandlerReqBody['payload'],
   createdBy: string,
   tenantId: string,
   ruleRequest: RuleRequest | undefined,
 ): Promise<RuleEntity> => {
-  const cloneRuleResult: RuleEntity = await cloneRuleInDB(newRuleName, createdBy, ruleId, tenantId);
+  const cloneRuleResult: RuleEntity = await cloneRuleInDB(payload, createdBy, ruleId, tenantId);
 
   const newRuleId = cloneRuleResult.id!;
 

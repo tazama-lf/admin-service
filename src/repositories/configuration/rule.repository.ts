@@ -1,6 +1,6 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { RuleEntity, RuleRequest, UpdateRuleRequest } from '../../interface/rule.interface';
+import type { CloneRuleHandlerReqBody, RuleEntity, RuleRequest, UpdateRuleRequest } from '../../interface/rule.interface';
 import type { RuleFlowResponse } from '../../interface/ruleFlow.interface';
 
 export const updateRuleStatusInDB = async (
@@ -314,7 +314,12 @@ export const saveRuleRequestInDB = async (txTp: string, tenantId: string, ruleRe
   );
 };
 
-export const cloneRuleInDB = async (newRuleName: string, createdBy: string, ruleId: number, tenantId: string): Promise<RuleEntity> => {
+export const cloneRuleInDB = async (
+  clonePayload: CloneRuleHandlerReqBody['payload'],
+  createdBy: string,
+  ruleId: number,
+  tenantId: string,
+): Promise<RuleEntity> => {
   const cloneRuleQuery = `
         INSERT INTO trs_rules (
           rule_name, description, tenant_id, txtp, txtp_version, version, status, 
@@ -322,24 +327,32 @@ export const cloneRuleInDB = async (newRuleName: string, createdBy: string, rule
         )
         SELECT 
           $1 AS rule_name, 
-          description, 
+          $2 AS description, 
           tenant_id, 
           txtp, 
           txtp_version,
-          version, 
+          $3 AS version, 
           'STATUS_01_IN_PROGRESS' AS status, 
           'ACTIVE' AS publishing_status, 
-          $2 AS updated_by, 
-          rule_type, 
+          $5 AS updated_by, 
+          $4 AS rule_type, 
           rule_config_id, 
           NOW() AS created_at, 
           NOW() AS updated_at
         FROM trs_rules
-        WHERE id = $3 AND tenant_id = $4
+        WHERE id = $6 AND tenant_id = $7
         RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, rule_config_id, created_at, updated_at
       `;
 
-  const ruleValues = [newRuleName, createdBy, ruleId, tenantId];
+  const ruleValues = [
+    clonePayload.ruleName,
+    clonePayload.description,
+    clonePayload.version,
+    clonePayload.rule_type,
+    createdBy,
+    ruleId,
+    tenantId,
+  ];
 
   const cloneRuleResult = await handlePostExecuteSqlStatement<RuleEntity>(
     {

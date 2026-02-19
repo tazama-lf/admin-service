@@ -49,7 +49,7 @@ export const createRule = async (
   },
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {
-  const result: RuleEntity = await createRuleInDB(ruleData);
+  const result: RuleEntity = await createRuleInDB(ruleData, ruleRequest);
   return result;
 };
 

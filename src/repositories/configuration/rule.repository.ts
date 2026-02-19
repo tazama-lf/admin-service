@@ -26,19 +26,22 @@ export const updateRuleStatusInDB = async (
   return { rowCount: result.rowCount ?? 0 };
 };
 
-export const createRuleInDB = async (ruleData: {
-  ruleName: string;
-  description: string;
-  tenant_id: string;
-  txtp: string;
-  txtp_version?: string;
-  version: string;
-  status?: string;
-  publishing_status?: string;
-  updated_by: string;
-  rule_type: string;
-  rule_config_id?: string;
-}): Promise<RuleEntity> => {
+export const createRuleInDB = async (
+  ruleData: {
+    ruleName: string;
+    description: string;
+    tenant_id: string;
+    txtp: string;
+    txtp_version?: string;
+    version: string;
+    status?: string;
+    publishing_status?: string;
+    updated_by: string;
+    rule_type: string;
+    rule_config_id?: string;
+  },
+  ruleRequest: RuleRequest,
+): Promise<RuleEntity> => {
   const query = `
     INSERT INTO trs_rules (
       rule_name,
@@ -79,6 +82,9 @@ export const createRuleInDB = async (ruleData: {
     } satisfies PgQueryConfig,
     'configuration',
   );
+
+  // save ruleRequest needs to be done here to ensure it is saved after the rule is created and we have the ruleId available. This is because ruleRequest is a separate column in the database and needs to be updated after the initial insert.
+  await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
 
   return result.rows[0];
 };

@@ -7,19 +7,25 @@ import {
   createConfigHandler,
   createCronJobHandler,
   createDestinationTypeHandler,
+  createPullJobHandler,
+  createPushJobHandler,
   createSimulationLogsHandler,
   createTazamaDataModelTableHandler,
   createTransactionTypeTableHandler,
   destinationTypeExistsHandler,
+  findJobByIdHandler,
   getAccountConditionsHandler,
   getAllCollectionsHandler,
   getAllConfigsHandler,
   getAllCronJobsHandler,
+  getAllJobsHandler,
   getCollectionFieldsHandler,
   getConfigByIdHandler,
   getCronJobByIdHandler,
   getCronJobByStatusHandler,
   getEntityConditionHandler,
+  getJobHistoryHandler,
+  getJobsByStatusHandler,
   getRuleFlowStatusHandler,
   getSimulationLogsHandler,
   handleHealthCheck,
@@ -34,7 +40,11 @@ import {
   updateCronJobHandler,
   updateCronJobStatusHandler,
   updateEntityConditionExpiryDateHandler,
+  updateJobActivationHandler,
+  updateJobByStatusHandler,
+  updateJobHandler,
   updatePublishingStatusHandler,
+  validateExistingHandler,
   writeConfigUpdateHandler,
 } from './app.controller';
 import {
@@ -52,18 +62,7 @@ import {
   // writeConfigUpdateHandler,
   getTransactionTypesHandler,
 } from './handlers/config.handler';
-import {
-  createPullJobHandler,
-  createPushJobHandler,
-  findJobByIdHandler,
-  getAllJobsHandler,
-  getAllJobsHistoryHandler,
-  getJobsByStatusHandler,
-  updateJobActivationHandler,
-  updateJobByStatusHandler,
-  updateJobHandler,
-  validateTableHandler,
-} from './handlers/job.handler';
+
 import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
 import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 import {
@@ -190,7 +189,7 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.post('/v1/admin/tcs/job/get/history', {
-    ...SetOptionsBodyAndParams(getAllJobsHistoryHandler, routePrivilege.getAllJobsHistory),
+    ...SetOptionsBodyAndParams(getJobHistoryHandler, routePrivilege.getAllJobsHistory),
   });
 
   fastify.get('/v1/admin/tcs/job/get/:id', {
@@ -213,7 +212,7 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.get('/v1/admin/tcs/job/table', {
-    ...SetOptionsBodyAndParams(validateTableHandler, routePrivilege.validateTable),
+    ...SetOptionsBodyAndParams(validateExistingHandler, routePrivilege.validateTable),
   });
 
   // ==================== SCHEDULER OPERATIONS ====================

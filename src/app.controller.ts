@@ -49,7 +49,7 @@ import {
   handleGetCronByStatus,
   handleUpdateCronStatus,
 } from './services/cron.logic.service';
-import type { JobStatus } from './interface/data-enrichment.interface';
+import type { ConfigType, JobStatus, ScheduleStatus } from './interface/data-enrichment.interface';
 import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
 import { ErrorHandler } from './handlers/errorHandler';
 import { createNode, deleteNodeById, executeSelectQuery, findAllNodes } from './services/node.logic.service';
@@ -70,6 +70,20 @@ import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
+import {
+  handleCreatePushJob,
+  handleGetAllJobs,
+  handleCreatePullJob,
+  handleGetJobHistory,
+  handleFindJobById,
+  handleGetJobsByStatus,
+  handleUpdateJob,
+  handleUpdateJobActivation,
+  handleUpdateJobByStatus,
+  handleTableExist,
+  handleValidateExisting,
+  handleValidateActive,
+} from './services/job.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -736,6 +750,294 @@ export const updateCronJobStatusHandler = async (req: FastifyRequest, reply: Fas
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle update cron job status request');
+  }
+};
+
+// =================== DE ======================
+
+export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create push job request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const pushData = req.body as Record<string, unknown>;
+    const response = await handleCreatePushJob(pushData, tenantId);
+    reply.code(201).send({ success: true, message: response.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create push job';
+    loggerService.error(`Failed to create push job: ${errorMessage}`, 'createCronJobHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create push job request');
+  }
+};
+
+export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all DE jobs request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await handleGetAllJobs(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get DE jobs';
+    loggerService.error(`Failed to get DE jobs: ${errorMessage}`, 'getAllDEJobsHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get all DE jobs request');
+  }
+};
+
+export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create pull job request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const pullData = req.body as Record<string, unknown>;
+    const response = await handleCreatePullJob(pullData, tenantId);
+    reply.code(201).send({ success: response.success, message: response.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create pull job';
+    loggerService.error(`Failed to create pull job: ${errorMessage}`, 'createPullJobHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle create pull job request');
+  }
+};
+
+export const getJobHistoryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get job history request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = (req.body as Record<string, string>) || {};
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    const result = await handleGetJobHistory(parsedLimit, parsedOffset, tenantId, body);
+    reply.code(200).send({
+      success: true,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get job history';
+    loggerService.error(`Failed to get job history: ${errorMessage}`, 'getJobHistoryHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get job history request');
+  }
+};
+
+export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle find job by ID request');
+  try {
+    const { id } = req.params as { id: string };
+    const { tableName } = req.query as { tableName: string };
+
+    if (!tableName) {
+      reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
+      return;
+    }
+
+    const result = await handleFindJobById(id, tableName);
+
+    if (!result) {
+      reply.code(404).send({ success: false, message: `Job with ID ${id} not found` });
+      return;
+    }
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to find job by ID';
+    loggerService.error(`Failed to find job by ID: ${errorMessage}`, 'findJobByIdHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle find job by ID request');
+  }
+};
+
+export const getJobsByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get jobs by status request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { status, page = '1', limit = '10' } = req.query as { status: JobStatus; page?: string; limit?: string };
+
+    if (!status) {
+      reply.code(400).send({ success: false, message: 'status query parameter is required' });
+      return;
+    }
+
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = parseInt(limit, 10);
+
+    const result = await handleGetJobsByStatus(tenantId, status, parsedPage, parsedLimit);
+    reply.code(200).send({ success: true, data: result });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get jobs by status';
+    loggerService.error(`Failed to get jobs by status: ${errorMessage}`, 'getJobsByStatusHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get jobs by status request');
+  }
+};
+
+export const updateJobHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update job request');
+  try {
+    const { id } = req.params as { id: string };
+    const { job, type } = req.body as { job: Record<string, unknown>; type: ConfigType };
+
+    if (!job || !type) {
+      reply.code(400).send({ success: false, message: 'job and type are required in request body' });
+      return;
+    }
+
+    const result = await handleUpdateJob(id, job, type);
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update job';
+    loggerService.error(`Failed to update job: ${errorMessage}`, 'updateJobHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update job request');
+  }
+};
+
+export const updateJobActivationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update job activation request');
+  try {
+    const { id } = req.params as { id: string };
+    const { status, type } = req.body as { status: ScheduleStatus; type: ConfigType };
+
+    if (!status || !type) {
+      reply.code(400).send({ success: false, message: 'status and type are required in request body' });
+      return;
+    }
+
+    const result = await handleUpdateJobActivation(id, status, type);
+    reply.code(200).send({
+      success: true,
+      message: 'Job activation status updated successfully',
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update job activation';
+    loggerService.error(`Failed to update job activation: ${errorMessage}`, 'updateJobActivationHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update job activation request');
+  }
+};
+
+export const updateJobByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle update job by status request');
+  try {
+    const { id } = req.params as { id: string };
+    const { status, type, reason } = req.body as { status: JobStatus; type: ConfigType; reason?: string };
+
+    if (!status || !type) {
+      reply.code(400).send({ success: false, message: 'status and type are required in request body' });
+      return;
+    }
+
+    const result = await handleUpdateJobByStatus(status, id, type, reason);
+    reply.code(200).send({
+      success: true,
+      message: `Job status updated successfully (${result} row(s) affected)`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update job status';
+    loggerService.error(`Failed to update job status: ${errorMessage}`, 'updateJobByStatusHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle update job by status request');
+  }
+};
+
+export const tableExistHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle table exist check request');
+  try {
+    const { tableName } = req.query as { tableName: string };
+
+    if (!tableName) {
+      reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
+      return;
+    }
+
+    const exists = await handleTableExist(tableName);
+    reply.code(200).send({
+      success: true,
+      exists,
+      message: exists ? `Table "${tableName}" exists` : `Table "${tableName}" does not exist`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to check if table exists';
+    loggerService.error(`Failed to check table existence: ${errorMessage}`, 'tableExistHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle table exist check request');
+  }
+};
+
+export const validateExistingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle validate existing table request');
+  try {
+    const { tableName } = req.query as { tableName: string };
+
+    if (!tableName) {
+      reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
+      return;
+    }
+
+    const exists = await handleValidateExisting(tableName);
+    reply.code(200).send({
+      success: true,
+      exists,
+      message: exists ? 'Table or associated job exists' : 'Table does not exist',
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to validate existing table';
+    loggerService.error(`Failed to validate existing table: ${errorMessage}`, 'validateExistingHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle validate existing table request');
+  }
+};
+
+export const validateActiveHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle validate active jobs request');
+  try {
+    const { tableName, type } = req.query as { tableName: string; type: ConfigType };
+
+    if (!tableName || !type) {
+      reply.code(400).send({ success: false, message: 'tableName and type query parameters are required' });
+      return;
+    }
+
+    await handleValidateActive(tableName, type);
+    reply.code(200).send({
+      success: true,
+      message: `No active jobs found for table "${tableName}"`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to validate active jobs';
+    loggerService.error(`Failed to validate active jobs: ${errorMessage}`, 'validateActiveHandler');
+    reply.code(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle validate active jobs request');
   }
 };
 

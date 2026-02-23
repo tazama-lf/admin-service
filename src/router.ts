@@ -50,6 +50,8 @@ import {
   getConfigByTransactionTypeHandler,
   createSimulationLogsHandler,
   getRuleFlowStatusHandler,
+  getDataModelJsonHandler,
+  putDataModelJsonHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -160,6 +162,8 @@ const routePrivilege = {
   executeQueryNode: 'editor',
   postSimulationLogs: 'editor',
   getSimulationLogs: 'view-profile',
+  getDataModelJson: 'view-profile',
+  putDataModelJson: 'editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -302,6 +306,17 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/data-model/table', {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
+
+  // ==================== DATA MODEL JSON OPERATIONS ====================
+
+  fastify.get('/v1/admin/tcs/data-model/json/:tenantId', {
+    ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
+  });
+
+  fastify.put('/v1/admin/tcs/data-model/json/:tenantId', {
+    ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
+  });
+
   // ====================  RULES OPERATIONS ====================
 
   // route for cloning a rule

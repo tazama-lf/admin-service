@@ -40,6 +40,8 @@ import {
   handleCreateDestinationType,
   handleDestinationTypeExists,
   handleAddFieldToDestinationType,
+  handleGetDataModelJson,
+  handleUpsertDataModelJson,
 } from './services/data-model.logic.service';
 import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
 import { ErrorHandler } from './handlers/errorHandler';
@@ -1217,5 +1219,73 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+// ==================== DATA MODEL JSON HANDLERS ====================
+
+export const getDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get data model JSON request');
+  try {
+    const { tenantId } = req.params as { tenantId: string };
+
+    if (!tenantId) {
+      reply.status(400).send({ success: false, message: 'tenantId is required' });
+      return;
+    }
+
+    const dataModelJson = await handleGetDataModelJson(tenantId);
+
+    if (!dataModelJson) {
+      reply.status(200).send({
+        success: true,
+        data: null,
+        message: `No data model JSON found for tenant: ${tenantId}`,
+      });
+      return;
+    }
+
+    reply.status(200).send({
+      success: true,
+      data: dataModelJson,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get data model JSON';
+    loggerService.error(`Failed to get data model JSON: ${errorMessage}`, 'getDataModelJsonHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get data model JSON request');
+  }
+};
+
+export const putDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle put data model JSON request');
+  try {
+    const { tenantId } = req.params as { tenantId: string };
+    const body = req.body as { data_model_json: Record<string, unknown> };
+
+    if (!tenantId) {
+      reply.status(400).send({ success: false, message: 'tenantId is required' });
+      return;
+    }
+
+    if (!body?.data_model_json) {
+      reply.status(400).send({ success: false, message: 'data_model_json is required in request body' });
+      return;
+    }
+
+    const result = await handleUpsertDataModelJson(tenantId, body.data_model_json);
+
+    reply.status(200).send({
+      success: true,
+      message: `Data model JSON saved for tenant: ${tenantId}`,
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to save data model JSON';
+    loggerService.error(`Failed to save data model JSON: ${errorMessage}`, 'putDataModelJsonHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle put data model JSON request');
   }
 };

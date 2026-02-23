@@ -83,8 +83,9 @@ export const createRuleInDB = async (
     'configuration',
   );
 
-  // save ruleRequest needs to be done here to ensure it is saved after the rule is created and we have the ruleId available. This is because ruleRequest is a separate column in the database and needs to be updated after the initial insert.
-  await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
+  if (ruleRequest) {
+    await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
+  }
 
   return result.rows[0];
 };

@@ -52,19 +52,6 @@ interface CreateRuleHandlerReqBody {
   ruleRequest: RuleRequest;
 }
 
-interface CloneRuleHandlerReqBody {
-  payload: {
-    ruleName: string;
-    description: string;
-    status: string;
-    publishing_status: string;
-    rule_config_id: string;
-    txtp: string;
-    version: string;
-  };
-  ruleRequest: RuleRequest;
-}
-
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
@@ -382,23 +369,22 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
 
 export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { ruleId } = req.params as { ruleId: number };
-    const authReq = req as AuthenticatedRequest;
-    const token = authReq.user?.tenantId ?? 'DEFAULT';
-    // console.log('Received request to clone rule with ID:', req.body);
-    const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
+    // const { ruleId } = req.params as { ruleId: number };
+    // const authReq = req as AuthenticatedRequest;
+    // const token = authReq.user?.tenantId ?? 'DEFAULT';
+    // // console.log('Received request to clone rule with ID:', req.body);
+    // const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
     // console.log('Cloning rule with ID:', ruleId);
     // console.log('Rule data for cloning:', payload);
     // console.log('Rule request for cloning:', ruleRequest);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-    const clonedRule = await databaseService.cloneRule(ruleId, payload.ruleName, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    // const clonedRule = await databaseService.cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', token, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Database service returns dynamic data
-      rule: clonedRule,
+
+      // rule: clonedRule,
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to clone rule');

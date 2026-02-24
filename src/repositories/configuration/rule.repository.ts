@@ -115,7 +115,7 @@ export const updateRuleInDB = async (ruleId: string, tenantId: string, updateDat
       SET ${setClauses.join(', ')}
       WHERE id = $${ruleIdParam}
         AND tenant_id = $${tenantIdParam}
-      RETURNING id, rule_name, description, tenant_id, txtp, version, status, publishing_status, updated_by, rule_type, rule_config_id, flow_id, metadata, created_at, updated_at
+      RETURNING id, rule_name, description, tenant_id, txtp, version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at
     `;
 
   values.push(ruleId, tenantId);

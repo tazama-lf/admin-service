@@ -56,8 +56,9 @@ export const createRuleInDB = async (
       rule_type,
       updated_at,
       created_at,
+      rulerequest,
       rule_config_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, NOW(), NOW(), $11)
+    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, NOW(), NOW(), $11, $12)
     RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, created_at, updated_at, rule_config_id
   `;
 
@@ -72,6 +73,7 @@ export const createRuleInDB = async (
     ruleData.publishing_status,
     ruleData.updated_by,
     ruleData.rule_type,
+    ruleRequest,
     ruleData.rule_config_id ?? null,
   ];
 
@@ -83,9 +85,9 @@ export const createRuleInDB = async (
     'configuration',
   );
 
-  if (ruleRequest) {
-    await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleRequest);
-  }
+  // if (ruleRequest) {
+  //   await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleData.id, ruleRequest);
+  // }
 
   return result.rows[0];
 };

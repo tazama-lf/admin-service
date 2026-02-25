@@ -206,7 +206,7 @@ export const getJobHistory = async (
     const countQuery = `
       SELECT COUNT(*) AS total
       FROM job_history ph
-      LEFT JOIN pull_jobs pj ON pj.id = ph.job_id
+      LEFT JOIN tcs_pull_jobs pj ON pj.id = ph.job_id
       ${whereClause};
     `;
     const countResult = await handlePostExecuteSqlStatement<{ total: string }>(
@@ -246,8 +246,8 @@ export const getJobHistory = async (
       WHEN ph.job_type = 'push' THEN psh.publishing_status
     END AS publishing_status
   FROM job_history ph
-  LEFT JOIN pull_jobs pj ON pj.id = ph.job_id AND ph.job_type = 'pull'
-  LEFT JOIN push_jobs psh ON psh.id = ph.job_id AND ph.job_type = 'push'
+  LEFT JOIN tcs_pull_jobs pj ON pj.id = ph.job_id AND ph.job_type = 'pull'
+  LEFT JOIN tcs_push_jobs psh ON psh.id = ph.job_id AND ph.job_type = 'push'
   ${whereClause}
   ORDER BY ph.created_at DESC
   LIMIT $${paramIndex} OFFSET $${paramIndex + 1};

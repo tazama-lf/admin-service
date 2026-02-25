@@ -946,8 +946,8 @@ export const updateJobActivationHandler = async (req: FastifyRequest, reply: Fas
 export const updateJobByStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update job by status request');
   try {
-    const { id, status, type } = req.params as { id: string; status: JobStatus; type: ConfigType };
-    const { reason } = req.body as { reason?: string };
+    const { id } = req.params as { id: string };
+    const { status, type, reason } = req.body as { status: JobStatus; type: ConfigType; reason?: string };
 
     if (!status || !type) {
       reply.code(400).send({ success: false, message: 'status and type are required in request body' });

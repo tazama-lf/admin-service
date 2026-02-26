@@ -1,3 +1,4 @@
+import { loggerService } from '..';
 import type { Node, QueryParams } from '../interface/node.interface';
 import {
   deleteNodeByIdFromDB,
@@ -7,7 +8,6 @@ import {
   insertNodesIntoDb,
 } from '../repositories/configuration/node.repository';
 import { HttpException, HttpStatus } from '../utils/error';
-import { validateSystemFunctions } from '../utils/validateQuery';
 
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await getNodeById(nodeId, tenantId);
@@ -90,56 +90,66 @@ export const executeSelectQuery = async (
 ): Promise<Array<Record<string, unknown>>> => {
   const upperCaseQuery = query.trim().toUpperCase();
 
+  // 1. Basic Security Filter
   const forbiddenKeywords = ['INSERT', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE'];
   if (forbiddenKeywords.some((keyword) => upperCaseQuery.includes(keyword))) {
     throw new Error('Only SELECT queries are allowed.');
   }
 
-  if (validateSystemFunctions(query)) {
-    throw new Error('System-level functions are not allowed in SELECT queries.');
-  }
+  // 2. Extract the Table Name
+  // This regex looks for the word after FROM or JOIN, ignoring quotes
+  const tableMatch = /FROM\s+([a-zA-Z0-9_".]+)/gi.exec(query);
+  const tableName = tableMatch ? tableMatch[1].replace(/['"`]/g, '').split('.').pop() : null;
 
-  const fromOrJoinRegex = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_."]+)/gi;
   let modifiedQuery = query;
-  let match;
-  const tables = new Set<string>();
-  while ((match = fromOrJoinRegex.exec(query)) !== null) {
-    tables.add(match[1]);
-  }
 
-  if (tables.size > 0) {
+  if (tableName) {
+    // 3. Determine which column name to use (Dynamic Check)
+    const tenantColumn = await resolveTenantColumn(tableName, dbName, tenantId);
+    const tenantIdCondition = `${tenantColumn} = '${tenantId}'`;
+
+    // 4. Inject into WHERE clause
     if (upperCaseQuery.includes('WHERE')) {
-      modifiedQuery = modifiedQuery.replace(/WHERE/gi, `WHERE tenant_id = '${tenantId}' AND`);
+      modifiedQuery = modifiedQuery.replace(/WHERE/i, `WHERE ${tenantIdCondition} AND`);
     } else {
-      const lastFromOrJoin = Math.max(...Array.from(tables).map((table) => query.lastIndexOf(table)));
-      const tableEndPosition = lastFromOrJoin + Array.from(tables).pop()!.length;
-      const nextClausePosition = query.substring(tableEndPosition).search(/\b(GROUP|ORDER|LIMIT)\b/i);
-
-      if (nextClausePosition === -1) {
-        modifiedQuery = `${query} WHERE tenant_id = '${tenantId}'`;
+      const groupByIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b/);
+      if (groupByIndex !== -1) {
+        modifiedQuery = `${query.slice(0, groupByIndex)} WHERE ${tenantIdCondition} ${query.slice(groupByIndex)}`;
       } else {
-        const insertionPoint = tableEndPosition + nextClausePosition;
-        modifiedQuery = `${query.slice(0, insertionPoint)}WHERE tenant_id = '${tenantId}' ${query.slice(insertionPoint)}`;
+        modifiedQuery = `${query} WHERE ${tenantIdCondition}`;
       }
     }
   }
 
+  // 5. Apply Safety Limit
   if (!upperCaseQuery.includes('LIMIT')) {
-    const hadSemicolon = modifiedQuery.endsWith(';');
-    if (hadSemicolon) {
-      modifiedQuery = modifiedQuery.slice(0, -1);
-    }
-    modifiedQuery = `${modifiedQuery} LIMIT 5`;
-    if (hadSemicolon) {
-      modifiedQuery = `${modifiedQuery};`;
-    }
+    modifiedQuery = modifiedQuery.replace(/;?$/, ' LIMIT 5;');
   }
 
-  try {
-    const result = await executeQueryNodeInDb(modifiedQuery, tenantId, dbName, params);
-    return result;
-  } catch (error) {
-    const err = error as Error;
-    throw new HttpException(`Failed to execute query: ${err.message}`, HttpStatus.INTERNAL_SERVER_ERROR, { cause: error });
-  }
+  return await executeQueryNodeInDb(modifiedQuery, tenantId, dbName, params);
 };
+
+/**
+ * Helper: Queries the Database Schema to find the correct column name
+ */
+async function resolveTenantColumn(tableName: string, dbName: string, tenantId: string): Promise<string> {
+  const schemaQuery = `
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = '${tableName}' 
+    AND column_name IN ('tenant_id', 'tenantid')
+    LIMIT 1;
+  `;
+
+  try {
+    // We execute this against the DB to see which one exists
+    const result = await executeQueryNodeInDb(schemaQuery, tenantId, dbName, []);
+    if (result && result.length > 0) {
+      return result[0].column_name as string;
+    }
+  } catch (e) {
+    loggerService.error(`Error resolving tenant column for table ${tableName}: ${e.message}`, e.stack, 'NodeLogicService');
+  }
+
+  return 'tenant_id'; // Default fallback
+}

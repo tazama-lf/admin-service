@@ -1,7 +1,12 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { RuleFlowRequest, RuleFlowResponse } from '../../interface/ruleFlow.interface';
-
+interface RuleConfig {
+  id: string;
+  cfg: string;
+  desc: string;
+  config: Record<string, unknown>;
+}
 export const getRuleRequestByRuleId = async (
   ruleId: string,
   tenantId: string,
@@ -23,8 +28,8 @@ export const getRuleRequestByRuleId = async (
   return { rulerequest: ruleRequestResult.rows[0].rulerequest, rule_config_id: ruleConfigId };
 };
 
-export const getRuleConfigById = async (ruleConfigId: string, tenantId: string): Promise<{ configuration: unknown } | null> => {
-  const configurationResult = await handlePostExecuteSqlStatement(
+export const getRuleConfigById = async (ruleConfigId: string, tenantId: string): Promise<{ configuration: RuleConfig | null }> => {
+  const configurationResult = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
     {
       text: 'SELECT configuration FROM rule WHERE "ruleid" = $1 AND "tenantid" = $2;',
       values: [ruleConfigId, tenantId],
@@ -33,7 +38,7 @@ export const getRuleConfigById = async (ruleConfigId: string, tenantId: string):
   );
 
   if (configurationResult.rows.length === 0) {
-    return null;
+    return { configuration: null };
   }
 
   return { configuration: configurationResult.rows[0].configuration };

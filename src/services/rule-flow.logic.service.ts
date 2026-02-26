@@ -9,13 +9,19 @@ import {
   updateRuleFlowInDB,
 } from '../repositories/configuration/rule-flow.repository';
 import { HttpException, HttpStatus } from '../utils/error';
+interface RuleConfig {
+  id: string;
+  cfg: string;
+  desc: string;
+  config: Record<string, unknown>;
+}
 
 export const getGlobalVariables = async (
   ruleId: string,
   tenantId: string,
 ): Promise<{
   ruleRequest: unknown;
-  configuration: unknown;
+  configuration: RuleConfig | null;
 } | null> => {
   const ruleRequest = await getRuleRequestByRuleId(ruleId, tenantId);
   if (!ruleRequest) {

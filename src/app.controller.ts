@@ -679,6 +679,12 @@ export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply)
     loggerService.log('End - Execute Query Node Handler');
   }
 };
+interface RuleConfig {
+  id: string;
+  cfg: string;
+  desc: string;
+  config: Record<string, unknown>;
+}
 
 export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -692,10 +698,10 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
     }
 
     const RuleRequest: unknown = globalVariables.ruleRequest;
-    const RuleConfig: unknown = globalVariables.configuration;
+    const RuleConfig: RuleConfig = globalVariables.configuration;
 
     const RuleResult = {
-      id: ruleId,
+      id: RuleConfig.id,
       tenantId,
       cfg: '',
       subRuleRef: '.err',

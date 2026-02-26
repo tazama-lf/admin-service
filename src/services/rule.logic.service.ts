@@ -29,7 +29,7 @@ export const updateRuleStatus = async (
 
   return {
     success: true,
-    message: `Rule with id "${ruleId}" successfully updated to status "${status}" with reason "${reason}"`,
+    message: `Rule with id "${ruleId}" successfully updated to status "${status}"${reason.trim() ? ` with reason "${reason}"` : ''}`,
   };
 };
 

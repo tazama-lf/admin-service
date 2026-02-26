@@ -148,7 +148,7 @@ async function resolveTenantColumn(tableName: string, dbName: string, tenantId: 
       return result[0].column_name as string;
     }
   } catch (e) {
-    loggerService.error(`Error resolving tenant column for table ${tableName}: ${e.message}`, e.stack, 'NodeLogicService');
+    loggerService.error(`Error resolving tenant column for table ${tableName}`);
   }
 
   return 'tenant_id'; // Default fallback

@@ -59,7 +59,7 @@ export const createRuleInDB = async (
       rulerequest,
       rule_config_id
       updated_at,
-      created_at,
+      created_at
     ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, $11, $12, $13, $14)
     RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, rule_config_id, created_at, updated_at
   `;

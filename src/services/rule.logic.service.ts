@@ -46,6 +46,8 @@ export const createRule = async (
     updated_by: string;
     rule_type: string;
     rule_config_id?: string;
+    updated_at: Date;
+    created_at: Date;
   },
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {

@@ -917,8 +917,8 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
       updated_by: userId,
       rule_type: processedRuleData.rule_type,
       rule_config_id: processedRuleData.rule_config_id,
-      updated_at: new Date(),
-      created_at: new Date(),
+      updated_at: new Date(Date.now()),
+      created_at: new Date(Date.now()),
     };
 
     // Step 5: Create rule in database

@@ -39,6 +39,8 @@ export const createRuleInDB = async (
     updated_by: string;
     rule_type: string;
     rule_config_id?: string;
+    updated_at: Date;
+    created_at: Date;
   },
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {
@@ -58,7 +60,7 @@ export const createRuleInDB = async (
       created_at,
       rulerequest,
       rule_config_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, NOW(), NOW(), $11, $12)
+    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, $11, $12, $13, $14)
     RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, created_at, updated_at, rule_config_id
   `;
 
@@ -75,6 +77,8 @@ export const createRuleInDB = async (
     ruleData.rule_type,
     ruleRequest,
     ruleData.rule_config_id ?? null,
+    ruleData.updated_at,
+    ruleData.created_at,
   ];
 
   const result = await handlePostExecuteSqlStatement<RuleEntity>(

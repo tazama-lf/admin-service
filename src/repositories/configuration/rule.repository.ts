@@ -212,7 +212,7 @@ export const findAllRuleIdsFromDb = async (tenantId: string): Promise<Array<{ ru
 
 export const findRuleByIdFromDB = async (id: number, tenantId: string): Promise<RuleEntity | null> => {
   const query = `
-      SELECT id, rule_name, description, tenant_id, txtp, version,txtp_version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at
+      SELECT id, rule_name, description, tenant_id, txtp, version,txtp_version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at, comments
       FROM trs_rules
       WHERE id = $1 AND tenant_id = $2
     `;

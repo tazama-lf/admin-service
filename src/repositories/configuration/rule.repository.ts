@@ -57,7 +57,7 @@ export const createRuleInDB = async (
       updated_by,
       rule_type,
       rulerequest,
-      rule_config_id
+      rule_config_id,
       updated_at,
       created_at
     ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, $11, $12, $13, $14)

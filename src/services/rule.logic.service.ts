@@ -1,4 +1,4 @@
-import type { RuleRequest, RuleEntity } from '../interface/rule.interface';
+import type { RuleRequest, RuleEntity, CloneRuleHandlerReqBody } from '../interface/rule.interface';
 import {
   countRulesWithFiltersInDB,
   createRuleInDB,
@@ -29,7 +29,7 @@ export const updateRuleStatus = async (
 
   return {
     success: true,
-    message: `Rule with id "${ruleId}" successfully updated to status "${status}" with reason "${reason}"`,
+    message: `Rule with id "${ruleId}" successfully updated to status "${status}"${reason.trim() ? ` with reason "${reason}"` : ''}`,
   };
 };
 
@@ -46,10 +46,12 @@ export const createRule = async (
     updated_by: string;
     rule_type: string;
     rule_config_id?: string;
+    updated_at: Date;
+    created_at: Date;
   },
   ruleRequest: RuleRequest,
 ): Promise<RuleEntity> => {
-  const result: RuleEntity = await createRuleInDB(ruleData);
+  const result: RuleEntity = await createRuleInDB(ruleData, ruleRequest);
   return result;
 };
 
@@ -66,7 +68,6 @@ export const updateRule = async (
     rule_type: string;
     rule_config_id: string;
     updated_by: string;
-    flow_id: string;
     metadata: {
       sync: boolean;
       deploy: boolean;
@@ -89,12 +90,12 @@ export const findRuleById = async (id: number, tenantId: string): Promise<RuleEn
 
 export const cloneRule = async (
   ruleId: number,
-  newRuleName: string,
+  payload: CloneRuleHandlerReqBody['payload'],
   createdBy: string,
   tenantId: string,
   ruleRequest: RuleRequest | undefined,
 ): Promise<RuleEntity> => {
-  const cloneRuleResult: RuleEntity = await cloneRuleInDB(newRuleName, createdBy, ruleId, tenantId);
+  const cloneRuleResult: RuleEntity = await cloneRuleInDB(payload, createdBy, ruleId, tenantId);
 
   const newRuleId = cloneRuleResult.id!;
 

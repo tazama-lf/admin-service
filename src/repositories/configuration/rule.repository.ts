@@ -1,6 +1,6 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { RuleEntity, RuleRequest, UpdateRuleRequest } from '../../interface/rule.interface';
+import type { CloneRuleHandlerReqBody, RuleEntity, RuleRequest, UpdateRuleRequest } from '../../interface/rule.interface';
 import type { RuleFlowResponse } from '../../interface/ruleFlow.interface';
 
 export const updateRuleStatusInDB = async (
@@ -26,19 +26,24 @@ export const updateRuleStatusInDB = async (
   return { rowCount: result.rowCount ?? 0 };
 };
 
-export const createRuleInDB = async (ruleData: {
-  ruleName: string;
-  description: string;
-  tenant_id: string;
-  txtp: string;
-  txtp_version?: string;
-  version: string;
-  status?: string;
-  publishing_status?: string;
-  updated_by: string;
-  rule_type: string;
-  rule_config_id?: string;
-}): Promise<RuleEntity> => {
+export const createRuleInDB = async (
+  ruleData: {
+    ruleName: string;
+    description: string;
+    tenant_id: string;
+    txtp: string;
+    txtp_version?: string;
+    version: string;
+    status?: string;
+    publishing_status?: string;
+    updated_by: string;
+    rule_type: string;
+    rule_config_id?: string;
+    updated_at: Date;
+    created_at: Date;
+  },
+  ruleRequest: RuleRequest,
+): Promise<RuleEntity> => {
   const query = `
     INSERT INTO trs_rules (
       rule_name,
@@ -53,8 +58,9 @@ export const createRuleInDB = async (ruleData: {
       rule_type,
       updated_at,
       created_at,
+      rulerequest,
       rule_config_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, NOW(), NOW(), $11)
+    ) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'STATUS_01_IN_PROGRESS'),COALESCE($8, 'ACTIVE'), $9, $10, $11, $12, $13, $14)
     RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, created_at, updated_at, rule_config_id
   `;
 
@@ -69,7 +75,10 @@ export const createRuleInDB = async (ruleData: {
     ruleData.publishing_status,
     ruleData.updated_by,
     ruleData.rule_type,
+    ruleRequest,
     ruleData.rule_config_id ?? null,
+    ruleData.updated_at,
+    ruleData.created_at,
   ];
 
   const result = await handlePostExecuteSqlStatement<RuleEntity>(
@@ -79,6 +88,10 @@ export const createRuleInDB = async (ruleData: {
     } satisfies PgQueryConfig,
     'configuration',
   );
+
+  // if (ruleRequest) {
+  //   await saveRuleRequestInDB(ruleData.txtp, ruleData.tenant_id, ruleData.id, ruleRequest);
+  // }
 
   return result.rows[0];
 };
@@ -108,7 +121,7 @@ export const updateRuleInDB = async (ruleId: string, tenantId: string, updateDat
       SET ${setClauses.join(', ')}
       WHERE id = $${ruleIdParam}
         AND tenant_id = $${tenantIdParam}
-      RETURNING id, rule_name, description, tenant_id, txtp, version, status, publishing_status, updated_by, rule_type, rule_config_id, flow_id, metadata, created_at, updated_at
+      RETURNING id, rule_name, description, tenant_id, txtp, version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at
     `;
 
   values.push(ruleId, tenantId);
@@ -203,7 +216,7 @@ export const findAllRuleIdsFromDb = async (tenantId: string): Promise<Array<{ ru
 
 export const findRuleByIdFromDB = async (id: number, tenantId: string): Promise<RuleEntity | null> => {
   const query = `
-      SELECT id, rule_name, description, tenant_id, txtp, version,txtp_version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at
+      SELECT id, rule_name, description, tenant_id, txtp, version,txtp_version, status, publishing_status, updated_by, rule_type, rule_config_id, metadata, created_at, updated_at, comments
       FROM trs_rules
       WHERE id = $1 AND tenant_id = $2
     `;
@@ -314,7 +327,12 @@ export const saveRuleRequestInDB = async (txTp: string, tenantId: string, ruleRe
   );
 };
 
-export const cloneRuleInDB = async (newRuleName: string, createdBy: string, ruleId: number, tenantId: string): Promise<RuleEntity> => {
+export const cloneRuleInDB = async (
+  clonePayload: CloneRuleHandlerReqBody['payload'],
+  createdBy: string,
+  ruleId: number,
+  tenantId: string,
+): Promise<RuleEntity> => {
   const cloneRuleQuery = `
         INSERT INTO trs_rules (
           rule_name, description, tenant_id, txtp, txtp_version, version, status, 
@@ -322,24 +340,32 @@ export const cloneRuleInDB = async (newRuleName: string, createdBy: string, rule
         )
         SELECT 
           $1 AS rule_name, 
-          description, 
+          $2 AS description, 
           tenant_id, 
           txtp, 
           txtp_version,
-          version, 
+          $3 AS version, 
           'STATUS_01_IN_PROGRESS' AS status, 
           'ACTIVE' AS publishing_status, 
-          $2 AS updated_by, 
-          rule_type, 
+          $5 AS updated_by, 
+          $4 AS rule_type, 
           rule_config_id, 
           NOW() AS created_at, 
           NOW() AS updated_at
         FROM trs_rules
-        WHERE id = $3 AND tenant_id = $4
+        WHERE id = $6 AND tenant_id = $7
         RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, rule_config_id, created_at, updated_at
       `;
 
-  const ruleValues = [newRuleName, createdBy, ruleId, tenantId];
+  const ruleValues = [
+    clonePayload.ruleName,
+    clonePayload.description,
+    clonePayload.version,
+    clonePayload.rule_type,
+    createdBy,
+    ruleId,
+    tenantId,
+  ];
 
   const cloneRuleResult = await handlePostExecuteSqlStatement<RuleEntity>(
     {

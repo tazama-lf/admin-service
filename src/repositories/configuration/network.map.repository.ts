@@ -93,5 +93,9 @@ export const findActiveNetworkMapInDb = async (tenantId: string): Promise<Active
     return null;
   }
 
+  if (result.rows.length > 1) {
+    throw new Error(`Multiple active network maps found for tenant ${tenantId}. Expected only one active network map.`);
+  }
+
   return { configuration: result.rows[0].configuration };
 };

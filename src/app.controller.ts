@@ -40,6 +40,8 @@ import {
   handleCreateDestinationType,
   handleDestinationTypeExists,
   handleAddFieldToDestinationType,
+  handleGetDataModelJson,
+  handleUpsertDataModelJson,
 } from './services/data-model.logic.service';
 import {
   handlePostCron,
@@ -1140,6 +1142,12 @@ export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply)
     loggerService.log('End - Execute Query Node Handler');
   }
 };
+interface RuleConfig {
+  id: string;
+  cfg: string;
+  desc: string;
+  config: Record<string, unknown>;
+}
 
 export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -1153,10 +1161,10 @@ export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: Fast
     }
 
     const RuleRequest: unknown = globalVariables.ruleRequest;
-    const RuleConfig: unknown = globalVariables.configuration;
+    const RuleConfig: RuleConfig = globalVariables.configuration;
 
     const RuleResult = {
-      id: ruleId,
+      id: RuleConfig.id,
       tenantId,
       cfg: '',
       subRuleRef: '.err',
@@ -1270,11 +1278,12 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
   try {
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
+    // const { tenantId } = req as ITenantRequest;
     const token = authReq.user?.tenantId ?? 'DEFAULT';
 
     const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
-    const clonedRule = await cloneRule(ruleId, payload.rule_name, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', token, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',
@@ -1333,34 +1342,89 @@ export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyRep
 
 export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
-  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  // const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const { tenantId } = req as ITenantRequest;
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+
   try {
     const { ruleData, ruleRequest } = req.body as CreateRuleHandlerReqBody;
 
-    const newRule = {
-      // rule_id: ruleData.rule_id as string,
-      ruleName: ruleData.ruleName,
-      description: ruleData.description,
-      tenant_id: tenantId,
-      txtp: ruleData.txtp,
-      txtp_version: ruleData.txtpVersion,
-      version: ruleData.version,
+    // Note: Validation is handled by rule-studio backend service
+    // This admin-service only handles data persistence
+
+    // Apply basic defaults if not provided
+    const processedRuleData = {
+      ...ruleData,
       status: 'STATUS_01_IN_PROGRESS',
-      publishing_status: 'ACTIVE',
-      updated_by: userId,
-      rule_type: ruleData.rule_type,
-      rule_config_id: ruleData.rule_config_id,
-      updated_at: new Date(),
-      created_at: new Date(),
+      publishing_status: 'INACTIVE',
     };
 
+    // Ensure rule name is generated if not provided
+    const ruleName =
+      processedRuleData.ruleName?.trim() ??
+      (processedRuleData.rule_config_id ? `${tenantId}-rule-${processedRuleData.rule_config_id.split('@')[0]}` : `${tenantId}-rule`);
+
+    // console.log('Rule data received for creation:', processedRuleData);
+    // console.log('Rule request received for creation:', ruleRequest);
+
+    // Step 4: Prepare rule data for database
+    const newRule = {
+      ruleName,
+      description: processedRuleData.description,
+      tenant_id: tenantId,
+      txtp: processedRuleData.txtp,
+      txtp_version: processedRuleData.txtpVersion,
+      version: processedRuleData.version,
+      status: processedRuleData.status, // Already has default applied
+      publishing_status: processedRuleData.publishing_status, // Already has default applied
+      updated_by: userId,
+      rule_type: processedRuleData.rule_type,
+      rule_config_id: processedRuleData.rule_config_id,
+      updated_at: new Date(Date.now()),
+      created_at: new Date(Date.now()),
+    };
+
+    // Step 5: Create rule in database
     const createdRule: unknown = await createRule(newRule, ruleRequest);
 
-    reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
+    reply.code(201).send({
+      success: true,
+      message: 'Rule created successfully',
+      rule: createdRule,
+    });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create rule');
   }
+
+  // const authReq = req as AuthenticatedRequest;
+  // const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  // const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+  // try {
+  //   const { ruleData, ruleRequest } = req.body as CreateRuleHandlerReqBody;
+
+  //   const newRule = {
+  //     // rule_id: ruleData.rule_id as string,
+  //     ruleName: ruleData.ruleName,
+  //     description: ruleData.description,
+  //     tenant_id: tenantId,
+  //     txtp: ruleData.txtp,
+  //     txtp_version: ruleData.txtpVersion,
+  //     version: ruleData.version,
+  //     status: 'STATUS_01_IN_PROGRESS',
+  //     publishing_status: 'ACTIVE',
+  //     updated_by: userId,
+  //     rule_type: ruleData.rule_type,
+  //     rule_config_id: ruleData.rule_config_id,
+  //     updated_at: new Date(),
+  //     created_at: new Date(),
+  //   };
+
+  //   const createdRule: unknown = await createRule(newRule, ruleRequest);
+
+  //   reply.code(201).send({ success: true, message: 'Rule created successfully', rule: createdRule });
+  // } catch (error: unknown) {
+  //   ErrorHandler.sendError(reply, error, 'Failed to create rule');
+  // }
 };
 
 export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -1624,5 +1688,73 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+// ==================== DATA MODEL JSON HANDLERS ====================
+
+export const getDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get data model JSON request');
+  try {
+    const { tenantId } = req.params as { tenantId: string };
+
+    if (!tenantId) {
+      reply.status(400).send({ success: false, message: 'tenantId is required' });
+      return;
+    }
+
+    const dataModelJson = await handleGetDataModelJson(tenantId);
+
+    if (!dataModelJson) {
+      reply.status(200).send({
+        success: true,
+        data: null,
+        message: `No data model JSON found for tenant: ${tenantId}`,
+      });
+      return;
+    }
+
+    reply.status(200).send({
+      success: true,
+      data: dataModelJson,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get data model JSON';
+    loggerService.error(`Failed to get data model JSON: ${errorMessage}`, 'getDataModelJsonHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get data model JSON request');
+  }
+};
+
+export const putDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle put data model JSON request');
+  try {
+    const { tenantId } = req.params as { tenantId: string };
+    const body = req.body as { data_model_json: Record<string, unknown> };
+
+    if (!tenantId) {
+      reply.status(400).send({ success: false, message: 'tenantId is required' });
+      return;
+    }
+
+    if (!body?.data_model_json) {
+      reply.status(400).send({ success: false, message: 'data_model_json is required in request body' });
+      return;
+    }
+
+    const result = await handleUpsertDataModelJson(tenantId, body.data_model_json);
+
+    reply.status(200).send({
+      success: true,
+      message: `Data model JSON saved for tenant: ${tenantId}`,
+      data: result,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to save data model JSON';
+    loggerService.error(`Failed to save data model JSON: ${errorMessage}`, 'putDataModelJsonHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle put data model JSON request');
   }
 };

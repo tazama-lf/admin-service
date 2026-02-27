@@ -9,4 +9,6 @@ export {
   createDestinationType,
   checkDestinationTypeExists,
   addFieldToDestinationType,
+  getDataModelJson,
+  upsertDataModelJson,
 } from './configuration/data-model.repository';

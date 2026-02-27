@@ -215,7 +215,12 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
 
+    // console.log(`Fetching transaction types for tenant: ${tenantId}`);
+    // console.log('Making call to database service to retrieve transaction types...', req.body);
+
     const transactionTypes = await databaseService.findAllTransactionTypes(tenantId);
+
+    // console.log(`Transaction types retrieved for tenant ${tenantId}:`, transactionTypes);
 
     reply.code(200).send({
       success: true,

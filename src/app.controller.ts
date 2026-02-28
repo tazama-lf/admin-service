@@ -783,6 +783,8 @@ export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
 
+    loggerService.log(`Get All Jobs Handler with offset ${offset} limit ${limit} parsedLimit ${parsedLimit} parsedOffset ${parsedOffset} `);
+
     const result = await handleGetAllJobs(parsedLimit, parsedOffset, body, tenantId);
     reply.code(200).send({
       success: true,

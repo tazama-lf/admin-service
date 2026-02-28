@@ -1176,14 +1176,14 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
   loggerService.log('Start - Handle get payload by transaction type request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const { transactionType } = req.params as { transactionType: string };
+    const { transactionType, transactionVersion } = req.params as { transactionType: string; transactionVersion: string };
 
-    if (!transactionType) {
-      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+    if (!transactionType || !transactionVersion) {
+      reply.status(400).send({ success: false, message: 'Transaction type and version are required' });
       return;
     }
 
-    const payload = await handleGetPayloadByTransactionType(transactionType, tenantId);
+    const payload = await handleGetPayloadByTransactionType(transactionType, transactionVersion, tenantId);
 
     reply.status(200).send({
       success: true,
@@ -1204,14 +1204,21 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
   loggerService.log('Start - Handle get config by transaction type request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const { transactionType } = req.params as { transactionType: string };
+    loggerService.log('request params are ====================: \n', JSON.stringify(req.params));
 
-    if (!transactionType) {
-      reply.status(400).send({ success: false, message: 'Transaction type is required' });
+    const { transactionType, version } = req.params as { transactionType: string; version: string };
+
+    if (!transactionType || !version) {
+      reply
+        .status(400)
+        .send({
+          success: false,
+          message: `Transaction type and version are required. Received: transactionType=${transactionType}, version=${version}`,
+        });
       return;
     }
 
-    const config = await handleGetConfigByTransactionType(transactionType, tenantId);
+    const config = await handleGetConfigByTransactionType(transactionType, version, tenantId);
 
     reply.status(200).send({
       success: true,

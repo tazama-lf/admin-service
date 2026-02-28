@@ -236,7 +236,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const { transactionType } = req.params as { transactionType: string };
+    const { transactionType, version } = req.params as { transactionType: string; version: string };
 
     loggerService.log(`Fetching config payload for transaction type: ${transactionType}, tenant: ${tenantId}`);
 
@@ -245,7 +245,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
       return;
     }
 
-    const payload = await databaseService.getPayloadByTransactionType(transactionType, tenantId);
+    const payload = await databaseService.getPayloadByTransactionType(transactionType, tenantId, version);
 
     if (!payload) {
       loggerService.warn(`No config payload found for transaction type: ${transactionType}, tenant: ${tenantId}`);
@@ -273,7 +273,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
   try {
     const authReq = req as AuthenticatedRequest;
     const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
-    const { transactionType } = req.params as { transactionType: string };
+    const { transactionType, version } = req.params as { transactionType: string; version: string };
 
     loggerService.log(`Fetching full config for transaction type: ${transactionType}, tenant: ${tenantId}`);
 
@@ -282,7 +282,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
       return;
     }
 
-    const config = await databaseService.getSchemaByTransactionType(transactionType, tenantId);
+    const config = await databaseService.getSchemaByTransactionType(transactionType, version, tenantId);
 
     if (!config) {
       loggerService.warn(`No config found for transaction type: ${transactionType}, tenant: ${tenantId}`);

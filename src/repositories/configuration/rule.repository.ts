@@ -334,37 +334,55 @@ export const cloneRuleInDB = async (
   tenantId: string,
 ): Promise<RuleEntity> => {
   const cloneRuleQuery = `
-        INSERT INTO trs_rules (
-          rule_name, description, tenant_id, txtp, txtp_version, version, status, 
-          publishing_status, updated_by, rule_type, rule_config_id, created_at, updated_at
-        )
-        SELECT 
-          $1 AS rule_name, 
-          $2 AS description, 
-          tenant_id, 
-          txtp, 
-          txtp_version,
-          $3 AS version, 
-          'STATUS_01_IN_PROGRESS' AS status, 
-          'ACTIVE' AS publishing_status, 
-          $5 AS updated_by, 
-          $4 AS rule_type, 
-          rule_config_id, 
-          NOW() AS created_at, 
-          NOW() AS updated_at
-        FROM trs_rules
-        WHERE id = $6 AND tenant_id = $7
-        RETURNING id, rule_name, description, tenant_id, txtp, txtp_version, version, status, publishing_status, updated_by, rule_type, rule_config_id, created_at, updated_at
-      `;
+  INSERT INTO trs_rules (
+    rule_name,
+    description,
+    rule_config_id,
+    txtp,
+    version,
+    rule_type,
+    tenant_id,
+    created_at,
+    updated_at,
+    status,
+    publishing_status,
+    updated_by,
+    rulerequest,
+    txtp_version,
+    comments,
+    metadata
+  )
+  SELECT
+    COALESCE($3, t.rule_name),
+    COALESCE($4, t.description),
+    COALESCE($5, t.rule_config_id),
+    COALESCE($6, t.txtp),
+    COALESCE($7, t.version),
+    COALESCE($8, t.rule_type),
+    t.tenant_id,
+    NOW(),
+    NOW(),
+    'STATUS_01_IN_PROGRESS', -- override status
+    'INACTIVE', -- override publishing_status
+    t.updated_by,
+    t.rulerequest,
+    t.txtp_version,
+    t.comments,
+    '{"sync":false,"test":false,"deploy":false,"simulation":false}'::jsonb
+  FROM trs_rules t
+  WHERE t.id = $1 AND t.tenant_id = $2
+  RETURNING *;
+`;
 
   const ruleValues = [
-    clonePayload.ruleName,
-    clonePayload.description,
-    clonePayload.version,
-    clonePayload.rule_type,
-    createdBy,
-    ruleId,
-    tenantId,
+    ruleId, // $1
+    tenantId, // $2
+    clonePayload.ruleName, // $3
+    clonePayload.description, // $4
+    clonePayload.rule_config_id, // $5
+    clonePayload.txtp, // $6
+    clonePayload.version, // $7
+    clonePayload.rule_type, // $8
   ];
 
   const cloneRuleResult = await handlePostExecuteSqlStatement<RuleEntity>(

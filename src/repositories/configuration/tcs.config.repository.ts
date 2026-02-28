@@ -3,6 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
+import { loggerService } from '../..';
 
 export type { ConfigData, ConfigRow };
 
@@ -349,20 +350,19 @@ export const findAllTransactionTypes = async (tenantId: string): Promise<string[
   return result.rows.map((row) => row.transaction_type);
 };
 
-export const getPayloadByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
-  if (!transactionType || !tenantId) {
-    throw new Error('Transaction type and tenant ID are required');
+export const getPayloadByTransactionType = async (transactionType: string, tenantId: string, version: string): Promise<unknown> => {
+  if (!transactionType || !tenantId || !version) {
+    throw new Error('Transaction type, tenant ID, and version are required');
   }
 
   const query = `
     SELECT payload_json
     FROM tcs_config
-    WHERE transaction_type = $1 AND tenant_id = $2
-    LIMIT 1
+    WHERE transaction_type = $1 AND tenant_id = $2 AND version = $3
   `;
 
   const result = await handlePostExecuteSqlStatement<{ payload_json: unknown }>(
-    { text: query, values: [transactionType, tenantId] } satisfies PgQueryConfig,
+    { text: query, values: [transactionType, tenantId, version] } satisfies PgQueryConfig,
     'configuration',
   );
 
@@ -375,28 +375,42 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
 
 export const getSchemaByTransactionType = async (
   transactionType: string,
+  version: string,
   tenantId: string,
-): Promise<{ schema: unknown; mapping: unknown }> => {
-  if (!transactionType || !tenantId) {
-    throw new Error('Transaction type and tenant ID are required');
+): Promise<{ schema: unknown; mapping: unknown; payload: unknown }> => {
+  if (!transactionType || !version || !tenantId) {
+    throw new Error('Transaction type, version, and tenant ID are required');
   }
 
   const query = `
-    SELECT schema, mapping
+    SELECT schema, mapping, payload_json
     FROM tcs_config
-    WHERE transaction_type = $1 AND tenant_id = $2
+    WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown }>(
-    { text: query, values: [transactionType, tenantId] } satisfies PgQueryConfig,
+  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; payload_json: unknown }>(
+    { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found for transaction type: ${transactionType}`);
+    throw new Error(`No config found for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
   }
 
-  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping };
+  loggerService.log(
+    `Schema for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
+    JSON.stringify(result.rows[0].schema),
+  );
+  loggerService.log(
+    `Mapping for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
+    JSON.stringify(result.rows[0].mapping),
+  );
+  loggerService.log(
+    `Payload for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
+    JSON.stringify(result.rows[0].payload_json),
+  );
+
+  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload_json };
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {

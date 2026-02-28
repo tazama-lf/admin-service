@@ -51,7 +51,7 @@ export const handleGetAllJobs = async (
   tenantId: string,
 ): Promise<PaginatedResult<Job>> => {
   try {
-    loggerService.log(`Started handling get all DE jobs request for tenant: ${tenantId}`);
+    loggerService.log(`Started handling get all DE jobs request for tenant: ${tenantId} with limit ${limit} and offset ${offset}`);
 
     const result = await getAllJobs(limit, offset, payload, tenantId);
 

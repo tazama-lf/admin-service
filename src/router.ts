@@ -247,11 +247,11 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getTransactionTypesHandler, routePrivilege.getTcsConfigs),
   });
 
-  fastify.get('/v1/admin/config/payload/:transactionType/:version(.*)', {
+  fastify.get('/v1/admin/config/payload/:transactionType/:transactionVersion', {
     ...SetOptionsBodyAndParams(getPayloadByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
 
-  fastify.get('/v1/admin/config/:transactionType/:version(.*)', {
+  fastify.get('/v1/admin/config/:transactionType/:transactionVersion', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
 

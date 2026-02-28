@@ -186,7 +186,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createPullJobHandler, routePrivilege.createPullJob),
   });
 
-  fastify.post('/v1/admin/tcs/job/get/all', {
+  fastify.post('/v1/admin/tcs/job/get/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
   });
 

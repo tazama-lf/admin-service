@@ -231,7 +231,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateCronJobHandler, routePrivilege.updateSchedule),
   });
 
-  fastify.post('/v1/admin/tcs/schedule/get/all', {
+  fastify.post('/v1/admin/tcs/schedule/get/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllCronJobsHandler, routePrivilege.getAllSchedules),
   });
 

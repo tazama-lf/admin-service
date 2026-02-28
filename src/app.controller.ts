@@ -1183,7 +1183,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
       return;
     }
 
-    const payload = await handleGetPayloadByTransactionType(transactionType, transactionVersion, tenantId);
+    const payload = await handleGetPayloadByTransactionType(transactionType, tenantId, transactionVersion);
 
     reply.status(200).send({
       success: true,
@@ -1209,12 +1209,10 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     const { transactionType, version } = req.params as { transactionType: string; version: string };
 
     if (!transactionType || !version) {
-      reply
-        .status(400)
-        .send({
-          success: false,
-          message: `Transaction type and version are required. Received: transactionType=${transactionType}, version=${version}`,
-        });
+      reply.status(400).send({
+        success: false,
+        message: `Transaction type and version are required. Received: transactionType=${transactionType}, version=${version}`,
+      });
       return;
     }
 

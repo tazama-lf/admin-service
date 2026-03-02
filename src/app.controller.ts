@@ -34,15 +34,7 @@ import {
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 
-import {
-  handleGetAllCollections,
-  handleGetCollectionFields,
-  handleCreateDestinationType,
-  handleDestinationTypeExists,
-  handleAddFieldToDestinationType,
-  handleGetDataModelJson,
-  handleUpsertDataModelJson,
-} from './services/data-model.logic.service';
+import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
 import type { AuthenticatedRequest } from './interface/AuthenticatedRequest';
 import { ErrorHandler } from './handlers/errorHandler';
 import { createNode, deleteNodeById, executeSelectQuery, findAllNodes } from './services/node.logic.service';
@@ -472,112 +464,6 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle remove function request');
-  }
-};
-
-// ==================== DATA MODEL HANDLERS ====================
-
-export const getAllCollectionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle get all collections request');
-  try {
-    const { tenantId } = req.params as { tenantId: string };
-    const collections = await handleGetAllCollections(tenantId);
-
-    reply.status(200).send({
-      success: true,
-      data: collections,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get collections';
-    loggerService.error(`Failed to get collections: ${errorMessage}`, 'getAllCollectionsHandler');
-    reply.status(500).send({ success: false, message: errorMessage, data: [] });
-  } finally {
-    loggerService.log('End - Handle get all collections request');
-  }
-};
-
-export const getCollectionFieldsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle get collection fields request');
-  try {
-    const { collectionId, tenantId } = req.params as { collectionId: string; tenantId: string };
-    const fields = await handleGetCollectionFields(Number(collectionId), tenantId);
-
-    reply.status(200).send({
-      success: true,
-      data: fields,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get collection fields';
-    loggerService.error(`Failed to get collection fields: ${errorMessage}`, 'getCollectionFieldsHandler');
-    reply.status(500).send({ success: false, message: errorMessage, data: [] });
-  } finally {
-    loggerService.log('End - Handle get collection fields request');
-  }
-};
-
-export const createDestinationTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle create destination type request');
-  try {
-    const body = req.body as { collection_type: string; name: string; destination_id: number };
-    const { tenantId } = req as ITenantRequest;
-
-    const result = await handleCreateDestinationType(body, tenantId);
-
-    reply.status(201).send({
-      success: true,
-      message: 'Destination type created successfully',
-      data: result,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create destination type';
-    loggerService.error(`Failed to create destination type: ${errorMessage}`, 'createDestinationTypeHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
-  } finally {
-    loggerService.log('End - Handle create destination type request');
-  }
-};
-
-export const destinationTypeExistsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle check destination type exists request');
-  try {
-    const { destinationTypeId } = req.params as { destinationTypeId: string };
-    const { tenantId } = req as ITenantRequest;
-
-    const exists = await handleDestinationTypeExists(Number(destinationTypeId), tenantId);
-
-    reply.status(200).send({
-      success: true,
-      exists,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to check destination type';
-    loggerService.error(`Failed to check destination type: ${errorMessage}`, 'destinationTypeExistsHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
-  } finally {
-    loggerService.log('End - Handle check destination type exists request');
-  }
-};
-
-export const addFieldToDestinationTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle add field to destination type request');
-  try {
-    const { destinationTypeId } = req.params as { destinationTypeId: string };
-    const body = req.body as { name: string; field_type: string; parent_id?: number; serial_no?: number };
-    const { tenantId } = req as ITenantRequest;
-
-    const result = await handleAddFieldToDestinationType(Number(destinationTypeId), body, tenantId);
-
-    reply.status(201).send({
-      success: true,
-      message: 'Field added successfully',
-      data: result,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to add field';
-    loggerService.error(`Failed to add field: ${errorMessage}`, 'addFieldToDestinationTypeHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
-  } finally {
-    loggerService.log('End - Handle add field to destination type request');
   }
 };
 

@@ -13,11 +13,6 @@ import {
   removeMappingHandler,
   addFunctionHandler,
   removeFunctionHandler,
-  getAllCollectionsHandler,
-  getCollectionFieldsHandler,
-  createDestinationTypeHandler,
-  destinationTypeExistsHandler,
-  addFieldToDestinationTypeHandler,
   getAccountConditionsHandler,
   getEntityConditionHandler,
   handleHealthCheck,
@@ -277,26 +272,6 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.delete('/v1/admin/tcs/config/:id/function/:index', {
     ...SetOptionsBodyAndParams(removeFunctionHandler, routePrivilege.deleteTcsConfigFunction),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
-    ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/collections/:collectionId/fields/:tenantId', {
-    ...SetOptionsBodyAndParams(getCollectionFieldsHandler, routePrivilege.getTcsDataModelCollectionFields),
-  });
-
-  fastify.post('/v1/admin/tcs/data-model/destination-types', {
-    ...SetOptionsBodyAndParams(createDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationType),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/exists', {
-    ...SetOptionsBodyAndParams(destinationTypeExistsHandler, routePrivilege.getTcsDataModelDestinationTypeExists),
-  });
-
-  fastify.post('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/fields', {
-    ...SetOptionsBodyAndParams(addFieldToDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationTypeField),
   });
 
   fastify.post('/v1/admin/tcs/deploy/transaction-type-table', {

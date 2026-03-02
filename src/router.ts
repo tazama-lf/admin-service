@@ -190,7 +190,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
   });
 
-  fastify.post('/v1/admin/tcs/job/get/history', {
+  fastify.post('/v1/admin/tcs/job/get/history/:offset/:limit', {
     ...SetOptionsBodyAndParams(getJobHistoryHandler, routePrivilege.getAllJobsHistory),
   });
 

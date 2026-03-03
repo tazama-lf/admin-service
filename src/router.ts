@@ -1,85 +1,70 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
-  addFieldToDestinationTypeHandler,
-  addFunctionHandler,
-  addMappingHandler,
-  cloneRuleHandler,
   createConfigHandler,
-  createCronJobHandler,
-  createDestinationTypeHandler,
-  createPullJobHandler,
-  createPushJobHandler,
-  createRuleFlowHandler,
-  createRuleHandler,
-  createSimulationLogsHandler,
-  createTazamaDataModelTableHandler,
-  createTransactionTypeTableHandler,
-  destinationTypeExistsHandler,
-  findJobByIdHandler,
-  getAccountConditionsHandler,
-  getAllCollectionsHandler,
-  getAllConfigsHandler,
-  getAllCronJobsHandler,
-  getAllJobsHandler,
-  getAllRulesHandler,
-  getCollectionFieldsHandler,
   getConfigByIdHandler,
-  getCronJobByIdHandler,
-  getCronJobByStatusHandler,
-  getDataModelJsonHandler,
+  getAllConfigsHandler,
+  updatePublishingStatusHandler,
+  writeConfigUpdateHandler,
+  createTransactionTypeTableHandler,
+  createTazamaDataModelTableHandler,
+  updateConfigByStatusHandler,
+  addMappingHandler,
+  removeMappingHandler,
+  addFunctionHandler,
+  removeFunctionHandler,
+  getAccountConditionsHandler,
   getEntityConditionHandler,
-  getGlobalVariablesHandler,
-  getJobHistoryHandler,
-  getJobsByStatusHandler,
-  getRuleConfigurationHandler,
-  getRuleFlowHandler,
-  getRuleFlowStatusHandler,
-  getRuleIdsHandler,
-  getRulesByIdHandler,
-  getSimulationLogsHandler,
-  getTxTpVersionsByTransactionTypeHandler,
   handleHealthCheck,
   postConditionHandlerAccount,
   postConditionHandlerEntity,
-  putDataModelJsonHandler,
   putRefreshCache,
-  removeFunctionHandler,
-  removeMappingHandler,
   reportRequestHandler,
   updateAccountConditionExpiryDateHandler,
-  updateConfigByStatusHandler,
+  updateEntityConditionExpiryDateHandler,
+  getNodeHandler,
+  createNodeHandler,
+  deleteNodeByIdHandler,
+  executeQueryNode,
+  createRuleFlowHandler,
+  updateRuleFlowHandler,
+  getAllRulesHandler,
+  getRulesByIdHandler,
+  createRuleHandler,
+  getRuleIdsHandler,
+  getRuleConfigurationHandler,
+  getRuleFlowHandler,
+  updateRuleHandler,
+  getTxTpVersionsByTransactionTypeHandler,
+  getGlobalVariablesHandler,
+  cloneRuleHandler,
+  updateRuleStatusHandler,
+  getSimulationLogsHandler,
+  getTransactionTypesHandler,
+  getPayloadByTransactionTypeHandler,
+  getConfigByTransactionTypeHandler,
+  createSimulationLogsHandler,
+  getRuleFlowStatusHandler,
+  getDataModelJsonHandler,
+  putDataModelJsonHandler,
+  getActiveNetworkMapHandler,
+  createCronJobHandler,
+  createPullJobHandler,
+  createPushJobHandler,
+  findJobByIdHandler,
+  getAllCronJobsHandler,
+  getAllJobsHandler,
+  getCronJobByIdHandler,
+  getCronJobByStatusHandler,
+  getJobHistoryHandler,
+  getJobsByStatusHandler,
   updateCronJobHandler,
   updateCronJobStatusHandler,
-  updateEntityConditionExpiryDateHandler,
   updateJobActivationHandler,
   updateJobByStatusHandler,
   updateJobHandler,
-  updatePublishingStatusHandler,
-  updateRuleFlowHandler,
-  updateRuleHandler,
-  updateRuleStatusHandler,
   validateExistingHandler,
-  writeConfigUpdateHandler,
 } from './app.controller';
-import {
-  getConfigByTransactionTypeHandler,
-  getPayloadByTransactionTypeHandler,
-  // createConfigHandler,
-  // getConfigByIdHandler,
-  // getAllConfigsHandler,
-  // updateConfigHandler,
-  // updatePublishingStatusHandler,
-  // createTransactionTypeTableHandler,
-  // createTazamaDataModelTableHandler,
-  // updateConfigByStatusHandler,
-  // writeConfigHandler,
-  // writeConfigUpdateHandler,
-  getTransactionTypesHandler,
-} from './handlers/config.handler';
-
-import { getActiveNetworkMapHandler } from './handlers/network-map.handler';
-import { createNodeHandler, deleteNodeByIdHandler, executeQueryNode, getNodeHandler } from './handlers/nodes.handler';
 
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -253,11 +238,11 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getTransactionTypesHandler, routePrivilege.getTcsConfigs),
   });
 
-  fastify.get('/v1/admin/config/payload/:transactionType', {
+  fastify.get('/v1/admin/config/payload/:transactionType/:transactionVersion', {
     ...SetOptionsBodyAndParams(getPayloadByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
 
-  fastify.get('/v1/admin/config/:transactionType', {
+  fastify.get('/v1/admin/config/:transactionType/:version(.*)', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
   });
 
@@ -283,26 +268,6 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.delete('/v1/admin/tcs/config/:id/function/:index', {
     ...SetOptionsBodyAndParams(removeFunctionHandler, routePrivilege.deleteTcsConfigFunction),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/collections/:tenantId', {
-    ...SetOptionsBodyAndParams(getAllCollectionsHandler, routePrivilege.getTcsDataModelCollections),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/collections/:collectionId/fields/:tenantId', {
-    ...SetOptionsBodyAndParams(getCollectionFieldsHandler, routePrivilege.getTcsDataModelCollectionFields),
-  });
-
-  fastify.post('/v1/admin/tcs/data-model/destination-types', {
-    ...SetOptionsBodyAndParams(createDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationType),
-  });
-
-  fastify.get('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/exists', {
-    ...SetOptionsBodyAndParams(destinationTypeExistsHandler, routePrivilege.getTcsDataModelDestinationTypeExists),
-  });
-
-  fastify.post('/v1/admin/tcs/data-model/destination-types/:destinationTypeId/fields', {
-    ...SetOptionsBodyAndParams(addFieldToDestinationTypeHandler, routePrivilege.postTcsDataModelDestinationTypeField),
   });
 
   fastify.post('/v1/admin/tcs/deploy/transaction-type-table', {

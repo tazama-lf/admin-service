@@ -361,11 +361,11 @@ export const handleGetAllTransactionTypes = async (tenantId: string): Promise<st
   }
 };
 
-export const handleGetPayloadByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
+export const handleGetPayloadByTransactionType = async (transactionType: string, tenantId: string, version: string): Promise<unknown> => {
   try {
-    loggerService.log(`Getting payload for transaction type: ${transactionType}, tenant: ${tenantId}`);
+    loggerService.log(`Getting payload for transaction type: ${transactionType}, tenant: ${tenantId}, version: ${version}`);
 
-    const payload = await getPayloadByTransactionType(transactionType, tenantId);
+    const payload = await getPayloadByTransactionType(transactionType, tenantId, version);
 
     loggerService.log(`Successfully retrieved payload for transaction type: ${transactionType}`);
     return payload;
@@ -376,17 +376,19 @@ export const handleGetPayloadByTransactionType = async (transactionType: string,
   }
 };
 
-export const handleGetConfigByTransactionType = async (transactionType: string, tenantId: string): Promise<unknown> => {
+export const handleGetConfigByTransactionType = async (transactionType: string, version: string, tenantId: string): Promise<unknown> => {
   try {
-    loggerService.log(`Getting config for transaction type: ${transactionType}, tenant: ${tenantId}`);
+    loggerService.log(`Getting config for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
 
-    const config = await getSchemaByTransactionType(transactionType, tenantId);
+    const config = await getSchemaByTransactionType(transactionType, version, tenantId);
 
-    loggerService.log(`Successfully retrieved config for transaction type: ${transactionType}`);
+    loggerService.log(
+      `Successfully retrieved config for transaction type: ${transactionType}, version: ${version}: ` + JSON.stringify(config),
+    );
     return config;
   } catch (error) {
     const errorMessage = error as { message: string };
-    loggerService.error(`Error getting config by transaction type: ${errorMessage.message}`, 'handleGetConfigByTransactionType');
+    loggerService.error(`Error getting config by transaction type in handleGetConfigByTransactionType: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

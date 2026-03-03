@@ -8,7 +8,7 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
   databaseName: string,
 ): Promise<QueryResult<T>> => {
   try {
-    loggerService.log(`Started handling execution of the sql statement ${JSON.stringify(queryConfig, null, 2)}`);
+    loggerService.log('Started handling execution of the sql statement');
 
     switch (databaseName) {
       case 'configuration':

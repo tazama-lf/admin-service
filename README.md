@@ -42,7 +42,7 @@ Before you start using the Admin API, ensure that you have the following items:
 
 4. **Run the Server**:
     ```bash
-    npm start
+    npm run start
     ```
 
 5. **Access the API**:
@@ -334,3 +334,225 @@ PUT /v1/admin/event-flow-control/cache HTTP/1.1
 #### Response
 
 - **Status 204 No Content:** Cache has been updated
+
+--------
+
+#  Repository CRUD Design Pattern
+
+
+## 1) Repository Overview
+
+Repositories provide a clear abstraction between the data layer and the API layer. Each repository implements the standard CRUD interface, handling data persistence logic independently from HTTP routing or validation concerns.
+
+
+
+---
+
+## 2) Request → Auth → CRUD → Repository Flow
+
+```mermaid
+flowchart TD
+  A[ClientRequest HTTP GET, POST, PUT, DELETE] --> B{Fastify Router}
+  B -->|"/"| HC[Health Check
+200 OK]
+  B -->|"/v1/... (CRUD)"| C[CRUD Route Handler
+buildCrudPlugin]
+
+  C --> VTM[validateTenantMiddleware
+extract tenantId]
+  VTM --> D{configuration.AUTHENTICATED?}
+
+  D -->|Yes| TK[tokenHandler
+validate JWT:
+check capabilities/permissions]
+  D -->|No| E[Skip tokenHandler]
+
+  TK -->|Invalid token| U401[401 Unauthorized]
+  TK -->|Missing capability| U403[403 Forbidden]
+  TK --> QS
+
+  E --> QS{Schema Validation
+params/query/body}
+  QS -->|Invalid| U400[400 Bad Request]
+  QS --> P[Build ID & Queryid  + payload + tenantId]
+
+  P --> R{Operation}
+  R -->|LIST| RL[List → repo.list]
+  R -->|GET| RG[Get → repo.get]
+  R -->|POST| RC[Create → repo.create]
+  R -->|PUT| RU[Update → repo.update]
+  R -->|DELETE| RD[Remove → repo.remove]
+
+  RL --> DB[(Database)]
+  RG --> DB
+  RC --> DB
+  RU --> DB
+  RD --> DB
+
+  DB --> X{Result?}
+  X -->|Not found GET/PUT| U404[404 Not Found]
+  X -->|OK| S[Shape Response
+data, meta  entity  success]
+  S --> Z[HTTP Response 200/201]
+  DB -.error.-> U500[500 Server Error]
+```
+
+## 3) Responsibilities of the Repository
+
+Each repository implementation follows a standardized interface, ensuring consistent behavior across different entity types. The key responsibilities include:
+
+* **Data Retrieval:** Executing parameterized SQL queries to list and fetch records from a table.
+* **Entity Creation:** Inserting new configuration entries into the target table.
+* **Entity Updating:** Replacing existing configuration data for a specific tenant and configuration key.
+* **Entity Deletion:** Removing entries that match provided identifiers.
+* **Filtering and Sorting:** Supporting dynamic filters and ordering for list operations.
+
+**We have 3 different repositories :**
+
+| No. | Config  | File name | Endpoint | Methods | 
+| --- | --- | --------- | -------- | ----------- | 
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL |
+| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
+| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
+
+---
+
+## 4) Conceptual Flow of Operations
+
+### List Operation
+
+When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain.
+
+The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin.
+
+### Get Operation
+
+The `get` method retrieves a single entity record based on the combination of ID, and tenantId. If the record exists, it returns the parsed configuration object.
+
+### Create Operation
+
+The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation.
+
+### Update Operation
+
+The update process replaces an existing configuration record that matches the composite key (`id`, `payload: configuration`, and `tenantId`). The repository ensures atomic updates by returning the modified record upon success or `null` if the record does not exist.
+
+### Delete Operation
+
+The deletion process removes the record from the table matching the same composite identifiers (id and tenantId). It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
+
+---
+
+## 5) Error Handling and Query Safety
+
+The repository leverages parameterized SQL queries to prevent injection vulnerabilities. The database interaction utility (`handlePostExecuteSqlStatement`) encapsulates execution, result parsing, and mapping logic. Each operation validates the query result and enforces type consistency.
+
+Failures such as missing records or constraint violations are surfaced gracefully, allowing the CRUD layer to translate them into HTTP responses.
+
+---
+
+## 6) Integration with the CRUD Plugin
+
+The repository is registered with the CRUD plugin builder using its entity schema and API prefix. Once registered, all HTTP routes automatically delegate database interactions to this repository. The plugin handles:
+
+* Request validation
+* Parameter parsing
+* Tenant enforcement
+* Response shaping
+
+This ensures that the repository remains focused solely on persistence logic.
+
+---
+
+## 7) Best Practices for Repository Design
+
+* **Enforce Tenant Boundaries:** Always include `tenantId` in filters and write conditions.
+* **Use Parameterized Queries:** Prevent injection and maintain predictable execution plans.
+* **Keep Repositories Pure:** Avoid embedding business logic or request-side context in repositories.
+* **Normalize Outputs:** Ensure all methods return predictable structures (`{ data, total }`, `TEntity | null`, `boolean`).
+* **Support Configurable Filtering:** Design flexible filters for future extensibility.
+
+---
+
+## 8) Claims & Tokens
+
+This section describes how claims-based tokens are used for authentication and authorization across CRUD endpoints, what claims to include, and the trade‑offs of this approach.
+
+### 7.1 Token Models
+
+**Authorization claims**
+
+* `permissions` (or `capabilities`): **Fine‑grained action strings** aligned to route capabilities (see 7.2). Example: `GET_V1_ADMIN_CONFIGURATION_RULE`.
+
+**Tenancy & configuration claims**
+
+* `tenantId`: The caller’s tenant context (MUST be bound to all data operations).
+* `payload: cfg`: Configuration partition/variant required by repositories.
+
+### 7.2 Mapping Claims to CRUD Endpoints
+
+Use **capability-style permissions** that the API checks per request via the token handler. Capabilities are derived as:
+
+```
+<METHOD><PREFIX_WITH_SLASHES_AS_UNDERSCORES_UPPERCASE>
+```
+PREFIX example: `v1/admin/configuration/rule`
+
+For the configuration entities shown earlier, recommended permission strings include:
+
+* `LIST_V1_ADMIN_CONFIGURATION_NETWORK_MAP`
+
+* `GET_V1_ADMIN_CONFIGURATION_NETWORK_MAP`
+
+* `POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP`
+
+* `PUT_V1_ADMIN_CONFIGURATION_NETWORK_MAP`
+
+* `DELETE_V1_ADMIN_CONFIGURATION_NETWORK_MAP`
+
+* `LIST_V1_ADMIN_CONFIGURATION_RULE`
+
+* `GET_V1_ADMIN_CONFIGURATION_RULE`
+
+* `POST_V1_ADMIN_CONFIGURATION_RULE`
+
+* `PUT_V1_ADMIN_CONFIGURATION_RULE`
+
+* `DELETE_V1_ADMIN_CONFIGURATION_RULE`
+
+* `LIST_V1_ADMIN_CONFIGURATION_TYPOLOGY`
+
+* `GET_V1_ADMIN_CONFIGURATION_TYPOLOGY`
+
+* `POST_V1_ADMIN_CONFIGURATION_TYPOLOGY`
+
+* `PUT_V1_ADMIN_CONFIGURATION_TYPOLOGY`
+
+* `DELETE_V1_ADMIN_CONFIGURATION_TYPOLOGY`
+
+> The token handler should accept **any** of the above capabilities depending on the endpoint being accessed. A default‑deny policy is recommended when the claim is missing.
+
+
+
+### 7.6 Best Practices
+
+* **Bind to tenant & payload:cfg:** Enforce `tenantId` and `payload:cfg` presence and consistency on every request.
+* **Version capabilities:** Namespace or version permission strings when APIs evolve (e.g., `GET_V1_...`).
+
+---
+
+**Notes**
+
+* `tenantId` is established by middleware and injected into every repository call.
+* `id: identifier` is provided as a path segment for GET/PUT/DELETE and included in ID construction.
+* Capability strings follow the `<METHOD><PREFIX_WITH_SLASHES_AS_UNDERSCORES>` pattern (e.g., `GET_V1_ADMIN_CONFIGURATION_RULE`).
+
+---
+
+## 8) Summary
+
+The repository pattern isolates data persistence logic from application behavior. In the context of Fastify and the CRUD plugin system, it:
+
+* Promotes maintainable and testable data logic.
+* Provides a clean boundary for tenant-aware, configuration-driven operations.
+* Supports consistent integration with RESTful endpoints.

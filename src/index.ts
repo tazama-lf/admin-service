@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'reflect-metadata';
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
-import { initializeDatabase, DatabaseService } from '@tazama-lf/tcs-lib';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
@@ -14,33 +13,14 @@ export const loggerService: LoggerService = new LoggerService(processorConfig);
 let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
 let configuration: Configuration;
 
-export let databaseService: DatabaseService;
-
 export const dbInit = async (): Promise<void> => {
-  await initializeDatabase({
-    host: process.env.TCS_DB_HOST ?? 'localhost',
-    port: parseInt(process.env.TCS_DB_PORT ?? '5432', 10),
-    database: process.env.TCS_DB_NAME ?? 'tcs',
-    user: process.env.TCS_DB_USER ?? 'postgres',
-    password: process.env.TCS_DB_PASSWORD ?? 'postgres',
-  });
-  loggerService.log('TCS Database initialized');
-
-  databaseService = new DatabaseService();
-  loggerService.log('TCS DatabaseService initialized');
-
-  configuration = processorConfig;
-  if (process.env.ENABLE_FRMS_DATABASES === 'true') {
-    const { db, config } = await CreateStorageManager(
-      [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Cache.DISTRIBUTED],
-      processorConfig.nodeEnv === 'production',
-    );
-    databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
-    configuration = { ...config, ...processorConfig };
-    loggerService.log(util.inspect(databaseManager.isReadyCheck()));
-  } else {
-    loggerService.log('FRMS databases disabled - Connection Studio mode');
-  }
+  const { db, config } = await CreateStorageManager(
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Cache.DISTRIBUTED],
+    processorConfig.nodeEnv === 'production',
+  );
+  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  configuration = { ...config, ...processorConfig };
+  loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };
 
 const connect = async (): Promise<void> => {

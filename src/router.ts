@@ -65,7 +65,6 @@ import {
   updateJobHandler,
   validateExistingHandler,
 } from './app.controller';
-
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
   AccountConditionSchema,

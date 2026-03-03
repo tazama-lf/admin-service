@@ -60,7 +60,6 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
-
   remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {

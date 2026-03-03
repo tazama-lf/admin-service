@@ -48,7 +48,24 @@ import {
   getDataModelJsonHandler,
   putDataModelJsonHandler,
   getActiveNetworkMapHandler,
+  createCronJobHandler,
+  createPullJobHandler,
+  createPushJobHandler,
+  findJobByIdHandler,
+  getAllCronJobsHandler,
+  getAllJobsHandler,
+  getCronJobByIdHandler,
+  getCronJobByStatusHandler,
+  getJobHistoryHandler,
+  getJobsByStatusHandler,
+  updateCronJobHandler,
+  updateCronJobStatusHandler,
+  updateJobActivationHandler,
+  updateJobByStatusHandler,
+  updateJobHandler,
+  validateExistingHandler,
 } from './app.controller';
+
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
   AccountConditionSchema,
@@ -64,28 +81,7 @@ import {
   TypologySchema,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
-
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
-import {
-  createScheduleHandler,
-  findScheduleByIdHandler,
-  getAllScheduleHandler,
-  getScheduleByStatusHandler,
-  updateScheduleByStatusHandler,
-  updateScheduleHandler,
-} from './handlers/scheduler.handler';
-import {
-  createPullJobHandler,
-  createPushJobHandler,
-  findJobByIdHandler,
-  getAllJobsHandler,
-  getAllJobsHistoryHandler,
-  getJobsByStatusHandler,
-  updateJobActivationHandler,
-  updateJobByStatusHandler,
-  updateJobHandler,
-  validateTableHandler,
-} from './handlers/job.handler';
 
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
@@ -175,12 +171,12 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(createPullJobHandler, routePrivilege.createPullJob),
   });
 
-  fastify.post('/v1/admin/tcs/job/get/all', {
+  fastify.post('/v1/admin/tcs/job/get/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
   });
 
-  fastify.post('/v1/admin/tcs/job/get/history', {
-    ...SetOptionsBodyAndParams(getAllJobsHistoryHandler, routePrivilege.getAllJobsHistory),
+  fastify.post('/v1/admin/tcs/job/get/history/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getJobHistoryHandler, routePrivilege.getAllJobsHistory),
   });
 
   fastify.get('/v1/admin/tcs/job/get/:id', {
@@ -203,33 +199,33 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.get('/v1/admin/tcs/job/table', {
-    ...SetOptionsBodyAndParams(validateTableHandler, routePrivilege.validateTable),
+    ...SetOptionsBodyAndParams(validateExistingHandler, routePrivilege.validateTable),
   });
 
   // ==================== SCHEDULER OPERATIONS ====================
 
   fastify.post('/v1/admin/tcs/schedule/create', {
-    ...SetOptionsBodyAndParams(createScheduleHandler, routePrivilege.createSchedule),
+    ...SetOptionsBodyAndParams(createCronJobHandler, routePrivilege.createSchedule),
   });
 
   fastify.get('/v1/admin/tcs/schedule/:id', {
-    ...SetOptionsBodyAndParams(findScheduleByIdHandler, routePrivilege.findSchedule),
+    ...SetOptionsBodyAndParams(getCronJobByIdHandler, routePrivilege.findSchedule),
   });
 
   fastify.put('/v1/admin/tcs/schedule/update/:id', {
-    ...SetOptionsBodyAndParams(updateScheduleHandler, routePrivilege.updateSchedule),
+    ...SetOptionsBodyAndParams(updateCronJobHandler, routePrivilege.updateSchedule),
   });
 
-  fastify.post('/v1/admin/tcs/schedule/get/all', {
-    ...SetOptionsBodyAndParams(getAllScheduleHandler, routePrivilege.getAllSchedules),
+  fastify.post('/v1/admin/tcs/schedule/get/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllCronJobsHandler, routePrivilege.getAllSchedules),
   });
 
   fastify.get('/v1/admin/tcs/schedule/get/status', {
-    ...SetOptionsBodyAndParams(getScheduleByStatusHandler, routePrivilege.getSchedules),
+    ...SetOptionsBodyAndParams(getCronJobByStatusHandler, routePrivilege.getSchedules),
   });
 
   fastify.put('/v1/admin/tcs/schedule/update/status/:id', {
-    ...SetOptionsBodyAndParams(updateScheduleByStatusHandler, routePrivilege.updateScheduleStatus),
+    ...SetOptionsBodyAndParams(updateCronJobStatusHandler, routePrivilege.updateScheduleStatus),
   });
 
   // ==================== TCS OPERATIONS ====================

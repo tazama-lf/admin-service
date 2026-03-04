@@ -6,11 +6,12 @@ import {
   getAllNodes,
   getNodeByName,
   insertNodesIntoDb,
+  getNodeByIdFromDb,
 } from '../repositories/configuration/node.repository';
 import { HttpException, HttpStatus } from '../utils/error';
 
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
-  const queryRes = await getNodeById(nodeId, tenantId);
+  const queryRes = await getNodeByIdFromDb(nodeId, tenantId);
   const resultArray = queryRes && queryRes.length > 0 ? queryRes : null;
   return resultArray;
 };

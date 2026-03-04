@@ -13,6 +13,17 @@ export const getNodeByName = async (nodeName: string, tenantId: string): Promise
   );
   return queryRes.rows.length > 0 ? queryRes.rows : null;
 };
+export const getNodeByIdFromDb = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
+  const queryRes = await handlePostExecuteSqlStatement<Node>(
+    {
+      // eslint-disable-next-line @stylistic/quotes -- SQL string contains single quotes
+      text: 'SELECT id FROM trs_nodes WHERE id = $1 AND tenant_id = $2 LIMIT 1',
+      values: [nodeId, tenantId],
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+  return queryRes.rows.length > 0 ? queryRes.rows : null;
+};
 
 export const insertNodesIntoDb = async (nodes: Node[]): Promise<Node[]> => {
   const valuesPerNode = 4;

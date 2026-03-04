@@ -22,6 +22,7 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  CERT_PATH_PUBLIC?: string;
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -42,6 +43,11 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
   },
   {
     name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'CERT_PATH_PUBLIC',
     type: 'string',
     optional: true,
   },

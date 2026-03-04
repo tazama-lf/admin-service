@@ -16,7 +16,6 @@ export const getNodeByName = async (nodeName: string, tenantId: string): Promise
 export const getNodeByIdFromDb = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await handlePostExecuteSqlStatement<Node>(
     {
-      // eslint-disable-next-line @stylistic/quotes -- SQL string contains single quotes
       text: 'SELECT id FROM trs_nodes WHERE id = $1 AND tenant_id = $2 LIMIT 1',
       values: [nodeId, tenantId],
     } satisfies PgQueryConfig,
@@ -62,7 +61,12 @@ export const getAllNodes = async (
   sortBy?: string,
   sortOrder?: 'asc' | 'desc',
 ): Promise<Node[]> => {
-  const dbquery = `SELECT * FROM trs_nodes ${whereClause} ORDER BY ${sortBy} ${sortOrder}`;
+  const allowedSortColumns = ['id', 'created_at', 'updated_at', 'tenant_id', 'order'];
+  const validatedSortBy = sortBy && allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
+
+  const validatedSortOrder = sortOrder?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+  const dbquery = `SELECT * FROM trs_nodes ${whereClause} ORDER BY ${validatedSortBy} ${validatedSortOrder}`;
 
   const result = await handlePostExecuteSqlStatement<Node>(
     {

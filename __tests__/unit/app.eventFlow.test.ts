@@ -43,7 +43,12 @@ jest.mock('../../src/', () => ({
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
     set: jest.fn(),
-    saveAccount: jest.fn(),
+    saveAccount: jest.fn((accountId: string, tenantId: string, creDtTm: string) => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
+      return Promise.resolve();
+    }),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
     saveGovernedAsCreditorAccountByEdge: jest.fn(),
@@ -380,7 +385,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve(void '');
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.resolve(void '');
     });
   });
@@ -489,7 +497,8 @@ describe('handlePostConditionAccount', () => {
     // Act & Assert
     await handlePostConditionAccount(condition as AccountCondition, 'DEFAULT');
     const accountId = condition.acct.id + condition.acct.schmeNm.prtry + condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
-    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT');
+    // Some string value for the creation datetime (we don't care about the exact value, just that it's a string)
+    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT', expect.any(String));
   });
 
   it('should handle error when creating a new account if account does not exist and forceCret is set to true', async () => {
@@ -497,7 +506,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve({ id: '' } as Account);
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.reject(new Error('Test Error'));
     });
 

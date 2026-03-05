@@ -14,20 +14,30 @@ Indicates when a record was initially created in the system.
 - **Type**: ISO 8601 timestamp string
 - **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
 - **Behavior**: Automatically set during record creation, immutable thereafter
-- **Example**: `"2023-02-03T07:17:52.216Z"`
+- **Example**: `"2026-02-11T14:30:45.123Z"`
+- **Generation**: `new Date().toISOString()`
 
 ### updDtTm (Update DateTime) 
 Indicates when a record was last modified.
 - **Type**: ISO 8601 timestamp string 
 - **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
 - **Behavior**: Automatically updated on every record modification
-- **Example**: `"2023-02-04T10:30:15.789Z"`
+- **Example**: `"2026-02-11T14:30:45.123Z"`
+- **Generation**: `new Date().toISOString()`
 
 ### Timestamp Behavior
 - All timestamps are stored and returned in UTC timezone
+- **System timestamp is used** (not from external source)
 - Timestamps are automatically managed by the system and cannot be manually set via API
 - Both fields are included in all GET, POST, and PUT operation responses
 - Timestamps follow ISO 8601 standard for consistent parsing across systems
+
+### forceCret Behavior with Timestamps
+When `forceCret` is set to `true` during entity or account creation:
+- The system will create new records if they don't exist
+- `CreDtTm` is automatically set to the current system timestamp using `new Date().toISOString()`
+- New records include both `CreDtTm` and initial `updDtTm` values
+- All timestamp fields are validated to ensure they are defined and of string type
 
 ## Pre-requisites
 

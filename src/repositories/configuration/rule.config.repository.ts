@@ -40,6 +40,11 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
 
   create: async function (payload: RuleConfig, tenantId: string): Promise<RuleConfig> {
     payload.tenantId = tenantId;
+    const dtTme = new Date().toISOString();
+
+    payload.creDtTm = dtTme;
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
         text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration;',
@@ -51,6 +56,9 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   },
 
   update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
+    const dtTme = new Date().toISOString();
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
         text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',

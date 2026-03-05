@@ -5,6 +5,30 @@
 
 The **Admin Service** is a Node.js-based API designed for administrative tasks, with a particular focus on report and condition management. It utilizes the Fastify framework to deliver a high-performance and low-overhead API interface. This document offers an in-depth examination of the API, covering setup requirements, a comprehensive overview of the application, and detailed route documentation.
 
+## Timestamp Fields
+
+All entities managed by the Admin Service now include automated timestamp tracking:
+
+### CreDtTm (Creation DateTime)
+Indicates when a record was initially created in the system.
+- **Type**: ISO 8601 timestamp string
+- **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
+- **Behavior**: Automatically set during record creation, immutable thereafter
+- **Example**: `"2023-02-03T07:17:52.216Z"`
+
+### updDtTm (Update DateTime) 
+Indicates when a record was last modified.
+- **Type**: ISO 8601 timestamp string 
+- **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
+- **Behavior**: Automatically updated on every record modification
+- **Example**: `"2023-02-04T10:30:15.789Z"`
+
+### Timestamp Behavior
+- All timestamps are stored and returned in UTC timezone
+- Timestamps are automatically managed by the system and cannot be manually set via API
+- Both fields are included in all GET, POST, and PUT operation responses
+- Timestamps follow ISO 8601 standard for consistent parsing across systems
+
 ## Pre-requisites
 
 Before you start using the Admin API, ensure that you have the following items:
@@ -101,6 +125,22 @@ GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
       "code": "FST_ERR_VALIDATION",
       "error": "Bad Request",
       "message": "querystring must have required property 'msgid'"
+    }
+    ```
+
+- **Status 200 OK:** Successful response with report data.
+    ```json
+    {
+      "reportData": {
+        "msgId": "1234567890",
+        "evaluationResult": {
+          "status": "completed",
+          "score": 85.5,
+          "riskLevel": "medium"
+        },
+        "creDtTm": "2023-02-03T07:17:52.216Z",
+        "updDtTm": "2023-02-03T09:30:45.123Z"
+      }
     }
     ```
 
@@ -260,6 +300,59 @@ Possible values for some fields mention in the table above
 #### Headers
 No specific headers required for both endpoints.
 
+### Request Examples
+
+```http
+GET /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&synccache=active HTTP/1.1
+```
+
+#### GET Response
+
+- **Status 200 OK:** Successful condition retrieval.
+    ```json
+    {
+      "conditions": [
+        {
+          "condId": "cond-67890-entity",
+          "evtTp": ["pacs.008.001.10"],
+          "condTp": "non-overridable-block",
+          "prsptv": "debtor",
+          "incptnDtTm": "2023-02-03T06:00:00.000Z",
+          "xprtnDtTm": "2023-02-10T23:59:59.999Z",
+          "condRsn": "SUSPICIOUS_ACTIVITY",
+          "status": "active",
+          "creDtTm": "2023-02-03T07:17:52.216Z",
+          "updDtTm": "2023-02-03T07:17:52.216Z"
+        }
+      ]
+    }
+    ```
+
+```http
+GET /v1/admin/event-flow-control/account?id=acc456&schmenm=IBAN&agt=bank001&synccache=all HTTP/1.1
+```
+
+#### GET Response
+
+- **Status 200 OK:** Successful account condition retrieval.
+    ```json
+    {
+      "conditions": [
+        {
+          "condId": "cond-54321-account",
+          "evtTp": ["pacs.002.001.12", "pain.001.001.11"],
+          "condTp": "overridable-block",
+          "prsptv": "both",
+          "incptnDtTm": "2023-02-02T08:00:00.000Z",
+          "xprtnDtTm": "2023-02-09T18:00:00.000Z",
+          "condRsn": "HIGH_RISK_TRANSACTION",
+          "status": "active",
+          "creDtTm": "2023-02-02T08:15:30.456Z",
+          "updDtTm": "2023-02-03T09:20:45.789Z"
+        }
+      ]
+    }
+    ```
 
 ```http
 POST /v1/admin/event-flow-control/entity HTTP/1.1
@@ -317,11 +410,67 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
     }
     ```
 
+- **Status 200 OK:** Successful condition creation.
+    ```json
+    {
+      "id": "cond-12345-entity",
+      "status": "created",
+      "entityId": "user-987654",
+      "conditionType": "non-overridable-block",
+      "creDtTm": "2023-02-03T07:17:52.216Z",
+      "updDtTm": "2023-02-03T07:17:52.216Z"
+    }
+    ```
+
 - **Status 500 Internal Server Error:** For server-side errors.
     ```json
     {
       "status": "error",
       "message": "Internal server error occurred."
+    }
+    ```
+    
+```http
+PUT /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&condId=cond-67890-entity HTTP/1.1
+Content-Type: application/json
+
+{
+  "xprtnDtTm": "2023-02-15T23:59:59.999Z"
+}
+```
+
+#### PUT Response
+
+- **Status 200 OK:** Successful condition update.
+    ```json
+    {
+      "condId": "cond-67890-entity",
+      "status": "updated",
+      "newExpirationDate": "2023-02-15T23:59:59.999Z",
+      "creDtTm": "2023-02-03T07:17:52.216Z",
+      "updDtTm": "2023-02-05T14:22:18.345Z"
+    }
+    ```
+
+```http
+PUT /v1/admin/event-flow-control/account?id=acc456&schmenm=IBAN&agt=bank001&condId=cond-54321-account HTTP/1.1
+Content-Type: application/json
+
+{
+  "xprtnDtTm": "2023-02-20T18:00:00.000Z"
+}
+```
+
+#### PUT Response
+
+- **Status 200 OK:** Successful account condition update.
+    ```json
+    {
+      "condId": "cond-54321-account",
+      "status": "updated", 
+      "newExpirationDate": "2023-02-20T18:00:00.000Z",
+      "creDtTm": "2023-02-02T08:15:30.456Z",
+      "updDtTm": "2023-02-05T16:45:12.678Z"
     }
     ```
     
@@ -332,6 +481,15 @@ PUT /v1/admin/event-flow-control/cache HTTP/1.1
 ```
 
 #### Response
+
+- **Status 200 OK:** Cache update successful.
+    ```json
+    {
+      "status": "success",
+      "message": "Cache refreshed successfully",
+      "updDtTm": "2023-02-03T10:45:30.567Z"
+    }
+    ```
 
 - **Status 204 No Content:** Cache has been updated
 

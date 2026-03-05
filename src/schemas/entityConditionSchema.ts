@@ -4,9 +4,13 @@ import { Type, type Static } from '@sinclair/typebox';
 export const EntityConditionSchema = Type.Object(
   {
     evtTp: Type.Array(
-      Type.String({
-        enum: ['pain.013.001.09', 'pain.001.001.11', 'pacs.008.001.10', 'pacs.002.001.12', 'all'],
-      }),
+      Type.Union([
+        Type.Literal('pacs.008.001.10'),
+        Type.Literal('pacs.002.001.12'),
+        Type.Literal('pain.013.001.09'),
+        Type.Literal('pain.001.001.11'),
+        Type.Literal('all'),
+      ]),
       { minItems: 1, uniqueItems: true },
     ),
     condTp: Type.String({

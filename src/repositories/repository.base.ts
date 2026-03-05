@@ -29,4 +29,5 @@ export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   create: (payload: TEntity, tenantId: string) => Promise<TEntity>;
   update: (id: TId, payload: TEntity) => Promise<TEntity | null>;
   remove: (id: TId) => Promise<boolean>;
+  getNodeByName?: (nodeName: string, tenantId: string) => Promise<TEntity[] | null>;
 }

@@ -11,7 +11,9 @@ dotenv.config({
 });
 
 // Just we don't want everything, just what we are configuring, add more fields accordingly
-export type AppDatabaseServices = Required<Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration'>>;
+export type AppDatabaseServices = Required<
+  Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration' | 'rawHistory'>
+>;
 
 export type Configuration = ProcessorConfig & AppDatabaseServices & IConfig;
 
@@ -20,6 +22,7 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  CERT_PATH_PUBLIC?: string;
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -40,6 +43,11 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
   },
   {
     name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'CERT_PATH_PUBLIC',
     type: 'string',
     optional: true,
   },

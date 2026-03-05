@@ -12,7 +12,7 @@ export const checkConditionValidity = (condition: EntityCondition | AccountCondi
     throw Error('Error: Inception date cannot be before current date/time');
   }
 
-  if (!incptnDtTm || condition?.incptnDtTm !== incptnDtTm.toISOString()) {
+  if (condition?.incptnDtTm !== incptnDtTm?.toISOString()) {
     throw Error(`Error: the provided incptnDtTm: '${condition.incptnDtTm}' is invalid`);
   }
 
@@ -30,7 +30,7 @@ export const checkConditionValidity = (condition: EntityCondition | AccountCondi
 
   if (condition?.xprtnDtTm) {
     const xprtnDtTm = isDateValid(condition.xprtnDtTm);
-    if (!xprtnDtTm || condition?.xprtnDtTm !== xprtnDtTm.toISOString()) {
+    if (condition?.xprtnDtTm !== xprtnDtTm?.toISOString()) {
       throw Error(`Error: the provided xprtnDtTm: '${condition.xprtnDtTm}' is invalid`);
     }
     condition.xprtnDtTm = xprtnDtTm.toISOString();

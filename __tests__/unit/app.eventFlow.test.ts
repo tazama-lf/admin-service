@@ -1014,3 +1014,29 @@ describe('handleCacheUpdate', () => {
     expect(result).toBe(undefined);
   });
 });
+
+describe('Condition Timestamp Population', () => {
+  it('should populate both creDtTm and updDtTm when creating entity condition', async () => {
+    const condition = {
+      /* valid entity condition */
+    };
+    await handlePostConditionEntity(condition, 'DEFAULT');
+
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creDtTm: expect.any(String),
+        updDtTm: expect.any(String),
+      }),
+    );
+  });
+
+  it('should set updDtTm equal to creDtTm on creation', async () => {
+    const condition = {
+      /* valid entity condition */
+    };
+    await handlePostConditionEntity(condition, 'DEFAULT');
+
+    const savedCondition = databaseManager.saveCondition.mock.calls[0][0];
+    expect(savedCondition.updDtTm).toBe(savedCondition.creDtTm);
+  });
+});

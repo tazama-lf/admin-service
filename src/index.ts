@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import 'reflect-metadata';
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
@@ -15,10 +14,11 @@ let configuration: Configuration;
 
 export const dbInit = async (): Promise<void> => {
   const { db, config } = await CreateStorageManager(
-    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Cache.DISTRIBUTED],
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
     processorConfig.nodeEnv === 'production',
   );
-  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+
+  databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
   configuration = { ...config, ...processorConfig };
   loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };

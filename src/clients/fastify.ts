@@ -41,7 +41,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
   });
   fastify.addHook('onRoute', (r) => {
     if (r.url === '/v1/admin/config/networkmap') {
-      fastify.log.info({ schema: r.schema?.response }, '200 schema');
+      fastify.log.info({ schema: r?.schema?.response }, '200 schema');
     }
   });
 

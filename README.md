@@ -9,7 +9,7 @@ The **Admin Service** is a Node.js-based API designed for administrative tasks, 
 
 All entities managed by the Admin Service now include automated timestamp tracking:
 
-### CreDtTm (Creation DateTime)
+### creDtTm (Creation DateTime)
 Indicates when a record was initially created in the system.
 - **Type**: ISO 8601 timestamp string
 - **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
@@ -32,8 +32,8 @@ Indicates when a record was last modified.
 ### forceCret Behavior with Timestamps
 When `forceCret` is set to `true` during entity or account creation:
 - The system will create new records if they don't exist
-- `CreDtTm` is automatically set to the current system timestamp using `new Date().toISOString()`
-- New records include both `CreDtTm` and initial `updDtTm` values
+- `creDtTm` is automatically set to the current system timestamp using `new Date().toISOString()`
+- New records include both `creDtTm` and initial `updDtTm` values
 - All timestamp fields are validated to ensure they are defined and of string type
 
 ## Pre-requisites
@@ -421,9 +421,9 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
      **Status 200 OK:** Successful condition creation.
     ```json
     {
-      "id": "cond-12345-entity",
+      "id": "cond-12345-account",
       "status": "created",
-      "entityId": "user-987654",
+      "accountId": "acct-987654",
       "conditionType": "non-overridable-block",
       "creDtTm": "2023-02-03T07:17:52.216Z",
       "updDtTm": "2023-02-03T07:17:52.216Z"

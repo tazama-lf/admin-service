@@ -22,8 +22,6 @@ Description: Create Release v2.0.0 release using Github Actions release workflow
 
 - Update release.yml (Linked Issues: 378d60b6b48e3c51bd232cce6e5cbf4ae204ffc7)
 
-## v1.2.0 (future date, 2026)
-
 ## v1.1.0 (March 5, 2026)
 
 ### ⭐️ New Features

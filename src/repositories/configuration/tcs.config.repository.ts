@@ -397,19 +397,6 @@ export const getSchemaByTransactionType = async (
     throw new Error(`No config found for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
   }
 
-  loggerService.log(
-    `Schema for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].schema),
-  );
-  loggerService.log(
-    `Mapping for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].mapping),
-  );
-  loggerService.log(
-    `Payload for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].payload_json),
-  );
-
   return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload_json };
 };
 

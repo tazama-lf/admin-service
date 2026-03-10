@@ -40,6 +40,7 @@ export const RuleSchema = Type.Object(
     cfg: Type.String(),
     config: Config,
     desc: Type.Optional(Type.String()),
+    creDtTm: Type.Optional(Type.String({ format: 'date-time' })),
   },
   { additionalProperties: true },
 );

@@ -381,7 +381,9 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
     const { id } = req.params as { id: string };
     const { status } = req.body as { status?: string };
 
-    const updatedCount = await handleUpdateConfigByStatus(id, status);
+    const { tenantId } = req as ITenantRequest;
+    const updatedCount = await handleUpdateConfigByStatus(id, status,tenantId);
+
 
     reply.code(200).send({
       success: true,

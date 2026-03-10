@@ -1,6 +1,7 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import * as util from 'node:util';
+import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import type { ITenantRequest } from './interface/ITenantRequest';

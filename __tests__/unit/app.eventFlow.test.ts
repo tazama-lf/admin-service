@@ -191,6 +191,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith({
       ...conditionCreditor,
       creDtTm: nowDateTime,
+      updDtTm: nowDateTime,
     });
     const entityId = `${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionCreditor);

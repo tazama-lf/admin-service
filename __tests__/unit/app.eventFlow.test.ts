@@ -1017,11 +1017,42 @@ describe('handleCacheUpdate', () => {
 });
 
 describe('Condition Timestamp Population', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+
+    jest
+      .spyOn(databaseManager, 'getEntity')
+      .mockImplementation((entityId: string, schemeProprietary: string): Promise<Entity | undefined> => {
+        return Promise.resolve({ id: `${entityId}${schemeProprietary}` } as Entity);
+      });
+
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseEntity] as unknown as RawConditionResponse[]);
+    });
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve(void '');
+    });
+
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation((_entityId: string, _CreDtTm: string): Promise<void> => {
+      return Promise.resolve(void '');
+    });
+  });
+
   it('should populate both creDtTm and updDtTm when creating entity condition', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const condition = {
-      /* valid entity condition */
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
     };
-    await handlePostConditionEntity(condition, 'DEFAULT');
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
 
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1032,12 +1063,16 @@ describe('Condition Timestamp Population', () => {
   });
 
   it('should set updDtTm equal to creDtTm on creation', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const condition = {
-      /* valid entity condition */
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
     };
-    await handlePostConditionEntity(condition, 'DEFAULT');
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
 
-    const savedCondition = databaseManager.saveCondition.mock.calls[0][0];
+    const savedCondition = (databaseManager.saveCondition as jest.Mock).mock.calls[0][0];
     expect(savedCondition.updDtTm).toBe(savedCondition.creDtTm);
   });
 });

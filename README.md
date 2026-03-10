@@ -29,6 +29,13 @@ Indicates when a record was last modified.
 - Both fields are included in all GET, POST, and PUT operation responses
 - Timestamps follow ISO 8601 standard for consistent parsing across systems
 
+### forceCret Behavior with Timestamps
+When `forceCret` is set to `true` during entity or account creation:
+- The system will create new records if they don't exist
+- `CreDtTm` is automatically set to the current system timestamp using `new Date().toISOString()`
+- New records include both `CreDtTm` and initial `updDtTm` values
+- All timestamp fields are validated to ensure they are defined and of string type
+
 ## Pre-requisites
 
 Before you start using the Admin API, ensure that you have the following items:

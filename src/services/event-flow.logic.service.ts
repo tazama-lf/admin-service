@@ -78,7 +78,7 @@ export const handlePostConditionEntity = async (
     if (!alreadyExistingEntity?.id) {
       if (condition.forceCret) {
         try {
-          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
+          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, updDtTm: nowDateTime });
           await databaseManager.saveEntity(entityIdentifier, tenantId, nowDateTime);
         } catch (err) {
           throw Error('Error: while trying to save new entity: ' + (err as { message: string }).message);
@@ -88,7 +88,7 @@ export const handlePostConditionEntity = async (
         throw Error('Error: entity was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime });
+      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, updDtTm: nowDateTime });
     }
 
     await saveConditionEdges(condition.prsptv, condId, entityIdentifier, condition, 'entity', tenantId);
@@ -285,7 +285,7 @@ export const handlePostConditionAccount = async (
     if (!alreadyExistingAccount?.id) {
       if (condition.forceCret) {
         try {
-          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId });
+          await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId, updDtTm: nowDateTime });
           await databaseManager.saveAccount(accountIdentifier, tenantId, nowDateTime);
         } catch (err) {
           throw Error('Error: while trying to save new account: ' + (err as { message: string }).message);
@@ -295,7 +295,7 @@ export const handlePostConditionAccount = async (
         throw Error('Error: account was not found and we could not create one because forceCret is set to false');
       }
     } else {
-      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId });
+      await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId, updDtTm: nowDateTime });
     }
 
     await saveConditionEdges(condition.prsptv, condId, accountIdentifier, condition as ConditionEdge, 'account', tenantId);

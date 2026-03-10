@@ -356,12 +356,17 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   }
 
   const query = `
-    SELECT payload_json
+    SELECT 
+      content_type,
+      CASE 
+        WHEN content_type = 'XML' THEN payload_xml 
+        ELSE payload_json 
+      END AS payload
     FROM tcs_config
     WHERE transaction_type = $1 AND tenant_id = $2 AND version = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ payload_json: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ content_type: string; payload: unknown }>(
     { text: query, values: [transactionType, tenantId, version] } satisfies PgQueryConfig,
     'configuration',
   );
@@ -370,7 +375,7 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
     throw new Error(`No payload found for transaction type: ${transactionType}`);
   }
 
-  return result.rows[0].payload_json;
+  return result.rows[0].payload;
 };
 
 export const getSchemaByTransactionType = async (
@@ -383,12 +388,19 @@ export const getSchemaByTransactionType = async (
   }
 
   const query = `
-    SELECT schema, mapping, payload_json
+    SELECT 
+      schema, 
+      mapping, 
+      content_type,
+      CASE 
+        WHEN content_type = 'XML' THEN payload_xml 
+        ELSE payload_json 
+      END AS payload
     FROM tcs_config
     WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; payload_json: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; content_type: string; payload: unknown }>(
     { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
@@ -397,7 +409,7 @@ export const getSchemaByTransactionType = async (
     throw new Error(`No config found for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
   }
 
-  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload_json };
+  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload };
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {

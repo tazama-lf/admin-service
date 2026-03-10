@@ -39,6 +39,11 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
 
   create: async function (payload: NetworkMap, tenantId: string): Promise<NetworkMap> {
     payload.tenantId = tenantId;
+
+    const dtTme = new Date().toISOString();
+    payload.creDtTm = dtTme;
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
         text: 'INSERT INTO network_map (configuration) VALUES ($1) RETURNING configuration',
@@ -50,6 +55,9 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   },
 
   update: async function ({ id, cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
+    const dtTme = new Date().toISOString();
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
         text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',

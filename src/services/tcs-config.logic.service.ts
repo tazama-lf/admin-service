@@ -215,11 +215,11 @@ export const handleCreateTazamaDataModelTable = async (tableName: string): Promi
   }
 };
 
-export const handleUpdateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+export const handleUpdateConfigByStatus = async (id: string, status: string, tenantId: string): Promise<number> => {
   try {
-    loggerService.log(`Updating config ${id} status to: ${status}`);
+    loggerService.log(`Updating config ${id} status to: ${status} for tenant: ${tenantId}`);
 
-    const updatedCount = await updateConfigByStatus(id, status);
+    const updatedCount = await updateConfigByStatus(id, status, tenantId);
     loggerService.log(`Successfully updated config ${id} status`);
 
     return updatedCount;

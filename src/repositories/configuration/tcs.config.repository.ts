@@ -441,21 +441,25 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
   await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
 };
 
-export const updateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+export const updateConfigByStatus = async (id: string, status: string, tenantId: string): Promise<number> => {
+  if (!status) {
+    throw new Error('Status is required and cannot be null or undefined');
+  }
+
   const query = `
     UPDATE tcs_config
     SET status = $1, updated_at = NOW()
-    WHERE id = $2
+    WHERE id = $2 AND tenant_id = $3
     RETURNING id;
   `;
 
   const result = await handlePostExecuteSqlStatement<{ id: number }>(
-    { text: query, values: [status, id] } satisfies PgQueryConfig,
+    { text: query, values: [status, id, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found with id: ${id}`);
+    throw new Error(`No config found with id: ${id} for tenant: ${tenantId}`);
   }
 
   return result.rows.length;

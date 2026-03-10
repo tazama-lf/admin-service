@@ -382,9 +382,7 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
 
     const config = await getSchemaByTransactionType(transactionType, version, tenantId);
 
-    loggerService.log(
-      `Successfully retrieved config for transaction type: ${transactionType}, version: ${version}: ` + JSON.stringify(config),
-    );
+    
     return config;
   } catch (error) {
     const errorMessage = error as { message: string };

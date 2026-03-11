@@ -938,7 +938,7 @@ export const validateActiveHandler = async (req: FastifyRequest, reply: FastifyR
 // ==================== TRS ====================
 export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
-  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const { tenantId } = req as ITenantRequest;
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
 
   try {
@@ -975,8 +975,7 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const queryParams = req.query as { type?: string; category?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' };
 
     const nodes = await findAllNodes(tenantId, queryParams);
@@ -995,8 +994,7 @@ export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): 
 
 export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const queryParams = req.params as { nodeId?: string };
     await deleteNodeById(Number(queryParams.nodeId), tenantId);
     reply.code(200).send({
@@ -1012,8 +1010,7 @@ export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyR
 
 export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const body = req.body as { query: string; dbName: string; params?: unknown[] };
 
     if (!body.query) {
@@ -1150,8 +1147,7 @@ export const updateRuleStatusHandler = async (req: FastifyRequest, reply: Fastif
   try {
     const { ruleId } = req.params as { ruleId: string };
     const { status, reason } = req.body as { status: string; reason: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const updatedRule = await updateRuleStatus(ruleId, tenantId, status, reason);
 
@@ -1169,12 +1165,11 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
   try {
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
-    // const { tenantId } = req as ITenantRequest;
-    const token = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
-    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', tenantId, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',
@@ -1189,7 +1184,7 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const body = authReq.body as Record<string, string>;
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
@@ -1211,8 +1206,7 @@ export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyRepl
 export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const rulesId = parseInt(id);
     if (isNaN(rulesId)) {
       ErrorHandler.sendError(reply, { status: 400 }, `Invalid rules ID: ${id}. Must be a valid number.`);
@@ -1321,8 +1315,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
 export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { transactionType } = req.params as { transactionType: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const versions: string[] = await getVersionsOfTransactionType(transactionType, tenantId);
 
@@ -1338,8 +1331,7 @@ export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyReques
 
 export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const ruleIds = await findAllRuleIds(tenantId);
 
@@ -1354,8 +1346,7 @@ export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
 
     const configuration: unknown = await findRuleConfiguration(ruleId, tenantId);
@@ -1378,7 +1369,7 @@ export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: Fa
 export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
     const { ruleId } = req.params as { ruleId: string };
     const updateData = req.body as Record<string, unknown>;
@@ -1407,8 +1398,7 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const networkMap: unknown = await findActiveNetworkMap(tenantId);
 
@@ -1435,7 +1425,7 @@ export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: Fas
 export const createSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
     const decodeToken = decodeInnerToken(req.headers.authorization ?? '');
     const payload = req.body as ISimulationBody;
@@ -1463,8 +1453,7 @@ export const createSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
 
 export const getSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
     const { category } = req.query as { category: string };
 

@@ -31,6 +31,7 @@ export const TypologySchema = Type.Object(
     expression: Type.Array(ExpressionMathJSON),
     workflow: WorkFlow,
     creDtTm: Type.Optional(Type.String({ format: 'date-time' })),
+    updDtTm: Type.Optional(Type.String({ format: 'date-time' })),
   },
   { additionalProperties: true },
 );

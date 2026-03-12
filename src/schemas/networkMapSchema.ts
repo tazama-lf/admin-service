@@ -36,6 +36,7 @@ export const NetworkMapSchema = Type.Object(
     cfg: Type.String(),
     messages: Type.Array(MessageSchema),
     creDtTm: Type.Optional(Type.String({ format: 'date-time' })),
+    updDtTm: Type.Optional(Type.String({ format: 'date-time' })),
   },
   { additionalProperties: true },
 );

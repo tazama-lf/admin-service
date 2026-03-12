@@ -339,7 +339,7 @@ GET /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&synccache=acti
 GET /v1/admin/event-flow-control/account?id=acc456&schmenm=IBAN&agt=bank001&synccache=all HTTP/1.1
 ```
 
-#### GET Response
+#### GET Response — Account
 
 - **Status 200 OK:** Successful account condition retrieval.
     ```json
@@ -441,7 +441,9 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
     ```http
 PUT /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&condId=cond-67890-entity HTTP/1.1
 Content-Type: application/json
+```
 
+```json
 {
   "xprtnDtTm": "2023-02-15T23:59:59.999Z"
 }
@@ -490,16 +492,6 @@ PUT /v1/admin/event-flow-control/cache HTTP/1.1
 ```
 
 #### Response
-
- **Status 200 OK:** Cache update successful.
-    ```json
-    {
-      "status": "success",
-      "message": "Cache refreshed successfully",
-      "updDtTm": "2023-02-03T10:45:30.567Z"
-    }
-    ```
-
 
 - **Status 204 No Content:** Cache has been updated
 

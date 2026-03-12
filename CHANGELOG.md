@@ -26,20 +26,22 @@ Description: Create Release v2.0.0 release using Github Actions release workflow
 
 ### ⭐️ New Features
 
-- feat: Add CreDtTm (Creation DateTime) and updDtTm (Update DateTime) timestamp fields to all API responses
-- feat: Automatic timestamp tracking for entity creation and updates
-- feat: ISO 8601 UTC timestamp format standardization across all entities
+- feat: Add creDtTm (Creation DateTime) and updDtTm (Update DateTime) timestamp fields to configuration objects (rules, typologies, network maps)
+- feat: Add creDtTm and updDtTm timestamp fields to entity and account condition payloads in event-flow-control endpoints
+- feat: Automatic timestamp tracking for configuration entity creation and updates
+- feat: ISO 8601 UTC timestamp format standardization for timestamp fields
 
 ### 📝 Documentation Updates
 
 - docs: Update README.md with comprehensive timestamp field documentation
-- docs: Add CreDtTm and updDtTm field descriptions and examples
+- docs: Add creDtTm and updDtTm field descriptions and examples
 - docs: Document timestamp format and behavior specifications
-- docs: Add API response examples showing new timestamp fields
+- docs: Add API response examples showing new timestamp fields for affected endpoints
 
 ### 🔄 Breaking Changes
 
-- BREAKING: All API responses now include CreDtTm and updDtTm fields
+- BREAKING: Configuration API responses (rules, typologies, network maps) now include creDtTm and updDtTm fields
+- BREAKING: Event-flow-control entity and account condition payloads now include creDtTm and updDtTm fields
 - BREAKING: Timestamp format standardized to ISO 8601 UTC format
 
 ## v1.0.0 (July 2nd, 2024)

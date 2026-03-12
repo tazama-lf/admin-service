@@ -29,12 +29,13 @@ const mapRowToConfig = (row: ConfigRow): Config => ({
   comments: row.comments,
   publishing_status: row.publishing_status,
   payload: row.content_type === ContentType.XML ? row.payload_xml : row.payload_json,
+  related_transaction: row.related_transaction,
 });
 
 export const createConfig = async (config: ConfigData, id?: number): Promise<number> => {
   const isXml = config.contentType === ContentType.XML;
   const payloadColumn = isXml ? 'payload_xml' : 'payload_json';
-  const payloadPlaceholder = isXml ? '$14::xml' : '$14';
+  const payloadPlaceholder = isXml ? '$15::xml' : '$15';
   const payloadValue = isXml
     ? typeof config.payload === 'string'
       ? config.payload
@@ -47,15 +48,15 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
     ? `
       INSERT INTO tcs_config (
         id, msg_fam, transaction_type, endpoint_path, version, content_type,
-        schema, mapping, functions, status, tenant_id, created_by, publishing_status, ${payloadColumn}
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, ${payloadPlaceholder})
+        schema, mapping, functions, status, tenant_id, created_by, publishing_status, related_transaction, ${payloadColumn}
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, ${payloadPlaceholder})
       RETURNING id
     `
     : `
       INSERT INTO tcs_config (
         msg_fam, transaction_type, endpoint_path, version, content_type,
-        schema, mapping, functions, status, tenant_id, created_by, publishing_status, ${payloadColumn}
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, ${isXml ? '$13::xml' : '$13'})
+        schema, mapping, functions, status, tenant_id, created_by, publishing_status, related_transaction, ${payloadColumn}
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, ${isXml ? '$14::xml' : '$14'})
       RETURNING id
     `;
 
@@ -74,6 +75,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
+        config.relatedTransaction ?? null,
         payloadValue,
       ]
     : [
@@ -89,6 +91,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
+        config.relatedTransaction ?? null,
         payloadValue,
       ];
 
@@ -108,7 +111,7 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comments
+      payload_xml, payload_json, created_at, updated_at, comments, related_transaction
     FROM tcs_config
     WHERE id = $1 AND tenant_id = $2
   `;
@@ -190,7 +193,7 @@ export const findConfigsByStatus = async (
      SELECT
        id, msg_fam, transaction_type, endpoint_path, version, content_type,
        schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-       payload_xml, payload_json, created_at, updated_at, comments
+       payload_xml, payload_json, created_at, updated_at, comments, related_transaction
      FROM tcs_config
      WHERE ${whereClause}
      ORDER BY updated_at DESC
@@ -262,6 +265,10 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     setClauses.push(`status = $${paramIndex++}`);
     values.push(updates.status);
   }
+  if (updates.related_transaction !== undefined) {
+    setClauses.push(`related_transaction = $${paramIndex++}`);
+    values.push(updates.related_transaction);
+  }
 
   if (setClauses.length === 0) {
     throw new Error('No fields to update');
@@ -275,7 +282,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
     RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
               schema, payload_xml, payload_json, comments, mapping, functions,
-              status, publishing_status, created_at, updated_at, tenant_id, created_by
+              status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction
   `;
 
   values.push(id, tenantId);
@@ -299,6 +306,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     updated_at: string;
     tenant_id: string;
     created_by: string;
+    related_transaction?: string;
   }
 
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
@@ -326,6 +334,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     updatedAt: row.updated_at,
     tenantId: row.tenant_id,
     createdBy: row.created_by,
+    related_transaction: row.related_transaction,
   };
 };
 

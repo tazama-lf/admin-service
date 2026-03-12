@@ -51,6 +51,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       publishing_status: config.publishing_status ?? 'inactive',
       payload: config.payload,
       creDtTm: nowDateTime,
+      relatedTransaction: config.relatedTransaction,
     };
 
     const createdConfigId = await createConfig(newConfig);

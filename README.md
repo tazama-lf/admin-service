@@ -471,7 +471,7 @@ Content-Type: application/json
 }
 ```
 
-#### PUT Response
+#### PUT Response - Account
 
 - **Status 200 OK:** Successful account condition update.
     ```json

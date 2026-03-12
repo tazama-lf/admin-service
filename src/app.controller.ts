@@ -30,6 +30,7 @@ import {
   handleGetAllTransactionTypes,
   handleGetPayloadByTransactionType,
   handleGetConfigByTransactionType,
+  handleGetRelatedTransactions,
 } from './services/tcs-config.logic.service';
 
 import { handleGetReportRequestByMsgId } from './services/report.logic.service';
@@ -382,8 +383,9 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
   try {
     const { id } = req.params as { id: string };
     const { status } = req.body as { status?: string };
+    const { tenantId } = req as ITenantRequest;
 
-    const updatedCount = await handleUpdateConfigByStatus(id, status);
+    const updatedCount = await handleUpdateConfigByStatus(id, status, tenantId);
 
     reply.code(200).send({
       success: true,
@@ -1584,6 +1586,26 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get related transactions request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const relatedTransactions = await handleGetRelatedTransactions(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      data: relatedTransactions,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get related transactions';
+    loggerService.error(`Failed to get related transactions: ${errorMessage}`, 'getRelatedTransactionsHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get related transactions request');
   }
 };
 

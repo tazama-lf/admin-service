@@ -20,6 +20,7 @@ import {
   findAllTransactionTypes,
   getPayloadByTransactionType,
   getSchemaByTransactionType,
+  getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
@@ -215,9 +216,9 @@ export const handleCreateTazamaDataModelTable = async (tableName: string): Promi
   }
 };
 
-export const handleUpdateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+export const handleUpdateConfigByStatus = async (id: string, status?: string, tenantId?: string): Promise<number> => {
   try {
-    loggerService.log(`Updating config ${id} status to: ${status}`);
+    loggerService.log(`Updating config ${id} status to: ${status} for tenant: ${tenantId}`);
 
     const updatedCount = await updateConfigByStatus(id, status);
     loggerService.log(`Successfully updated config ${id} status`);
@@ -389,6 +390,22 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error getting config by transaction type in handleGetConfigByTransactionType: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetRelatedTransactions = async (tenantId: string): Promise<string[]> => {
+  try {
+    loggerService.log(`Started handling get related transactions request for tenant ${tenantId}.`);
+
+    const relatedTransactions = await getRelatedTransactions(tenantId);
+
+    loggerService.log('Related transactions retrieved successfully.');
+
+    return relatedTransactions;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: getting related transactions with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

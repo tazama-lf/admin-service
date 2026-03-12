@@ -43,6 +43,7 @@ import {
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
+  getRelatedTransactionsHandler,
   createSimulationLogsHandler,
   getRuleFlowStatusHandler,
   getDataModelJsonHandler,
@@ -95,6 +96,7 @@ const routePrivilege = {
   postTcsConfig: 'editor',
   getTcsConfig: 'view-profile',
   getTcsConfigs: 'view-profile',
+  getTcsConfigRelatedTransactions: 'view-profile',
   putTcsConfig: 'editor',
   patchTcsConfigPublishingStatus: 'publisher',
   deleteTcsConfig: 'editor',
@@ -231,6 +233,9 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
     ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
+  });
+  fastify.get('/v1/admin/tcs/config/tcs/related-transactions', {
+    ...SetOptionsBodyAndParams(getRelatedTransactionsHandler, routePrivilege.getTcsConfigRelatedTransactions),
   });
 
   fastify.get('/v1/admin/config/transaction-types', {

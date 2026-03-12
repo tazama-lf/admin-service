@@ -461,3 +461,19 @@ export const updateConfigByStatus = async (id: string, status?: string): Promise
 
   return result.rows.length;
 };
+
+export const getRelatedTransactions = async (tenantId: string): Promise<string[]> => {
+  const query = `
+    SELECT related_transaction
+    FROM tcs_config
+    WHERE tenant_id = $1
+      AND related_transaction IS NOT NULL
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{ related_transaction: string }>(
+    { text: query, values: [tenantId] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return result.rows.map((row) => row.related_transaction);
+};

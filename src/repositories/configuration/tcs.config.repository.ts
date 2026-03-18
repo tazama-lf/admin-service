@@ -245,6 +245,10 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     setClauses.push(`payload_json = $${paramIndex++}`);
     values.push(JSON.stringify(updates.payload));
   }
+  if (updates.schema !== undefined) {
+    setClauses.push(`schema = $${paramIndex++}`);
+    values.push(JSON.stringify(updates.schema));
+  }
   if (updates.comments !== undefined) {
     setClauses.push(`comments = $${paramIndex++}`);
     values.push(updates.comments);

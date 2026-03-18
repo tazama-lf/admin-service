@@ -452,7 +452,7 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
     );
   `;
 
-  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'evaluation');
+  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
 };
 
 export const updateConfigByStatus = async (id: string, status?: string): Promise<number> => {

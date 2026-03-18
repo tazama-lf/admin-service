@@ -122,7 +122,7 @@ export const getAllCronJobs = async (
   const dataQuery = `
     SELECT * FROM tcs_cron_jobs ${whereClause}  ORDER BY updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-  const dataParams = [...queryParams, limit, offset * 10];
+  const dataParams = [...queryParams, limit, offset];
   const dataResult = await handlePostExecuteSqlStatement<CronJob>(
     {
       text: dataQuery,

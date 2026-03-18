@@ -252,7 +252,7 @@ export const getJobHistory = async (
   ORDER BY ph.created_at DESC
   LIMIT $${paramIndex} OFFSET $${paramIndex + 1};
 `;
-    const dataParams = [...queryParams, limit, offset * limit];
+    const dataParams = [...queryParams, limit, offset];
     const dataResult = await handlePostExecuteSqlStatement<PullJobHistory>(
       {
         text: dataQuery,
@@ -360,7 +360,7 @@ export const getAllJobs = async (
   LIMIT $${paramIndex} OFFSET $${paramIndex + 1};
 `;
 
-  const dataParams = [...queryParams, limit, offset * 10];
+  const dataParams = [...queryParams, limit, offset];
   const dataResult = await handlePostExecuteSqlStatement<Job>(
     {
       text: dataQuery,

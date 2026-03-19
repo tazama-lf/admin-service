@@ -304,7 +304,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
-    throw new Error(`Config with id ${id} not found or not authorized`);
+    throw new Error('Configuration not found');
   }
 
   const [row] = result.rows;
@@ -372,7 +372,7 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No payload found for transaction type: ${transactionType}`);
+    throw new Error('Configuration not found');
   }
 
   return result.rows[0].payload;
@@ -406,7 +406,7 @@ export const getSchemaByTransactionType = async (
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
+    throw new Error('Configuration not found');
   }
 
   return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload };
@@ -459,7 +459,7 @@ export const updateConfigByStatus = async (id: string, status: string, tenantId:
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found with id: ${id} for tenant: ${tenantId}`);
+    throw new Error('Configuration not found');
   }
 
   return result.rows.length;

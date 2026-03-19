@@ -13,7 +13,7 @@ import {
   tableExist,
   validateExisting,
   validateActive,
-} from '../repositories/dateEnrichment/job.de.repository';
+} from '../repositories/dataEnrichment/job.de.repository';
 import type {
   ConfigType,
   ISuccess,

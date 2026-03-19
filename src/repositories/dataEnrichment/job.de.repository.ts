@@ -390,7 +390,7 @@ export const getAllJobs = async (
   LIMIT $${paramIndex} OFFSET $${paramIndex + 1};
 `;
 
-  const dataParams = [...queryParams, limit, offset * 10];
+  const dataParams = [...queryParams, limit, offset];
   const dataResult = await handlePostExecuteSqlStatement<Job>(
     {
       text: dataQuery,

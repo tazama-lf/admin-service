@@ -213,7 +213,7 @@ export const findConfigsByStatus = async (
   };
 };
 
-export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>, expectedUpdatedAt?: string): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
@@ -270,16 +270,24 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
 
   setClauses.push('updated_at = NOW()');
 
+  const whereClause = expectedUpdatedAt
+    ? `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} AND updated_at = $${paramIndex + 2}`
+    : `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
+
   const query = `
     UPDATE tcs_config
     SET ${setClauses.join(', ')}
-    WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
+    ${whereClause}
     RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
               schema, payload_xml, payload_json, comments, mapping, functions,
               status, publishing_status, created_at, updated_at, tenant_id, created_by
   `;
 
-  values.push(id, tenantId);
+  if (expectedUpdatedAt) {
+    values.push(id, tenantId, expectedUpdatedAt);
+  } else {
+    values.push(id, tenantId);
+  }
 
   interface UpdateConfigRow {
     id: number;
@@ -305,6 +313,9 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
+    if (expectedUpdatedAt) {
+      throw new Error('Config has been modified by another process. Please refresh and try again.');
+    }
     throw new Error('Configuration not found');
   }
 

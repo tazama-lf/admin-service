@@ -144,7 +144,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);
+    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.updatedAt);
 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
@@ -253,7 +253,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.updatedAt);
 
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
@@ -280,7 +280,7 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] }, config.updatedAt);
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
@@ -310,7 +310,7 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, config.updatedAt);
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
@@ -337,7 +337,7 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] }, config.updatedAt);
 
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;

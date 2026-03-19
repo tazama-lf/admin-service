@@ -1,10 +1,5 @@
 import type { FastifyReply } from 'fastify';
-
-interface HttpError extends Error {
-  status?: number;
-  statusCode?: number;
-  response?: { message: string; statusCode?: number };
-}
+import type { HttpError } from '../interface/common.interface';
 
 const statusMessages: Record<number, string> = {
   400: 'Bad Request',

@@ -14,15 +14,15 @@ import {
   validateExisting,
   validateActive,
 } from '../repositories/dataEnrichment/job.de.repository';
-import type {
+import {
   ConfigType,
-  ISuccess,
-  Job,
-  JobStatus,
-  JobSummary,
-  PaginatedResult,
-  PullJobHistory,
-  ScheduleStatus,
+  type ISuccess,
+  type Job,
+  type JobStatus,
+  type JobSummary,
+  type PaginatedResult,
+  type PullJobHistory,
+  type ScheduleStatus,
 } from '../interface/data-enrichment.interface';
 
 export const handleCreatePushJob = async (job: Partial<PushJob>, tenantId: string): Promise<{ message: string }> => {
@@ -101,8 +101,9 @@ export const handleGetJobHistory = async (
   }
 };
 
-export const handleFindJobById = async (id: string, tableName: string): Promise<Job | null> => {
+export const handleFindJobById = async (id: string, type: ConfigType): Promise<Job | null> => {
   try {
+    const tableName = type === ConfigType.PUSH ? 'tcs_push_jobs' : 'tcs_pull_jobs';
     loggerService.log(`Started handling find job by id: ${id} in table: ${tableName}`);
 
     const result = await findJobById(id, tableName);

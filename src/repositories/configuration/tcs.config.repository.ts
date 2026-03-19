@@ -4,6 +4,7 @@ import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, 
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
 import { loggerService } from '../..';
+import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
@@ -413,8 +414,10 @@ export const getSchemaByTransactionType = async (
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
+  const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
+  validateTableName(safeTableName);
   const query = `
-    CREATE TABLE IF NOT EXISTS "${transactionType}" (
+    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       document JSONB NOT NULL,
       creDtTm TEXT,
       messageId TEXT,
@@ -429,8 +432,10 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
 };
 
 export const createTazamaDataModelTable = async (tableName: string): Promise<void> => {
+  const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '_');
+  validateTableName(safeTableName);
   const query = `
-    CREATE TABLE IF NOT EXISTS "${tableName}" (
+    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       _key text PRIMARY KEY,
       data jsonb NOT NULL,
       tenantId text,

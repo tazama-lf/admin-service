@@ -31,3 +31,10 @@ export function validateTableName(tableName: string): void {
     throw new Error(`Invalid table name "${tableName}". It is a reserved SQL keyword.`);
   }
 }
+
+export function validateColumnKeys(keys: string[], allowedColumns: ReadonlySet<string>, context: string): void {
+  const invalid = keys.filter((k) => !allowedColumns.has(k));
+  if (invalid.length > 0) {
+    throw new Error(`Invalid field(s) for ${context}: ${invalid.join(', ')}`);
+  }
+}

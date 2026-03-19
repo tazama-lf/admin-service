@@ -1,6 +1,6 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import { validateTableName } from '../../utils/enrichment-utils';
+import { validateTableName, validateColumnKeys } from '../../utils/enrichment-utils';
 import {
   ConfigType,
   type ISuccess,
@@ -12,6 +12,34 @@ import {
   type PushJob,
   ScheduleStatus,
 } from '../../interface/data-enrichment.interface';
+
+const ALLOWED_PUSH_JOB_COLUMNS = new Set([
+  'endpoint_name',
+  'path',
+  'mode',
+  'table_name',
+  'description',
+  'version',
+  'status',
+  'publishing_status',
+  'tenant_id',
+  'comments',
+]);
+
+const ALLOWED_PULL_JOB_COLUMNS = new Set([
+  'endpoint_name',
+  'mode',
+  'table_name',
+  'description',
+  'version',
+  'status',
+  'publishing_status',
+  'tenant_id',
+  'schedule_id',
+  'comments',
+]);
+
+const ALLOWED_JOB_TABLES = new Set(['tcs_push_jobs', 'tcs_pull_jobs']);
 
 export const tableExist = async (tableName: string): Promise<boolean> => {
   try {
@@ -109,6 +137,7 @@ export const createPushJob = async (job: Partial<PushJob>): Promise<number> => {
     }
 
     const keys = Object.keys(job);
+    validateColumnKeys(keys, ALLOWED_PUSH_JOB_COLUMNS, 'tcs_push_jobs insert');
     const values = Object.values(job);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -146,6 +175,7 @@ export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
     }
 
     const keys = Object.keys(job);
+    validateColumnKeys(keys, ALLOWED_PULL_JOB_COLUMNS, 'tcs_pull_jobs insert');
     const values = Object.values(job);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -378,6 +408,9 @@ export const getAllJobs = async (
 
 export const findJobById = async (id: string, tableName: string): Promise<Job | null> => {
   try {
+    if (!ALLOWED_JOB_TABLES.has(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
     const query = ` SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1;`;
     const result = await handlePostExecuteSqlStatement<Job>(
       {
@@ -454,6 +487,7 @@ export const updateJob = async (
 ): Promise<{ success: boolean; message: string }> => {
   try {
     const tableName = type === ConfigType.PUSH ? 'tcs_push_jobs' : 'tcs_pull_jobs';
+    const allowedColumns = type === ConfigType.PUSH ? ALLOWED_PUSH_JOB_COLUMNS : ALLOWED_PULL_JOB_COLUMNS;
 
     const keys = Object.keys(job);
     const values = Object.values(job);
@@ -462,6 +496,7 @@ export const updateJob = async (
       throw new Error('No fields provided to update');
     }
 
+    validateColumnKeys(keys, allowedColumns, `${tableName} update`);
     const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ') + ', updated_at = NOW()';
     const query = `
       UPDATE ${tableName}

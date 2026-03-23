@@ -1470,14 +1470,13 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
 
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId;
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
     const query = req.query as { category?: string };
 
     const ruleFlow = await getRuleFlowStatus(
       ruleId,
-      tenantId ?? '',
+      tenantId,
       query.category && query.category !== 'undefined' ? { category: query.category } : undefined,
     );
 

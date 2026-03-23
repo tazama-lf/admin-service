@@ -17,8 +17,6 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
         return await databaseManager._eventHistory.query<T>(queryConfig.text, queryConfig.values);
       case 'evaluation':
         return await databaseManager._evaluation.query<T>(queryConfig.text, queryConfig.values);
-      case 'raw_history':
-        return await databaseManager._rawHistory.query<T>(queryConfig.text, queryConfig.values);
       default:
         throw new Error('Specified database was not found.');
     }

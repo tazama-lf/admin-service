@@ -1,0 +1,35 @@
+export const validateSystemFunctions = (query: string): boolean => {
+  const upperCaseQuery = query.toUpperCase();
+  const forbiddenFunctions = [
+    'PG_READ_FILE',
+    'PG_STAT_FILE',
+    'PG_STAT_ACTIVITY',
+    'PG_STAT_ALL_TABLES',
+    'PG_STAT_USER_TABLES',
+    'PG_STAT_DATABASE',
+    'PG_STAT_BGWRITER',
+    'PG_STAT_REPLICATION',
+    'PG_STAT_WAL_RECEIVER',
+    'PG_STAT_XACT_ALL_TABLES',
+    'PG_STAT_XACT_USER_TABLES',
+    'PG_STAT_XACT_SYS_TABLES',
+    'PG_STAT_SYS_TABLES',
+    'PG_STAT_PROGRESS_VACUUM',
+    'PG_STAT_PROGRESS_CLUSTER',
+    'PG_STAT_PROGRESS_CREATE_INDEX',
+    'PG_STAT_PROGRESS_ANALYZE',
+    'PG_STAT_IO',
+    'PG_STAT_SLRU',
+    'PG_STAT_ARCHIVER',
+    'PG_STAT_SUBSCRIPTION',
+    'PG_STAT_REPLICATION_SLOTS',
+    'PG_STAT_DATABASE_CONFLICTS',
+    'PG_STAT_USER_FUNCTIONS',
+    'PG_STAT_SYS_FUNCTIONS',
+    'PG_STAT_USER_INDEXES',
+    'PG_STAT_SYS_INDEXES',
+    'PG_STAT_USER_SEQUENCES',
+    'PG_STAT_SYS_SEQUENCES',
+  ];
+  return forbiddenFunctions.some((fn) => upperCaseQuery.includes(fn));
+};

@@ -3,7 +3,6 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
-import type { ActiveNetworkMap } from '../../interface/rule.interface';
 
 export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   list: async function ({ limit, offset, sort, order, filters, tenantId }): Promise<{ data: NetworkMap[]; total: number }> {
@@ -70,30 +69,4 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     );
     return queryRes.rowCount ? true : false;
   },
-};
-export const findActiveNetworkMapInDb = async (tenantId: string): Promise<ActiveNetworkMap | null> => {
-  const query = `
-      SELECT configuration
-      FROM network_map
-      WHERE tenantId = $1
-        AND configuration->>'active' = 'true'
-    `;
-
-  const result = await handlePostExecuteSqlStatement(
-    {
-      text: query,
-      values: [tenantId],
-    } as const satisfies PgQueryConfig,
-    'configuration',
-  );
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  if (result.rows.length > 1) {
-    throw new Error(`Multiple active network maps found for tenant ${tenantId}. Expected only one active network map.`);
-  }
-
-  return { configuration: result.rows[0].configuration };
 };

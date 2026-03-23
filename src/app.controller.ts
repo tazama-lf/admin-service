@@ -656,7 +656,7 @@ export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyRe
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to create push job';
-    loggerService.error(`Failed to create push job: ${errorMessage}`, 'createCronJobHandler');
+    loggerService.error(`Failed to create push job: ${errorMessage}`, 'createPushJobHandler');
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle create push job request');

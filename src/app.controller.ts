@@ -381,8 +381,13 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
     const { id } = req.params as { id: string };
     const { status } = req.body as { status?: string };
 
+    if (!status) {
+      reply.code(400).send({ success: false, message: 'status is required in request body' });
+      return;
+    }
+
     const { tenantId } = req as ITenantRequest;
-    const updatedCount = await handleUpdateConfigByStatus(id, status,tenantId);
+    const updatedCount = await handleUpdateConfigByStatus(id, status, tenantId);
 
 
     reply.code(200).send({
@@ -602,10 +607,14 @@ export const getCronJobByStatusHandler = async (req: FastifyRequest, reply: Fast
   loggerService.log('Start - Handle get cron job by status request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const { status } = req.params as { status: JobStatus };
-    const { page = '1', limit = '10' } = req.query as { page?: string; limit?: string };
+    const { status, page = '1', limit = '10' } = req.query as { status?: JobStatus; page?: string; limit?: string };
     const parsedPage = parseInt(page, 10);
     const parsedLimit = parseInt(limit, 10);
+
+    if (!status) {
+      reply.code(400).send({ success: false, message: 'status query parameter is required' });
+      return;
+    }
 
     const cronJobs = await handleGetCronByStatus(tenantId, status, parsedPage, parsedLimit);
     reply.code(200).send({
@@ -739,7 +748,7 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
   loggerService.log('Start - Handle find job by ID request');
   try {
     const { id } = req.params as { id: string };
-    const { tableName } = req.query as { tableName: string };
+    const { tableName } = req.query as { tableName: ConfigType };
 
     if (!tableName) {
       reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
@@ -1039,7 +1048,8 @@ interface RuleConfig {
 
 export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { ruleId, tenantId } = req.params as { ruleId: string; tenantId: string };
+    const { tenantId } = req as ITenantRequest;
+    const { ruleId } = req.params as { ruleId: string };
 
     const globalVariables = await getGlobalVariables(ruleId, tenantId);
 
@@ -1580,12 +1590,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
 export const getDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle get data model JSON request');
   try {
-    const { tenantId } = req.params as { tenantId: string };
-
-    if (!tenantId) {
-      reply.status(400).send({ success: false, message: 'tenantId is required' });
-      return;
-    }
+    const { tenantId } = req as ITenantRequest;
 
     const dataModelJson = await handleGetDataModelJson(tenantId);
 
@@ -1614,13 +1619,8 @@ export const getDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
 export const putDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle put data model JSON request');
   try {
-    const { tenantId } = req.params as { tenantId: string };
+    const { tenantId } = req as ITenantRequest;
     const body = req.body as { data_model_json: Record<string, unknown> };
-
-    if (!tenantId) {
-      reply.status(400).send({ success: false, message: 'tenantId is required' });
-      return;
-    }
 
     if (!body?.data_model_json) {
       reply.status(400).send({ success: false, message: 'data_model_json is required in request body' });

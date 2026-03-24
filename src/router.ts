@@ -119,20 +119,20 @@ const routePrivilege = {
   postTcsWorkflowExport: 'exporter',
   postTcsWorkflowReturnToProgress: 'editor',
   getTcsWorkflowStatus: 'view-profile',
-  createSchedule: 'view-profile',
+  createSchedule: 'editor',
   findSchedule: 'view-profile',
-  updateSchedule: 'view-profile',
+  updateSchedule: 'editor',
   getSchedules: 'view-profile',
   getAllSchedules: 'view-profile',
-  updateScheduleStatus: 'view-profile',
-  createPushJob: 'view-profile',
-  createPullJob: 'view-profile',
+  updateScheduleStatus: 'editor',
+  createPushJob: 'editor',
+  createPullJob: 'editor',
     getAllJobs: 'view-profile',
   getAllJobsHistory: 'view-profile',
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
   updateJobActivation: 'publisher',
-  updateJobStatus: 'view-profile',
+  updateJobStatus: 'editor',
   updateJob: 'editor',
     validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
@@ -345,11 +345,11 @@ function Routes(fastify: FastifyInstance): void {
 
   // ==================== DATA MODEL JSON OPERATIONS ====================
 
-  fastify.get('/v1/admin/tcs/data-model/json/:tenantId', {
+  fastify.get('/v1/admin/tcs/data-model/json', {
     ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
   });
 
-  fastify.put('/v1/admin/tcs/data-model/json/:tenantId', {
+  fastify.put('/v1/admin/tcs/data-model/json', {
     ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
   });
    // ====================  RULES OPERATIONS ====================

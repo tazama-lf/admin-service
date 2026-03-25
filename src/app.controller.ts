@@ -252,7 +252,6 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
-    loggerService.log(`getAllConfigsHandler-body--1: ${JSON.stringify(req.body)}`);
 
     const result = await handleGetAllConfigs(parsedLimit, parsedOffset, body, tenantId);
     reply.code(200).send({
@@ -374,7 +373,6 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
 
     const { tenantId } = req as ITenantRequest;
     const updatedCount = await handleUpdateConfigByStatus(id, status, tenantId);
-
 
     reply.code(200).send({
       success: true,
@@ -1571,4 +1569,3 @@ export const putDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
     loggerService.log('End - Handle put data model JSON request');
   }
 };
-

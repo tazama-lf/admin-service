@@ -405,7 +405,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
   });
 
-  fastify.get('/v1/admin/trs/global-variables/:ruleId/:tenantId', {
+  fastify.get('/v1/admin/trs/global-variables/:ruleId', {
     ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
   });
   fastify.get('/v1/admin/nodes', {

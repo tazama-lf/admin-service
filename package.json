@@ -38,7 +38,7 @@
     "@sinclair/typebox": "^0.34.41",
     "@tazama-lf/auth-lib": "4.0.0-rc.4",
     "@tazama-lf/frms-coe-lib": "7.0.2-rc.0",
-    "@tazama-lf/frms-coe-startup-lib": "3.0.2-rc.0",
+    "@tazama-lf/frms-coe-startup-lib": "3.0.2-rc.1",
     "@tazama-lf/tcs-lib": "1.0.155",
     "ajv": "^8.17.1",
     "dotenv": "^17.2.0",

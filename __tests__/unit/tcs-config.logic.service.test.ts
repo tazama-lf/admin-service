@@ -418,7 +418,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(result.mapping).toHaveLength(1);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
       expect(result.mapping?.[0]).toEqual(newMapping);
     });
 
@@ -488,7 +488,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(result.mapping).toHaveLength(1);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [mappings[1]] });
       expect(result.mapping?.[0]).toEqual(mappings[1]);
     });
 
@@ -538,7 +538,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
 
-      expect(result.functions).toHaveLength(1);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -607,7 +607,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(result.functions).toHaveLength(1);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [functions[1]] });
       expect(result.functions?.[0]).toEqual(functions[1]);
     });
 

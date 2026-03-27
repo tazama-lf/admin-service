@@ -31,6 +31,7 @@ import {
   handleGetAllTransactionTypes,
   handleGetPayloadByTransactionType,
   handleGetConfigByTransactionType,
+  handleGetRelatedTransactions,
 } from './services/tcs-config.logic.service';
 import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
 import {
@@ -1513,6 +1514,26 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     ErrorHandler.sendError(reply, error, 'Failed to get config by transaction type');
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get related transactions request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const relatedTransactions = await handleGetRelatedTransactions(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      data: relatedTransactions,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get related transactions';
+    loggerService.error(`Failed to get related transactions: ${errorMessage}`, 'getRelatedTransactionsHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get related transactions request');
   }
 };
 

@@ -20,6 +20,7 @@ import {
   findAllTransactionTypes,
   getPayloadByTransactionType,
   getSchemaByTransactionType,
+  getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
@@ -50,6 +51,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       publishing_status: config.publishing_status ?? 'inactive',
       payload: config.payload,
       creDtTm: nowDateTime,
+      relatedTransaction: config.relatedTransaction,
     };
 
     const createdConfigId = await createConfig(newConfig);
@@ -392,5 +394,21 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
       'handleGetConfigByTransactionType',
     );
     throw new Error('Configuration not found');
+  }
+};
+
+export const handleGetRelatedTransactions = async (tenantId: string): Promise<string[]> => {
+  try {
+    loggerService.log(`Started handling get related transactions request for tenant ${tenantId}.`);
+
+    const relatedTransactions = await getRelatedTransactions(tenantId);
+
+    loggerService.log('Related transactions retrieved successfully.');
+
+    return relatedTransactions;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: getting related transactions with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
   }
 };

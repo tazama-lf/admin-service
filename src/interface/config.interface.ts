@@ -17,6 +17,7 @@ export interface ConfigData {
   publishing_status?: string;
   payload?: string | object;
   creDtTm?: string;
+  relatedTransaction?: string;
 }
 
 export interface ConfigRow {
@@ -38,6 +39,7 @@ export interface ConfigRow {
   publishing_status: 'active' | 'inactive';
   payload_xml?: string;
   payload_json?: Record<string, unknown>;
+  related_transaction?: string;
 }
 
 export type ConfigInput = Partial<ConfigData>;

@@ -9,9 +9,10 @@ const ALLOWED_CRON_UPDATE_COLUMNS = new Set(['name', 'cron', 'iterations', 'stat
 
 export const createCronJob = async (cronData: Record<string, unknown>): Promise<number> => {
   try {
-    const keys = Object.keys(cronData);
+    const { id, ...cronDataWithoutId } = cronData;
+    const keys = Object.keys(cronDataWithoutId);
     validateColumnKeys(keys, ALLOWED_CRON_INSERT_COLUMNS, 'tcs_cron_jobs insert');
-    const values = Object.values(cronData);
+    const values = Object.values(cronDataWithoutId);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
     const insertQuery = `
@@ -129,7 +130,7 @@ export const getAllCronJobs = async (
   const dataQuery = `
     SELECT * FROM tcs_cron_jobs ${whereClause}  ORDER BY updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-  const dataParams = [...queryParams, limit, offset ];
+  const dataParams = [...queryParams, limit, offset];
   const dataResult = await handlePostExecuteSqlStatement<CronJob>(
     {
       text: dataQuery,

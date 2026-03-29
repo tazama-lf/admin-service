@@ -245,7 +245,7 @@ describe('TCS Config Logic Service', () => {
       const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updateData);
 
       expect(tcsConfigRepository.findConfigById).toHaveBeenCalledWith(1, mockTenantId);
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData, mockExistingConfig.updatedAt);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData);
       expect(result).toEqual(mockUpdatedConfig);
     });
 

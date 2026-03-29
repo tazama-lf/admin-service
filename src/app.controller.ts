@@ -623,7 +623,8 @@ export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyRe
   loggerService.log('Start - Handle create push job request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const pushData = req.body as Record<string, unknown>;
+    const { id: _id, ...pushData } = req.body as Record<string, unknown>;
+
     const response = await handleCreatePushJob(pushData, tenantId);
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
@@ -664,7 +665,7 @@ export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyRe
   loggerService.log('Start - Handle create pull job request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const pullData = req.body as Record<string, unknown>;
+    const { id: _id, ...pullData } = req.body as Record<string, unknown>;
     const response = await handleCreatePullJob(pullData, tenantId);
     reply.code(201).send({ success: response.success, message: response.message });
   } catch (error: unknown) {

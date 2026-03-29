@@ -704,18 +704,17 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
   loggerService.log('Start - Handle find job by ID request');
   try {
     const { id } = req.params as { id: string };
-    const { tableName, type } = req.query as { tableName?: string; type?: string };
+    const { tableName } = req.query as { tableName?: string };
 
-    // Support both ?tableName=tcs_push_jobs (from backend) and ?type=push (from frontend)
     let resolvedType: string | undefined;
-    if (tableName === 'tcs_push_jobs' || type === 'push') {
+    if (tableName === 'tcs_push_jobs') {
       resolvedType = 'push';
-    } else if (tableName === 'tcs_pull_jobs' || type === 'pull') {
+    } else if (tableName === 'tcs_pull_jobs') {
       resolvedType = 'pull';
     }
 
     if (!resolvedType) {
-      reply.code(400).send({ success: false, message: 'tableName or type query parameter is required' });
+      reply.code(400).send({ success: false, message: 'tableName query parameter is required (tcs_push_jobs or tcs_pull_jobs)' });
       return;
     }
 

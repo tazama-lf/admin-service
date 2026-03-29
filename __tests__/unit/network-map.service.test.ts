@@ -67,9 +67,7 @@ describe('Network Map Service', () => {
     });
 
     it('should throw error on repository failure', async () => {
-      (networkMapRepository.findActiveNetworkMapInDb as jest.Mock).mockRejectedValue(
-        new Error('Database connection failed')
-      );
+      (networkMapRepository.findActiveNetworkMapInDb as jest.Mock).mockRejectedValue(new Error('Database connection failed'));
 
       await expect(networkMapService.findActiveNetworkMap(tenantId)).rejects.toThrow('Database connection failed');
     });
@@ -86,10 +84,7 @@ describe('Network Map Service', () => {
 
     it('should handle network map with multiple messages', async () => {
       const multiMessageConfig = {
-        messages: [
-          mockConfiguration.messages[0],
-          { ...mockConfiguration.messages[0], id: 'msg-002', txTp: 'pain.002.001.03' },
-        ],
+        messages: [mockConfiguration.messages[0], { ...mockConfiguration.messages[0], id: 'msg-002', txTp: 'pain.002.001.03' }],
       };
       const multiMessageMap = { ...mockNetworkMap, configuration: multiMessageConfig };
       (networkMapRepository.findActiveNetworkMapInDb as jest.Mock).mockResolvedValue(multiMessageMap);

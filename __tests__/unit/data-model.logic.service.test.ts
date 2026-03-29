@@ -79,9 +79,7 @@ describe('Data Model Logic Service', () => {
     it('should throw error when upsert fails', async () => {
       (dataModelRepository.upsertDataModelJson as jest.Mock).mockRejectedValue(new Error('Upsert failed'));
 
-      await expect(
-        dataModelService.handleUpsertDataModelJson(mockTenantId, mockDataModel)
-      ).rejects.toThrow('Upsert failed');
+      await expect(dataModelService.handleUpsertDataModelJson(mockTenantId, mockDataModel)).rejects.toThrow('Upsert failed');
     });
   });
 });

@@ -92,9 +92,7 @@ describe('Cron Logic Service', () => {
     it('should throw error when no rows affected', async () => {
       (cronRepository.updateCronJob as jest.Mock).mockResolvedValue(0);
 
-      await expect(cronService.handleUpdateCron(mockCronId, {})).rejects.toThrow(
-        `No cron job found with id: ${mockCronId}`
-      );
+      await expect(cronService.handleUpdateCron(mockCronId, {})).rejects.toThrow(`No cron job found with id: ${mockCronId}`);
     });
 
     it('should throw error when update fails', async () => {
@@ -187,9 +185,7 @@ describe('Cron Logic Service', () => {
     it('should throw error on repository failure', async () => {
       (cronRepository.getCronJobByStatus as jest.Mock).mockRejectedValue(new Error('Status query failed'));
 
-      await expect(cronService.handleGetCronByStatus(mockTenantId, JobStatus.PENDING, 1, 10)).rejects.toThrow(
-        'Status query failed'
-      );
+      await expect(cronService.handleGetCronByStatus(mockTenantId, JobStatus.PENDING, 1, 10)).rejects.toThrow('Status query failed');
     });
   });
 
@@ -223,16 +219,14 @@ describe('Cron Logic Service', () => {
       (cronRepository.updateCronJobByStatus as jest.Mock).mockResolvedValue(0);
 
       await expect(cronService.handleUpdateCronStatus(JobStatus.APPROVED, mockCronId)).rejects.toThrow(
-        `No cron job found with id: ${mockCronId}`
+        `No cron job found with id: ${mockCronId}`,
       );
     });
 
     it('should throw error when status update fails', async () => {
       (cronRepository.updateCronJobByStatus as jest.Mock).mockRejectedValue(new Error('Status update failed'));
 
-      await expect(cronService.handleUpdateCronStatus(JobStatus.APPROVED, mockCronId)).rejects.toThrow(
-        'Status update failed'
-      );
+      await expect(cronService.handleUpdateCronStatus(JobStatus.APPROVED, mockCronId)).rejects.toThrow('Status update failed');
     });
   });
 });

@@ -126,15 +126,15 @@ const routePrivilege = {
   updateSchedule: 'editor',
   getSchedules: 'view-profile',
   getAllSchedules: 'view-profile',
-  updateScheduleStatus: 'editor',
+  updateScheduleStatus: 'view-profile',
   createPushJob: 'editor',
   createPullJob: 'editor',
   getAllJobs: 'view-profile',
   getAllJobsHistory: 'view-profile',
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
-  updateJobActivation: 'publisher',
-  updateJobStatus: 'editor',
+  updateJobActivation: 'view-profile',
+  updateJobStatus: 'view-profile',
   updateJob: 'editor',
   validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
@@ -181,11 +181,12 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getJobHistoryHandler, routePrivilege.getAllJobsHistory),
   });
 
-  fastify.get('/v1/admin/tcs/job/get/:id', {
-    ...SetOptionsBodyAndParams(findJobByIdHandler, routePrivilege.getJobById),
-  });
   fastify.get('/v1/admin/tcs/job/get/status', {
     ...SetOptionsBodyAndParams(getJobsByStatusHandler, routePrivilege.getJobByStatus),
+  });
+
+  fastify.get('/v1/admin/tcs/job/get/:id', {
+    ...SetOptionsBodyAndParams(findJobByIdHandler, routePrivilege.getJobById),
   });
 
   fastify.put('/v1/admin/tcs/job/update/activation/:id', {
@@ -420,6 +421,18 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
   });
 
+  // ==================== DATA MODEL JSON OPERATIONS ====================
+
+  fastify.get('/v1/admin/tcs/data-model/json', {
+    ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
+  });
+
+  fastify.put('/v1/admin/tcs/data-model/json', {
+    ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
+  });
+  fastify.get('/v1/admin/trs/global-variables/:ruleId', {
+    ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
+  });
   fastify.get('/v1/admin/nodes', {
     ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
   });

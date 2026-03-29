@@ -58,7 +58,7 @@ describe('Simulation Logs Logic Service', () => {
         { config: 'new' },
         'Test log',
         'rule',
-        mockEmail
+        mockEmail,
       );
     });
 
@@ -83,14 +83,12 @@ describe('Simulation Logs Logic Service', () => {
         { config: 'new' },
         '',
         'rule',
-        mockEmail
+        mockEmail,
       );
     });
 
     it('should throw error when log creation fails', async () => {
-      (simulationLogsRepository.createSimulationLogsInDb as jest.Mock).mockRejectedValue(
-        new Error('Database error')
-      );
+      (simulationLogsRepository.createSimulationLogsInDb as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       await expect(
         simulationLogsService.createSimulationLogs({
@@ -101,7 +99,7 @@ describe('Simulation Logs Logic Service', () => {
           newData: { config: 'new' },
           category: 'rule',
           createdByEmail: mockEmail,
-        })
+        }),
       ).rejects.toThrow('Database error');
     });
   });
@@ -147,13 +145,7 @@ describe('Simulation Logs Logic Service', () => {
       const mockLogs = [mockSimulationLog];
       (simulationLogsRepository.getSimulationLogsFromDb as jest.Mock).mockResolvedValue(mockLogs);
 
-      const result = await simulationLogsService.getSimulationLogs(
-        mockRuleId,
-        mockTenantId,
-        undefined,
-        'updated_at',
-        'asc'
-      );
+      const result = await simulationLogsService.getSimulationLogs(mockRuleId, mockTenantId, undefined, 'updated_at', 'asc');
 
       expect(result).toEqual(mockLogs);
       expect(simulationLogsRepository.getSimulationLogsFromDb).toHaveBeenCalledWith({
@@ -171,15 +163,7 @@ describe('Simulation Logs Logic Service', () => {
       const mockLogs = [mockSimulationLog];
       (simulationLogsRepository.getSimulationLogsFromDb as jest.Mock).mockResolvedValue(mockLogs);
 
-      const result = await simulationLogsService.getSimulationLogs(
-        mockRuleId,
-        mockTenantId,
-        undefined,
-        'created_at',
-        'desc',
-        10,
-        20
-      );
+      const result = await simulationLogsService.getSimulationLogs(mockRuleId, mockTenantId, undefined, 'created_at', 'desc', 10, 20);
 
       expect(result).toEqual(mockLogs);
       expect(simulationLogsRepository.getSimulationLogsFromDb).toHaveBeenCalledWith({
@@ -202,13 +186,9 @@ describe('Simulation Logs Logic Service', () => {
     });
 
     it('should throw error on repository failure', async () => {
-      (simulationLogsRepository.getSimulationLogsFromDb as jest.Mock).mockRejectedValue(
-        new Error('Query failed')
-      );
+      (simulationLogsRepository.getSimulationLogsFromDb as jest.Mock).mockRejectedValue(new Error('Query failed'));
 
-      await expect(
-        simulationLogsService.getSimulationLogs(mockRuleId, mockTenantId)
-      ).rejects.toThrow('Query failed');
+      await expect(simulationLogsService.getSimulationLogs(mockRuleId, mockTenantId)).rejects.toThrow('Query failed');
     });
   });
 });

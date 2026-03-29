@@ -146,7 +146,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);
+    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.updatedAt);
 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;

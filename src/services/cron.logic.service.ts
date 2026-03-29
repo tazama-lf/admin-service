@@ -5,7 +5,7 @@ import {
   getAllCronJobs,
   getCronJobByStatus,
   updateCronJobByStatus,
-} from '../repositories/dateEnrichment/cron.de.repository';
+} from '../repositories/dataEnrichment/cron.de.repository';
 import { loggerService } from '..';
 import type { CronJob, JobStatus, PaginatedResult } from '../interface/data-enrichment.interface';
 

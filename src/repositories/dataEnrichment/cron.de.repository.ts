@@ -1,10 +1,16 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { type CronJob, JobStatus, type PaginatedResult } from '../../interface/data-enrichment.interface';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { validateColumnKeys } from '../../utils/enrichment-utils';
+
+const ALLOWED_CRON_INSERT_COLUMNS = new Set(['name', 'cron', 'iterations', 'status', 'tenant_id', 'comments', 'schedule_id']);
+
+const ALLOWED_CRON_UPDATE_COLUMNS = new Set(['name', 'cron', 'iterations', 'status', 'comments']);
 
 export const createCronJob = async (cronData: Record<string, unknown>): Promise<number> => {
   try {
     const keys = Object.keys(cronData);
+    validateColumnKeys(keys, ALLOWED_CRON_INSERT_COLUMNS, 'tcs_cron_jobs insert');
     const values = Object.values(cronData);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -52,6 +58,7 @@ export const findCronJobById = async (id: string): Promise<CronJob | null> => {
 export const updateCronJob = async (id: string, attr: Record<string, unknown>): Promise<number | null> => {
   try {
     const keys = Object.keys(attr);
+    validateColumnKeys(keys, ALLOWED_CRON_UPDATE_COLUMNS, 'tcs_cron_jobs update');
     const values = Object.values(attr);
     const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ') + ', updated_at = NOW()';
 

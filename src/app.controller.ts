@@ -1,7 +1,7 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import * as util from 'node:util';
+import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import type { ITenantRequest } from './interface/ITenantRequest';
@@ -14,6 +14,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
+import { handleGetReportRequestByMsgId } from './services/report.logic.service';
 import {
   handlePostConfig,
   handleFindConfigByID,
@@ -32,9 +33,6 @@ import {
   handleGetConfigByTransactionType,
   handleGetRelatedTransactions,
 } from './services/tcs-config.logic.service';
-
-import { handleGetReportRequestByMsgId } from './services/report.logic.service';
-
 import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
 import {
   handlePostCron,
@@ -191,7 +189,7 @@ export const getAccountConditionsHandler = async (req: FastifyRequest, reply: Fa
 
 export const updateAccountConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update condition for account request');
-  const expiryDate = (req.body as { xprtnDtTm?: string }).xprtnDtTm;
+  const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { tenantId } = req as ITenantRequest;
     const { code, message } = await handleUpdateExpiryDateForConditionsOfAccount(req.query as ConditionRequest, tenantId, expiryDate);
@@ -208,7 +206,7 @@ export const updateAccountConditionExpiryDateHandler = async (req: FastifyReques
 
 export const updateEntityConditionExpiryDateHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle update condition for entity request');
-  const expiryDate = (req.body as { xprtnDtTm?: string }).xprtnDtTm;
+  const expiryDate = (req.body as { xprtnDtTm?: string })?.xprtnDtTm;
   try {
     const { tenantId } = req as ITenantRequest;
     const { code, message } = await handleUpdateExpiryDateForConditionsOfEntity(req.query as ConditionRequest, tenantId, expiryDate);
@@ -230,9 +228,7 @@ export const createConfigHandler = async (req: FastifyRequest, reply: FastifyRep
     const response = await handlePostConfig(configData, tenantId);
     reply.code(201).send({ success: true, message: response.message, config: { id: response.result.id, ...configData } });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create config';
-    loggerService.error(`Failed to create config: ${errorMessage}`, 'createConfigHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create config');
   } finally {
     loggerService.log('End - Handle create config request');
   }
@@ -245,9 +241,7 @@ export const getConfigByIdHandler = async (req: FastifyRequest, reply: FastifyRe
     const config = await handleFindConfigByID(id, tenantId);
     reply.code(200).send({ success: true, config });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get config';
-    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByIdHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get config');
   } finally {
     loggerService.log('End - Handle get config by id request');
   }
@@ -259,7 +253,6 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
     const parsedOffset = parseInt(offset, 10);
-    loggerService.log(`getAllConfigsHandler-body--1: ${JSON.stringify(req.body)}`);
 
     const result = await handleGetAllConfigs(parsedLimit, parsedOffset, body, tenantId);
     reply.code(200).send({
@@ -271,9 +264,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get configs';
-    loggerService.error(`Failed to get configs: ${errorMessage}`, 'getAllConfigsHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get configs');
   }
 };
 
@@ -287,9 +278,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
     reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update config';
-    loggerService.error(`Failed to update config: ${errorMessage}`, 'writeConfigUpdateHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update config');
   } finally {
     loggerService.log('End - Handle write config update request');
   }
@@ -320,9 +309,7 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update publishing status';
-    loggerService.error(`Failed to update publishing status: ${errorMessage}`, 'updatePublishingStatusHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update publishing status');
   } finally {
     loggerService.log('End - Handle update publishing status request');
   }
@@ -345,9 +332,7 @@ export const createTransactionTypeTableHandler = async (req: FastifyRequest, rep
       message: `Table for transaction type '${transactionType}' created successfully`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create transaction type table';
-    loggerService.error(`Failed to create transaction type table: ${errorMessage}`, 'createTransactionTypeTableHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create transaction type table');
   } finally {
     loggerService.log('End - Handle create transaction type table request');
   }
@@ -370,9 +355,7 @@ export const createTazamaDataModelTableHandler = async (req: FastifyRequest, rep
       message: `Table '${tableName}' created successfully`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create Tazama data model table';
-    loggerService.error(`Failed to create Tazama data model table: ${errorMessage}`, 'createTazamaDataModelTableHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create Tazama data model table');
   } finally {
     loggerService.log('End - Handle create Tazama data model table request');
   }
@@ -383,8 +366,13 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
   try {
     const { id } = req.params as { id: string };
     const { status } = req.body as { status?: string };
-    const { tenantId } = req as ITenantRequest;
 
+    if (!status) {
+      reply.code(400).send({ success: false, message: 'status is required in request body' });
+      return;
+    }
+
+    const { tenantId } = req as ITenantRequest;
     const updatedCount = await handleUpdateConfigByStatus(id, status, tenantId);
 
     reply.code(200).send({
@@ -392,9 +380,7 @@ export const updateConfigByStatusHandler = async (req: FastifyRequest, reply: Fa
       message: `Publishing status updated successfully (${updatedCount} row(s) affected).`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update config publishing status';
-    loggerService.error(`Failed to update config by status: ${errorMessage}`, 'updateConfigByStatusHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update config publishing status');
   } finally {
     loggerService.log('End - Handle update config by status request');
   }
@@ -415,9 +401,7 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to add mapping';
-    loggerService.error(`Failed to add mapping: ${errorMessage}`, 'addMappingHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to add mapping');
   } finally {
     loggerService.log('End - Handle add mapping request');
   }
@@ -438,9 +422,7 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to remove mapping';
-    loggerService.error(`Failed to remove mapping: ${errorMessage}`, 'removeMappingHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to remove mapping');
   } finally {
     loggerService.log('End - Handle remove mapping request');
   }
@@ -461,9 +443,7 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to add function';
-    loggerService.error(`Failed to add function: ${errorMessage}`, 'addFunctionHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to add function');
   } finally {
     loggerService.log('End - Handle add function request');
   }
@@ -484,9 +464,7 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
       config: updatedConfig,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to remove function';
-    loggerService.error(`Failed to remove function: ${errorMessage}`, 'removeFunctionHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to remove function');
   } finally {
     loggerService.log('End - Handle remove function request');
   }
@@ -527,9 +505,7 @@ export const createCronJobHandler = async (req: FastifyRequest, reply: FastifyRe
     const response = await handlePostCron(configData, tenantId);
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create cron job';
-    loggerService.error(`Failed to create cron job: ${errorMessage}`, 'createCronJobHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create cron job');
   } finally {
     loggerService.log('End - Handle create cron job request');
   }
@@ -548,9 +524,7 @@ export const getCronJobByIdHandler = async (req: FastifyRequest, reply: FastifyR
 
     reply.code(200).send({ ...cronJob });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron job';
-    loggerService.error(`Failed to get cron job: ${errorMessage}`, 'getCronJobByIdHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get cron job');
   } finally {
     loggerService.log('End - Handle get cron job by id request');
   }
@@ -565,9 +539,7 @@ export const updateCronJobHandler = async (req: FastifyRequest, reply: FastifyRe
     const response = await handleUpdateCron(id, updateData);
     reply.code(200).send({ success: true, message: response.message });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update cron job';
-    loggerService.error(`Failed to update cron job: ${errorMessage}`, 'updateCronJobHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update cron job');
   } finally {
     loggerService.log('End - Handle update cron job request');
   }
@@ -592,9 +564,7 @@ export const getAllCronJobsHandler = async (req: FastifyRequest, reply: FastifyR
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron jobs';
-    loggerService.error(`Failed to get cron jobs: ${errorMessage}`, 'getAllCronJobsHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get cron jobs');
   } finally {
     loggerService.log('End - Handle get all cron jobs request');
   }
@@ -604,10 +574,14 @@ export const getCronJobByStatusHandler = async (req: FastifyRequest, reply: Fast
   loggerService.log('Start - Handle get cron job by status request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const { status } = req.params as { status: JobStatus };
-    const { page = '1', limit = '10' } = req.query as { page?: string; limit?: string };
+    const { status, page = '1', limit = '10' } = req.query as { status?: JobStatus; page?: string; limit?: string };
     const parsedPage = parseInt(page, 10);
     const parsedLimit = parseInt(limit, 10);
+
+    if (!status) {
+      reply.code(400).send({ success: false, message: 'status query parameter is required' });
+      return;
+    }
 
     const cronJobs = await handleGetCronByStatus(tenantId, status, parsedPage, parsedLimit);
     reply.code(200).send({
@@ -616,9 +590,7 @@ export const getCronJobByStatusHandler = async (req: FastifyRequest, reply: Fast
       count: cronJobs.length,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get cron jobs by status';
-    loggerService.error(`Failed to get cron jobs by status: ${errorMessage}`, 'getCronJobByStatusHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get cron jobs by status');
   } finally {
     loggerService.log('End - Handle get cron job by status request');
   }
@@ -639,9 +611,7 @@ export const updateCronJobStatusHandler = async (req: FastifyRequest, reply: Fas
     const response = await handleUpdateCronStatus(status, id, reason);
     reply.code(200).send({ success: true, message: response.message });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update cron job status';
-    loggerService.error(`Failed to update cron job status: ${errorMessage}`, 'updateCronJobStatusHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update cron job status');
   } finally {
     loggerService.log('End - Handle update cron job status request');
   }
@@ -657,9 +627,7 @@ export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyRe
     const response = await handleCreatePushJob(pushData, tenantId);
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create push job';
-    loggerService.error(`Failed to create push job: ${errorMessage}`, 'createCronJobHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create push job');
   } finally {
     loggerService.log('End - Handle create push job request');
   }
@@ -686,9 +654,7 @@ export const getAllJobsHandler = async (req: FastifyRequest, reply: FastifyReply
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get DE jobs';
-    loggerService.error(`Failed to get DE jobs: ${errorMessage}`, 'getAllDEJobsHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get DE jobs');
   } finally {
     loggerService.log('End - Handle get all DE jobs request');
   }
@@ -702,9 +668,7 @@ export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyRe
     const response = await handleCreatePullJob(pullData, tenantId);
     reply.code(201).send({ success: response.success, message: response.message });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create pull job';
-    loggerService.error(`Failed to create pull job: ${errorMessage}`, 'createPullJobHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to create pull job');
   } finally {
     loggerService.log('End - Handle create pull job request');
   }
@@ -729,9 +693,7 @@ export const getJobHistoryHandler = async (req: FastifyRequest, reply: FastifyRe
       pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get job history';
-    loggerService.error(`Failed to get job history: ${errorMessage}`, 'getJobHistoryHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get job history');
   } finally {
     loggerService.log('End - Handle get job history request');
   }
@@ -741,7 +703,7 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
   loggerService.log('Start - Handle find job by ID request');
   try {
     const { id } = req.params as { id: string };
-    const { tableName } = req.query as { tableName: string };
+    const { tableName } = req.query as { tableName: ConfigType };
 
     if (!tableName) {
       reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
@@ -757,9 +719,7 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
 
     reply.code(200).send(result);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to find job by ID';
-    loggerService.error(`Failed to find job by ID: ${errorMessage}`, 'findJobByIdHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to find job by ID');
   } finally {
     loggerService.log('End - Handle find job by ID request');
   }
@@ -782,9 +742,7 @@ export const getJobsByStatusHandler = async (req: FastifyRequest, reply: Fastify
     const result = await handleGetJobsByStatus(tenantId, status, parsedPage, parsedLimit);
     reply.code(200).send({ success: true, data: result });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get jobs by status';
-    loggerService.error(`Failed to get jobs by status: ${errorMessage}`, 'getJobsByStatusHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get jobs by status');
   } finally {
     loggerService.log('End - Handle get jobs by status request');
   }
@@ -804,9 +762,7 @@ export const updateJobHandler = async (req: FastifyRequest, reply: FastifyReply)
     const result = await handleUpdateJob(id, job, type);
     reply.code(200).send(result);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update job';
-    loggerService.error(`Failed to update job: ${errorMessage}`, 'updateJobHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update job');
   } finally {
     loggerService.log('End - Handle update job request');
   }
@@ -830,9 +786,7 @@ export const updateJobActivationHandler = async (req: FastifyRequest, reply: Fas
       data: result,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update job activation';
-    loggerService.error(`Failed to update job activation: ${errorMessage}`, 'updateJobActivationHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update job activation');
   } finally {
     loggerService.log('End - Handle update job activation request');
   }
@@ -855,9 +809,7 @@ export const updateJobByStatusHandler = async (req: FastifyRequest, reply: Fasti
       message: `Job status updated successfully (${result} row(s) affected)`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update job status';
-    loggerService.error(`Failed to update job status: ${errorMessage}`, 'updateJobByStatusHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to update job status');
   } finally {
     loggerService.log('End - Handle update job by status request');
   }
@@ -880,9 +832,7 @@ export const tableExistHandler = async (req: FastifyRequest, reply: FastifyReply
       message: exists ? `Table "${tableName}" exists` : `Table "${tableName}" does not exist`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to check if table exists';
-    loggerService.error(`Failed to check table existence: ${errorMessage}`, 'tableExistHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to check if table exists');
   } finally {
     loggerService.log('End - Handle table exist check request');
   }
@@ -905,9 +855,7 @@ export const validateExistingHandler = async (req: FastifyRequest, reply: Fastif
       message: exists ? 'Table or associated job exists' : 'Table does not exist',
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to validate existing table';
-    loggerService.error(`Failed to validate existing table: ${errorMessage}`, 'validateExistingHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to validate existing table');
   } finally {
     loggerService.log('End - Handle validate existing table request');
   }
@@ -929,9 +877,7 @@ export const validateActiveHandler = async (req: FastifyRequest, reply: FastifyR
       message: `No active jobs found for table "${tableName}"`,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to validate active jobs';
-    loggerService.error(`Failed to validate active jobs: ${errorMessage}`, 'validateActiveHandler');
-    reply.code(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to validate active jobs');
   } finally {
     loggerService.log('End - Handle validate active jobs request');
   }
@@ -940,7 +886,7 @@ export const validateActiveHandler = async (req: FastifyRequest, reply: FastifyR
 // ==================== TRS ====================
 export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
-  const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+  const { tenantId } = req as ITenantRequest;
   const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
 
   try {
@@ -977,8 +923,7 @@ export const createNodeHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const queryParams = req.query as { type?: string; category?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' };
 
     const nodes = await findAllNodes(tenantId, queryParams);
@@ -997,8 +942,7 @@ export const getNodeHandler = async (req: FastifyRequest, reply: FastifyReply): 
 
 export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const queryParams = req.params as { nodeId?: string };
     await deleteNodeById(Number(queryParams.nodeId), tenantId);
     reply.code(200).send({
@@ -1014,8 +958,7 @@ export const deleteNodeByIdHandler = async (req: FastifyRequest, reply: FastifyR
 
 export const executeQueryNode = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const body = req.body as { query: string; dbName: string; params?: unknown[] };
 
     if (!body.query) {
@@ -1044,7 +987,8 @@ interface RuleConfig {
 
 export const getGlobalVariablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { ruleId, tenantId } = req.params as { ruleId: string; tenantId: string };
+    const { tenantId } = req as ITenantRequest;
+    const { ruleId } = req.params as { ruleId: string };
 
     const globalVariables = await getGlobalVariables(ruleId, tenantId);
 
@@ -1152,8 +1096,7 @@ export const updateRuleStatusHandler = async (req: FastifyRequest, reply: Fastif
   try {
     const { ruleId } = req.params as { ruleId: string };
     const { status, reason } = req.body as { status: string; reason: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const updatedRule = await updateRuleStatus(ruleId, tenantId, status, reason);
 
@@ -1171,12 +1114,11 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
   try {
     const { ruleId } = req.params as { ruleId: number };
     const authReq = req as AuthenticatedRequest;
-    // const { tenantId } = req as ITenantRequest;
-    const token = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const { payload, ruleRequest } = req.body as CloneRuleHandlerReqBody;
 
-    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', token, ruleRequest);
+    const clonedRule = await cloneRule(ruleId, payload, authReq.user?.clientId ?? 'default', tenantId, ruleRequest);
     reply.code(201).send({
       success: true,
       message: 'Rule cloned successfully',
@@ -1191,7 +1133,7 @@ export const cloneRuleHandler = async (req: FastifyRequest, reply: FastifyReply)
 export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const body = authReq.body as Record<string, string>;
     const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
     const parsedLimit = parseInt(limit, 10);
@@ -1213,8 +1155,7 @@ export const getAllRulesHandler = async (req: FastifyRequest, reply: FastifyRepl
 export const getRulesByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const rulesId = parseInt(id);
     if (isNaN(rulesId)) {
       ErrorHandler.sendError(reply, { status: 400 }, `Invalid rules ID: ${id}. Must be a valid number.`);
@@ -1323,8 +1264,7 @@ export const createRuleHandler = async (req: FastifyRequest, reply: FastifyReply
 export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { transactionType } = req.params as { transactionType: string };
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const versions: string[] = await getVersionsOfTransactionType(transactionType, tenantId);
 
@@ -1340,8 +1280,7 @@ export const getTxTpVersionsByTransactionTypeHandler = async (req: FastifyReques
 
 export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const ruleIds = await findAllRuleIds(tenantId);
 
@@ -1356,8 +1295,7 @@ export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
 
     const configuration: unknown = await findRuleConfiguration(ruleId, tenantId);
@@ -1380,7 +1318,7 @@ export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: Fa
 export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
     const { ruleId } = req.params as { ruleId: string };
     const updateData = req.body as Record<string, unknown>;
@@ -1409,8 +1347,7 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
 
 export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
 
     const networkMap: unknown = await findActiveNetworkMap(tenantId);
 
@@ -1429,15 +1366,14 @@ export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: Fas
       return;
     }
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get active network map';
-    ErrorHandler.sendError(reply, { status: 500 }, errorMessage);
+    ErrorHandler.sendError(reply, error, 'Failed to get active network map');
   }
 };
 
 export const createSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
     const decodeToken = decodeInnerToken(req.headers.authorization ?? '');
     const payload = req.body as ISimulationBody;
@@ -1465,8 +1401,7 @@ export const createSimulationLogsHandler = async (req: FastifyRequest, reply: Fa
 
 export const getSimulationLogsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId ?? 'DEFAULT';
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
     const { category } = req.query as { category: string };
 
@@ -1483,14 +1418,13 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
 
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const tenantId = authReq.user?.tenantId;
+    const { tenantId } = req as ITenantRequest;
     const { ruleId } = req.params as { ruleId: string };
     const query = req.query as { category?: string };
 
     const ruleFlow = await getRuleFlowStatus(
       ruleId,
-      tenantId ?? '',
+      tenantId,
       query.category && query.category !== 'undefined' ? { category: query.category } : undefined,
     );
 
@@ -1520,9 +1454,7 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
       transactionTypes,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get transaction types';
-    loggerService.error(`Failed to get transaction types: ${errorMessage}`, 'getTransactionTypesHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get transaction types');
   } finally {
     loggerService.log('End - Handle get transaction types request');
   }
@@ -1548,9 +1480,7 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
       payload,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get payload by transaction type';
-    loggerService.error(`Failed to get payload: ${errorMessage}`, 'getPayloadByTransactionTypeHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get payload by transaction type');
   } finally {
     loggerService.log('End - Handle get payload by transaction type request');
   }
@@ -1581,9 +1511,7 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
       config,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get config by transaction type';
-    loggerService.error(`Failed to get config: ${errorMessage}`, 'getConfigByTransactionTypeHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get config by transaction type');
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
   }
@@ -1614,12 +1542,7 @@ export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: 
 export const getDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle get data model JSON request');
   try {
-    const { tenantId } = req.params as { tenantId: string };
-
-    if (!tenantId) {
-      reply.status(400).send({ success: false, message: 'tenantId is required' });
-      return;
-    }
+    const { tenantId } = req as ITenantRequest;
 
     const dataModelJson = await handleGetDataModelJson(tenantId);
 
@@ -1637,9 +1560,7 @@ export const getDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
       data: dataModelJson,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get data model JSON';
-    loggerService.error(`Failed to get data model JSON: ${errorMessage}`, 'getDataModelJsonHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to get data model JSON');
   } finally {
     loggerService.log('End - Handle get data model JSON request');
   }
@@ -1648,13 +1569,8 @@ export const getDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
 export const putDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle put data model JSON request');
   try {
-    const { tenantId } = req.params as { tenantId: string };
+    const { tenantId } = req as ITenantRequest;
     const body = req.body as { data_model_json: Record<string, unknown> };
-
-    if (!tenantId) {
-      reply.status(400).send({ success: false, message: 'tenantId is required' });
-      return;
-    }
 
     if (!body?.data_model_json) {
       reply.status(400).send({ success: false, message: 'data_model_json is required in request body' });
@@ -1669,9 +1585,7 @@ export const putDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
       data: result,
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to save data model JSON';
-    loggerService.error(`Failed to save data model JSON: ${errorMessage}`, 'putDataModelJsonHandler');
-    reply.status(500).send({ success: false, message: errorMessage });
+    ErrorHandler.sendError(reply, error, 'Failed to save data model JSON');
   } finally {
     loggerService.log('End - Handle put data model JSON request');
   }

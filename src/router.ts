@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { FastifyInstance } from 'fastify';
 import {
+  getAccountConditionsHandler,
+  getEntityConditionHandler,
+  handleHealthCheck,
+  postConditionHandlerAccount,
+  postConditionHandlerEntity,
+  putRefreshCache,
+  reportRequestHandler,
+  updateAccountConditionExpiryDateHandler,
+  updateEntityConditionExpiryDateHandler,
   createConfigHandler,
   getConfigByIdHandler,
   getAllConfigsHandler,
@@ -13,28 +22,6 @@ import {
   removeMappingHandler,
   addFunctionHandler,
   removeFunctionHandler,
-  getAccountConditionsHandler,
-  getEntityConditionHandler,
-  handleHealthCheck,
-  postConditionHandlerAccount,
-  postConditionHandlerEntity,
-  putRefreshCache,
-  reportRequestHandler,
-  updateAccountConditionExpiryDateHandler,
-  updateEntityConditionExpiryDateHandler,
-  getNodeHandler,
-  createNodeHandler,
-  deleteNodeByIdHandler,
-  executeQueryNode,
-  createRuleFlowHandler,
-  updateRuleFlowHandler,
-  getAllRulesHandler,
-  getRulesByIdHandler,
-  createRuleHandler,
-  getRuleIdsHandler,
-  getRuleConfigurationHandler,
-  getRuleFlowHandler,
-  updateRuleHandler,
   getTxTpVersionsByTransactionTypeHandler,
   getGlobalVariablesHandler,
   cloneRuleHandler,
@@ -65,6 +52,19 @@ import {
   updateJobByStatusHandler,
   updateJobHandler,
   validateExistingHandler,
+    getNodeHandler,
+  createNodeHandler,
+  deleteNodeByIdHandler,
+  executeQueryNode,
+  createRuleFlowHandler,
+  updateRuleFlowHandler,
+  getAllRulesHandler,
+  getRulesByIdHandler,
+  createRuleHandler,
+  getRuleIdsHandler,
+  getRuleConfigurationHandler,
+  getRuleFlowHandler,
+  updateRuleHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -83,6 +83,7 @@ import {
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 
+// Privilege mapping for each route, for easier maintenance and claim management
 const routePrivilege = {
   getAccount: 'GET_V1_EVENT_FLOW_CONTROL_ACCOUNT',
   getEntity: 'GET_V1_EVENT_FLOW_CONTROL_ENTITY',
@@ -92,7 +93,7 @@ const routePrivilege = {
   postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
-  executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
+    executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
   postTcsConfig: 'editor',
   getTcsConfig: 'view-profile',
   getTcsConfigs: 'view-profile',
@@ -120,22 +121,22 @@ const routePrivilege = {
   postTcsWorkflowExport: 'exporter',
   postTcsWorkflowReturnToProgress: 'editor',
   getTcsWorkflowStatus: 'view-profile',
-  createSchedule: 'view-profile',
+  createSchedule: 'editor',
   findSchedule: 'view-profile',
-  updateSchedule: 'view-profile',
+  updateSchedule: 'editor',
   getSchedules: 'view-profile',
   getAllSchedules: 'view-profile',
-  updateScheduleStatus: 'view-profile',
-  createPushJob: 'view-profile',
-  createPullJob: 'view-profile',
-  getAllJobs: 'view-profile',
+  updateScheduleStatus: 'editor',
+  createPushJob: 'editor',
+  createPullJob: 'editor',
+    getAllJobs: 'view-profile',
   getAllJobsHistory: 'view-profile',
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
   updateJobActivation: 'publisher',
-  updateJobStatus: 'view-profile',
+  updateJobStatus: 'editor',
   updateJob: 'editor',
-  validateTable: 'view-profile',
+    validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
   getTcsDataModelCollectionFields: 'view-profile',
   postTcsDataModelDestinationType: 'editor',
@@ -408,9 +409,123 @@ function Routes(fastify: FastifyInstance): void {
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
     }),
   );
+  
+  // ==================== Job OPERATIONS ====================
 
-  // admin-service way for tcs
-  fastify.post('/v1/admin/tcs/config/write', {
+  fastify.post('/v1/admin/tcs/push/create', {
+    ...SetOptionsBodyAndParams(createPushJobHandler, routePrivilege.createPushJob),
+  });
+
+  fastify.post('/v1/admin/tcs/pull/create', {
+    ...SetOptionsBodyAndParams(createPullJobHandler, routePrivilege.createPullJob),
+  });
+
+  fastify.post('/v1/admin/tcs/job/get/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllJobsHandler, routePrivilege.getAllJobs),
+  });
+
+  fastify.post('/v1/admin/tcs/job/get/history/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getJobHistoryHandler, routePrivilege.getAllJobsHistory),
+  });
+
+  fastify.get('/v1/admin/tcs/job/get/:id', {
+    ...SetOptionsBodyAndParams(findJobByIdHandler, routePrivilege.getJobById),
+  });
+  fastify.get('/v1/admin/tcs/job/get/status', {
+    ...SetOptionsBodyAndParams(getJobsByStatusHandler, routePrivilege.getJobByStatus),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/activation/:id', {
+    ...SetOptionsBodyAndParams(updateJobActivationHandler, routePrivilege.updateJobActivation),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/status/:id', {
+    ...SetOptionsBodyAndParams(updateJobByStatusHandler, routePrivilege.updateJobStatus),
+  });
+
+  fastify.put('/v1/admin/tcs/job/update/:id', {
+    ...SetOptionsBodyAndParams(updateJobHandler, routePrivilege.updateJob),
+  });
+
+  fastify.get('/v1/admin/tcs/job/table', {
+    ...SetOptionsBodyAndParams(validateExistingHandler, routePrivilege.validateTable),
+  });
+   // ==================== SCHEDULER OPERATIONS ====================
+
+  fastify.post('/v1/admin/tcs/schedule/create', {
+    ...SetOptionsBodyAndParams(createCronJobHandler, routePrivilege.createSchedule),
+  });
+
+  fastify.get('/v1/admin/tcs/schedule/:id', {
+    ...SetOptionsBodyAndParams(getCronJobByIdHandler, routePrivilege.findSchedule),
+  });
+
+  fastify.put('/v1/admin/tcs/schedule/update/:id', {
+    ...SetOptionsBodyAndParams(updateCronJobHandler, routePrivilege.updateSchedule),
+  });
+
+  fastify.post('/v1/admin/tcs/schedule/get/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllCronJobsHandler, routePrivilege.getAllSchedules),
+  });
+
+  fastify.get('/v1/admin/tcs/schedule/get/status', {
+    ...SetOptionsBodyAndParams(getCronJobByStatusHandler, routePrivilege.getSchedules),
+  });
+
+  fastify.put('/v1/admin/tcs/schedule/update/status/:id', {
+    ...SetOptionsBodyAndParams(updateCronJobStatusHandler, routePrivilege.updateScheduleStatus),
+  });
+
+  // ==================== TCS OPERATIONS ====================
+
+  fastify.put('/v1/admin/tcs/config/status/:id', {
+    ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.putTcsConfig),
+  });
+
+  fastify.get('/v1/admin/config/transaction-types', {
+    ...SetOptionsBodyAndParams(getTransactionTypesHandler, routePrivilege.getTcsConfigs),
+  });
+
+  fastify.get('/v1/admin/config/payload/:transactionType/:transactionVersion', {
+    ...SetOptionsBodyAndParams(getPayloadByTransactionTypeHandler, routePrivilege.getTcsConfig),
+  });
+
+  fastify.get('/v1/admin/config/:transactionType/:version', {
+    ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
+  });
+
+  fastify.put('/v1/admin/tcs/config/:id/write', {
+    ...SetOptionsBodyAndParams(writeConfigUpdateHandler, routePrivilege.putTcsConfigWrite),
+  });
+
+  fastify.patch('/v1/admin/tcs/config/:id/publishing-status', {
+    ...SetOptionsBodyAndParams(updatePublishingStatusHandler, routePrivilege.patchTcsConfigPublishingStatus),
+  });
+
+  fastify.post('/v1/admin/tcs/config/:id/mapping', {
+    ...SetOptionsBodyAndParams(addMappingHandler, routePrivilege.postTcsConfigMapping),
+  });
+
+  fastify.delete('/v1/admin/tcs/config/:id/mapping/:index', {
+    ...SetOptionsBodyAndParams(removeMappingHandler, routePrivilege.deleteTcsConfigMapping),
+  });
+
+  fastify.post('/v1/admin/tcs/config/:id/function', {
+    ...SetOptionsBodyAndParams(addFunctionHandler, routePrivilege.postTcsConfigFunction),
+  });
+
+  fastify.delete('/v1/admin/tcs/config/:id/function/:index', {
+    ...SetOptionsBodyAndParams(removeFunctionHandler, routePrivilege.deleteTcsConfigFunction),
+  });
+
+  fastify.post('/v1/admin/tcs/deploy/transaction-type-table', {
+    ...SetOptionsBodyAndParams(createTransactionTypeTableHandler, routePrivilege.postTcsDataModelTransactionTypeTable),
+  });
+
+  fastify.post('/v1/admin/tcs/data-model/table', {
+    ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
+  });
+   fastify.post('/v1/admin/tcs/config/write', {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
   fastify.get('/v1/admin/tcs/config/:id', {
@@ -420,7 +535,71 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
   });
 
-  //nodes
+  // ==================== DATA MODEL JSON OPERATIONS ====================
+
+  fastify.get('/v1/admin/tcs/data-model/json', {
+    ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
+  });
+
+  fastify.put('/v1/admin/tcs/data-model/json', {
+    ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
+  });
+   // ====================  RULES OPERATIONS ====================
+
+  // route for cloning a rule
+  fastify.post('/v1/admin/trs/rule/clone/:ruleId', {
+    ...SetOptionsBodyAndParams(cloneRuleHandler, routePrivilege.postTrsRule),
+  });
+
+  // route for updating status of a rule
+  fastify.put('/v1/admin/trs/rule/updateStatus/:ruleId', {
+    ...SetOptionsBodyAndParams(updateRuleStatusHandler, routePrivilege.putTrsRule),
+  });
+
+  fastify.get('/v1/admin/config/versions/:transactionType', {
+    ...SetOptionsBodyAndParams(getTxTpVersionsByTransactionTypeHandler, routePrivilege.getTcsConfigByTransaction),
+  });
+
+  fastify.post('/v1/admin/trs/rule', {
+    ...SetOptionsBodyAndParams(createRuleHandler, routePrivilege.postTrsRule),
+  });
+  fastify.post('/v1/admin/trs/rules/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllRulesHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rules/:id', {
+    ...SetOptionsBodyAndParams(getRulesByIdHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rule-ids', {
+    ...SetOptionsBodyAndParams(getRuleIdsHandler, routePrivilege.getTrsRules),
+  });
+  fastify.get('/v1/admin/trs/rule-configuration/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleConfigurationHandler, routePrivilege.getTrsRules),
+  });
+  fastify.put('/v1/admin/trs/rule/:ruleId', {
+    ...SetOptionsBodyAndParams(updateRuleHandler, routePrivilege.putTrsRule),
+  });
+  fastify.get('/v1/admin/network-map/active', {
+    ...SetOptionsBodyAndParams(getActiveNetworkMapHandler, routePrivilege.getActiveNetworkMap),
+  });
+  fastify.post('/v1/admin/trs/rule-flow/:id', {
+    ...SetOptionsBodyAndParams(createRuleFlowHandler, routePrivilege.postTrsRuleFlow),
+  });
+
+  fastify.get('/v1/admin/trs/rule-flow/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleFlowHandler, routePrivilege.getTrsRules),
+  });
+
+  fastify.get('/v1/admin/trs/rule-flow/status/:ruleId', {
+    ...SetOptionsBodyAndParams(getRuleFlowStatusHandler, routePrivilege.getTrsRules),
+  });
+
+  fastify.put('/v1/admin/trs/rule-flow/:id', {
+    ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
+  });
+
+  fastify.get('/v1/admin/trs/global-variables/:ruleId', {
+    ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
+  });
   fastify.get('/v1/admin/nodes', {
     ...SetOptionsBodyAndParams(getNodeHandler, routePrivilege.getNodes),
   });

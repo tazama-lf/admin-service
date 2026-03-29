@@ -71,7 +71,6 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     return queryRes.rowCount ? true : false;
   },
 };
-
 export const findActiveNetworkMapInDb = async (tenantId: string): Promise<ActiveNetworkMap | null> => {
   const query = `
       SELECT configuration

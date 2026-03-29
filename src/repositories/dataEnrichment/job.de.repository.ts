@@ -133,10 +133,7 @@ export const validateActive = async (tableName: string, type: ConfigType): Promi
 export const createPushJob = async (job: Partial<PushJob>): Promise<number> => {
   try {
     if (job.status === JobStatus.DEPLOYED) {
-      if (!job.table_name || typeof job.table_name !== 'string' || job.table_name.trim() === '') {
-        throw new Error('table_name is required and must be a non-empty string when creating a push job with DEPLOYED status');
-      }
-      await validateActive(job.table_name, ConfigType.PUSH);
+      await validateActive(job.table_name!, ConfigType.PUSH);
     }
 
     const keys = Object.keys(job);
@@ -171,14 +168,10 @@ export const createPushJob = async (job: Partial<PushJob>): Promise<number> => {
 
 export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
   try {
-    if (!job.table_name || typeof job.table_name !== 'string' || job.table_name.trim() === '') {
-      throw new Error('table_name is required and must be a non-empty string when creating a pull job');
-    }
-
-    const exists = await validateExisting(job.table_name);
+    const exists = await validateExisting(job.table_name!);
 
     if (job.status === JobStatus.DEPLOYED) {
-      await validateActive(job.table_name, ConfigType.PULL);
+      await validateActive(job.table_name!, ConfigType.PULL);
     }
 
     const keys = Object.keys(job);
@@ -289,7 +282,7 @@ export const getJobHistory = async (
   ORDER BY ph.created_at DESC
   LIMIT $${paramIndex} OFFSET $${paramIndex + 1};
 `;
-    const dataParams = [...queryParams, limit, offset];
+    const dataParams = [...queryParams, limit, offset * limit];
     const dataResult = await handlePostExecuteSqlStatement<PullJobHistory>(
       {
         text: dataQuery,

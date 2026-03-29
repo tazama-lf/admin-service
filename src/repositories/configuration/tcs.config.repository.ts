@@ -3,7 +3,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
-import { loggerService } from '../..';
+import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
@@ -215,7 +215,7 @@ export const findConfigsByStatus = async (
   };
 };
 
-export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>, expectedUpdatedAt?: string): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
@@ -280,16 +280,24 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
 
   setClauses.push('updated_at = NOW()');
 
+  const whereClause = expectedUpdatedAt
+    ? `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} AND updated_at = $${paramIndex + 2}`
+    : `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
+
   const query = `
     UPDATE tcs_config
     SET ${setClauses.join(', ')}
-    WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
+    ${whereClause}
     RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
               schema, payload_xml, payload_json, comments, mapping, functions,
               status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction
   `;
 
-  values.push(id, tenantId);
+  if (expectedUpdatedAt) {
+    values.push(id, tenantId, expectedUpdatedAt);
+  } else {
+    values.push(id, tenantId);
+  }
 
   interface UpdateConfigRow {
     id: number;
@@ -316,7 +324,10 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
-    throw new Error(`Config with id ${id} not found or not authorized`);
+    if (expectedUpdatedAt) {
+      throw new Error('Config has been modified by another process. Please refresh and try again.');
+    }
+    throw new Error('Configuration not found');
   }
 
   const [row] = result.rows;
@@ -369,21 +380,26 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   }
 
   const query = `
-    SELECT payload_json
+    SELECT 
+      content_type,
+      CASE 
+        WHEN content_type = 'XML' THEN payload_xml 
+        ELSE payload_json 
+      END AS payload
     FROM tcs_config
     WHERE transaction_type = $1 AND tenant_id = $2 AND version = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ payload_json: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ content_type: string; payload: unknown }>(
     { text: query, values: [transactionType, tenantId, version] } satisfies PgQueryConfig,
     'configuration',
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No payload found for transaction type: ${transactionType}`);
+    throw new Error('Configuration not found');
   }
 
-  return result.rows[0].payload_json;
+  return result.rows[0].payload;
 };
 
 export const getSchemaByTransactionType = async (
@@ -396,39 +412,35 @@ export const getSchemaByTransactionType = async (
   }
 
   const query = `
-    SELECT schema, mapping, payload_json
+    SELECT 
+      schema, 
+      mapping, 
+      content_type,
+      CASE 
+        WHEN content_type = 'XML' THEN payload_xml 
+        ELSE payload_json 
+      END AS payload
     FROM tcs_config
     WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; payload_json: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; content_type: string; payload: unknown }>(
     { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
+    throw new Error('Configuration not found');
   }
 
-  loggerService.log(
-    `Schema for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].schema),
-  );
-  loggerService.log(
-    `Mapping for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].mapping),
-  );
-  loggerService.log(
-    `Payload for transaction type ${transactionType}, version ${version}, tenant ${tenantId}:`,
-    JSON.stringify(result.rows[0].payload_json),
-  );
-
-  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload_json };
+  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload };
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
+  const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
+  validateTableName(safeTableName);
   const query = `
-    CREATE TABLE IF NOT EXISTS "${transactionType}" (
+    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       document JSONB NOT NULL,
       creDtTm TEXT,
       messageId TEXT,
@@ -443,8 +455,10 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
 };
 
 export const createTazamaDataModelTable = async (tableName: string): Promise<void> => {
+  const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '_');
+  validateTableName(safeTableName);
   const query = `
-    CREATE TABLE IF NOT EXISTS "${tableName}" (
+    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       _key text PRIMARY KEY,
       data jsonb NOT NULL,
       tenantId text,
@@ -455,21 +469,25 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
   await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
 };
 
-export const updateConfigByStatus = async (id: string, status?: string): Promise<number> => {
+export const updateConfigByStatus = async (id: string, status: string, tenantId: string): Promise<number> => {
+  if (!status) {
+    throw new Error('Status is required and cannot be null or undefined');
+  }
+
   const query = `
     UPDATE tcs_config
     SET status = $1, updated_at = NOW()
-    WHERE id = $2
+    WHERE id = $2 AND tenant_id = $3
     RETURNING id;
   `;
 
   const result = await handlePostExecuteSqlStatement<{ id: number }>(
-    { text: query, values: [status, id] } satisfies PgQueryConfig,
+    { text: query, values: [status, id, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
 
   if (result.rows.length === 0) {
-    throw new Error(`No config found with id: ${id}`);
+    throw new Error('Configuration not found');
   }
 
   return result.rows.length;

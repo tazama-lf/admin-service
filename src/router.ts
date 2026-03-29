@@ -104,7 +104,7 @@ const routePrivilege = {
   getTcsConfigByTransaction: 'view-profile',
   getTcsConfigByEndpoint: 'view-profile',
   postTcsConfigWrite: 'editor',
-  putTcsConfigWrite: 'editor',
+  putTcsConfigWrite: 'view-profile',
   deleteTcsConfigWrite: 'editor',
   postTcsRawQuery: 'publisher',
   postTcsConfigMapping: 'editor',

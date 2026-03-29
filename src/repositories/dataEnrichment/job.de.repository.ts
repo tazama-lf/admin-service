@@ -136,9 +136,10 @@ export const createPushJob = async (job: Partial<PushJob>): Promise<number> => {
       await validateActive(job.table_name!, ConfigType.PUSH);
     }
 
-    const keys = Object.keys(job);
+    const { id, ...jobWithoutId } = job;
+    const keys = Object.keys(jobWithoutId);
     validateColumnKeys(keys, ALLOWED_PUSH_JOB_COLUMNS, 'tcs_push_jobs insert');
-    const values = Object.values(job);
+    const values = Object.values(jobWithoutId);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
     const insertQuery = `
@@ -174,9 +175,10 @@ export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
       await validateActive(job.table_name!, ConfigType.PULL);
     }
 
-    const keys = Object.keys(job);
+    const { id, ...jobWithoutId } = job;
+    const keys = Object.keys(jobWithoutId);
     validateColumnKeys(keys, ALLOWED_PULL_JOB_COLUMNS, 'tcs_pull_jobs insert');
-    const values = Object.values(job);
+    const values = Object.values(jobWithoutId);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
     const insertQuery = `

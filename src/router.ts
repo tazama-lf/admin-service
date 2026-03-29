@@ -447,6 +447,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/nodes/query', {
     ...SetOptionsBodyAndParams(executeQueryNode, routePrivilege.executeQueryNode),
   });
+
   fastify.post('/v1/admin/simulation-logs/insert', {
     ...SetOptionsBodyAndParams(createSimulationLogsHandler, routePrivilege.postSimulationLogs),
   });

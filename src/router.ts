@@ -134,7 +134,7 @@ const routePrivilege = {
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
   updateJobActivation: 'view-profile',
-  updateJobStatus: 'approver',
+  updateJobStatus: 'view-profile',
   updateJob: 'editor',
   validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',

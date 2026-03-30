@@ -1,6 +1,6 @@
 {
   "name": "admin-service",
-  "version": "3.0.0",
+  "version": "4.0.0-rc.0",
   "description": "admin service",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -18,16 +18,12 @@
     "lint:prettier": "prettier --check \"**/*.ts\"",
     "test": "set ACTIVE_CONDITIONS_ONLY=true &&jest --config=jest.config.ts --passWithNoTests --forceExit",
     "test:watch": "jest --config=jest.config.ts --watch",
+    "test:compile": "tsc --noEmit",
     "prepare": "husky"
   },
   "keywords": [
-    "actio",
+    "tazama",
     "frm"
-  ],
-  "contributors": [
-    {
-      "name": "Cebolenkosi Shezi"
-    }
   ],
   "license": "Apache-2.0",
   "dependencies": {
@@ -36,10 +32,10 @@
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
     "@sinclair/typebox": "^0.34.41",
-    "@tazama-lf/auth-lib": "3.0.0",
-    "@tazama-lf/frms-coe-lib": "7.0.2-rc.1",
-    "@tazama-lf/frms-coe-startup-lib": "3.0.0",
-    "@tazama-lf/tcs-lib": "^1.0.155",
+    "@tazama-lf/auth-lib": "4.0.0-rc.4",
+    "@tazama-lf/frms-coe-lib": "7.0.2-rc.2",
+    "@tazama-lf/frms-coe-startup-lib": "3.0.2-rc.1",
+    "@tazama-lf/tcs-lib": "1.0.155",
     "ajv": "^8.17.1",
     "dotenv": "^17.2.0",
     "fastify": "^5.4.0",

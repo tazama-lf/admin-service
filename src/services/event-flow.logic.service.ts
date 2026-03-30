@@ -286,7 +286,7 @@ export const handlePostConditionAccount = async (
       if (condition.forceCret) {
         try {
           await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId });
-          await databaseManager.saveAccount(accountIdentifier, tenantId);
+          await databaseManager.saveAccount(accountIdentifier, tenantId, nowDateTime);
         } catch (err) {
           throw Error('Error: while trying to save new account: ' + (err as { message: string }).message);
         }

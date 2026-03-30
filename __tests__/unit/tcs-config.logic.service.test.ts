@@ -23,6 +23,7 @@ jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   findAllTransactionTypes: jest.fn(),
   getPayloadByTransactionType: jest.fn(),
   getSchemaByTransactionType: jest.fn(),
+  getRelatedTransactions: jest.fn(),
 }));
 
 import * as tcsConfigService from '../../src/services/tcs-config.logic.service';
@@ -376,12 +377,12 @@ describe('TCS Config Logic Service', () => {
       expect(result).toBe(1);
     });
 
-    it('should return 0 when no rows are updated', async () => {
-      (tcsConfigRepository.updateConfigByStatus as jest.Mock).mockResolvedValue(0);
+    it('should throw error when no rows are updated', async () => {
+      (tcsConfigRepository.updateConfigByStatus as jest.Mock).mockRejectedValue(new Error('Configuration not found'));
 
-      const result = await tcsConfigService.handleUpdateConfigByStatus('999', 'active', mockTenantId);
-
-      expect(result).toBe(0);
+      await expect(tcsConfigService.handleUpdateConfigByStatus('999', 'active', mockTenantId)).rejects.toThrow(
+        'Failed to update configuration status',
+      );
     });
 
     it('should throw error when status update fails', async () => {
@@ -710,6 +711,34 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleGetConfigByTransactionType('invalid.type', '1.0.0', mockTenantId)).rejects.toThrow(
         'Configuration not found',
       );
+    });
+  });
+
+  describe('handleGetRelatedTransactions', () => {
+    it('should retrieve related transactions for a tenant', async () => {
+      const mockRelatedTransactions = ['pacs.008.001.10', 'pacs.002.001.12'];
+
+      (tcsConfigRepository.getRelatedTransactions as jest.Mock).mockResolvedValue(mockRelatedTransactions);
+
+      const result = await tcsConfigService.handleGetRelatedTransactions(mockTenantId);
+
+      expect(tcsConfigRepository.getRelatedTransactions).toHaveBeenCalledWith(mockTenantId);
+      expect(result).toEqual(mockRelatedTransactions);
+    });
+
+    it('should return empty array when no related transactions exist', async () => {
+      (tcsConfigRepository.getRelatedTransactions as jest.Mock).mockResolvedValue([]);
+
+      const result = await tcsConfigService.handleGetRelatedTransactions(mockTenantId);
+
+      expect(tcsConfigRepository.getRelatedTransactions).toHaveBeenCalledWith(mockTenantId);
+      expect(result).toEqual([]);
+    });
+
+    it('should throw error when retrieval fails', async () => {
+      (tcsConfigRepository.getRelatedTransactions as jest.Mock).mockRejectedValue(new Error('Database error'));
+
+      await expect(tcsConfigService.handleGetRelatedTransactions(mockTenantId)).rejects.toThrow('Database error');
     });
   });
 });

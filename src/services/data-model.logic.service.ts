@@ -8,6 +8,22 @@ export const handleGetDataModelJson = async (tenantId: string): Promise<Record<s
 
     const dataModelJson = await getDataModelJson(tenantId);
 
+    if (dataModelJson === null) {
+      loggerService.log(`No data model JSON found for tenant: ${tenantId}. Attempting to clone from tenant: default`);
+
+      const defaultDataModelJson = await getDataModelJson('default');
+
+      if (defaultDataModelJson === null) {
+        loggerService.log('No default data model JSON found. Returning null response.');
+        return null;
+      }
+
+      await upsertDataModelJson(tenantId, defaultDataModelJson);
+
+      loggerService.log(`Successfully cloned default data model JSON for tenant: ${tenantId}`);
+      return defaultDataModelJson;
+    }
+
     loggerService.log(`Successfully retrieved data model JSON for tenant: ${tenantId}`);
     return dataModelJson;
   } catch (error) {

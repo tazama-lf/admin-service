@@ -7,30 +7,34 @@ import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
-const mapRowToConfig = (row: ConfigRow): Config => ({
-  id: row.id,
-  msgFam: row.msg_fam,
-  transactionType: row.transaction_type,
-  endpointPath: row.endpoint_path,
-  version: row.version,
-  contentType: row.content_type,
-  schema: typeof row.schema === 'string' ? (JSON.parse(row.schema) as JSONSchema) : row.schema,
-  mapping: row.mapping ? (typeof row.mapping === 'string' ? (JSON.parse(row.mapping) as FieldMapping[]) : row.mapping) : undefined,
-  functions: row.functions
-    ? typeof row.functions === 'string'
-      ? (JSON.parse(row.functions) as FunctionDefinition[])
-      : row.functions
-    : undefined,
-  status: row.status as ConfigStatus,
-  tenantId: row.tenant_id,
-  createdBy: row.created_by,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  comments: row.comments,
-  publishing_status: row.publishing_status,
-  payload: row.content_type === ContentType.XML ? row.payload_xml : row.payload_json,
-  related_transaction: row.related_transaction,
-});
+const mapRowToConfig = (row: ConfigRow): Config => {
+  const mapped = {
+    id: row.id,
+    msgFam: row.msg_fam,
+    transactionType: row.transaction_type,
+    endpointPath: row.endpoint_path,
+    version: row.version,
+    contentType: row.content_type,
+    schema: typeof row.schema === 'string' ? (JSON.parse(row.schema) as JSONSchema) : row.schema,
+    mapping: row.mapping ? (typeof row.mapping === 'string' ? (JSON.parse(row.mapping) as FieldMapping[]) : row.mapping) : undefined,
+    functions: row.functions
+      ? typeof row.functions === 'string'
+        ? (JSON.parse(row.functions) as FunctionDefinition[])
+        : row.functions
+      : undefined,
+    status: row.status as ConfigStatus,
+    tenantId: row.tenant_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    comments: row.comments,
+    publishing_status: row.publishing_status,
+    payload: row.content_type === ContentType.XML ? row.payload_xml : row.payload_json,
+    relatedTransaction: row.related_transaction,
+  };
+
+  return mapped as unknown as Config;
+};
 
 export const createConfig = async (config: ConfigData, id?: number): Promise<number> => {
   const isXml = config.contentType === ContentType.XML;
@@ -215,7 +219,11 @@ export const findConfigsByStatus = async (
   };
 };
 
-export const updateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+export const updateConfig = async (
+  id: number,
+  tenantId: string,
+  updates: Partial<Config> & { relatedTransaction?: string; related_transaction?: string },
+): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
@@ -269,9 +277,10 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     setClauses.push(`status = $${paramIndex++}`);
     values.push(updates.status);
   }
-  if (updates.related_transaction !== undefined) {
+  const relatedTransactionUpdate = updates.relatedTransaction ?? updates.related_transaction;
+  if (relatedTransactionUpdate !== undefined) {
     setClauses.push(`related_transaction = $${paramIndex++}`);
-    values.push(updates.related_transaction);
+    values.push(relatedTransactionUpdate);
   }
 
   if (setClauses.length === 0) {
@@ -322,7 +331,7 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
   }
 
   const [row] = result.rows;
-  return {
+  const updatedConfig = {
     id: row.id,
     msgFam: row.msg_fam,
     transactionType: row.transaction_type,
@@ -340,8 +349,10 @@ export const updateConfig = async (id: number, tenantId: string, updates: Partia
     updatedAt: row.updated_at,
     tenantId: row.tenant_id,
     createdBy: row.created_by,
-    related_transaction: row.related_transaction,
+    relatedTransaction: row.related_transaction,
   };
+
+  return updatedConfig as unknown as Config;
 };
 
 export const findAllTransactionTypes = async (tenantId: string): Promise<string[]> => {

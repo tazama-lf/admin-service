@@ -347,10 +347,6 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
   });
 
-  fastify.get('/v1/admin/trs/global-variables/:ruleId/:tenantId', {
-    ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
-  });
-
   // ====================  ADMIN SERVICE OPERATIONS ====================
 
   fastify.get('/v1/admin/reports/getreportbymsgid', {

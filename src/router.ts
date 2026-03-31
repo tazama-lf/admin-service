@@ -413,51 +413,6 @@ function Routes(fastify: FastifyInstance): void {
     ),
   });
   fastify.put('/v1/admin/event-flow-control/cache', { ...SetOptionsBodyAndParams(putRefreshCache, routePrivilege.putCache) });
-
-  //-- configuration
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/configuration/network_map',
-      repo: NetworkMapRepo,
-      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/configuration/rule',
-      repo: RuleConfigRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
-    }),
-  );
-
-  fastify.register(
-    buildCrudPlugin({
-      prefix: '/v1/admin/configuration/typology',
-      repo: TypologyConfigRepo,
-      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
-    }),
-  );
-
-  fastify.post('/v1/admin/tcs/config/write', {
-    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
-  });
-  fastify.get('/v1/admin/tcs/config/:id', {
-    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
-  });
-  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
-  });
-
-  // ==================== DATA MODEL JSON OPERATIONS ====================
-
-  fastify.get('/v1/admin/tcs/data-model/json', {
-    ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
-  });
-
-  fastify.put('/v1/admin/tcs/data-model/json', {
-    ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
-  });
   fastify.get('/v1/admin/trs/global-variables/:ruleId', {
     ...SetOptionsBodyAndParams(getGlobalVariablesHandler, routePrivilege.getTrsRules),
   });

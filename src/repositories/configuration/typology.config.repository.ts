@@ -40,6 +40,11 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
 
   create: async function (payload: TypologyConfig, tenantId: string): Promise<TypologyConfig> {
     payload.tenantId = tenantId;
+
+    const dtTme = new Date().toISOString();
+    payload.creDtTm = dtTme;
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
         text: 'INSERT INTO typology (configuration) VALUES ($1) RETURNING configuration',
@@ -51,6 +56,9 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   },
 
   update: async function ({ id, cfg, tenantId }, payload: TypologyConfig): Promise<TypologyConfig | null> {
+    const dtTme = new Date().toISOString();
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
         text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 AND typologycfg = $3 AND tenantid = $4 RETURNING configuration',

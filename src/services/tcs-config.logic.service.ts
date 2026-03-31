@@ -280,7 +280,12 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] }, config.updatedAt);
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { mapping: updatedMappings.length > 0 ? updatedMappings : [] },
+      config.updatedAt,
+    );
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
@@ -337,7 +342,12 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] }, config.updatedAt);
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
+      config.updatedAt,
+    );
 
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
@@ -384,7 +394,6 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
 
     const config = await getSchemaByTransactionType(transactionType, version, tenantId);
 
-    
     return config;
   } catch (error) {
     const errorMessage = error as { message: string };

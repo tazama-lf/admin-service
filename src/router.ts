@@ -51,7 +51,7 @@ import {
   updateJobByStatusHandler,
   updateJobHandler,
   validateExistingHandler,
-    getNodeHandler,
+  getNodeHandler,
   createNodeHandler,
   deleteNodeByIdHandler,
   executeQueryNode,
@@ -92,7 +92,7 @@ const routePrivilege = {
   postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
-    executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
+  executeDatabase: 'PUT_V1_ADMIN_DATABASE_EXECUTE',
   postTcsConfig: 'editor',
   getTcsConfig: 'view-profile',
   getTcsConfigs: 'view-profile',
@@ -127,14 +127,14 @@ const routePrivilege = {
   updateScheduleStatus: 'editor',
   createPushJob: 'editor',
   createPullJob: 'editor',
-    getAllJobs: 'view-profile',
+  getAllJobs: 'view-profile',
   getAllJobsHistory: 'view-profile',
   getJobById: 'view-profile',
   getJobByStatus: 'view-profile',
   updateJobActivation: 'publisher',
   updateJobStatus: 'editor',
   updateJob: 'editor',
-    validateTable: 'view-profile',
+  validateTable: 'view-profile',
   getTcsDataModelCollections: 'view-profile',
   getTcsDataModelCollectionFields: 'view-profile',
   postTcsDataModelDestinationType: 'editor',
@@ -217,7 +217,7 @@ function Routes(fastify: FastifyInstance): void {
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
     }),
   );
-  
+
   // ==================== Job OPERATIONS ====================
 
   fastify.post('/v1/admin/tcs/push/create', {
@@ -258,7 +258,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/tcs/job/table', {
     ...SetOptionsBodyAndParams(validateExistingHandler, routePrivilege.validateTable),
   });
-   // ==================== SCHEDULER OPERATIONS ====================
+  // ==================== SCHEDULER OPERATIONS ====================
 
   fastify.post('/v1/admin/tcs/schedule/create', {
     ...SetOptionsBodyAndParams(createCronJobHandler, routePrivilege.createSchedule),
@@ -333,7 +333,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/data-model/table', {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
-   fastify.post('/v1/admin/tcs/config/write', {
+  fastify.post('/v1/admin/tcs/config/write', {
     ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
   });
   fastify.get('/v1/admin/tcs/config/:id', {
@@ -352,7 +352,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.put('/v1/admin/tcs/data-model/json', {
     ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
   });
-   // ====================  RULES OPERATIONS ====================
+  // ====================  RULES OPERATIONS ====================
 
   // route for cloning a rule
   fastify.post('/v1/admin/trs/rule/clone/:ruleId', {

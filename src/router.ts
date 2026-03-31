@@ -319,11 +319,11 @@ function Routes(fastify: FastifyInstance): void {
 
   // ==================== DATA MODEL JSON OPERATIONS ====================
 
-  fastify.get('/v1/admin/tcs/data-model/json/:tenantId', {
+  fastify.get('/v1/admin/tcs/data-model/json', {
     ...SetOptionsBodyAndParams(getDataModelJsonHandler, routePrivilege.getDataModelJson),
   });
 
-  fastify.put('/v1/admin/tcs/data-model/json/:tenantId', {
+  fastify.put('/v1/admin/tcs/data-model/json', {
     ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
   });
   // ====================  RULES OPERATIONS ====================

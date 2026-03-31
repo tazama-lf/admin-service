@@ -257,7 +257,7 @@ function Routes(fastify: FastifyInstance): void {
 
   // ==================== TCS OPERATIONS ====================
 
-  fastify.put('/v1/admin/tcs/tcs/config/status/:id', {
+  fastify.put('/v1/admin/tcs/config/status/:id', {
     ...SetOptionsBodyAndParams(updateConfigByStatusHandler, routePrivilege.updateJobStatus),
   });
   fastify.get('/v1/admin/tcs/config/tcs/related-transactions', {

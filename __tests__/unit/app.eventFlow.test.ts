@@ -43,7 +43,12 @@ jest.mock('../../src/', () => ({
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
     set: jest.fn(),
-    saveAccount: jest.fn(),
+    saveAccount: jest.fn((accountId: string, tenantId: string, creDtTm: string) => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
+      return Promise.resolve();
+    }),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
     saveGovernedAsCreditorAccountByEdge: jest.fn(),
@@ -186,6 +191,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith({
       ...conditionCreditor,
       creDtTm: nowDateTime,
+      updDtTm: nowDateTime,
     });
     const entityId = `${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionCreditor);
@@ -380,7 +386,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve(void '');
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.resolve(void '');
     });
   });
@@ -489,7 +498,8 @@ describe('handlePostConditionAccount', () => {
     // Act & Assert
     await handlePostConditionAccount(condition as AccountCondition, 'DEFAULT');
     const accountId = condition.acct.id + condition.acct.schmeNm.prtry + condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
-    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT');
+    // Some string value for the creation datetime (we don't care about the exact value, just that it's a string)
+    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT', expect.any(String));
   });
 
   it('should handle error when creating a new account if account does not exist and forceCret is set to true', async () => {
@@ -497,7 +507,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve({ id: '' } as Account);
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.reject(new Error('Test Error'));
     });
 
@@ -1000,5 +1013,66 @@ describe('handleCacheUpdate', () => {
     const result = await handleRefreshCache(true, 'DEFAULT', 12);
 
     expect(result).toBe(undefined);
+  });
+});
+
+describe('Condition Timestamp Population', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+
+    jest
+      .spyOn(databaseManager, 'getEntity')
+      .mockImplementation((entityId: string, schemeProprietary: string): Promise<Entity | undefined> => {
+        return Promise.resolve({ id: `${entityId}${schemeProprietary}` } as Entity);
+      });
+
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseEntity] as unknown as RawConditionResponse[]);
+    });
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve(void '');
+    });
+
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation((_entityId: string, _CreDtTm: string): Promise<void> => {
+      return Promise.resolve(void '');
+    });
+  });
+
+  it('should populate both creDtTm and updDtTm when creating entity condition', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const condition = {
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
+    };
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
+
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creDtTm: expect.any(String),
+        updDtTm: expect.any(String),
+      }),
+    );
+  });
+
+  it('should set updDtTm equal to creDtTm on creation', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const condition = {
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
+    };
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
+
+    const savedCondition = (databaseManager.saveCondition as jest.Mock).mock.calls[0][0];
+    expect(savedCondition.updDtTm).toBe(savedCondition.creDtTm);
   });
 });

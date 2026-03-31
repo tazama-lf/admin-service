@@ -163,6 +163,31 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/', handleHealthCheck);
   fastify.get('/health', handleHealthCheck);
 
+  //-- configuration
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/configuration/network_map',
+      repo: NetworkMapRepo,
+      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/configuration/rule',
+      repo: RuleConfigRepo,
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+    }),
+  );
+
+  fastify.register(
+    buildCrudPlugin({
+      prefix: '/v1/admin/configuration/typology',
+      repo: TypologyConfigRepo,
+      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
+    }),
+  );
+
   // ==================== Job OPERATIONS ====================
 
   fastify.post('/v1/admin/tcs/push/create', {
@@ -204,7 +229,6 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/tcs/job/table', {
     ...SetOptionsBodyAndParams(validateExistingHandler, routePrivilege.validateTable),
   });
-
   // ==================== SCHEDULER OPERATIONS ====================
 
   fastify.post('/v1/admin/tcs/schedule/create', {
@@ -283,6 +307,15 @@ function Routes(fastify: FastifyInstance): void {
   fastify.post('/v1/admin/tcs/data-model/table', {
     ...SetOptionsBodyAndParams(createTazamaDataModelTableHandler, routePrivilege.postTcsDataModelTable),
   });
+  fastify.post('/v1/admin/tcs/config/write', {
+    ...SetOptionsBodyAndParams(createConfigHandler, routePrivilege.postTcsConfig),
+  });
+  fastify.get('/v1/admin/tcs/config/:id', {
+    ...SetOptionsBodyAndParams(getConfigByIdHandler, routePrivilege.getTcsConfig),
+  });
+  fastify.post('/v1/admin/tcs/config/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
+  });
 
   // ==================== DATA MODEL JSON OPERATIONS ====================
 
@@ -293,7 +326,6 @@ function Routes(fastify: FastifyInstance): void {
   fastify.put('/v1/admin/tcs/data-model/json/:tenantId', {
     ...SetOptionsBodyAndParams(putDataModelJsonHandler, routePrivilege.putDataModelJson),
   });
-
   // ====================  RULES OPERATIONS ====================
 
   // route for cloning a rule

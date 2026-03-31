@@ -91,6 +91,7 @@ const conditionObjectAssign = (
       condRsn: condition.condRsn,
       usr: condition.usr,
       creDtTm: condition.creDtTm,
+      updDtTm: condition.updDtTm,
       tenantId,
       prsptvs: [],
     };

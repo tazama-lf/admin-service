@@ -419,8 +419,8 @@ export const getSchemaByTransactionType = async (
       mapping, 
       content_type,
       CASE 
-        WHEN content_type = 'XML' THEN payload_xml 
-        ELSE payload_json 
+        WHEN content_type = 'XML' THEN payload_xml::text
+        ELSE payload_json::text
       END AS payload
     FROM tcs_config
     WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3

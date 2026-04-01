@@ -386,7 +386,16 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
 
     const config = await getSchemaByTransactionType(transactionType, version, tenantId);
 
-    return config;
+    const payload =
+      config.content_type === ContentType.XML
+        ? config.payload_xml
+        : config.payload_json;
+
+    return {
+      schema: config.schema,
+      mapping: config.mapping,
+      payload,
+    };
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(

@@ -408,7 +408,7 @@ export const getSchemaByTransactionType = async (
   transactionType: string,
   version: string,
   tenantId: string,
-): Promise<{ schema: unknown; mapping: unknown; payload: unknown }> => {
+): Promise<{ schema: unknown; mapping: unknown; content_type: string; payload_xml: string | null; payload_json: unknown }> => {
   if (!transactionType || !version || !tenantId) {
     throw new Error('Transaction type, version, and tenant ID are required');
   }
@@ -418,15 +418,19 @@ export const getSchemaByTransactionType = async (
       schema, 
       mapping, 
       content_type,
-      CASE 
-        WHEN content_type = 'XML' THEN payload_xml::text
-        ELSE payload_json::text
-      END AS payload
+      payload_xml,
+      payload_json
     FROM tcs_config
     WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ schema: unknown; mapping: unknown; content_type: string; payload: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{
+    schema: unknown;
+    mapping: unknown;
+    content_type: string;
+    payload_xml: string | null;
+    payload_json: unknown;
+  }>(
     { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
@@ -435,7 +439,13 @@ export const getSchemaByTransactionType = async (
     throw new Error('Configuration not found');
   }
 
-  return { schema: result.rows[0].schema, mapping: result.rows[0].mapping, payload: result.rows[0].payload };
+  return {
+    schema: result.rows[0].schema,
+    mapping: result.rows[0].mapping,
+    content_type: result.rows[0].content_type,
+    payload_xml: result.rows[0].payload_xml,
+    payload_json: result.rows[0].payload_json,
+  };
 };
 
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {

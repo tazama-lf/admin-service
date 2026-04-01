@@ -691,10 +691,11 @@ describe('TCS Config Logic Service', () => {
   describe('handleGetConfigByTransactionType', () => {
     it('should retrieve config by transaction type', async () => {
       const mockConfig = {
-        id: 1,
-        msgFam: 'ISO20022',
-        transactionType: 'pacs.008.001.10',
         schema: { type: 'object' },
+        mapping: { field: 'value' },
+        content_type: 'JSON',
+        payload_xml: null,
+        payload_json: { payloadField: 'payloadValue' },
       };
 
       (tcsConfigRepository.getSchemaByTransactionType as jest.Mock).mockResolvedValue(mockConfig);
@@ -702,7 +703,11 @@ describe('TCS Config Logic Service', () => {
       const result = await tcsConfigService.handleGetConfigByTransactionType('pacs.008.001.10', '1.0.0', mockTenantId);
 
       expect(tcsConfigRepository.getSchemaByTransactionType).toHaveBeenCalledWith('pacs.008.001.10', '1.0.0', mockTenantId);
-      expect(result).toEqual(mockConfig);
+      expect(result).toEqual({
+        schema: mockConfig.schema,
+        mapping: mockConfig.mapping,
+        payload: mockConfig.payload_json,
+      });
     });
 
     it('should throw error when config is not found', async () => {

@@ -31,6 +31,7 @@ import {
   handleGetAllTransactionTypes,
   handleGetPayloadByTransactionType,
   handleGetConfigByTransactionType,
+  handleGetRelatedTransactions,
 } from './services/tcs-config.logic.service';
 import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
 import {
@@ -622,7 +623,8 @@ export const createPushJobHandler = async (req: FastifyRequest, reply: FastifyRe
   loggerService.log('Start - Handle create push job request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const pushData = req.body as Record<string, unknown>;
+    const { id: _id, ...pushData } = req.body as Record<string, unknown>;
+
     const response = await handleCreatePushJob(pushData, tenantId);
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
@@ -663,7 +665,7 @@ export const createPullJobHandler = async (req: FastifyRequest, reply: FastifyRe
   loggerService.log('Start - Handle create pull job request');
   try {
     const { tenantId } = req as ITenantRequest;
-    const pullData = req.body as Record<string, unknown>;
+    const { id: _id, ...pullData } = req.body as Record<string, unknown>;
     const response = await handleCreatePullJob(pullData, tenantId);
     reply.code(201).send({ success: response.success, message: response.message });
   } catch (error: unknown) {
@@ -702,14 +704,21 @@ export const findJobByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
   loggerService.log('Start - Handle find job by ID request');
   try {
     const { id } = req.params as { id: string };
-    const { tableName } = req.query as { tableName: ConfigType };
+    const { tableName } = req.query as { tableName?: string };
 
-    if (!tableName) {
-      reply.code(400).send({ success: false, message: 'tableName query parameter is required' });
+    let resolvedType: string | undefined;
+    if (tableName === 'tcs_push_jobs') {
+      resolvedType = 'push';
+    } else if (tableName === 'tcs_pull_jobs') {
+      resolvedType = 'pull';
+    }
+
+    if (!resolvedType) {
+      reply.code(400).send({ success: false, message: 'tableName query parameter is required (tcs_push_jobs or tcs_pull_jobs)' });
       return;
     }
 
-    const result = await handleFindJobById(id, tableName);
+    const result = await handleFindJobById(id, resolvedType as ConfigType);
 
     if (!result) {
       reply.code(404).send({ success: false, message: `Job with ID ${id} not found` });
@@ -1513,6 +1522,26 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     ErrorHandler.sendError(reply, error, 'Failed to get config by transaction type');
   } finally {
     loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get related transactions request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const relatedTransactions = await handleGetRelatedTransactions(tenantId);
+
+    reply.code(200).send({
+      success: true,
+      data: relatedTransactions,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get related transactions';
+    loggerService.error(`Failed to get related transactions: ${errorMessage}`, 'getRelatedTransactionsHandler');
+    reply.status(500).send({ success: false, message: errorMessage });
+  } finally {
+    loggerService.log('End - Handle get related transactions request');
   }
 };
 

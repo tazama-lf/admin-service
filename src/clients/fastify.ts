@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import Ajv from 'ajv';
+import addFormats from 'ajv-formats'; // <-- add this import
 import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
@@ -14,6 +15,7 @@ const ajv = new Ajv({
   coerceTypes: 'array',
   strictTuples: false,
 });
+addFormats(ajv); // <-- add this line
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {

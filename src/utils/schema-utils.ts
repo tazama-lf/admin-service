@@ -5,12 +5,13 @@ import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 import { tokenHandler } from '../auth/authHandler';
 import { loggerService, configuration } from '../index';
 import type { TSchema } from '@sinclair/typebox';
+import type { Claim } from './claim-utils';
 
 type preHandler = (request: FastifyRequest, reply: FastifyReply) => void | Promise<void>;
 
 export const SetOptionsBodyAndParams = (
   handler: RouteHandlerMethod,
-  claim: string,
+  claim: Claim,
   bodySchemaName?: TSchema,
   paramSchemaName?: TSchema,
 ): { preHandler?: preHandler[]; handler: RouteHandlerMethod; schema: FastifySchema } => {

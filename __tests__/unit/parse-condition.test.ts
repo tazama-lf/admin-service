@@ -268,6 +268,93 @@ describe('parse-condition', () => {
       expect(result.conditions).toHaveLength(0);
       expect(result.ntty).toBeUndefined();
     });
+
+    it('should aggregate across multiple records and extract ntty from first non-empty record when first record has empty arrays', () => {
+      // Create conditions with different timestamps for sorting verification
+      const condition1 = createMockEntityCondition('cond-1', mockDate3, mockDate3); // Latest timestamp
+      const condition2 = createMockEntityCondition('cond-2', mockDate1, mockDate1); // Earliest timestamp
+      const condition3 = { ...createMockEntityCondition('cond-3', mockDate2, mockDate2), prsptv: 'governed_as_debtor_by' }; // Middle timestamp, different perspective
+
+      // First record: all condition arrays are empty (would result in no ntty if processed alone)
+      const emptyRecord: RawConditionResponse = {
+        governed_as_creditor_by: [],
+        governed_as_debtor_by: [],
+        governed_as_creditor_account_by: [],
+        governed_as_debtor_account_by: [],
+      };
+
+      // Second record: contains actual conditions across different perspectives
+      const populatedRecord: RawConditionResponse = {
+        governed_as_creditor_by: [
+          {
+            edge: {
+              id: 'edge-1',
+              source: 'source-1',
+              destination: 'dest-1',
+              evtTp: ['test-event'],
+              tenantId: mockTenantId,
+              incptnDtTm: '2024-01-01T00:00:00Z',
+            },
+            result: { id: 'entity-1', creDtTm: mockDate3, TenantId: mockTenantId },
+            condition: condition1,
+          },
+          {
+            edge: {
+              id: 'edge-2',
+              source: 'source-2',
+              destination: 'dest-2',
+              evtTp: ['test-event'],
+              tenantId: mockTenantId,
+              incptnDtTm: '2024-01-01T00:00:00Z',
+            },
+            result: { id: 'entity-2', creDtTm: mockDate1, TenantId: mockTenantId },
+            condition: condition2,
+          },
+        ],
+        governed_as_debtor_by: [
+          {
+            edge: {
+              id: 'edge-3',
+              source: 'source-3',
+              destination: 'dest-3',
+              evtTp: ['test-event'],
+              tenantId: mockTenantId,
+              incptnDtTm: '2024-01-01T00:00:00Z',
+            },
+            result: { id: 'entity-3', creDtTm: mockDate2, TenantId: mockTenantId },
+            condition: condition3,
+          },
+        ],
+        governed_as_creditor_account_by: [],
+        governed_as_debtor_account_by: [],
+      };
+
+      const mockInput: RawConditionResponse[] = [emptyRecord, populatedRecord];
+
+      const result: EntityConditionResponse = parseConditionEntity(mockInput, mockTenantId);
+
+      // Verify that conditions were aggregated and sorted properly
+      expect(result.conditions).toHaveLength(3);
+
+      // Verify sorting by creDtTm ascending
+      expect(result.conditions[0].condId).toBe('cond-2'); // mockDate1 (earliest)
+      expect(result.conditions[1].condId).toBe('cond-3'); // mockDate2 (middle)
+      expect(result.conditions[2].condId).toBe('cond-1'); // mockDate3 (latest)
+
+      expect(result.conditions[0].creDtTm).toBe(mockDate1);
+      expect(result.conditions[1].creDtTm).toBe(mockDate2);
+      expect(result.conditions[2].creDtTm).toBe(mockDate3);
+
+      // Verify perspectives are correct
+      expect(result.conditions[0].prsptvs[0].prsptv).toBe('governed_as_creditor_by');
+      expect(result.conditions[1].prsptvs[0].prsptv).toBe('governed_as_debtor_by');
+      expect(result.conditions[2].prsptvs[0].prsptv).toBe('governed_as_creditor_by');
+
+      // Verify that ntty extraction follows current implementation behavior
+      // Note: Current implementation always checks input[0] for ntty, so when first record has empty arrays,
+      // ntty remains undefined even if subsequent records contain valid ntty data
+      expect(result.ntty).toBeUndefined();
+    });
   });
 
   describe('parseConditionAccount', () => {

@@ -25,6 +25,7 @@ import { TypologyConfigRepo } from '../../../src/repositories/configuration/typo
 
 describe('TypologyConfigRepository', () => {
   const mockTenantId = 'test-tenant-123';
+  const mockClientTenantId = 'client-tenant-999'; // Different tenant to test server-side overwriting
 
   // Mock dates for predictable testing
   const mockCreateDate = '2024-01-01T10:00:00.000Z';
@@ -34,7 +35,7 @@ describe('TypologyConfigRepository', () => {
   const createMockTypologyConfig = (includeTimestamps = false): TypologyConfig => ({
     id: 'typology-001',
     cfg: '1.0.0',
-    tenantId: mockTenantId,
+    tenantId: mockClientTenantId, // Start with client-provided tenant to test server overwriting
     desc: 'Test typology configuration',
     ...(includeTimestamps && {
       creDtTm: '2024-01-01T00:00:00.000Z', // Client provided timestamps should be overridden
@@ -94,6 +95,7 @@ describe('TypologyConfigRepository', () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue(mockCreateResponse);
 
       const inputPayload = createMockTypologyConfig();
+      const originalTenantId = inputPayload.tenantId;
       const result = await TypologyConfigRepo.create(inputPayload, mockTenantId);
 
       // Verify that the payload was modified with timestamp data
@@ -101,8 +103,9 @@ describe('TypologyConfigRepository', () => {
       expect(inputPayload.updDtTm).toBe(mockCreateDate);
       expect(inputPayload.creDtTm).toBe(inputPayload.updDtTm); // Both should be the same on creation
 
-      // Verify tenantId was set
+      // Verify server-side tenantId overwrites client-provided value
       expect(inputPayload.tenantId).toBe(mockTenantId);
+      expect(inputPayload.tenantId).not.toBe(originalTenantId);
 
       // Verify database call was made with correct parameters
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
@@ -126,6 +129,7 @@ describe('TypologyConfigRepository', () => {
       const inputPayload = createMockTypologyConfig(true);
       const originalCreDtTm = inputPayload.creDtTm;
       const originalUpdDtTm = inputPayload.updDtTm;
+      const originalTenantId = inputPayload.tenantId;
 
       await TypologyConfigRepo.create(inputPayload, mockTenantId);
 
@@ -135,17 +139,27 @@ describe('TypologyConfigRepository', () => {
       expect(inputPayload.creDtTm).not.toBe(originalCreDtTm);
       expect(inputPayload.updDtTm).not.toBe(originalUpdDtTm);
 
+      // Verify that server-side tenantId overrides client value
+      expect(inputPayload.tenantId).toBe(mockTenantId);
+      expect(inputPayload.tenantId).not.toBe(originalTenantId);
+
       expect(mockToISOString).toHaveBeenCalled();
     });
 
-    it('should set tenantId on the payload', async () => {
+    it('should override client-supplied tenantId with server-side tenantId', async () => {
       jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockCreateDate);
       mockHandlePostExecuteSqlStatement.mockResolvedValue(mockCreateResponse);
 
       const inputPayload = createMockTypologyConfig();
+      const originalTenantId = inputPayload.tenantId; // Should be mockClientTenantId
+
+      expect(originalTenantId).toBe(mockClientTenantId); // Verify starting state
+
       await TypologyConfigRepo.create(inputPayload, mockTenantId);
 
+      // Verify server-side tenantId overwrites client value
       expect(inputPayload.tenantId).toBe(mockTenantId);
+      expect(inputPayload.tenantId).not.toBe(originalTenantId);
     });
   });
 

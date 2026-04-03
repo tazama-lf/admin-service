@@ -25,6 +25,7 @@ import { RuleConfigRepo } from '../../../src/repositories/configuration/rule.con
 
 describe('RuleConfigRepository', () => {
   const mockTenantId = 'test-tenant-123';
+  const mockClientTenantId = 'client-tenant-999'; // Different tenant to test server-side overwriting
 
   // Mock dates for predictable testing
   const mockCreateDate = '2024-01-01T10:00:00.000Z';
@@ -34,7 +35,7 @@ describe('RuleConfigRepository', () => {
   const createMockRuleConfig = (includeTimestamps = false): RuleConfig => ({
     id: 'rule-001',
     cfg: '1.0.0',
-    tenantId: mockTenantId,
+    tenantId: mockClientTenantId, // Start with client-provided tenant to test server overwriting
     desc: 'Test rule configuration',
     ...(includeTimestamps && {
       creDtTm: '2024-01-01T00:00:00.000Z', // Client provided timestamps should be overridden
@@ -130,14 +131,20 @@ describe('RuleConfigRepository', () => {
       expect(mockToISOString).toHaveBeenCalled();
     });
 
-    it('should set tenantId on the payload', async () => {
+    it('should override client-supplied tenantId with server-side tenantId', async () => {
       jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockCreateDate);
       mockHandlePostExecuteSqlStatement.mockResolvedValue(mockCreateResponse);
 
       const inputPayload = createMockRuleConfig();
+      const originalTenantId = inputPayload.tenantId; // Should be mockClientTenantId
+
+      expect(originalTenantId).toBe(mockClientTenantId); // Verify starting state
+
       await RuleConfigRepo.create(inputPayload, mockTenantId);
 
+      // Verify server-side tenantId overwrites client value
       expect(inputPayload.tenantId).toBe(mockTenantId);
+      expect(inputPayload.tenantId).not.toBe(originalTenantId);
     });
   });
 

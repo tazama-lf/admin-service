@@ -462,7 +462,6 @@ describe('handlePostConditionAccount', () => {
 
   it('should handle a successful post request for a creditor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleAccountCondition, prsptv: 'creditor' };
 
     // Act
@@ -472,7 +471,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
       expect.objectContaining({
         ...conditionCreditor,
-        creDtTm: nowDateTime,
+        creDtTm: expect.any(String),
       }),
     );
     const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;

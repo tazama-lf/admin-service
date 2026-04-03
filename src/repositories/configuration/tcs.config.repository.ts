@@ -380,19 +380,16 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   if (!transactionType || !tenantId || !version) {
     throw new Error('Transaction type, tenant ID, and version are required');
   }
-
   const query = `
     SELECT 
       content_type,
-      CASE 
-        WHEN content_type = 'XML' THEN payload_xml 
-        ELSE payload_json 
-      END AS payload
+      payload_xml,
+      payload_json
     FROM tcs_config
     WHERE transaction_type = $1 AND tenant_id = $2 AND version = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ content_type: string; payload: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ content_type: string; payload_xml: string | null; payload_json: unknown }>(
     { text: query, values: [transactionType, tenantId, version] } satisfies PgQueryConfig,
     'configuration',
   );
@@ -400,8 +397,11 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   if (result.rows.length === 0) {
     throw new Error('Configuration not found');
   }
-
-  return result.rows[0].payload;
+  if (result.rows[0].payload_xml) {
+    return result.rows[0].payload_xml;
+  } else {
+    return result.rows[0].payload_json;
+  }
 };
 
 export const getSchemaByTransactionType = async (

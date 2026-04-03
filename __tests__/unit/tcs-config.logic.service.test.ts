@@ -456,6 +456,37 @@ describe('TCS Config Logic Service', () => {
       expect(result.mapping).toHaveLength(2);
     });
 
+    it('should add mapping when source is undefined', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: undefined,
+        updatedAt: new Date(),
+      };
+
+      const newMapping = {
+        destination: 'targetField',
+        type: 'direct',
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [{ ...newMapping, source: undefined }],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        expect.objectContaining({ mapping: expect.any(Array) }),
+      );
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
     it('should throw error when config is not found', async () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(null);
 
@@ -510,6 +541,28 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
 
       await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 5)).rejects.toThrow('Failed to remove mapping');
+    });
+
+    it('should set mapping to empty array when last mapping is removed', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [{ source: ['field1'], destination: 'target1', type: 'direct' }],
+        updatedAt: new Date(),
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(result.mapping).toEqual([]);
     });
   });
 
@@ -575,6 +628,35 @@ describe('TCS Config Logic Service', () => {
       expect(result.functions?.[0]).toEqual(expectedFunction);
     });
 
+    it('should add function to config when functions list is null', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        functions: null,
+        updatedAt: new Date(),
+      };
+
+      const newFunction = {
+        functionName: 'testFunction',
+        params: ['param1'],
+        tableName: 'testTable',
+        columns: ['col1'],
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        functions: [newFunction],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(result.functions?.[0]).toEqual(newFunction);
+    });
+
     it('should throw error when config is not found', async () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(null);
 
@@ -616,6 +698,28 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(null);
 
       await expect(tcsConfigService.handleRemoveFunction(999, mockTenantId, 0)).rejects.toThrow('Failed to remove function');
+    });
+
+    it('should set functions to empty array when last function is removed', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        functions: [{ functionName: 'func1', params: [], tableName: '', columns: [] }],
+        updatedAt: new Date(),
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        functions: [],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(result.functions).toEqual([]);
     });
 
     it('should throw error when function index is invalid', async () => {
@@ -716,6 +820,26 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleGetConfigByTransactionType('invalid.type', '1.0.0', mockTenantId)).rejects.toThrow(
         'Configuration not found',
       );
+    });
+
+    it('should retrieve config with XML payload when content type is XML', async () => {
+      const mockConfig = {
+        schema: { type: 'object' },
+        mapping: { field: 'value' },
+        content_type: 'application/xml',
+        payload_xml: '<root><data>test</data></root>',
+        payload_json: null,
+      };
+
+      (tcsConfigRepository.getSchemaByTransactionType as jest.Mock).mockResolvedValue(mockConfig);
+
+      const result = await tcsConfigService.handleGetConfigByTransactionType('pacs.008.001.10', '1.0.0', mockTenantId);
+
+      expect(result).toEqual({
+        schema: mockConfig.schema,
+        mapping: mockConfig.mapping,
+        payload: mockConfig.payload_xml,
+      });
     });
   });
 

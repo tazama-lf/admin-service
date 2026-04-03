@@ -355,9 +355,9 @@ export const updateConfig = async (
   return updatedConfig as unknown as Config;
 };
 
-export const findAllTransactionTypes = async (tenantId: string): Promise<string[]> => {
+export const findAllTransactionTypes = async (tenantId: string): Promise<Array<Record<string, unknown>>> => {
   const query = `
-    SELECT DISTINCT transaction_type
+    SELECT DISTINCT transaction_type, endpoint_path
     FROM tcs_config
     WHERE tenant_id = $1
       AND (
@@ -368,12 +368,12 @@ export const findAllTransactionTypes = async (tenantId: string): Promise<string[
     ORDER BY transaction_type
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ transaction_type: string }>(
+  const result = await handlePostExecuteSqlStatement<{ transaction_type: string; endpoint_path: string }>(
     { text: query, values: [tenantId] } satisfies PgQueryConfig,
     'configuration',
   );
 
-  return result.rows.map((row) => row.transaction_type);
+  return result.rows.map((row) => row);
 };
 
 export const getPayloadByTransactionType = async (transactionType: string, tenantId: string, version: string): Promise<unknown> => {
@@ -430,10 +430,7 @@ export const getSchemaByTransactionType = async (
     content_type: string;
     payload_xml: string | null;
     payload_json: unknown;
-  }>(
-    { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
-    'configuration',
-  );
+  }>({ text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
     throw new Error('Configuration not found');

@@ -407,14 +407,14 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
   }
 };
 
-export const handleGetAllTransactionTypes = async (tenantId: string): Promise<string[]> => {
+export const handleGetAllTransactionTypes = async (tenantId: string): Promise<Array<Record<string, unknown>>> => {
   try {
     loggerService.log(`Getting all transaction types for tenant: ${tenantId}`);
 
-    const transactionTypes = await findAllTransactionTypes(tenantId);
+    const transactiondetails = await findAllTransactionTypes(tenantId);
 
-    loggerService.log(`Successfully retrieved ${transactionTypes.length} transaction types`);
-    return transactionTypes;
+    loggerService.log(`Successfully retrieved ${transactiondetails.length} transaction types`);
+    return transactiondetails;
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.error(`Error getting transaction types: ${errorMessage.message}`, 'handleGetAllTransactionTypes');
@@ -443,10 +443,7 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
 
     const config = await getSchemaByTransactionType(transactionType, version, tenantId);
 
-    const payload =
-      config.content_type === ContentType.XML
-        ? config.payload_xml
-        : config.payload_json;
+    const payload = (config.content_type as ContentType) === ContentType.XML ? config.payload_xml : config.payload_json;
 
     return {
       schema: config.schema,

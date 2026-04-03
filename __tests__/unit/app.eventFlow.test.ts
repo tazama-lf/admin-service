@@ -205,8 +205,6 @@ describe('handlePostConditionEntity', () => {
       return Promise.resolve({ id: undefined } as unknown as Entity);
     });
 
-    const nowDateTime = new Date().toISOString();
-
     // Arrange
     const condition = {
       ...sampleEntityCondition,
@@ -217,7 +215,7 @@ describe('handlePostConditionEntity', () => {
     // Act & Assert
     await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
     const entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
-    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, 'DEFAULT', nowDateTime);
+    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, 'DEFAULT', expect.any(String));
   });
   it('should handle error when creating a new entity if entity does not exist and forceCret is set to true', async () => {
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {

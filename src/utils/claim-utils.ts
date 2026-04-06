@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-export type Claim = string | string[];
+import type { Claim } from '../interface/claim.interface';
 
 /**
  * Normalizes a claim (single string or array) into a flat array of claim strings.

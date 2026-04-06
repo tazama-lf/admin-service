@@ -5,7 +5,7 @@ import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 import { tokenHandler } from '../auth/authHandler';
 import { loggerService, configuration } from '../index';
 import type { TSchema } from '@sinclair/typebox';
-import type { Claim } from './claim-utils';
+import type { Claim } from '../interface/claim.interface';
 
 type preHandler = (request: FastifyRequest, reply: FastifyReply) => void | Promise<void>;
 

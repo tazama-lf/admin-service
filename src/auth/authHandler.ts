@@ -1,7 +1,8 @@
 import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { loggerService } from '..';
-import { type Claim, normalizeClaims, hasAnyClaim } from '../utils/claim-utils';
+import type { Claim } from '../interface/claim.interface';
+import { normalizeClaims, hasAnyClaim } from '../utils/claim-utils';
 
 export const tokenHandler =
   (claim: Claim) =>

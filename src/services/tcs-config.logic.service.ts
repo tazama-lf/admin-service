@@ -26,7 +26,7 @@ import {
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 import { HttpException, HttpStatus } from '../utils/error';
 
-const getExpectedUpdatedAt = (updatedAt: unknown): string => {
+const getUpdatedAt = (updatedAt: unknown): string => {
   if (updatedAt instanceof Date) {
     return updatedAt.toISOString();
   }
@@ -150,17 +150,11 @@ export const handleGetAllConfigs = async (
   }
 };
 
-export const handleUpdateConfig = async (id: number, tenantId: string, updates: Partial<Config>): Promise<Config> => {
+export const handleUpdateConfig = async (id: number, tenantId: string, updates: Partial<Config>, updatedAt: unknown): Promise<Config> => {
   try {
     loggerService.log(`Started handling update config request for ID: ${id}, tenant: ${tenantId}`);
 
-    const existingConfig = await findConfigById(id, tenantId);
-    if (!existingConfig) {
-      loggerService.error(`Config with id ${id} not found for tenant ${tenantId}`, 'handleUpdateConfig');
-      throw new Error('Configuration not found');
-    }
-
-    const updatedConfig = await updateConfig(id, tenantId, updates, getExpectedUpdatedAt(existingConfig.updatedAt));
+    const updatedConfig = await updateConfig(id, tenantId, updates, getUpdatedAt(updatedAt));
 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
@@ -179,17 +173,12 @@ export const handleUpdatePublishingStatus = async (
   id: number,
   tenantId: string,
   publishingStatus: 'active' | 'inactive',
+  updatedAt: unknown,
 ): Promise<Config> => {
   try {
     loggerService.log(`[${tenantId}] Started updating publishing status to '${publishingStatus}' for config ${id}`);
 
-    const existingConfig = await findConfigById(id, tenantId);
-    if (!existingConfig) {
-      loggerService.error(`Config ${id} not found for tenant ${tenantId}`, 'handleUpdatePublishingStatus');
-      throw new Error('Configuration not found');
-    }
-
-    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus }, getExpectedUpdatedAt(existingConfig.updatedAt));
+    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus }, getUpdatedAt(updatedAt));
 
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
 
@@ -256,7 +245,7 @@ export const handleUpdateConfigByStatus = async (id: string, status: string, ten
   }
 };
 
-export const handleAddMapping = async (id: number, tenantId: string, mappingDto: AddMappingDto): Promise<Config> => {
+export const handleAddMapping = async (id: number, tenantId: string, mappingDto: AddMappingDto, updatedAt: unknown): Promise<Config> => {
   try {
     loggerService.log(`Adding mapping to config ${id} for tenant ${tenantId}`);
 
@@ -277,7 +266,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, getExpectedUpdatedAt(config.updatedAt));
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, getUpdatedAt(updatedAt));
 
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
@@ -292,7 +281,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
   }
 };
 
-export const handleRemoveMapping = async (id: number, tenantId: string, mappingIndex: number): Promise<Config> => {
+export const handleRemoveMapping = async (id: number, tenantId: string, mappingIndex: number, updatedAt: unknown): Promise<Config> => {
   try {
     loggerService.log(`Removing mapping at index ${mappingIndex} from config ${id} for tenant ${tenantId}`);
 
@@ -312,7 +301,7 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
       id,
       tenantId,
       { mapping: updatedMappings.length > 0 ? updatedMappings : [] },
-      getExpectedUpdatedAt(config.updatedAt),
+      getUpdatedAt(updatedAt),
     );
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
@@ -328,7 +317,7 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
   }
 };
 
-export const handleAddFunction = async (id: number, tenantId: string, functionDto: AddFunctionDto): Promise<Config> => {
+export const handleAddFunction = async (id: number, tenantId: string, functionDto: AddFunctionDto, updatedAt: unknown): Promise<Config> => {
   try {
     loggerService.log(`Adding function to config ${id} for tenant ${tenantId}`);
 
@@ -347,7 +336,7 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, getExpectedUpdatedAt(config.updatedAt));
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, getUpdatedAt(updatedAt));
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
@@ -362,7 +351,7 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
   }
 };
 
-export const handleRemoveFunction = async (id: number, tenantId: string, functionIndex: number): Promise<Config> => {
+export const handleRemoveFunction = async (id: number, tenantId: string, functionIndex: number, updatedAt: unknown): Promise<Config> => {
   try {
     loggerService.log(`Removing function at index ${functionIndex} from config ${id} for tenant ${tenantId}`);
 
@@ -382,7 +371,7 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
       id,
       tenantId,
       { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
-      getExpectedUpdatedAt(config.updatedAt),
+      getUpdatedAt(updatedAt),
     );
 
     loggerService.log(`Successfully removed function from config ${id}`);

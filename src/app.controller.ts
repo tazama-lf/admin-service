@@ -272,10 +272,10 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
   loggerService.log('Start - Handle write config update request');
   try {
     const { id } = req.params as { id: string };
-    const updateData = req.body as Record<string, unknown>;
+    const { updatedAt, ...updateData } = req.body as Record<string, unknown> & { updatedAt?: unknown };
     const { tenantId } = req as ITenantRequest;
 
-    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
+    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>, updatedAt);
     reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to update config');
@@ -288,7 +288,10 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
   loggerService.log('Start - Handle update publishing status request');
   try {
     const { id } = req.params as { id: string };
-    const { publishing_status: publishingStatus } = req.body as { publishing_status?: 'active' | 'inactive' };
+    const { publishing_status: publishingStatus, updatedAt } = req.body as {
+      publishing_status?: 'active' | 'inactive';
+      updatedAt?: unknown;
+    };
     const { tenantId } = req as ITenantRequest;
     const configId = parseInt(id);
 
@@ -302,7 +305,7 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
       return;
     }
 
-    const updatedConfig = await handleUpdatePublishingStatus(configId, tenantId, publishingStatus);
+    const updatedConfig = await handleUpdatePublishingStatus(configId, tenantId, publishingStatus, updatedAt);
     reply.code(200).send({
       success: true,
       message: `Publishing status updated to ${publishingStatus}`,
@@ -391,9 +394,9 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
-    const mappingDto = req.body as AddMappingDto;
+    const { updatedAt, ...mappingDto } = req.body as AddMappingDto & { updatedAt?: unknown };
 
-    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto);
+    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto as AddMappingDto, updatedAt);
 
     reply.status(200).send({
       success: true,
@@ -413,8 +416,9 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
     const { id, index } = req.params as { id: string; index: string };
     const { tenantId } = req as ITenantRequest;
     const mappingIndex = Number(index);
+    const { updatedAt } = req.body as { updatedAt?: unknown };
 
-    const updatedConfig = await handleRemoveMapping(Number(id), tenantId, mappingIndex);
+    const updatedConfig = await handleRemoveMapping(Number(id), tenantId, mappingIndex, updatedAt);
 
     reply.status(200).send({
       success: true,
@@ -433,9 +437,9 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
-    const functionDto = req.body as AddFunctionDto;
+    const { updatedAt, ...functionDto } = req.body as AddFunctionDto & { updatedAt?: unknown };
 
-    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto);
+    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto as AddFunctionDto, updatedAt);
 
     reply.status(200).send({
       success: true,
@@ -455,8 +459,9 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
     const { id, index } = req.params as { id: string; index: string };
     const { tenantId } = req as ITenantRequest;
     const functionIndex = Number(index);
+    const { updatedAt } = req.body as { updatedAt?: unknown };
 
-    const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex);
+    const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex, updatedAt);
 
     reply.status(200).send({
       success: true,

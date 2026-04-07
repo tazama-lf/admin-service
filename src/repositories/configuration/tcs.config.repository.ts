@@ -230,7 +230,7 @@ export const updateConfig = async (
   id: number,
   tenantId: string,
   updates: Partial<Config> & { relatedTransaction?: string; related_transaction?: string },
-  expectedUpdatedAt: string,
+  updatedAt: string,
 ): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
@@ -309,7 +309,7 @@ export const updateConfig = async (
               status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction
   `;
 
-  values.push(id, tenantId, expectedUpdatedAt);
+  values.push(id, tenantId, updatedAt);
 
   interface UpdateConfigRow {
     id: number;

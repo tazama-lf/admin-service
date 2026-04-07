@@ -430,10 +430,7 @@ export const getSchemaByTransactionType = async (
     content_type: string;
     payload_xml: string | null;
     payload_json: unknown;
-  }>(
-    { text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig,
-    'configuration',
-  );
+  }>({ text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
     throw new Error('Configuration not found');
@@ -507,7 +504,7 @@ export const updateConfigByStatus = async (id: string, status: string, tenantId:
 
 export const getRelatedTransactions = async (tenantId: string): Promise<string[]> => {
   const query = `
-    SELECT related_transaction
+    SELECT DISTINCT related_transaction
     FROM tcs_config
     WHERE tenant_id = $1
       AND related_transaction IS NOT NULL

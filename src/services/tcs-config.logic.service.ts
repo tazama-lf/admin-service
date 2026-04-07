@@ -27,15 +27,11 @@ import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/confi
 import { HttpException, HttpStatus } from '../utils/error';
 
 const getUpdatedAt = (updatedAt: unknown): string => {
-  if (updatedAt instanceof Date) {
-    return updatedAt.toISOString();
-  }
-
-  if (typeof updatedAt === 'string' && updatedAt.length > 0) {
+  if (typeof updatedAt === 'string' && updatedAt.trim().length > 0) {
     return updatedAt;
   }
 
-  throw new Error('Missing configuration version token');
+  throw new HttpException('Missing configuration version token', HttpStatus.BAD_REQUEST);
 };
 
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
@@ -159,6 +155,10 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -184,6 +184,10 @@ export const handleUpdatePublishingStatus = async (
 
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -271,6 +275,10 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -307,6 +315,10 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -341,6 +353,10 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }
@@ -377,6 +393,10 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof ConfigConflictError) {
       throw new HttpException(error.message, HttpStatus.CONFLICT);
     }

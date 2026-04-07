@@ -11,6 +11,7 @@ import {
 } from '@tazama-lf/tcs-lib';
 import {
   createConfig,
+  ConfigConflictError,
   findConfigById,
   findConfigsByStatus,
   updateConfig,
@@ -23,6 +24,19 @@ import {
   getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
+import { HttpException, HttpStatus } from '../utils/error';
+
+const getExpectedUpdatedAt = (updatedAt: unknown): string => {
+  if (updatedAt instanceof Date) {
+    return updatedAt.toISOString();
+  }
+
+  if (typeof updatedAt === 'string' && updatedAt.length > 0) {
+    return updatedAt;
+  }
+
+  throw new Error('Missing configuration version token');
+};
 
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
@@ -146,11 +160,15 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);
+    const updatedConfig = await updateConfig(id, tenantId, updates, getExpectedUpdatedAt(existingConfig.updatedAt));
 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
     throw new Error('Failed to update configuration');
@@ -171,12 +189,16 @@ export const handleUpdatePublishingStatus = async (
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus });
+    const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus }, getExpectedUpdatedAt(existingConfig.updatedAt));
 
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
 
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating publishing status with error message: ${errorMessage.message}`, 'handleUpdatePublishingStatus');
     throw new Error('Failed to update publishing status');
@@ -255,11 +277,15 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
 
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, getExpectedUpdatedAt(config.updatedAt));
 
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding mapping: ${errorMessage.message}`, 'handleAddMapping');
     throw new Error('Failed to add mapping');
@@ -282,11 +308,20 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { mapping: updatedMappings.length > 0 ? updatedMappings : [] },
+      getExpectedUpdatedAt(config.updatedAt),
+    );
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
     throw new Error('Failed to remove mapping');
@@ -312,11 +347,15 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, getExpectedUpdatedAt(config.updatedAt));
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
     throw new Error('Failed to add function');
@@ -339,11 +378,20 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
+      getExpectedUpdatedAt(config.updatedAt),
+    );
 
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof ConfigConflictError) {
+      throw new HttpException(error.message, HttpStatus.CONFLICT);
+    }
+
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
     throw new Error('Failed to remove function');

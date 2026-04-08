@@ -74,6 +74,12 @@ describe('Data Model Logic Service', () => {
 
       await expect(dataModelService.handleGetDataModelJson(mockTenantId)).rejects.toThrow('Database error');
     });
+
+    it('should throw Unknown error when non-Error is thrown', async () => {
+      mockedGetDataModelJson.mockRejectedValue('string error');
+
+      await expect(dataModelService.handleGetDataModelJson(mockTenantId)).rejects.toThrow('Unknown error');
+    });
   });
 
   describe('handleUpsertDataModelJson', () => {
@@ -102,6 +108,12 @@ describe('Data Model Logic Service', () => {
       mockedUpsertDataModelJson.mockRejectedValue(new Error('Upsert failed'));
 
       await expect(dataModelService.handleUpsertDataModelJson(mockTenantId, mockDataModel)).rejects.toThrow('Upsert failed');
+    });
+
+    it('should throw Unknown error when non-Error is thrown on upsert', async () => {
+      mockedUpsertDataModelJson.mockRejectedValue('string error');
+
+      await expect(dataModelService.handleUpsertDataModelJson(mockTenantId, mockDataModel)).rejects.toThrow('Unknown error');
     });
   });
 });

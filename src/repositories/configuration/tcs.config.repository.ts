@@ -504,7 +504,7 @@ export const updateConfigByStatus = async (id: string, status: string, tenantId:
 
 export const getRelatedTransactions = async (tenantId: string): Promise<string[]> => {
   const query = `
-    SELECT related_transaction
+    SELECT DISTINCT related_transaction
     FROM tcs_config
     WHERE tenant_id = $1
       AND related_transaction IS NOT NULL

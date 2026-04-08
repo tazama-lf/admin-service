@@ -495,6 +495,13 @@ describe('TCS Config Logic Service', () => {
       await expect(
         tcsConfigService.handleAddMapping(1, mockTenantId, { source: ['field'], destination: 'target', type: 'direct' } as any, updatedAt),
       ).rejects.toMatchObject({ status: 409 });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { mapping: [{ source: ['field'], destination: 'target', type: 'direct' }] },
+        updatedAt,
+      );
     });
   });
 
@@ -564,6 +571,8 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
 
       await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 0, updatedAt)).rejects.toMatchObject({ status: 409 });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, updatedAt);
     });
   });
 
@@ -656,6 +665,13 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleAddFunction(1, mockTenantId, { functionName: 'testFn' }, updatedAt)).rejects.toMatchObject({
         status: 409,
       });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { functions: [{ functionName: 'testFn', params: [], tableName: '', columns: [] }] },
+        updatedAt,
+      );
     });
   });
 
@@ -725,6 +741,8 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
 
       await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 0, updatedAt)).rejects.toMatchObject({ status: 409 });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, updatedAt);
     });
   });
 

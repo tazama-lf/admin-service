@@ -78,6 +78,7 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
+import { handlePostMask } from './services/masking.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -1548,6 +1549,22 @@ export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: 
     reply.status(500).send({ success: false, message: errorMessage });
   } finally {
     loggerService.log('End - Handle get related transactions request');
+  }
+};
+
+// ==================== MASKING OPERATIONS ====================
+
+export const createMaskHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle create mask request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const maskData = req.body as Record<string, unknown>;
+    const response = await handlePostMask({ ...maskData }, tenantId);
+    reply.code(201).send({ success: true, message: response.message });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create cron job');
+  } finally {
+    loggerService.log('End - Handle create masking request');
   }
 };
 

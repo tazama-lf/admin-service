@@ -66,6 +66,7 @@ import {
   getRuleFlowHandler,
   updateRuleHandler,
   getAllMasksHandler,
+  createMaskHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -362,6 +363,11 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/trs/masking/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllMasksHandler, routePrivilege.getTrsMasks),
+  // ====================  MASKING OPERATIONS ====================
+  });
+
+  fastify.post('/v1/admin/trs/mask/create', {
+    ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.postTrsRule),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

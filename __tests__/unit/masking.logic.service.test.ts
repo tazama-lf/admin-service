@@ -6,14 +6,22 @@ jest.mock('../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: jest.fn(),
 }));
 
+jest.mock('../../src', () => ({
+  loggerService: {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  },
+}));
+
 jest.mock('../../src/repositories/configuration/masking.repository', () => ({
   countMasksWithFiltersInDB: jest.fn(),
   findMasksWithFiltersInDB: jest.fn(),
+  createMasking: jest.fn(),
 }));
 
 import * as maskingLogicService from '../../src/services/masking.logic.service';
 import * as maskingRepository from '../../src/repositories/configuration/masking.repository';
-
 describe('Masking Logic Service', () => {
   const mockTenantId = 'tenant-123';
 
@@ -177,6 +185,42 @@ describe('Masking Logic Service', () => {
 
       expect(result.limit).toBe(10);
       expect(result.offset).toBe(0);
+    });
+  });
+
+  describe('handlePostMask', () => {
+    it('should create a masking configuration successfully', async () => {
+      (maskingRepository.createMasking as jest.Mock).mockResolvedValue(42);
+
+      const mask = { txtp: 'pain.001.001.11', txtp_version: '11' };
+      const result = await maskingLogicService.handlePostMask(mask, mockTenantId);
+
+      expect(maskingRepository.createMasking).toHaveBeenCalledWith({
+        txtp: 'pain.001.001.11',
+        txtp_version: '11',
+        tenant_id: mockTenantId,
+      });
+      expect(result).toEqual({ message: 'Masking Configuration with id 42 created Successfully' });
+    });
+
+    it('should unwrap maskData property if present', async () => {
+      (maskingRepository.createMasking as jest.Mock).mockResolvedValue(7);
+
+      const mask = { maskData: { txtp: 'pacs.008.001.10', txtp_version: '10' } };
+      const result = await maskingLogicService.handlePostMask(mask, mockTenantId);
+
+      expect(maskingRepository.createMasking).toHaveBeenCalledWith({
+        txtp: 'pacs.008.001.10',
+        txtp_version: '10',
+        tenant_id: mockTenantId,
+      });
+      expect(result.message).toContain('7');
+    });
+
+    it('should throw an error when createMasking fails', async () => {
+      (maskingRepository.createMasking as jest.Mock).mockRejectedValue(new Error('DB insert failed'));
+
+      await expect(maskingLogicService.handlePostMask({ txtp: 'pain.001.001.11' }, mockTenantId)).rejects.toThrow('DB insert failed');
     });
   });
 });

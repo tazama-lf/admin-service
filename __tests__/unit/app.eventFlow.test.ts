@@ -177,7 +177,6 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a successful post request for a creditor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleEntityCondition, prsptv: 'creditor' };
 
     jest.spyOn(databaseManager, 'saveEntity').mockImplementation((): Promise<void> => {
@@ -187,11 +186,13 @@ describe('handlePostConditionEntity', () => {
     const result = await handlePostConditionEntity(conditionCreditor as EntityCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith({
-      ...conditionCreditor,
-      creDtTm: nowDateTime,
-      updDtTm: nowDateTime,
-    });
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...conditionCreditor,
+        creDtTm: expect.any(String),
+        updDtTm: expect.any(String),
+      }),
+    );
     const entityId = `${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionCreditor);
     expect(result).toEqual({

@@ -65,6 +65,7 @@ import {
   getRuleConfigurationHandler,
   getRuleFlowHandler,
   updateRuleHandler,
+  getAllMasksHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -126,6 +127,7 @@ const routePrivilege = {
   getTrsRules: ['editor', 'approver', 'exporter', 'publisher'],
   postTrsRule: 'editor',
   putTrsRule: 'editor',
+  getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],
   postNodes: 'editor',
@@ -356,6 +358,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
+  });
+
+  fastify.post('/v1/admin/trs/masking/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllMasksHandler, routePrivilege.getTrsMasks),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

@@ -58,6 +58,7 @@ import {
   updateRule,
   updateRuleStatus,
 } from './services/rule.logic.service';
+import { findMasksWithFilters } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
@@ -1601,5 +1602,27 @@ export const putDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
     ErrorHandler.sendError(reply, error, 'Failed to save data model JSON');
   } finally {
     loggerService.log('End - Handle put data model JSON request');
+  }
+};
+
+export const getAllMasksHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const body = authReq.body as Record<string, string>;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const result = await findMasksWithFilters(parsedLimit, parsedOffset, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      masks: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get masks');
   }
 };

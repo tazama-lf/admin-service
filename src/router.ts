@@ -97,11 +97,11 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher'],
-  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher'],
+  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
-  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher'],
+  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
   putTcsConfigWrite: ['editor', 'approver', 'exporter', 'publisher'],
   postTcsConfigMapping: 'editor',
   deleteTcsConfigMapping: 'editor',
@@ -139,6 +139,7 @@ const routePrivilege = {
   getSimulationLogs: ['editor', 'approver'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
+  createMask: 'trs_data_engineer_editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -367,7 +368,7 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   fastify.post('/v1/admin/trs/mask/create', {
-    ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.postTrsRule),
+    ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.createMask),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

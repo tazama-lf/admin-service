@@ -1,35 +1,38 @@
-export const validateSystemFunctions = (query: string): boolean => {
-  const upperCaseQuery = query.toUpperCase();
-  const forbiddenFunctions = [
-    'PG_READ_FILE',
-    'PG_STAT_FILE',
-    'PG_STAT_ACTIVITY',
-    'PG_STAT_ALL_TABLES',
-    'PG_STAT_USER_TABLES',
-    'PG_STAT_DATABASE',
-    'PG_STAT_BGWRITER',
-    'PG_STAT_REPLICATION',
-    'PG_STAT_WAL_RECEIVER',
-    'PG_STAT_XACT_ALL_TABLES',
-    'PG_STAT_XACT_USER_TABLES',
-    'PG_STAT_XACT_SYS_TABLES',
-    'PG_STAT_SYS_TABLES',
-    'PG_STAT_PROGRESS_VACUUM',
-    'PG_STAT_PROGRESS_CLUSTER',
-    'PG_STAT_PROGRESS_CREATE_INDEX',
-    'PG_STAT_PROGRESS_ANALYZE',
-    'PG_STAT_IO',
-    'PG_STAT_SLRU',
-    'PG_STAT_ARCHIVER',
-    'PG_STAT_SUBSCRIPTION',
-    'PG_STAT_REPLICATION_SLOTS',
-    'PG_STAT_DATABASE_CONFLICTS',
-    'PG_STAT_USER_FUNCTIONS',
-    'PG_STAT_SYS_FUNCTIONS',
-    'PG_STAT_USER_INDEXES',
-    'PG_STAT_SYS_INDEXES',
-    'PG_STAT_USER_SEQUENCES',
-    'PG_STAT_SYS_SEQUENCES',
-  ];
-  return forbiddenFunctions.some((fn) => upperCaseQuery.includes(fn));
+import { parse } from 'pgsql-ast-parser';
+
+/** Statement type discriminants that are part of the SELECT family */
+const SELECT_TYPES = new Set(['select', 'union', 'union all', 'values', 'with', 'with recursive']);
+
+/**
+ * Parses the SQL string and asserts it is a single SELECT-family statement.
+ * Returns the parsed AST on success so the caller can inspect it further.
+ * Throws a descriptive Error on any violation.
+ */
+export const validateSelectQuery = (query: string): ReturnType<typeof parse> => {
+  let ast: ReturnType<typeof parse>;
+
+  // Replace {{ variable }} template placeholders with $N before parsing so the
+  // AST parser sees valid parameterised SQL while still validating the structure.
+  let paramIndex = 1;
+  const normalised = query.replace(/\{\{\s*\w+\s*\}\}/g, () => `$${paramIndex++}`);
+
+  try {
+    ast = parse(normalised);
+  } catch (e) {
+    throw new Error(`Invalid SQL syntax: ${(e as Error).message}`);
+  }
+
+  if (ast.length === 0) {
+    throw new Error('Empty query is not allowed.');
+  }
+
+  if (ast.length > 1) {
+    throw new Error('Only a single SELECT statement is allowed — multiple statements detected.');
+  }
+
+  if (!SELECT_TYPES.has(ast[0].type)) {
+    throw new Error(`Only SELECT queries are allowed. Got: ${ast[0].type}`);
+  }
+
+  return ast;
 };

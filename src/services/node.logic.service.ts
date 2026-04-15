@@ -2,12 +2,13 @@ import { loggerService } from '..';
 import type { Node, QueryParams } from '../interface/node.interface';
 import {
   deleteNodeByIdFromDB,
-  executeQueryNodeInDb,
+  executeQueryNodeInDbReadOnly,
   getAllNodes,
   getNodeByName,
   insertNodesIntoDb,
   getNodeByIdFromDb,
 } from '../repositories/configuration/node.repository';
+import { validateSelectQuery } from '../utils/validateQuery';
 import { HttpException, HttpStatus } from '../utils/error';
 
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
@@ -89,62 +90,69 @@ export const executeSelectQuery = async (
   { query, dbName, params = [] }: { query: string; dbName: string; params?: unknown[] },
   tenantId: string,
 ): Promise<Array<Record<string, unknown>>> => {
-  const upperCaseQuery = query.trim().toUpperCase();
+  // 0. Strip trailing semicolons before any processing
+  const normalisedQuery = query.replace(/\s*;\s*$/, '').trim();
 
-  // 1. Basic Security Filter
-  const forbiddenKeywords = ['INSERT', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE'];
-  if (forbiddenKeywords.some((keyword) => upperCaseQuery.includes(keyword))) {
-    throw new Error('Only SELECT queries are allowed.');
+  // 1. Parse and validate — rejects non-SELECT, multiple statements, and invalid SQL
+  //    The AST parser handles comments internally so no pre-stripping is needed here.
+  try {
+    validateSelectQuery(normalisedQuery);
+  } catch (e) {
+    throw new HttpException((e as Error).message, HttpStatus.FORBIDDEN);
   }
 
-  // 2. Extract the Table Name
-  // This regex looks for the word after FROM or JOIN, ignoring quotes
-  const tableMatch = /FROM\s+([a-zA-Z0-9_".]+)/gi.exec(query);
+  // 2. Extract table name for tenant column resolution
+  const tableMatch = /FROM\s+([a-zA-Z0-9_".]+)/gi.exec(normalisedQuery);
   const tableName = tableMatch ? tableMatch[1].replace(/['"`]/g, '').split('.').pop() : null;
 
-  let modifiedQuery = query;
-
+  let modifiedQuery = normalisedQuery;
+  let mutableParams = [...params];
   if (tableName) {
-    // 3. Determine which column name to use (Dynamic Check)
-    const tenantColumn = await resolveTenantColumn(tableName, dbName, tenantId);
-    const tenantIdCondition = `${tenantColumn} = '${tenantId}'`;
+    // 3. Resolve which tenant column this table uses (tenant_id vs tenantId).
+    //    Column name is safe to interpolate — it comes from information_schema, not user input.
+    //    The tenantId value is passed as a bind parameter ($N).
+    const tenantColumn = await resolveTenantColumn(tableName, dbName);
+    const paramIdx = mutableParams.length + 1;
+    const tenantIdCondition = `${tenantColumn} = $${paramIdx}`;
+    mutableParams = [...mutableParams, tenantId];
 
-    // 4. Inject into WHERE clause
-    if (upperCaseQuery.includes('WHERE')) {
-      modifiedQuery = modifiedQuery.replace(/WHERE/i, `WHERE ${tenantIdCondition} AND`);
+    // 4. Inject tenant condition into WHERE clause using word boundary match
+    if (/\bWHERE\b/i.test(modifiedQuery)) {
+      modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${tenantIdCondition} AND`);
     } else {
+      const upperCaseQuery = modifiedQuery.toUpperCase();
       const groupByIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b/);
       if (groupByIndex !== -1) {
-        modifiedQuery = `${query.slice(0, groupByIndex)} WHERE ${tenantIdCondition} ${query.slice(groupByIndex)}`;
+        modifiedQuery = `${modifiedQuery.slice(0, groupByIndex)} WHERE ${tenantIdCondition} ${modifiedQuery.slice(groupByIndex)}`;
       } else {
-        modifiedQuery = `${query} WHERE ${tenantIdCondition}`;
+        modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${tenantIdCondition}`;
       }
     }
   }
 
-  // 5. Apply Safety Limit
-  if (!upperCaseQuery.includes('LIMIT')) {
-    modifiedQuery = modifiedQuery.replace(/;?$/, ' LIMIT 5;');
-  }
+  // 7. Hard-cap rows — strip any user-supplied LIMIT/OFFSET and enforce our own cap
+  modifiedQuery = modifiedQuery.replace(/\bLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i, '').trimEnd();
+  modifiedQuery = `${modifiedQuery} LIMIT 10`;
 
-  return await executeQueryNodeInDb(modifiedQuery, tenantId, dbName, params);
+  // 8. Execute via the readonly connection pool
+  loggerService.log(`Executing query: ${modifiedQuery}`);
+  loggerService.log(`With params: ${JSON.stringify(mutableParams)}`);
+  return await executeQueryNodeInDbReadOnly(modifiedQuery, dbName, mutableParams);
 };
 
 /**
- * Helper: Queries the Database Schema to find the correct column name
+ * Queries information_schema to find whether this table uses 'tenant_id' or 'tenantId'.
+ * tableName is extracted from information_schema (not echoed back as a value) so it is
+ * safe to use as an identifier in the query text. The lookup itself uses a bind parameter.
  */
-async function resolveTenantColumn(tableName: string, dbName: string, tenantId: string): Promise<string> {
-  const schemaQuery = `
-    SELECT column_name 
-    FROM information_schema.columns 
-    WHERE table_name = '${tableName}' 
-    AND column_name IN ('tenant_id', 'tenantid')
-    LIMIT 1;
-  `;
-
+async function resolveTenantColumn(tableName: string, dbName: string): Promise<string> {
   try {
-    // We execute this against the DB to see which one exists
-    const result = await executeQueryNodeInDb(schemaQuery, tenantId, dbName, []);
+    const result = await executeQueryNodeInDbReadOnly(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = $1 AND column_name IN ('tenant_id', 'tenantId') LIMIT 1`,
+      dbName,
+      [tableName],
+    );
     if (result && result.length > 0) {
       return result[0].column_name as string;
     }
@@ -152,5 +160,5 @@ async function resolveTenantColumn(tableName: string, dbName: string, tenantId: 
     loggerService.error(`Error resolving tenant column for table ${tableName}`);
   }
 
-  return 'tenant_id'; // Default fallback
+  return 'tenant_id'; // default fallback
 }

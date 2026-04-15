@@ -4,6 +4,8 @@ import { validateColumnKeys } from '../../utils/enrichment-utils';
 
 const ALLOWED_MASKING_COLUMNS = new Set(['tenant_id', 'txtp', 'txtp_version']);
 
+const ALLOWED_UPDATE_COLUMNS = new Set(['txtp', 'txtp_version', 'status', 'fields_masked', 'total_fields', 'comments']);
+
 export const createMasking = async (maskingData: Record<string, unknown>): Promise<number> => {
   try {
     const keys = Object.keys(maskingData);
@@ -87,4 +89,65 @@ export const findMasksWithFiltersInDB = async (
   );
 
   return { result: result.rows };
+};
+
+export const findMaskByIdInDB = async (id: number, tenantId: string): Promise<Record<string, unknown> | null> => {
+  const query = `
+    SELECT
+      id,
+      tenant_id,
+      txtp,
+      txtp_version,
+      status,
+      fields_masked,
+      total_fields,
+      comments,
+      created_at,
+      updated_at
+    FROM trs_masking
+    WHERE id = $1 AND tenant_id = $2
+  `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: query, values: [id, tenantId] } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return result.rows[0] ?? null;
+};
+
+export const updateMaskingInDB = async (
+  id: number,
+  tenantId: string,
+  updateData: Record<string, unknown>,
+): Promise<Record<string, unknown>> => {
+  const keys = Object.keys(updateData).filter((k) => ALLOWED_UPDATE_COLUMNS.has(k));
+
+  if (keys.length === 0) {
+    throw new Error('No valid fields provided for update');
+  }
+
+  const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
+  setClauses.push('updated_at = NOW()');
+  const values: unknown[] = keys.map((k) => updateData[k]);
+
+  const query = `
+    UPDATE trs_masking
+    SET ${setClauses.join(', ')}
+    WHERE id = $${keys.length + 1} AND tenant_id = $${keys.length + 2}
+    RETURNING id, tenant_id, txtp, txtp_version, status, fields_masked, total_fields, comments, created_at, updated_at
+  `;
+
+  values.push(id, tenantId);
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: query, values } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`Masking configuration with id ${id} not found`);
+  }
+
+  return result.rows[0];
 };

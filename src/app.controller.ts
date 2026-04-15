@@ -58,7 +58,7 @@ import {
   updateRule,
   updateRuleStatus,
 } from './services/rule.logic.service';
-import { findMasksWithFilters } from './services/masking.logic.service';
+import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
@@ -1641,5 +1641,56 @@ export const getAllMasksHandler = async (req: FastifyRequest, reply: FastifyRepl
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get masks');
+  }
+};
+
+export const updateMaskHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as { id: string };
+    const updateData = req.body as Record<string, unknown>;
+    const maskId = parseInt(id, 10);
+
+    if (!id || isNaN(maskId)) {
+      reply.code(400).send({ success: false, message: 'Invalid masking configuration ID' });
+      return;
+    }
+
+    const updated = await handleUpdateMask(maskId, tenantId, updateData);
+
+    reply.code(200).send({
+      success: true,
+      message: `Masking configuration with id ${maskId} updated successfully`,
+      mask: updated,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to update masking configuration');
+  }
+};
+
+export const getMaskByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as { id: string };
+    const maskId = parseInt(id, 10);
+
+    if (!id || isNaN(maskId)) {
+      reply.code(400).send({ success: false, message: 'Invalid masking configuration ID' });
+      return;
+    }
+
+    const mask = await handleGetMaskById(maskId, tenantId);
+
+    if (!mask) {
+      ErrorHandler.sendError(reply, { status: 404 }, `Masking configuration with id ${maskId} not found`);
+      return;
+    }
+
+    reply.code(200).send({
+      success: true,
+      mask,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get masking configuration');
   }
 };

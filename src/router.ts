@@ -67,6 +67,8 @@ import {
   updateRuleHandler,
   getAllMasksHandler,
   createMaskHandler,
+  updateMaskHandler,
+  getMaskByIdHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -97,11 +99,11 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher'],
-  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
+  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
-  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
+  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   putTcsConfigWrite: ['editor', 'approver', 'exporter', 'publisher'],
   postTcsConfigMapping: 'editor',
   deleteTcsConfigMapping: 'editor',
@@ -140,6 +142,7 @@ const routePrivilege = {
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   createMask: 'trs_data_engineer_editor',
+  updateMask: 'trs_data_engineer_editor',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -369,6 +372,14 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/trs/mask/create', {
     ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.createMask),
+  });
+
+  fastify.put('/v1/admin/trs/masking/:id', {
+    ...SetOptionsBodyAndParams(updateMaskHandler, routePrivilege.updateMask),
+  });
+
+  fastify.get('/v1/admin/trs/masking/:id', {
+    ...SetOptionsBodyAndParams(getMaskByIdHandler, routePrivilege.getTrsMasks),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

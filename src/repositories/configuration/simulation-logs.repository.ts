@@ -1,6 +1,7 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
+import pgFormat from 'pg-format';
 
 type SortField = 'created_at' | 'updated_at';
 
@@ -113,15 +114,10 @@ export const createSimulationLogsInDb = async (
 };
 
 export const getSimulationMessagesFromDb = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> => {
-  const query = `
-      SELECT payload
-      FROM ${tableName}
-      WHERE tenantId = $1
-    `;
 
   const result = await handlePostExecuteSqlStatement<{ payload: SimulationMessage }>(
     {
-      text: query,
+      text: pgFormat('SELECT payload FROM %I WHERE tenantId = $1 order by credttm', tableName),
       values: [tenantId],
     } satisfies PgQueryConfig,
     'simulation',
@@ -129,3 +125,4 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
 
   return result.rows.map((row) => row.payload);
 };
+

@@ -1562,7 +1562,7 @@ export const createMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     const response = await handlePostMask({ ...maskData }, tenantId);
     reply.code(201).send({ success: true, message: response.message });
   } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to create cron job');
+    ErrorHandler.sendError(reply, error, 'Failed to create masking configuration');
   } finally {
     loggerService.log('End - Handle create masking request');
   }

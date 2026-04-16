@@ -1,5 +1,9 @@
 import type { SimulationLog, SimulationLogRequest, SimulationMessage } from '../interface/simulattionLogs.interface';
-import { createSimulationLogsInDb, getSimulationLogsFromDb } from '../repositories/configuration/simulation-logs.repository';
+import {
+  createSimulationLogsInDb,
+  getSimulationLogsFromDb,
+  getSimulationMessagesFromDb,
+} from '../repositories/configuration/simulation-logs.repository';
 
 export const createSimulationLogs = async ({
   userId,
@@ -24,44 +28,5 @@ export const getSimulationLogs = async (
   offset?: number,
 ): Promise<SimulationLog[]> => await getSimulationLogsFromDb({ ruleId, tenantId, category, sortBy, sortOrder, limit, offset });
 
-export const getSimulationMessages = (_tenantId: string): SimulationMessage[] => [
-  {
-    messageId: 'msg_001',
-    timestamp: '2024-04-14T10:00:00.000Z',
-    endpoint: 'http://localhost:3002/dems-engine/cbe/1.0.0/iso/test_transaction',
-    data: {
-      msgid: 'msg001',
-      amount: 1000,
-      currency: 'PKR',
-      country: 'PK',
-      cnic: '1234-5678-910',
-      date: '10-10-2025',
-    },
-  },
-  {
-    messageId: 'msg_002',
-    timestamp: '2024-04-14T10:00:03.000Z',
-    endpoint: 'http://localhost:3002/dems-engine/cbe/1.0.0/iso/test_transaction',
-    data: {
-      msgid: 'msg002',
-      amount: 2500,
-      currency: 'PKR',
-      country: 'PK',
-      cnic: '9876-5432-109',
-      date: '11-10-2025',
-    },
-  },
-  {
-    messageId: 'msg_003',
-    timestamp: '2024-04-14T10:00:08.000Z',
-    endpoint: 'http://localhost:3002/dems-engine/cbe/1.0.0/iso/test_transaction',
-    data: {
-      msgid: 'msg003',
-      amount: 5000,
-      currency: 'PKR',
-      country: 'PK',
-      cnic: '5555-4444-333',
-      date: '12-10-2025',
-    },
-  },
-];
+export const getSimulationMessages = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> =>
+  await getSimulationMessagesFromDb(tenantId, tableName);

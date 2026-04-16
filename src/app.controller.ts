@@ -1432,8 +1432,9 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
 export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName: string };
 
-    const messages = getSimulationMessages(tenantId);
+    const messages = await getSimulationMessages(tenantId, tableName);
 
     reply.code(200).send({
       success: true,

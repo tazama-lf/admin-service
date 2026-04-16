@@ -11,6 +11,103 @@ import {
 import { validateSelectQuery } from '../utils/validateQuery';
 import { HttpException, HttpStatus } from '../utils/error';
 
+/**
+ * Recursively extracts all base table names from a parsed SQL AST.
+ * Handles subqueries, joins, CTEs, and unions.
+ * Returns unique table names (without aliases), handling dotted identifiers.
+ */
+function extractTablesFromAST(ast: unknown[]): string[] {
+  const tables = new Set<string>();
+
+  function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  function extractTableName(node: Record<string, unknown>): string | null {
+    const { name } = node;
+    if (typeof name === 'string') {
+      return name.replace(/['"`]/g, '');
+    }
+    if (isObject(name) && typeof name.name === 'string') {
+      return name.name.replace(/['"`]/g, '');
+    }
+    return null;
+  }
+
+  function handleSelectNode(node: Record<string, unknown>): void {
+    if (node.from) traverse(node.from);
+    if (node.where) traverse(node.where);
+    if (node.columns) traverse(node.columns);
+    if (node.groupBy) traverse(node.groupBy);
+    if (node.orderBy) traverse(node.orderBy);
+  }
+
+  function handleJoinNode(node: Record<string, unknown>): void {
+    if (node.from) traverse(node.from);
+    if (node.on) traverse(node.on);
+  }
+
+  function handleWithNode(node: Record<string, unknown>): void {
+    if (node.bind) traverse(node.bind);
+    if (node.in) traverse(node.in);
+  }
+
+  function handleUnionNode(node: Record<string, unknown>): void {
+    if (node.left) traverse(node.left);
+    if (node.right) traverse(node.right);
+  }
+
+  function traverse(value: unknown): void {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      value.forEach(traverse);
+      return;
+    }
+
+    if (!isObject(value)) return;
+    const node = value;
+
+    const nodeType = node.type;
+
+    // Handle different node types first
+    if (nodeType === 'select') {
+      handleSelectNode(node);
+      return;
+    }
+
+    if (nodeType === 'join' || node.join) {
+      handleJoinNode(node);
+      return;
+    }
+
+    if (nodeType === 'with' || nodeType === 'with recursive') {
+      handleWithNode(node);
+      return;
+    }
+
+    if (nodeType === 'union' || nodeType === 'union all') {
+      handleUnionNode(node);
+      return;
+    }
+
+    // Extract table name from table reference
+    if (nodeType === 'table') {
+      const tableName = extractTableName(node);
+      if (tableName) {
+        tables.add(tableName);
+      }
+      return;
+    }
+
+    // Recursively traverse all object properties for unknown node types
+    Object.values(node).forEach(traverse);
+  }
+
+  traverse(ast);
+  return Array.from(tables);
+}
+
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await getNodeByIdFromDb(nodeId, tenantId);
   const resultArray = queryRes && queryRes.length > 0 ? queryRes : null;
@@ -94,49 +191,62 @@ export const executeSelectQuery = async (
   const normalisedQuery = query.replace(/\s*;\s*$/, '').trim();
 
   // 1. Parse and validate — rejects non-SELECT, multiple statements, and invalid SQL
-  //    The AST parser handles comments internally so no pre-stripping is needed here.
+  //    Capture the AST for subsequent table extraction.
+  let ast;
   try {
-    validateSelectQuery(normalisedQuery);
+    ast = validateSelectQuery(normalisedQuery);
   } catch (e) {
     throw new HttpException((e as Error).message, HttpStatus.FORBIDDEN);
   }
 
-  // 2. Extract table name for tenant column resolution
-  const tableMatch = /FROM\s+([a-zA-Z0-9_".]+)/gi.exec(normalisedQuery);
-  const tableName = tableMatch ? tableMatch[1].replace(/['"`]/g, '').split('.').pop() : null;
+  // 2. Extract all base table references from the AST (including subqueries, joins, CTEs)
+  //    The extractTablesFromAST function traverses the parsed AST to find all base tables.
+  //    This handles complex cases like derived tables and subqueries that the regex misses.
+  const tables = extractTablesFromAST(ast);
 
   let modifiedQuery = normalisedQuery;
   let mutableParams = [...params];
-  if (tableName) {
-    // 3. Resolve which tenant column this table uses (tenant_id vs tenantId).
-    //    Column name is safe to interpolate — it comes from information_schema, not user input.
-    //    The tenantId value is passed as a bind parameter ($N).
-    const tenantColumn = await resolveTenantColumn(tableName, dbName);
-    const paramIdx = mutableParams.length + 1;
-    const tenantIdCondition = `${tenantColumn} = $${paramIdx}`;
-    mutableParams = [...mutableParams, tenantId];
 
-    // 4. Inject tenant condition into WHERE clause using word boundary match
+  // Check if query already has a tenant filter to avoid duplicate conditions
+  const hasTenantFilter = /\b(tenant_id|tenantid)\s*=\s*\$/i.test(normalisedQuery);
+
+  if (tables.length > 0 && !hasTenantFilter) {
+    // 3. Resolve tenant columns for all referenced tables and collect tenant conditions
+    const tenantConditions: string[] = [];
+    for (const table of tables) {
+      const tenantColumn = await resolveTenantColumn(table, dbName);
+      const paramIdx = mutableParams.length + 1;
+      mutableParams = [...mutableParams, tenantId];
+
+      // Don't prefix table name for simple single-table queries (backwards compatibility)
+      tenantConditions.push(`${tenantColumn} = $${paramIdx}`);
+    }
+
+    // 4. Inject all tenant conditions into WHERE clause
+    const combinedCondition = tenantConditions.join(' AND ');
     if (/\bWHERE\b/i.test(modifiedQuery)) {
-      modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${tenantIdCondition} AND`);
+      modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${combinedCondition} AND`);
     } else {
       const upperCaseQuery = modifiedQuery.toUpperCase();
-      const groupByIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b/);
-      if (groupByIndex !== -1) {
-        modifiedQuery = `${modifiedQuery.slice(0, groupByIndex)} WHERE ${tenantIdCondition} ${modifiedQuery.slice(groupByIndex)}`;
+      // Find the first clause that should come after WHERE (GROUP BY, ORDER BY, LIMIT, OFFSET, or FETCH)
+      const clauseIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|FETCH\s+(FIRST|NEXT))\b/);
+      if (clauseIndex !== -1) {
+        modifiedQuery = `${modifiedQuery.slice(0, clauseIndex)} WHERE ${combinedCondition} ${modifiedQuery.slice(clauseIndex)}`;
       } else {
-        modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${tenantIdCondition}`;
+        modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${combinedCondition}`;
       }
     }
   }
 
-  // 7. Hard-cap rows — strip any user-supplied LIMIT/OFFSET and enforce our own cap
+  // 7. Hard-cap rows — strip any user-supplied LIMIT/OFFSET/FETCH and enforce our own cap
+  //    Remove LIMIT with optional OFFSET
   modifiedQuery = modifiedQuery.replace(/\bLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i, '').trimEnd();
+  //    Remove standalone OFFSET clause
+  modifiedQuery = modifiedQuery.replace(/\bOFFSET\s+\d+\s*$/i, '').trimEnd();
+  //    Remove FETCH FIRST/NEXT variants (PostgreSQL standard syntax)
+  modifiedQuery = modifiedQuery.replace(/\bFETCH\s+(FIRST|NEXT)\s+\d+\s+ROWS?\s+ONLY\s*$/i, '').trimEnd();
   modifiedQuery = `${modifiedQuery} LIMIT 10`;
 
-  // 8. Execute via the readonly connection pool
-  loggerService.log(`Executing query: ${modifiedQuery}`);
-  loggerService.log(`With params: ${JSON.stringify(mutableParams)}`);
   return await executeQueryNodeInDbReadOnly(modifiedQuery, dbName, mutableParams);
 };
 
@@ -153,7 +263,7 @@ async function resolveTenantColumn(tableName: string, dbName: string): Promise<s
       dbName,
       [tableName],
     );
-    if (result && result.length > 0) {
+    if (result.length > 0) {
       return result[0].column_name as string;
     }
   } catch (e) {

@@ -78,7 +78,6 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
-import { handlePostMask } from './services/masking.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');

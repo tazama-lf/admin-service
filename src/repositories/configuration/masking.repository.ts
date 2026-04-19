@@ -4,7 +4,7 @@ import { validateColumnKeys } from '../../utils/enrichment-utils';
 
 const ALLOWED_MASKING_COLUMNS = new Set(['tenant_id', 'txtp', 'txtp_version']);
 
-const ALLOWED_UPDATE_COLUMNS = new Set(['txtp', 'txtp_version', 'status', 'fields_masked', 'total_fields', 'comments']);
+const ALLOWED_UPDATE_COLUMNS = new Set(['txtp', 'txtp_version', 'tokenize', 'status', 'fields_masked', 'total_fields', 'comments']);
 
 export const createMasking = async (maskingData: Record<string, unknown>): Promise<number> => {
   try {
@@ -135,7 +135,7 @@ export const updateMaskingInDB = async (
     UPDATE trs_masking
     SET ${setClauses.join(', ')}
     WHERE id = $${keys.length + 1} AND tenant_id = $${keys.length + 2}
-    RETURNING id, tenant_id, txtp, txtp_version, status, fields_masked, total_fields, comments, created_at, updated_at
+    RETURNING id, tenant_id, txtp, txtp_version, tokenize, status, fields_masked, total_fields, comments, created_at, updated_at
   `;
 
   values.push(id, tenantId);

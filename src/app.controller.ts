@@ -1559,7 +1559,7 @@ export const createMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     const { tenantId } = req as ITenantRequest;
     const maskData = req.body as Record<string, unknown>;
     const response = await handlePostMask({ ...maskData }, tenantId);
-    reply.code(201).send({ success: true, message: response.message });
+    reply.code(201).send({ success: true, message: response.message, id: response.id });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create masking configuration');
   } finally {

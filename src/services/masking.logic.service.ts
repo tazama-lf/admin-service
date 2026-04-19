@@ -7,7 +7,7 @@ import {
   findMaskByIdInDB,
 } from '../repositories/configuration/masking.repository';
 
-export const handlePostMask = async (mask: Record<string, unknown>, tenantId: string): Promise<{ message: string }> => {
+export const handlePostMask = async (mask: Record<string, unknown>, tenantId: string): Promise<{ message: string; id: number }> => {
   try {
     loggerService.log('Started handling post request of mask configuration executed');
 
@@ -19,6 +19,7 @@ export const handlePostMask = async (mask: Record<string, unknown>, tenantId: st
 
     return {
       message: `Masking Configuration with id ${createdMaskId} created Successfully`,
+      id: createdMaskId,
     };
   } catch (error: unknown) {
     const errorMessage = error as { message: string };

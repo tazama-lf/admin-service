@@ -40,3 +40,10 @@ export interface ISimulationBody {
   description?: string;
   category: string;
 }
+
+export interface SimulationMessage {
+  messageId: string;
+  timestamp: string;
+  endpoint: string;
+  data: Record<string, unknown>;
+}

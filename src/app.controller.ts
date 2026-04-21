@@ -61,7 +61,7 @@ import {
 import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1427,6 +1427,22 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get simulation logs');
+  }
+};
+
+export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName: string };
+
+    const messages = await getSimulationMessages(tenantId, tableName);
+
+    reply.code(200).send({
+      success: true,
+      messages,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation messages');
   }
 };
 

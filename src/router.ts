@@ -27,6 +27,7 @@ import {
   cloneRuleHandler,
   updateRuleStatusHandler,
   getSimulationLogsHandler,
+  getSimulationMessagesHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
@@ -139,6 +140,7 @@ const routePrivilege = {
   executeQueryNode: 'editor',
   postSimulationLogs: ['editor', 'approver'],
   getSimulationLogs: ['editor', 'approver'],
+  getSimulationMessages: ['editor', 'approver', 'exporter', 'publisher'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   createMask: 'trs_data_engineer_editor',
@@ -440,6 +442,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/simulation-logs/:ruleId', {
     ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),
+  });
+  fastify.get('/v1/admin/simulation/messages', {
+    ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
   });
 }
 

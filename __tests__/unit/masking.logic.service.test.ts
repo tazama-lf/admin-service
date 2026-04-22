@@ -53,8 +53,8 @@ describe('Masking Logic Service', () => {
 
       const result = await maskingLogicService.findMasksWithFilters(10, 0, {}, mockTenantId);
 
-      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('', []);
-      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('', 1, [10, 0], 'DESC');
+      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1', ['tenant-123']);
+      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1', 2, ['tenant-123', 10, 0], 'DESC');
       expect(result.data).toEqual(mockMasks.result);
       expect(result.total).toBe(1);
       expect(result.limit).toBe(10);
@@ -69,11 +69,14 @@ describe('Masking Logic Service', () => {
 
       const result = await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE status = ANY($1)', [['STATUS_01_IN_PROGRESS']]);
+      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1 AND status = ANY($2)', [
+        'tenant-123',
+        ['STATUS_01_IN_PROGRESS'],
+      ]);
       expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith(
-        'WHERE status = ANY($1)',
-        2,
-        [['STATUS_01_IN_PROGRESS'], 10, 0],
+        'WHERE tenant_id = $1 AND status = ANY($2)',
+        3,
+        ['tenant-123', ['STATUS_01_IN_PROGRESS'], 10, 0],
         'DESC',
       );
       expect(result.data).toEqual(mockMasks.result);
@@ -88,7 +91,8 @@ describe('Masking Logic Service', () => {
 
       await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE status = ANY($1)', [
+      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1 AND status = ANY($2)', [
+        'tenant-123',
         ['STATUS_01_IN_PROGRESS', 'STATUS_04_APPROVED'],
       ]);
     });
@@ -101,8 +105,16 @@ describe('Masking Logic Service', () => {
 
       const result = await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE txtp ILIKE $1', ['%pain.001%']);
-      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE txtp ILIKE $1', 2, ['%pain.001%', 10, 0], 'DESC');
+      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1 AND txtp ILIKE $2', [
+        'tenant-123',
+        '%pain.001%',
+      ]);
+      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith(
+        'WHERE tenant_id = $1 AND txtp ILIKE $2',
+        3,
+        ['tenant-123', '%pain.001%', 10, 0],
+        'DESC',
+      );
       expect(result.data).toEqual(mockMasks.result);
     });
 
@@ -114,14 +126,14 @@ describe('Masking Logic Service', () => {
 
       await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE status = ANY($1) AND txtp ILIKE $2', [
-        ['STATUS_01_IN_PROGRESS'],
-        '%pain.001%',
-      ]);
+      expect(maskingRepository.countMasksWithFiltersInDB).toHaveBeenCalledWith(
+        'WHERE tenant_id = $1 AND status = ANY($2) AND txtp ILIKE $3',
+        ['tenant-123', ['STATUS_01_IN_PROGRESS'], '%pain.001%'],
+      );
       expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith(
-        'WHERE status = ANY($1) AND txtp ILIKE $2',
-        3,
-        [['STATUS_01_IN_PROGRESS'], '%pain.001%', 10, 0],
+        'WHERE tenant_id = $1 AND status = ANY($2) AND txtp ILIKE $3',
+        4,
+        ['tenant-123', ['STATUS_01_IN_PROGRESS'], '%pain.001%', 10, 0],
         'DESC',
       );
     });
@@ -134,7 +146,7 @@ describe('Masking Logic Service', () => {
 
       await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('', 1, [10, 0], 'ASC');
+      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1', 2, ['tenant-123', 10, 0], 'ASC');
     });
 
     it('should default to DESC sort order for unknown sortOrder value', async () => {
@@ -145,7 +157,7 @@ describe('Masking Logic Service', () => {
 
       await maskingLogicService.findMasksWithFilters(10, 0, payload, mockTenantId);
 
-      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('', 1, [10, 0], 'DESC');
+      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1', 2, ['tenant-123', 10, 0], 'DESC');
     });
 
     it('should handle pagination correctly', async () => {
@@ -154,7 +166,7 @@ describe('Masking Logic Service', () => {
 
       const result = await maskingLogicService.findMasksWithFilters(5, 3, {}, mockTenantId);
 
-      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('', 1, [5, 15], 'DESC');
+      expect(maskingRepository.findMasksWithFiltersInDB).toHaveBeenCalledWith('WHERE tenant_id = $1', 2, ['tenant-123', 5, 15], 'DESC');
       expect(result.limit).toBe(5);
       expect(result.offset).toBe(3);
       expect(result.total).toBe(50);
@@ -200,7 +212,7 @@ describe('Masking Logic Service', () => {
         txtp_version: '11',
         tenant_id: mockTenantId,
       });
-      expect(result).toEqual({ message: 'Masking Configuration with id 42 created Successfully' });
+      expect(result).toEqual({ message: 'Masking Configuration with id 42 created Successfully', id: 42 });
     });
 
     it('should unwrap maskData property if present', async () => {

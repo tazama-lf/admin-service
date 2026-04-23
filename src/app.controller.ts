@@ -61,7 +61,7 @@ import {
 import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1707,5 +1707,18 @@ export const getMaskByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get masking configuration');
+  }
+};
+
+export const fetchFromDlhHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const token = req.headers.authorization ?? '';
+    const queries = req.body as Array<Record<string, unknown>>;
+
+    const result = await fetchFromDlh(queries, token);
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch data from DLH');
   }
 };

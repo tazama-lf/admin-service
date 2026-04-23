@@ -70,6 +70,7 @@ import {
   createMaskHandler,
   updateMaskHandler,
   getMaskByIdHandler,
+  fetchFromDlhHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -141,6 +142,7 @@ const routePrivilege = {
   postSimulationLogs: ['editor', 'approver'],
   getSimulationLogs: ['editor', 'approver'],
   getSimulationMessages: ['editor', 'approver', 'exporter', 'publisher'],
+  fetchFromDlh: ['editor', 'approver', 'exporter', 'publisher'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   createMask: 'trs_data_engineer_editor',
@@ -445,6 +447,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
+  });
+  fastify.post('/v1/dlh/fetch', {
+    ...SetOptionsBodyAndParams(fetchFromDlhHandler, routePrivilege.fetchFromDlh),
   });
 }
 

@@ -124,3 +124,33 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
 
   return result.rows.map((row) => row.payload);
 };
+
+export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
+  // This function is a placeholder for the actual implementation of fetching data from DLH.
+  // The implementation would depend on how the admin service is expected to communicate with DLH,
+  // such as the API endpoint, request format, authentication method, etc.
+
+  // For demonstration purposes, let's assume we are making an HTTP POST request to a DLH endpoint.
+  // You would replace the URL and request details with the actual ones.
+
+  // url env main jayega
+  const DLH_ENDPOINT = process.env.DLH_URL;
+  if (!DLH_ENDPOINT) {
+    throw new Error('DLH endpoint is not defined');
+  }
+  const response = await fetch(DLH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(queries),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch data from DLH: ${response.statusText}`);
+  }
+
+  const result = (await response.json()) as Record<string, unknown>;
+  return result;
+};

@@ -7,12 +7,7 @@ import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
-export class ConfigConflictError extends Error {
-  constructor(message = 'Configuration has been modified by another process') {
-    super(message);
-    this.name = 'ConfigConflictError';
-  }
-}
+
 
 const mapRowToConfig = (row: ConfigRow): Config => {
   const mapped = {
@@ -230,7 +225,6 @@ export const updateConfig = async (
   id: number,
   tenantId: string,
   updates: Partial<Config> & { relatedTransaction?: string; related_transaction?: string },
-  updatedAt: string,
 ): Promise<Config> => {
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
@@ -297,9 +291,7 @@ export const updateConfig = async (
 
   setClauses.push('updated_at = NOW()');
 
-  // Optimistic lock: update only when updated_at still matches the token returned by the previous read.
-  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} AND updated_at = $${paramIndex + 2}::timestamptz`;
-
+  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
   const query = `
     UPDATE tcs_config
     SET ${setClauses.join(', ')}
@@ -309,7 +301,7 @@ export const updateConfig = async (
               status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction
   `;
 
-  values.push(id, tenantId, updatedAt);
+  values.push(id, tenantId);
 
   interface UpdateConfigRow {
     id: number;
@@ -336,17 +328,6 @@ export const updateConfig = async (
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
-    const existenceCheck = await handlePostExecuteSqlStatement<{ id: number }>(
-      {
-        text: 'SELECT id FROM tcs_config WHERE id = $1 AND tenant_id = $2',
-        values: [id, tenantId],
-      } satisfies PgQueryConfig,
-      'configuration',
-    );
-
-    if (existenceCheck.rows.length > 0) {
-      throw new ConfigConflictError();
-    }
 
     throw new Error('Configuration not found');
   }

@@ -61,7 +61,7 @@ import {
 import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1430,6 +1430,22 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
+export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName: string };
+
+    const messages = await getSimulationMessages(tenantId, tableName);
+
+    reply.code(200).send({
+      success: true,
+      messages,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation messages');
+  }
+};
+
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
@@ -1559,7 +1575,7 @@ export const createMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     const { tenantId } = req as ITenantRequest;
     const maskData = req.body as Record<string, unknown>;
     const response = await handlePostMask({ ...maskData }, tenantId);
-    reply.code(201).send({ success: true, message: response.message });
+    reply.code(201).send({ success: true, message: response.message, id: response.id });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create masking configuration');
   } finally {

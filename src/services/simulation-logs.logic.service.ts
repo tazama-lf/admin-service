@@ -1,5 +1,9 @@
-import type { SimulationLog, SimulationLogRequest } from '../interface/simulattionLogs.interface';
-import { createSimulationLogsInDb, getSimulationLogsFromDb } from '../repositories/configuration/simulation-logs.repository';
+import type { SimulationLog, SimulationLogRequest, SimulationMessage } from '../interface/simulattionLogs.interface';
+import {
+  createSimulationLogsInDb,
+  getSimulationLogsFromDb,
+  getSimulationMessagesFromDb,
+} from '../repositories/configuration/simulation-logs.repository';
 
 export const createSimulationLogs = async ({
   userId,
@@ -23,3 +27,6 @@ export const getSimulationLogs = async (
   limit?: number,
   offset?: number,
 ): Promise<SimulationLog[]> => await getSimulationLogsFromDb({ ruleId, tenantId, category, sortBy, sortOrder, limit, offset });
+
+export const getSimulationMessages = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> =>
+  await getSimulationMessagesFromDb(tenantId, tableName);

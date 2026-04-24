@@ -203,7 +203,7 @@ export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
       message: `Pull Job Created Successfully ${exists ? 'with an existing table' : ''}`,
     };
   } catch (error) {
-    throw new Error(`Failed to create pull job : ${(error as Error).message}`, { cause: error });
+    throw new Error(`Failed to create pull job: ${(error as Error).message}`, { cause: error });
   }
 };
 

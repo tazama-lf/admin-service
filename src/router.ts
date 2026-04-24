@@ -70,6 +70,7 @@ import {
   createMaskHandler,
   updateMaskHandler,
   getMaskByIdHandler,
+  getExcludedTypesHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -132,6 +133,7 @@ const routePrivilege = {
   postTrsRule: 'editor',
   putTrsRule: 'editor',
   getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getExcludedTypes: 'editor',
   getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],
   postNodes: 'editor',
@@ -367,12 +369,13 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
   });
 
+  // ====================  MASKING OPERATIONS ====================
+
   fastify.post('/v1/admin/trs/masking/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllMasksHandler, routePrivilege.getTrsMasks),
-    // ====================  MASKING OPERATIONS ====================
   });
 
-  fastify.post('/v1/admin/trs/mask/create', {
+  fastify.post('/v1/admin/trs/masking/create', {
     ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.createMask),
   });
 
@@ -382,6 +385,12 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/masking/:id', {
     ...SetOptionsBodyAndParams(getMaskByIdHandler, routePrivilege.getTrsMasks),
+  });
+
+  // ====================  RULE SIMULATION OPERATIONS ====================
+
+  fastify.get('/v1/admin/trs/excluded/types', {
+    ...SetOptionsBodyAndParams(getExcludedTypesHandler, routePrivilege.getExcludedTypes),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

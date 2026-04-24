@@ -1,6 +1,7 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import { validateColumnKeys } from '../../utils/enrichment-utils';
+import type { ExcludedTypeProps } from '../../interface/masking.interface';
 
 const ALLOWED_MASKING_COLUMNS = new Set(['tenant_id', 'txtp', 'txtp_version']);
 
@@ -54,6 +55,38 @@ export const countMasksWithFiltersInDB = async (whereClauses: string, queryParam
   );
 
   return parseInt(countResult.rows[0].count, 10) || 0;
+};
+
+export const getExcludedTypes = async (tenantId: string): Promise<ExcludedTypeProps[] | null> => {
+  const query = `
+   SELECT 
+    tm.id AS masking_id,
+    tc.transaction_type,
+    tc.version,
+    CASE 
+        WHEN tm.txtp IS NOT NULL
+             AND tm.txtp_version IS NOT NULL
+             AND tc.status IN ('STATUS_04_APPROVED', 'STATUS_06_EXPORTED')
+        THEN 'Exists'
+        ELSE 'Not Exists'
+    END AS record_status
+FROM tcs_config tc
+LEFT JOIN trs_masking tm
+    ON tc.tenant_id = tm.tenant_id
+    AND tc.transaction_type = tm.txtp
+    AND tc.version = tm.txtp_version
+WHERE tc.tenant_id = $1;
+  `;
+
+  const result = await handlePostExecuteSqlStatement<ExcludedTypeProps>(
+    {
+      text: query,
+      values: [tenantId],
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return result.rows ?? null;
 };
 
 export const findMasksWithFiltersInDB = async (

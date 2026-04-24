@@ -1,10 +1,12 @@
 import { loggerService } from '..';
+import type { ExcludedTypeProps } from '../interface/masking.interface';
 import {
   countMasksWithFiltersInDB,
   findMasksWithFiltersInDB,
   createMasking,
   updateMaskingInDB,
   findMaskByIdInDB,
+  getExcludedTypes,
 } from '../repositories/configuration/masking.repository';
 
 export const handlePostMask = async (mask: Record<string, unknown>, tenantId: string): Promise<{ message: string; id: number }> => {
@@ -24,6 +26,21 @@ export const handlePostMask = async (mask: Record<string, unknown>, tenantId: st
   } catch (error: unknown) {
     const errorMessage = error as { message: string };
     loggerService.log(`Error: posting masking configuration with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleGetExcludedTypes = async (tenantId: string): Promise<ExcludedTypeProps[] | null> => {
+  try {
+    loggerService.log(`Started handling get job history request for tenant: ${tenantId}`);
+
+    const result = await getExcludedTypes(tenantId);
+
+    loggerService.log(`Retrieved ${result?.length} job history records successfully.`);
+    return result;
+  } catch (error: unknown) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: getting job history with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

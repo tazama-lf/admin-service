@@ -58,7 +58,13 @@ import {
   updateRule,
   updateRuleStatus,
 } from './services/rule.logic.service';
-import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
+import {
+  findMasksWithFilters,
+  handlePostMask,
+  handleUpdateMask,
+  handleGetMaskById,
+  handleGetExcludedTypes,
+} from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
@@ -1487,6 +1493,24 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
     ErrorHandler.sendError(reply, error, 'Failed to get transaction types');
   } finally {
     loggerService.log('End - Handle get transaction types request');
+  }
+};
+
+export const getExcludedTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get excluded types request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const excludedTypes = await handleGetExcludedTypes(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      excludedTypes,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get excluded types');
+  } finally {
+    loggerService.log('End - Handle get excluded types request');
   }
 };
 

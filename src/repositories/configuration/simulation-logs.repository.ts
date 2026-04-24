@@ -126,14 +126,6 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
 };
 
 export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
-  // This function is a placeholder for the actual implementation of fetching data from DLH.
-  // The implementation would depend on how the admin service is expected to communicate with DLH,
-  // such as the API endpoint, request format, authentication method, etc.
-
-  // For demonstration purposes, let's assume we are making an HTTP POST request to a DLH endpoint.
-  // You would replace the URL and request details with the actual ones.
-
-  // url env main jayega
   const DLH_ENDPOINT = process.env.DLH_URL;
   if (!DLH_ENDPOINT) {
     throw new Error('DLH endpoint is not defined');
@@ -152,5 +144,49 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
   }
 
   const result = (await response.json()) as Record<string, unknown>;
+
+  const results = result.results as Array<{ data: Array<{ document: Record<string, unknown> }> }> | undefined;
+  if (Array.isArray(results)) {
+    const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
+      {
+        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public'",
+        values: [],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+
+    const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
+    const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
+
+    await handlePostExecuteSqlStatement(
+      {
+        text: pgFormat(
+          `CREATE TABLE %I (
+            id SERIAL PRIMARY KEY,
+            payload JSONB NOT NULL,
+            credttm TEXT,
+            "endpointPath" TEXT,
+            "tenantId" TEXT,
+            msgid TEXT
+          )`,
+          nextTableName,
+        ),
+        values: [],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+
+    const documents = results.flatMap((r) => (Array.isArray(r.data) ? r.data.map((item) => item.document) : []));
+    for (const doc of documents) {
+      await handlePostExecuteSqlStatement(
+        {
+          text: pgFormat('INSERT INTO %I (payload) VALUES ($1)', nextTableName),
+          values: [JSON.stringify(doc)],
+        } satisfies PgQueryConfig,
+        'simulation',
+      );
+    }
+  }
+
   return result;
 };

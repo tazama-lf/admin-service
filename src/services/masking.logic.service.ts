@@ -7,7 +7,7 @@ import {
   findMaskByIdInDB,
 } from '../repositories/configuration/masking.repository';
 
-export const handlePostMask = async (mask: Record<string, unknown>, tenantId: string): Promise<{ message: string }> => {
+export const handlePostMask = async (mask: Record<string, unknown>, tenantId: string): Promise<{ message: string; id: number }> => {
   try {
     loggerService.log('Started handling post request of mask configuration executed');
 
@@ -19,6 +19,7 @@ export const handlePostMask = async (mask: Record<string, unknown>, tenantId: st
 
     return {
       message: `Masking Configuration with id ${createdMaskId} created Successfully`,
+      id: createdMaskId,
     };
   } catch (error: unknown) {
     const errorMessage = error as { message: string };
@@ -31,13 +32,13 @@ export const findMasksWithFilters = async (
   limit = 10,
   offset = 0,
   payload: Record<string, string>,
-  _tenantId: string,
+  tenantId: string,
 ): Promise<{ data: unknown; total: number; limit: number; offset: number }> => {
   const { status, txtp, sortOrder } = payload;
 
-  const whereClauses: string[] = [];
-  const queryParams: unknown[] = [];
-  let paramIndex = 1;
+  const whereClauses: string[] = ['tenant_id = $1'];
+  const queryParams: unknown[] = [tenantId];
+  let paramIndex = 2;
 
   if (status) {
     const statusArray = status.split(',').map((s) => s.trim());
@@ -52,7 +53,7 @@ export const findMasksWithFilters = async (
     paramIndex += 1;
   }
 
-  const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const whereClause = `WHERE ${whereClauses.join(' AND ')}`;
   const order = sortOrder === 'ASC' ? 'ASC' : 'DESC';
 
   const total = await countMasksWithFiltersInDB(whereClause, queryParams);
@@ -93,6 +94,46 @@ export const handleGetMaskById = async (id: number, tenantId: string): Promise<R
   } catch (error: unknown) {
     const errorMessage = error as { message: string };
     loggerService.log(`Error: getting masking configuration with error message: ${errorMessage.message}`);
+    throw new Error(errorMessage.message);
+  }
+};
+
+export const handleReviewMask = async (
+  id: number,
+  tenantId: string,
+  action: 'approve' | 'reject',
+  comments?: string,
+): Promise<Record<string, unknown>> => {
+  try {
+    loggerService.log(`Started handling review (${action}) request for mask id ${id}`);
+
+    const mask = await findMaskByIdInDB(id, tenantId);
+    if (!mask) {
+      throw new Error(`Masking configuration with id ${id} not found`);
+    }
+
+    if (mask.status !== 'STATUS_03_UNDER_REVIEW') {
+      throw new Error(
+        `Cannot review masking configuration with status '${mask.status as string}'. Only configurations with status 'STATUS_03_UNDER_REVIEW' can be reviewed.`,
+      );
+    }
+
+    if (action === 'reject' && !comments?.trim()) {
+      throw new Error('A comment is required when rejecting a masking configuration');
+    }
+
+    const targetStatus = action === 'approve' ? 'STATUS_04_APPROVED' : 'STATUS_05_REJECTED';
+    const updatePayload: Record<string, unknown> = { status: targetStatus };
+    if (comments?.trim()) {
+      updatePayload.comments = comments.trim();
+    }
+
+    const updated = await updateMaskingInDB(id, tenantId, updatePayload);
+    loggerService.log(`Mask configuration with id ${id} ${action}d successfully`);
+    return updated;
+  } catch (error: unknown) {
+    const errorMessage = error as { message: string };
+    loggerService.log(`Error: reviewing masking configuration with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

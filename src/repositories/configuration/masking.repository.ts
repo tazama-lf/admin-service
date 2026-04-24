@@ -61,8 +61,8 @@ export const getExcludedTypes = async (tenantId: string): Promise<ExcludedTypePr
   const query = `
    SELECT 
     tm.id AS masking_id,
-    tc.transaction_type,
-    tc.version,
+    tc.transaction_type as txtp,
+    tc.version as txtp_version,
     CASE 
         WHEN tm.txtp IS NOT NULL
              AND tm.txtp_version IS NOT NULL

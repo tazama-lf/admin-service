@@ -391,7 +391,7 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
     WHERE transaction_type = $1 AND tenant_id = $2 AND version = $3
   `;
 
-  const result = await handlePostExecuteSqlStatement<{ content_type: string; payload_xml: string | null; payload_json: unknown }>(
+  const result = await handlePostExecuteSqlStatement<{ content_type: ContentType; payload_xml: string | null; payload_json: unknown }>(
     { text: query, values: [transactionType, tenantId, version] } satisfies PgQueryConfig,
     'configuration',
   );
@@ -399,11 +399,7 @@ export const getPayloadByTransactionType = async (transactionType: string, tenan
   if (result.rows.length === 0) {
     throw new Error('Configuration not found');
   }
-  if (result.rows[0].payload_xml) {
-    return result.rows[0].payload_xml;
-  } else {
-    return result.rows[0].payload_json;
-  }
+  return result.rows[0].content_type === ContentType.XML ? result.rows[0].payload_xml : result.rows[0].payload_json;
 };
 
 export const getSchemaByTransactionType = async (

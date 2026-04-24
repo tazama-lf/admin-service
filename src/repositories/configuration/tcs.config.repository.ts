@@ -290,7 +290,6 @@ export const updateConfig = async (
   setClauses.push('updated_at = NOW()');
 
   const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
-
   const query = `
     UPDATE tcs_config
     SET ${setClauses.join(', ')}

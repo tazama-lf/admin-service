@@ -147,7 +147,6 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     }
 
     const updatedConfig = await updateConfig(id, tenantId, updates);
-
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -172,7 +171,6 @@ export const handleUpdatePublishingStatus = async (
     }
 
     const updatedConfig = await updateConfig(id, tenantId, { publishing_status: publishingStatus });
-
     loggerService.log(`[${tenantId}] Publishing status updated to '${publishingStatus}' for config ${id}`);
 
     return updatedConfig;
@@ -256,7 +254,6 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     const updatedMappings = [...(config.mapping ?? []), newMapping];
 
     const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
-
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -340,7 +337,6 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
     const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
-
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {

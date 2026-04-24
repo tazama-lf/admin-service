@@ -392,9 +392,7 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
     const mappingDto = req.body as AddMappingDto;
-
     const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto);
-
     reply.status(200).send({
       success: true,
       message: 'Mapping added successfully',
@@ -415,7 +413,6 @@ export const removeMappingHandler = async (req: FastifyRequest, reply: FastifyRe
     const mappingIndex = Number(index);
 
     const updatedConfig = await handleRemoveMapping(Number(id), tenantId, mappingIndex);
-
     reply.status(200).send({
       success: true,
       message: 'Mapping removed successfully',
@@ -434,9 +431,7 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
     const functionDto = req.body as AddFunctionDto;
-
     const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto);
-
     reply.status(200).send({
       success: true,
       message: 'Function added successfully',
@@ -457,7 +452,6 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
     const functionIndex = Number(index);
 
     const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex);
-
     reply.status(200).send({
       success: true,
       message: 'Function removed successfully',

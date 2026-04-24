@@ -58,7 +58,13 @@ import {
   updateRule,
   updateRuleStatus,
 } from './services/rule.logic.service';
-import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
+import {
+  findMasksWithFilters,
+  handlePostMask,
+  handleUpdateMask,
+  handleGetMaskById,
+  handleReviewMask,
+} from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
@@ -1704,5 +1710,45 @@ export const getMaskByIdHandler = async (req: FastifyRequest, reply: FastifyRepl
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get masking configuration');
+  }
+};
+
+export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle review mask request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as { id: string };
+    const maskId = parseInt(id, 10);
+
+    if (!id || isNaN(maskId)) {
+      reply.code(400).send({ success: false, message: 'Invalid masking configuration ID' });
+      return;
+    }
+
+    const body = req.body as { action?: string; comments?: string };
+
+    if (!body.action || !['approve', 'reject'].includes(body.action)) {
+      reply.code(400).send({ success: false, message: "Invalid action. Must be 'approve' or 'reject'" });
+      return;
+    }
+
+    const action = body.action as 'approve' | 'reject';
+
+    if (action === 'reject' && !body.comments?.trim()) {
+      reply.code(400).send({ success: false, message: 'A comment is required when rejecting a masking configuration' });
+      return;
+    }
+
+    const updated = await handleReviewMask(maskId, tenantId, action, body.comments);
+
+    reply.code(200).send({
+      success: true,
+      message: `Masking configuration with id ${maskId} has been ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+      mask: updated,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to review masking configuration');
+  } finally {
+    loggerService.log('End - Handle review mask request');
   }
 };

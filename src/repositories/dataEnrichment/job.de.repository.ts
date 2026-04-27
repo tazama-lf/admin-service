@@ -1,6 +1,4 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
-import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import { validateTableName, validateColumnKeys } from '../../utils/enrichment-utils';
 import {
   ConfigType,
   type ISuccess,
@@ -12,6 +10,8 @@ import {
   type PushJob,
   ScheduleStatus,
 } from '../../interface/data-enrichment.interface';
+import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { validateColumnKeys, validateTableName } from '../../utils/enrichment-utils';
 
 const ALLOWED_PUSH_JOB_COLUMNS = new Set([
   'endpoint_name',
@@ -31,6 +31,9 @@ const ALLOWED_PULL_JOB_COLUMNS = new Set([
   'mode',
   'table_name',
   'description',
+  'source_type',
+  'file',
+  'connection',
   'version',
   'status',
   'publishing_status',
@@ -186,6 +189,7 @@ export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
       VALUES (${placeholders})
       RETURNING *;
     `;
+
     await handlePostExecuteSqlStatement<Job>(
       {
         text: insertQuery,
@@ -199,7 +203,7 @@ export const createPullJob = async (job: Partial<Job>): Promise<ISuccess> => {
       message: `Pull Job Created Successfully ${exists ? 'with an existing table' : ''}`,
     };
   } catch (error) {
-    throw new Error(`Failed to create job: ${(error as Error).message}`, { cause: error });
+    throw new Error(`Failed to create pull job: ${(error as Error).message}`, { cause: error });
   }
 };
 

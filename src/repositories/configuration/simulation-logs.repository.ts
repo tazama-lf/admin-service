@@ -149,7 +149,7 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
   if (Array.isArray(results)) {
     const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
       {
-        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public'",
+        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
         values: [],
       } satisfies PgQueryConfig,
       'simulation',
@@ -161,7 +161,7 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
     await handlePostExecuteSqlStatement(
       {
         text: pgFormat(
-          `CREATE TABLE %I (
+          `CREATE TABLE IF NOT EXISTS %I (
             id SERIAL PRIMARY KEY,
             payload JSONB NOT NULL,
             credttm TEXT,
@@ -177,15 +177,19 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
     );
 
     const documents = results.flatMap((r) => (Array.isArray(r.data) ? r.data.map((item) => item.document) : []));
-    for (const doc of documents) {
+    if (documents.length > 0) {
+      const serialized = documents.map((doc) => JSON.stringify(doc));
+      const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
       await handlePostExecuteSqlStatement(
         {
-          text: pgFormat('INSERT INTO %I (payload) VALUES ($1)', nextTableName),
-          values: [JSON.stringify(doc)],
+          text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
+          values: serialized,
         } satisfies PgQueryConfig,
         'simulation',
       );
     }
+
+    return { ...result, tableName: nextTableName };
   }
 
   return result;

@@ -58,7 +58,6 @@ import {
   updateRule,
   updateRuleStatus,
 } from './services/rule.logic.service';
-import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
@@ -1540,22 +1539,6 @@ export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: 
   }
 };
 
-// ==================== MASKING OPERATIONS ====================
-
-export const createMaskHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  loggerService.log('Start - Handle create mask request');
-  try {
-    const { tenantId } = req as ITenantRequest;
-    const maskData = req.body as Record<string, unknown>;
-    const response = await handlePostMask({ ...maskData }, tenantId);
-    reply.code(201).send({ success: true, message: response.message, id: response.id });
-  } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to create masking configuration');
-  } finally {
-    loggerService.log('End - Handle create masking request');
-  }
-};
-
 // ==================== DATA MODEL JSON HANDLERS ====================
 
 export const getDataModelJsonHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -1607,78 +1590,5 @@ export const putDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
     ErrorHandler.sendError(reply, error, 'Failed to save data model JSON');
   } finally {
     loggerService.log('End - Handle put data model JSON request');
-  }
-};
-
-export const getAllMasksHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const { tenantId } = req as ITenantRequest;
-    const body = authReq.body as Record<string, string>;
-    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
-    const result = await findMasksWithFilters(parsedLimit, parsedOffset, body, tenantId);
-    reply.code(200).send({
-      success: true,
-      masks: result.data,
-      total: result.total,
-      limit: result.limit,
-      offset: result.offset,
-      pages: Math.ceil(result.total / result.limit),
-    });
-  } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to get masks');
-  }
-};
-
-export const updateMaskHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as { id: string };
-    const updateData = req.body as Record<string, unknown>;
-    const maskId = parseInt(id, 10);
-
-    if (!id || isNaN(maskId)) {
-      reply.code(400).send({ success: false, message: 'Invalid masking configuration ID' });
-      return;
-    }
-
-    const updated = await handleUpdateMask(maskId, tenantId, updateData);
-
-    reply.code(200).send({
-      success: true,
-      message: `Masking configuration with id ${maskId} updated successfully`,
-      mask: updated,
-    });
-  } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to update masking configuration');
-  }
-};
-
-export const getMaskByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as { id: string };
-    const maskId = parseInt(id, 10);
-
-    if (!id || isNaN(maskId)) {
-      reply.code(400).send({ success: false, message: 'Invalid masking configuration ID' });
-      return;
-    }
-
-    const mask = await handleGetMaskById(maskId, tenantId);
-
-    if (!mask) {
-      ErrorHandler.sendError(reply, { status: 404 }, `Masking configuration with id ${maskId} not found`);
-      return;
-    }
-
-    reply.code(200).send({
-      success: true,
-      mask,
-    });
-  } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to get masking configuration');
   }
 };

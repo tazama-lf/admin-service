@@ -7,8 +7,6 @@ import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
-
-
 const mapRowToConfig = (row: ConfigRow): Config => {
   const mapped = {
     id: row.id,
@@ -328,7 +326,6 @@ export const updateConfig = async (
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
-
     throw new Error('Configuration not found');
   }
 

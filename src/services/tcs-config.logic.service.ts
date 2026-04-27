@@ -24,8 +24,6 @@ import {
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 
-
-
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
     const userId = config.createdBy ?? 'system';
@@ -148,10 +146,10 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);    loggerService.log(`Successfully updated config ID: ${id}`);
+    const updatedConfig = await updateConfig(id, tenantId, updates);
+    loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
-
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
     throw new Error('Failed to update configuration');
@@ -162,7 +160,6 @@ export const handleUpdatePublishingStatus = async (
   id: number,
   tenantId: string,
   publishingStatus: 'active' | 'inactive',
-
 ): Promise<Config> => {
   try {
     loggerService.log(`[${tenantId}] Started updating publishing status to '${publishingStatus}' for config ${id}`);
@@ -260,7 +257,6 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
-
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding mapping: ${errorMessage.message}`, 'handleAddMapping');
     throw new Error('Failed to add mapping');
@@ -283,12 +279,11 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-     const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
   } catch (error) {
-
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
     throw new Error('Failed to remove mapping');
@@ -319,7 +314,6 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
   } catch (error) {
-
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
     throw new Error('Failed to add function');
@@ -342,11 +336,10 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-     const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {
-    
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
     throw new Error('Failed to remove function');

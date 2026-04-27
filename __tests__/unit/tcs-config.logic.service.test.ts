@@ -488,12 +488,14 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
-      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any);
+      const updatedAt = '2026-04-07T10:00:00.000Z';
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any, updatedAt);
 
       expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
         1,
         mockTenantId,
         expect.objectContaining({ mapping: expect.any(Array) }),
+        updatedAt,
       );
       expect(result).toEqual(mockUpdatedConfig);
     });
@@ -622,6 +624,29 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
+      const updatedAt = '2026-04-07T10:00:00.000Z';
+      const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0, updatedAt);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, updatedAt);
+      expect(result.mapping).toEqual([]);
+    });
+
+    it('should set mapping to empty array when last mapping is removed', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [{ source: ['field1'], destination: 'target1', type: 'direct' }],
+        updatedAt: new Date(),
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
       expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
@@ -716,9 +741,10 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
-      const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
+      const updatedAt = '2026-04-07T10:00:00.000Z';
+      const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction, updatedAt);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] }, updatedAt);
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -727,9 +753,7 @@ describe('TCS Config Logic Service', () => {
 
       await expect(
         tcsConfigService.handleAddFunction(999, mockTenantId, { functionName: 'test' }, '2026-04-07T10:00:00.000Z'),
-      ).rejects.toThrow(
-        'Failed to add function',
-      );
+      ).rejects.toThrow('Failed to add function');
     });
 
     it('should throw HTTP 409 when add function has a version conflict', async () => {
@@ -792,6 +816,29 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleRemoveFunction(999, mockTenantId, 0, '2026-04-07T10:00:00.000Z')).rejects.toThrow(
         'Failed to remove function',
       );
+    });
+
+    it('should set functions to empty array when last function is removed', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        functions: [{ functionName: 'func1', params: [], tableName: '', columns: [] }],
+        updatedAt: new Date(),
+      };
+
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        functions: [],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const updatedAt = '2026-04-07T10:00:00.000Z';
+      const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0, updatedAt);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, updatedAt);
+      expect(result.functions).toEqual([]);
     });
 
     it('should set functions to empty array when last function is removed', async () => {

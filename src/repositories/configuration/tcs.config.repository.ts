@@ -543,6 +543,7 @@ export interface MaskTuple {
   tenant_id: string;
   txtp: string;
   txtp_version: string;
+  endpoint_path: string;
 }
 
 export const findActiveConfigsByTuples = async (tuples: MaskTuple[]): Promise<MaskTuple[]> => {

@@ -71,6 +71,7 @@ import {
   updateMaskHandler,
   getMaskByIdHandler,
   getExcludedTypesHandler,
+  reviewMaskHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -100,8 +101,8 @@ const routePrivilege = {
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
-  getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
-  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
+  getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
@@ -147,6 +148,7 @@ const routePrivilege = {
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   createMask: 'trs_data_engineer_editor',
   updateMask: 'trs_data_engineer_editor',
+  reviewMask: 'trs_data_engineer_approver',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -391,6 +393,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/excluded/types', {
     ...SetOptionsBodyAndParams(getExcludedTypesHandler, routePrivilege.getExcludedTypes),
+  });
+
+  fastify.patch('/v1/admin/trs/masking/:id/review', {
+    ...SetOptionsBodyAndParams(reviewMaskHandler, routePrivilege.reviewMask),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

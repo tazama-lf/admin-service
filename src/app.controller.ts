@@ -59,6 +59,7 @@ import {
   updateRuleStatus,
 } from './services/rule.logic.service';
 import { findMasksWithFilters, handlePostMask, handleUpdateMask, handleGetMaskById } from './services/masking.logic.service';
+import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh } from './services/simulation-logs.logic.service';
@@ -1720,5 +1721,31 @@ export const fetchFromDlhHandler = async (req: FastifyRequest, reply: FastifyRep
     reply.code(200).send(result);
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to fetch data from DLH');
+  }
+};
+
+export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const tuples = req.body as MaskTuple[];
+    const result = await findActiveConfigsByTuples(tuples);
+    reply.code(200).send({ success: true, masks: result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to find active masking configurations');
+  }
+};
+
+export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const body = (authReq.body ?? {}) as Record<string, string>;
+    const result = await findMasksWithFilters(Number.MAX_SAFE_INTEGER, 0, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      masks: result.data,
+      total: result.total,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
   }
 };

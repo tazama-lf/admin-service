@@ -70,6 +70,9 @@ import {
   createMaskHandler,
   updateMaskHandler,
   getMaskByIdHandler,
+  fetchFromDlhHandler,
+  fetchCountApiFlow,
+  findActiveMaskConfigsHandler,
   getExcludedTypesHandler,
   reviewMaskHandler,
 } from './app.controller';
@@ -144,6 +147,7 @@ const routePrivilege = {
   postSimulationLogs: ['editor', 'approver'],
   getSimulationLogs: ['editor', 'approver'],
   getSimulationMessages: ['editor', 'approver', 'exporter', 'publisher'],
+  fetchFromDlh: ['editor', 'approver', 'exporter', 'publisher'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   createMask: 'trs_data_engineer_editor',
@@ -460,6 +464,17 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
+  });
+  fastify.post('/v1/dlh/fetch', {
+    ...SetOptionsBodyAndParams(fetchFromDlhHandler, routePrivilege.fetchFromDlh),
+  });
+
+  fastify.get('/v1/admin/trs/masking/all-fetch', {
+    ...SetOptionsBodyAndParams(fetchCountApiFlow, routePrivilege.fetchFromDlh),
+  });
+
+  fastify.post('/v1/admin/trs/masking/active-configs', {
+    ...SetOptionsBodyAndParams(findActiveMaskConfigsHandler, routePrivilege.fetchFromDlh),
   });
 }
 

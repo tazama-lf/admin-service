@@ -72,6 +72,8 @@ import {
   getMaskByIdHandler,
   getExcludedTypesHandler,
   reviewMaskHandler,
+  getAllSimulationsHandler,
+  createSimulationHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -149,6 +151,8 @@ const routePrivilege = {
   createMask: 'trs_data_engineer_editor',
   updateMask: 'trs_data_engineer_editor',
   reviewMask: 'trs_data_engineer_approver',
+  getSimulations: ['editor', 'approver'],
+  createSimulation: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -387,6 +391,16 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/masking/:id', {
     ...SetOptionsBodyAndParams(getMaskByIdHandler, routePrivilege.getTrsMasks),
+  });
+
+  // ====================  SIMULATION OPERATIONS ====================
+
+  fastify.post('/v1/admin/trs/simulation/create', {
+    ...SetOptionsBodyAndParams(createSimulationHandler, routePrivilege.createSimulation),
+  });
+
+  fastify.get('/v1/admin/trs/simulation/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllSimulationsHandler, routePrivilege.getSimulations),
   });
 
   // ====================  RULE SIMULATION OPERATIONS ====================

@@ -280,7 +280,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
   loggerService.log('Start - Handle write config update request');
   try {
     const { id } = req.params as { id: string };
-    const { updatedAt, ...updateData } = req.body as Record<string, unknown> & { updatedAt?: unknown };
+    const updateData = req.body as Record<string, unknown>;
     const { tenantId } = req as ITenantRequest;
 
     const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
@@ -296,9 +296,7 @@ export const updatePublishingStatusHandler = async (req: FastifyRequest, reply: 
   loggerService.log('Start - Handle update publishing status request');
   try {
     const { id } = req.params as { id: string };
-    const { publishing_status: publishingStatus } = req.body as {
-      publishing_status?: 'active' | 'inactive';
-    };
+    const { publishing_status: publishingStatus } = req.body as { publishing_status?: 'active' | 'inactive' };
     const { tenantId } = req as ITenantRequest;
     const configId = parseInt(id);
 
@@ -401,9 +399,8 @@ export const addMappingHandler = async (req: FastifyRequest, reply: FastifyReply
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
-    const { updatedAt, ...mappingDto } = req.body as AddMappingDto & { updatedAt?: unknown };
-
-    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto as AddMappingDto);
+    const mappingDto = req.body as AddMappingDto;
+    const updatedConfig = await handleAddMapping(Number(id), tenantId, mappingDto);
 
     reply.status(200).send({
       success: true,
@@ -443,9 +440,8 @@ export const addFunctionHandler = async (req: FastifyRequest, reply: FastifyRepl
   try {
     const { id } = req.params as { id: string };
     const { tenantId } = req as ITenantRequest;
-    const { updatedAt, ...functionDto } = req.body as AddFunctionDto & { updatedAt?: unknown };
-
-    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto as AddFunctionDto);
+    const functionDto = req.body as AddFunctionDto;
+    const updatedConfig = await handleAddFunction(Number(id), tenantId, functionDto);
 
     reply.status(200).send({
       success: true,
@@ -465,7 +461,6 @@ export const removeFunctionHandler = async (req: FastifyRequest, reply: FastifyR
     const { id, index } = req.params as { id: string; index: string };
     const { tenantId } = req as ITenantRequest;
     const functionIndex = Number(index);
-
     const updatedConfig = await handleRemoveFunction(Number(id), tenantId, functionIndex);
 
     reply.status(200).send({

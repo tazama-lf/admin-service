@@ -7,13 +7,6 @@ import { validateTableName } from '../../utils/enrichment-utils';
 
 export type { ConfigData, ConfigRow };
 
-export class ConfigConflictError extends Error {
-  constructor(message = 'Configuration has been modified by another process') {
-    super(message);
-    this.name = 'ConfigConflictError';
-  }
-}
-
 const mapRowToConfig = (row: ConfigRow): Config => {
   const mapped = {
     id: row.id,
@@ -335,18 +328,6 @@ export const updateConfig = async (
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
-    const existenceCheck = await handlePostExecuteSqlStatement<{ id: number }>(
-      {
-        text: 'SELECT id FROM tcs_config WHERE id = $1 AND tenant_id = $2',
-        values: [id, tenantId],
-      } satisfies PgQueryConfig,
-      'configuration',
-    );
-
-    if (existenceCheck.rows.length > 0) {
-      throw new ConfigConflictError();
-    }
-
     throw new Error('Configuration not found');
   }
 

@@ -66,6 +66,7 @@ import {
   handleGetExcludedTypes,
   handleReviewMask,
 } from './services/masking.logic.service';
+import { findSimulations, createSimulation } from './services/simulation.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs, getSimulationMessages } from './services/simulation-logs.logic.service';
@@ -1764,5 +1765,38 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     ErrorHandler.sendError(reply, error, 'Failed to review masking configuration');
   } finally {
     loggerService.log('End - Handle review mask request');
+  }
+};
+
+// ==================== SIMULATION OPERATIONS ====================
+
+export const createSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, unknown>;
+    const response = await createSimulation(body, tenantId);
+    reply.code(201).send({ success: true, message: response.message, id: response.id });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create simulation');
+  }
+};
+
+export const getAllSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const result = await findSimulations(parsedLimit, parsedOffset, tenantId);
+    reply.code(200).send({
+      success: true,
+      simulations: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulations');
   }
 };

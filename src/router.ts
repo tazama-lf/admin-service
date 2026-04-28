@@ -130,7 +130,7 @@ const routePrivilege = {
   postTcsDataModelTable: ['editor', 'approver', 'publisher'],
   getTrsRules: ['editor', 'approver', 'exporter', 'publisher'],
   postTrsRule: 'editor',
-  putTrsRule: 'editor',
+  putTrsRule: ['editor', 'aaprover', 'trs_approver'],
   getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],

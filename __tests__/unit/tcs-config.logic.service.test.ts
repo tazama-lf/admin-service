@@ -728,6 +728,7 @@ describe('TCS Config Logic Service', () => {
       await expect(
         tcsConfigService.handleAddFunction(999, mockTenantId, { functionName: 'test' }, '2026-04-07T10:00:00.000Z'),
       ).rejects.toThrow('Failed to add function');
+      ).rejects.toThrow('Failed to add function');
     });
 
     it('should throw HTTP 409 when add function has a version conflict', async () => {
@@ -932,6 +933,26 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleGetConfigByTransactionType('invalid.type', '1.0.0', mockTenantId)).rejects.toThrow(
         'Configuration not found',
       );
+    });
+
+    it('should retrieve config with XML payload when content type is XML', async () => {
+      const mockConfig = {
+        schema: { type: 'object' },
+        mapping: { field: 'value' },
+        content_type: 'application/xml',
+        payload_xml: '<root><data>test</data></root>',
+        payload_json: null,
+      };
+
+      (tcsConfigRepository.getSchemaByTransactionType as jest.Mock).mockResolvedValue(mockConfig);
+
+      const result = await tcsConfigService.handleGetConfigByTransactionType('pacs.008.001.10', '1.0.0', mockTenantId);
+
+      expect(result).toEqual({
+        schema: mockConfig.schema,
+        mapping: mockConfig.mapping,
+        payload: mockConfig.payload_xml,
+      });
     });
 
     it('should retrieve config with XML payload when content type is XML', async () => {

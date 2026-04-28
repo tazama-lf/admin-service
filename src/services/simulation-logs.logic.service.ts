@@ -3,6 +3,7 @@ import {
   createSimulationLogsInDb,
   getSimulationLogsFromDb,
   getSimulationMessagesFromDb,
+  fetchDataFromDlh,
 } from '../repositories/configuration/simulation-logs.repository';
 
 export const createSimulationLogs = async ({
@@ -30,3 +31,6 @@ export const getSimulationLogs = async (
 
 export const getSimulationMessages = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> =>
   await getSimulationMessagesFromDb(tenantId, tableName);
+
+export const fetchFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> =>
+  await fetchDataFromDlh(queries, token);

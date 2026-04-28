@@ -124,3 +124,73 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
 
   return result.rows.map((row) => row.payload);
 };
+
+export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
+  const DLH_ENDPOINT = process.env.DLH_URL;
+  if (!DLH_ENDPOINT) {
+    throw new Error('DLH endpoint is not defined');
+  }
+  const response = await fetch(DLH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(queries),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch data from DLH: ${response.statusText}`);
+  }
+
+  const result = (await response.json()) as Record<string, unknown>;
+
+  const results = result.results as Array<{ data: Array<{ document: Record<string, unknown> }> }> | undefined;
+  if (Array.isArray(results)) {
+    const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
+      {
+        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+        values: [],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+
+    const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
+    const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
+
+    await handlePostExecuteSqlStatement(
+      {
+        text: pgFormat(
+          `CREATE TABLE IF NOT EXISTS %I (
+            id SERIAL PRIMARY KEY,
+            payload JSONB NOT NULL,
+            credttm TEXT,
+            "endpointPath" TEXT,
+            "tenantId" TEXT,
+            msgid TEXT
+          )`,
+          nextTableName,
+        ),
+        values: [],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+
+    const documents = results.flatMap((r) => (Array.isArray(r.data) ? r.data.map((item) => item.document) : []));
+    if (documents.length > 0) {
+      const serialized = documents.map((doc) => JSON.stringify(doc));
+      const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
+      await handlePostExecuteSqlStatement(
+        {
+          text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
+          values: serialized,
+        } satisfies PgQueryConfig,
+        'simulation',
+      );
+    }
+
+    return { ...result, tableName: nextTableName };
+  }
+
+  return result;
+};

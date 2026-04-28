@@ -1487,8 +1487,8 @@ export const getPayloadByTransactionTypeHandler = async (req: FastifyRequest, re
 
     reply.status(200).send({
       success: true,
-      transactionType,
-      tenantId,
+      // transactionType, // commented in CFP-321
+      // tenantId,
       payload,
     });
   } catch (error: unknown) {

@@ -75,6 +75,7 @@ import {
   findActiveMaskConfigsHandler,
   getExcludedTypesHandler,
   reviewMaskHandler,
+  getAllEvaluationsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -103,6 +104,7 @@ const routePrivilege = {
   postEntity: 'POST_V1_EVENT_FLOW_CONTROL_ENTITY',
   putCache: 'PUT_V1_EVENT_FLOW_CONTROL_CACHE',
   getReport: 'GET_V1_GETREPORTBYMSGID',
+  getAllEvaluations: ['editor', 'approver', 'exporter', 'publisher'],
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
@@ -407,6 +409,9 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/reports/getreportbymsgid', {
     ...SetOptionsBodyAndParams(reportRequestHandler, routePrivilege.getReport, undefined, GetReportSchema),
+  });
+  fastify.get('/v1/admin/reports/evaluations', {
+    ...SetOptionsBodyAndParams(getAllEvaluationsHandler, routePrivilege.getAllEvaluations),
   });
   fastify.get('/v1/admin/event-flow-control/entity', {
     ...SetOptionsBodyAndParams(getEntityConditionHandler, routePrivilege.getEntity, undefined, QueryEntityConditionSchema),

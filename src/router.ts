@@ -65,6 +65,11 @@ import {
   getRuleConfigurationHandler,
   getRuleFlowHandler,
   updateRuleHandler,
+  getAllMasksHandler,
+  createMaskHandler,
+  updateMaskHandler,
+  getMaskByIdHandler,
+  reviewMaskHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -95,7 +100,7 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
-  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor'],
+  getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
@@ -126,6 +131,7 @@ const routePrivilege = {
   getTrsRules: ['editor', 'approver', 'exporter', 'publisher'],
   postTrsRule: 'editor',
   putTrsRule: 'editor',
+  getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],
   postNodes: 'editor',
@@ -136,6 +142,9 @@ const routePrivilege = {
   getSimulationLogs: ['editor', 'approver'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
+  createMask: 'trs_data_engineer_editor',
+  updateMask: 'trs_data_engineer_editor',
+  reviewMask: 'trs_data_engineer_approver',
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -356,6 +365,27 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.put('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
+  });
+
+  fastify.post('/v1/admin/trs/masking/all/:offset/:limit', {
+    ...SetOptionsBodyAndParams(getAllMasksHandler, routePrivilege.getTrsMasks),
+    // ====================  MASKING OPERATIONS ====================
+  });
+
+  fastify.post('/v1/admin/trs/mask/create', {
+    ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.createMask),
+  });
+
+  fastify.put('/v1/admin/trs/masking/:id', {
+    ...SetOptionsBodyAndParams(updateMaskHandler, routePrivilege.updateMask),
+  });
+
+  fastify.get('/v1/admin/trs/masking/:id', {
+    ...SetOptionsBodyAndParams(getMaskByIdHandler, routePrivilege.getTrsMasks),
+  });
+
+  fastify.patch('/v1/admin/trs/masking/:id/review', {
+    ...SetOptionsBodyAndParams(reviewMaskHandler, routePrivilege.reviewMask),
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================

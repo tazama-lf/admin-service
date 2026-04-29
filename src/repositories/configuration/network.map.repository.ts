@@ -10,8 +10,9 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'cfg', value: '' };
     if (filters) {
-      filter.field = filters[0];
-      filter.value = filters[1];
+      const [field, value] = Object.entries(filters)[0];
+      filter.field = field;
+      filter.value = value;
     }
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
@@ -26,11 +27,11 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
       : { data: [], total: 0 };
   },
 
-  get: async function ({ id, cfg, tenantId }): Promise<NetworkMap | null> {
+  get: async function ({ cfg, tenantId }): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>name = $1, configuration->>cfg = $2 AND tenantId = $3;',
-        values: [id, cfg, tenantId],
+        text: 'SELECT configuration FROM network_map WHERE configuration->>cfg = $1 AND tenantId = $2;',
+        values: [cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -55,24 +56,25 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
     return queryRes.rows[0].configuration;
   },
 
-  update: async function ({ id, cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
+  update: async function ({ cfg, tenantId }, payload: NetworkMap): Promise<NetworkMap | null> {
     const dtTme = new Date().toISOString();
     payload.updDtTm = dtTme;
+    payload.tenantId = tenantId;
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
-        values: [payload, id, cfg, tenantId],
+        text: 'UPDATE network_map SET configuration = $1 WHERE cfg = $2 AND tenantId = $3 RETURNING configuration;',
+        values: [payload, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
-  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
+  remove: async function ({ cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'DELETE FROM network_map WHERE configuration->>name = $1 AND configuration->>cfg = $2 AND tenantId = $3;',
-        values: [id, cfg, tenantId],
+        text: 'DELETE FROM network_map WHERE configuration->>cfg = $1 AND tenantId = $2;',
+        values: [cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

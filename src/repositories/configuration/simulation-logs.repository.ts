@@ -1,6 +1,6 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
+import type { IRecordCount, SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
 import pgFormat from 'pg-format';
 
 type SortField = 'created_at' | 'updated_at';
@@ -123,6 +123,31 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
   );
 
   return result.rows.map((row) => row.payload);
+};
+
+export const fetchCountFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<IRecordCount> => {
+  const DLH_ENDPOINT = process.env.DLH_URL;
+  if (!DLH_ENDPOINT) {
+    throw new Error('DLH endpoint is not defined');
+  }
+  const response = await fetch(`${DLH_ENDPOINT}/count`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(queries),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch count from DLH: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { results?: number[] };
+
+  const rowCount = data.results ? data.results.reduce((acc: number, current: number) => acc + current, 0) : 0;
+
+  return { row_count: rowCount };
 };
 
 export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {

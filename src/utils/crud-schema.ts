@@ -35,9 +35,7 @@ const DefaultQuery = Type.Object({
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
-const makeIdSchema = (
-  cfg?: { kind: 'single'; name?: string } | { kind: 'composite'; names: readonly [string, string] },
-): TObject<Record<string, TSchema>> => {
+const makeIdSchema = (cfg?: { kind: 'single'; name?: string } | { kind: 'composite'; names: readonly [string, string] }): TObject => {
   const props: Record<string, TSchema> = { cfg: Type.String() };
   if (cfg?.kind === 'composite') {
     const [firstParamKey, secondParamKey] = cfg.names;
@@ -88,8 +86,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       },
       async (req, reply) => {
         const queryParams = req.query as Static<typeof QuerySchema>;
-        const { tenantId: authTenantId } = req as ITenantRequest;
-        const { limit = 20, tenantId = authTenantId, offset = 0, sort, order = 'ASC', filters } = queryParams;
+        const { tenantId } = req as ITenantRequest;
+        const { limit = 20, offset = 0, sort, order = 'ASC', filters } = queryParams;
 
         type SortField = Extract<keyof TEntity, string>;
 

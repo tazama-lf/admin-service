@@ -125,28 +125,70 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
   return result.rows.map((row) => row.payload);
 };
 
+type DlhPageResponse = {
+  items: Record<string, unknown>[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+};
+
+const PAGE_SIZE = 100;
+
 export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
-  const DLH_ENDPOINT = process.env.DLH_URL;
-  if (!DLH_ENDPOINT) {
+  const DLH_BASE_ENDPOINT = `${process.env.DLH_URL}/extract/page`;
+  if (!process.env.DLH_URL) {
     throw new Error('DLH endpoint is not defined');
   }
-  const response = await fetch(DLH_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(queries),
-  });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch data from DLH: ${response.statusText}`);
+  console.log('Fetching data from DLH with queries:', JSON.stringify(queries, null, 2));
+
+  const allItems: Record<string, unknown>[] = [];
+
+  for (const query of queries) {
+    console.log('Sending query to DLH:', JSON.stringify(query, null, 2));
+
+    // First call to page 1 to determine total number of pages
+    const firstResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=1&size=${PAGE_SIZE}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(query),
+    });
+
+    if (!firstResponse.ok) {
+      throw new Error(`Failed to fetch data from DLH: ${firstResponse.statusText}`);
+    }
+
+    const firstResult = (await firstResponse.json()) as DlhPageResponse;
+    const totalPages = firstResult.pages ?? 1;
+    console.log(`DLH returned ${firstResult.total} total records across ${totalPages} page(s)`);
+    allItems.push(...(firstResult.items ?? []));
+
+    // Fetch remaining pages
+    for (let page = 2; page <= totalPages; page++) {
+      console.log(`Fetching page ${page} of ${totalPages}`);
+      const pageResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=${page}&size=${PAGE_SIZE}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(query),
+      });
+
+      if (!pageResponse.ok) {
+        throw new Error(`Failed to fetch page ${page} from DLH: ${pageResponse.statusText}`);
+      }
+
+      const pageResult = (await pageResponse.json()) as DlhPageResponse;
+      allItems.push(...(pageResult.items ?? []));
+    }
   }
 
-  const result = (await response.json()) as Record<string, unknown>;
-
-  const results = result.results as Array<{ data: Array<{ document: Record<string, unknown> }> }> | undefined;
-  if (Array.isArray(results)) {
+  if (allItems.length > 0) {
     const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
       {
         text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
@@ -176,21 +218,18 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
       'simulation',
     );
 
-    const documents = results.flatMap((r) => (Array.isArray(r.data) ? r.data.map((item) => item.document) : []));
-    if (documents.length > 0) {
-      const serialized = documents.map((doc) => JSON.stringify(doc));
-      const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
-      await handlePostExecuteSqlStatement(
-        {
-          text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
-          values: serialized,
-        } satisfies PgQueryConfig,
-        'simulation',
-      );
-    }
+    const serialized = allItems.map((doc) => JSON.stringify(doc));
+    const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
+    await handlePostExecuteSqlStatement(
+      {
+        text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
+        values: serialized,
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
 
-    return { ...result, tableName: nextTableName };
+    return { ...allItems, tableName: nextTableName };
   }
 
-  return result;
+  return { total: 0 };
 };

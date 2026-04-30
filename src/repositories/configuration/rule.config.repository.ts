@@ -9,8 +9,9 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'ruleid', value: '' };
     if (filters) {
-      filter.field = filters[0];
-      filter.value = filters[1];
+      const [field, value] = Object.entries(filters)[0];
+      filter.field = field;
+      filter.value = value;
     }
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
@@ -58,6 +59,7 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
     const dtTme = new Date().toISOString();
     payload.updDtTm = dtTme;
+    payload.tenantId = tenantId;
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {

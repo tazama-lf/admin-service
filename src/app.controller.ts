@@ -69,7 +69,8 @@ import {
 import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults, saveEvaluationsInResultsTable } from './services/simulation-logs.logic.service';
+import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1799,6 +1800,16 @@ export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: F
     ErrorHandler.sendError(reply, error, 'Failed to find active masking configurations');
   }
 };
+
+export const saveEvaluationsInResultsTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { evaluations, tableName } = req.body as { evaluations: EvaluationRow[]; tableName?: string };
+    await saveEvaluationsInResultsTable(evaluations, tableName);
+    reply.code(200).send({ success: true, message: 'Evaluations saved successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save evaluations');
+  }
+}
 
 export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {

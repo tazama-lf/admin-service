@@ -6,6 +6,7 @@ import {
   fetchDataFromDlh,
   truncateEvaluationResultsInDb,
 } from '../repositories/configuration/simulation-logs.repository';
+import { saveEvaluationsInDb, type EvaluationRow } from '../repositories/configuration/evaluation.repository';
 
 export const createSimulationLogs = async ({
   userId,
@@ -39,4 +40,8 @@ export const fetchFromDlh = async (queries: Array<Record<string, unknown>>, toke
 export const truncateEvaluationResults = async (): Promise<void> => {
   await truncateEvaluationResultsInDb();
   return;
-}
+};
+
+export const saveEvaluationsInResultsTable = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {
+  await saveEvaluationsInDb(evaluations, tableName)
+};

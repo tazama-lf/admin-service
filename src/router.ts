@@ -77,6 +77,7 @@ import {
   reviewMaskHandler,
   getAllEvaluationsHandler,
   truncateEvaluationResultsHandler,
+  saveEvaluationsInResultsTableHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -483,6 +484,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/trs/masking/active-configs', {
     ...SetOptionsBodyAndParams(findActiveMaskConfigsHandler, routePrivilege.fetchFromDlh),
+  });
+
+  fastify.post('/v1/admin/trs/evaluations/save', {
+    ...SetOptionsBodyAndParams(saveEvaluationsInResultsTableHandler, routePrivilege.getAllEvaluations),
   });
 }
 

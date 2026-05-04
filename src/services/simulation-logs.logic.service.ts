@@ -39,7 +39,6 @@ export const fetchFromDlh = async (queries: Array<Record<string, unknown>>, toke
 
 export const truncateEvaluationResults = async (): Promise<void> => {
   await truncateEvaluationResultsInDb();
-  return;
 };
 
 export const saveEvaluationsInResultsTable = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {

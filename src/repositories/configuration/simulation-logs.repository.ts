@@ -125,8 +125,8 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
   return result.rows.map((row) => row.payload);
 };
 
-type DlhPageResponse = {
-  items: Record<string, unknown>[];
+interface DlhPageResponse {
+  items: Array<Record<string, unknown>>;
   total: number;
   page: number;
   size: number;
@@ -141,12 +141,9 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
     throw new Error('DLH endpoint is not defined');
   }
 
-  console.log('Fetching data from DLH with queries:', JSON.stringify(queries, null, 2));
-
-  const allItems: Record<string, unknown>[] = [];
+  const allItems: Array<Record<string, unknown>> = [];
 
   for (const query of queries) {
-    console.log('Sending query to DLH:', JSON.stringify(query, null, 2));
 
     // First call to page 1 to determine total number of pages
     const firstResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=1&size=${PAGE_SIZE}`, {
@@ -164,12 +161,10 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
 
     const firstResult = (await firstResponse.json()) as DlhPageResponse;
     const totalPages = firstResult.pages ?? 1;
-    console.log(`DLH returned ${firstResult.total} total records across ${totalPages} page(s)`);
     allItems.push(...(firstResult.items ?? []));
 
     // Fetch remaining pages
     for (let page = 2; page <= totalPages; page++) {
-      console.log(`Fetching page ${page} of ${totalPages}`);
       const pageResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=${page}&size=${PAGE_SIZE}`, {
         method: 'POST',
         headers: {
@@ -191,7 +186,7 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
   if (allItems.length > 0) {
     const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
       {
-        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+        text: 'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = \'public\' AND table_name LIKE \'sim%\'',
         values: [],
       } satisfies PgQueryConfig,
       'simulation',
@@ -203,14 +198,7 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
     await handlePostExecuteSqlStatement(
       {
         text: pgFormat(
-          `CREATE TABLE IF NOT EXISTS %I (
-            id SERIAL PRIMARY KEY,
-            payload JSONB NOT NULL,
-            credttm TEXT,
-            "endpointPath" TEXT,
-            "tenantId" TEXT,
-            msgid TEXT
-          )`,
+          'CREATE TABLE IF NOT EXISTS %I (id SERIAL PRIMARY KEY, payload JSONB NOT NULL, credttm TEXT, "endpointPath" TEXT, "tenantId" TEXT, "msgid" TEXT)',
           nextTableName,
         ),
         values: [],
@@ -235,7 +223,7 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
 };
 
 export const truncateEvaluationResultsInDb = async (): Promise<void> => {
-  const query = `TRUNCATE TABLE evaluation;`;
+  const query = 'TRUNCATE TABLE evaluation;';
   await handlePostExecuteSqlStatement(
     {
       text: query,

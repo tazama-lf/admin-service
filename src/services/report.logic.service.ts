@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Evaluation } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TADPReport';
 import { databaseManager, loggerService } from '..';
-import { EvaluationRow, fetchAllEvaluations } from '../repositories/configuration/evaluation.repository';
-
+import { fetchAllEvaluations } from '../repositories/configuration/evaluation.repository';
+import type { EvaluationRow } from '../repositories/configuration/evaluation.repository';
 export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: string): Promise<Evaluation | undefined> => {
   let report;
   try {

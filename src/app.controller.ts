@@ -1744,7 +1744,7 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     const body = req.body as { action?: string; comments?: string };
 
     if (!body.action || !['approve', 'reject'].includes(body.action)) {
-      reply.code(400).send({ success: false, message: "Invalid action. Must be 'approve' or 'reject'" });
+      reply.code(400).send({ success: false, message: 'Invalid action. Must be \'approve\' or \'reject\'' });
       return;
     }
 

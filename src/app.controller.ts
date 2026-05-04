@@ -14,7 +14,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handleGetReportRequestByMsgId, handleGetAllReportsRequest } from './services/report.logic.service';
 import {
   handlePostConfig,
   handleFindConfigByID,
@@ -1805,4 +1805,18 @@ export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
   }
-};
+}
+
+  export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all evaluations request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const data = await handleGetAllReportsRequest(tenantId);
+    reply.status(200).send({ message: 'Evaluations fetched successfully', data });
+  } catch (err) {
+    const failMessage = `Failed to fetch evaluations. \n${util.inspect(err)}`;
+    reply.status(500).send(failMessage);
+  } finally {
+    loggerService.log('End - Handle get all evaluations request');
+  }
+}

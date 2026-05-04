@@ -75,6 +75,7 @@ import {
   findActiveMaskConfigsHandler,
   getExcludedTypesHandler,
   reviewMaskHandler,
+  getAllEvaluationsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -105,6 +106,7 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getAllEvaluations: ['editor', 'approver', 'exporter', 'publisher'],
   getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
@@ -419,6 +421,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.post('/v1/admin/event-flow-control/account', {
     ...SetOptionsBodyAndParams(postConditionHandlerAccount, routePrivilege.postAccount, AccountConditionSchema),
+  });
+  fastify.get('/v1/admin/reports/evaluations', {
+    ...SetOptionsBodyAndParams(getAllEvaluationsHandler, routePrivilege.getAllEvaluations),
   });
   fastify.put('/v1/admin/event-flow-control/entity', {
     ...SetOptionsBodyAndParams(

@@ -4,6 +4,7 @@ import {
   getSimulationLogsFromDb,
   getSimulationMessagesFromDb,
   fetchDataFromDlh,
+  truncateEvaluationResultsInDb,
 } from '../repositories/configuration/simulation-logs.repository';
 
 export const createSimulationLogs = async ({
@@ -34,3 +35,8 @@ export const getSimulationMessages = async (tenantId: string, tableName: string)
 
 export const fetchFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> =>
   await fetchDataFromDlh(queries, token);
+
+export const truncateEvaluationResults = async (): Promise<void> => {
+  await truncateEvaluationResultsInDb();
+  return;
+}

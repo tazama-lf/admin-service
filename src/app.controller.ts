@@ -69,7 +69,7 @@ import {
 import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1780,6 +1780,15 @@ export const fetchFromDlhHandler = async (req: FastifyRequest, reply: FastifyRep
     ErrorHandler.sendError(reply, error, 'Failed to fetch data from DLH');
   }
 };
+
+export const truncateEvaluationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    await truncateEvaluationResults();
+    reply.code(200).send({ success: true, message: 'Evaluation results truncated successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');
+  }
+}
 
 export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {

@@ -76,6 +76,7 @@ import {
   getExcludedTypesHandler,
   reviewMaskHandler,
   getAllEvaluationsHandler,
+  truncateEvaluationResultsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -406,9 +407,11 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   // ====================  ADMIN SERVICE OPERATIONS ====================
-
   fastify.get('/v1/admin/reports/getreportbymsgid', {
     ...SetOptionsBodyAndParams(reportRequestHandler, routePrivilege.getReport, undefined, GetReportSchema),
+  });
+  fastify.get('/v1/dlh/truncate-evaluations', {
+    ...SetOptionsBodyAndParams(truncateEvaluationResultsHandler, routePrivilege.fetchFromDlh),
   });
   fastify.get('/v1/admin/event-flow-control/entity', {
     ...SetOptionsBodyAndParams(getEntityConditionHandler, routePrivilege.getEntity, undefined, QueryEntityConditionSchema),

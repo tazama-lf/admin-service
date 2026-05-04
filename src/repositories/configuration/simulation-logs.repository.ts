@@ -233,3 +233,14 @@ export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, 
 
   return { total: 0 };
 };
+
+export const truncateEvaluationResultsInDb = async (): Promise<void> => {
+  const query = `TRUNCATE TABLE evaluation;`;
+  await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: [],
+    } satisfies PgQueryConfig,
+    'evaluation',
+  );
+}

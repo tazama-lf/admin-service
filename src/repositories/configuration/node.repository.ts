@@ -1,4 +1,4 @@
-import { handlePostExecuteSqlStatement, handleReadOnlyExecuteSqlStatement } from '../../services/database.logic.service';
+import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { Node } from '../../interface/node.interface';
 
@@ -84,21 +84,6 @@ export const executeQueryNodeInDb = async (
   params: unknown[] = [],
 ): Promise<Array<Record<string, unknown>>> => {
   const result = await handlePostExecuteSqlStatement(
-    {
-      text: query,
-      values: params,
-    } satisfies PgQueryConfig,
-    dbName,
-  );
-  return result.rows;
-};
-
-export const executeQueryNodeInDbReadOnly = async (
-  query: string,
-  dbName: string,
-  params: unknown[] = [],
-): Promise<Array<Record<string, unknown>>> => {
-  const result = await handleReadOnlyExecuteSqlStatement(
     {
       text: query,
       values: params,

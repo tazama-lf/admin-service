@@ -2,7 +2,7 @@ import { loggerService } from '..';
 import type { Node, QueryParams } from '../interface/node.interface';
 import {
   deleteNodeByIdFromDB,
-  executeQueryNodeInDbReadOnly,
+  executeQueryNodeInDb,
   getAllNodes,
   getNodeByName,
   insertNodesIntoDb,
@@ -192,7 +192,7 @@ export const executeSelectQuery = async (
 
   // 1. Parse and validate — rejects non-SELECT, multiple statements, and invalid SQL
   //    Capture the AST for subsequent table extraction.
-  let ast;
+  let ast: Array<{ type: string }>;
   try {
     ast = validateSelectQuery(normalisedQuery);
   } catch (e) {
@@ -211,14 +211,15 @@ export const executeSelectQuery = async (
   const hasTenantFilter = /\b(tenant_id|tenantid)\s*=\s*\$/i.test(normalisedQuery);
 
   if (tables.length > 0 && !hasTenantFilter) {
-    // 3. Resolve tenant columns for all referenced tables and collect tenant conditions
+    // 3. Resolve tenant columns for all referenced tables and collect tenant conditions.
+    //    Tables with no tenant column are skipped — their rows are returned unfiltered.
     const tenantConditions: string[] = [];
     for (const table of tables) {
       const tenantColumn = await resolveTenantColumn(table, dbName);
+      if (tenantColumn === null) continue;
+
       const paramIdx = mutableParams.length + 1;
       mutableParams = [...mutableParams, tenantId];
-
-      // Don't prefix table name for simple single-table queries (backwards compatibility)
       tenantConditions.push(`${tenantColumn} = $${paramIdx}`);
     }
 
@@ -247,7 +248,7 @@ export const executeSelectQuery = async (
   modifiedQuery = modifiedQuery.replace(/\bFETCH\s+(FIRST|NEXT)\s+\d+\s+ROWS?\s+ONLY\s*$/i, '').trimEnd();
   modifiedQuery = `${modifiedQuery} LIMIT 10`;
 
-  return await executeQueryNodeInDbReadOnly(modifiedQuery, dbName, mutableParams);
+  return await executeQueryNodeInDb(modifiedQuery, dbName, mutableParams);
 };
 
 /**
@@ -255,9 +256,9 @@ export const executeSelectQuery = async (
  * tableName is extracted from information_schema (not echoed back as a value) so it is
  * safe to use as an identifier in the query text. The lookup itself uses a bind parameter.
  */
-async function resolveTenantColumn(tableName: string, dbName: string): Promise<string> {
+async function resolveTenantColumn(tableName: string, dbName: string): Promise<string | null> {
   try {
-    const result = await executeQueryNodeInDbReadOnly(
+    const result = await executeQueryNodeInDb(
       `SELECT column_name FROM information_schema.columns
        WHERE table_name = $1 AND column_name IN ('tenant_id', 'tenantId') LIMIT 1`,
       dbName,
@@ -270,5 +271,5 @@ async function resolveTenantColumn(tableName: string, dbName: string): Promise<s
     loggerService.error(`Error resolving tenant column for table ${tableName}`);
   }
 
-  return 'tenant_id'; // default fallback
+  return null;
 }

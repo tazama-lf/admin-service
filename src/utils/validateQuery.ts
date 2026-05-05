@@ -1,5 +1,10 @@
 import { parse } from 'pgsql-ast-parser';
 
+/** Minimal structural type for a parsed SQL statement. */
+interface SqlStatement {
+  type: string;
+}
+
 /** Statement type discriminants that are part of the SELECT family */
 const SELECT_TYPES = new Set(['select', 'union', 'union all', 'values', 'with', 'with recursive']);
 
@@ -8,8 +13,8 @@ const SELECT_TYPES = new Set(['select', 'union', 'union all', 'values', 'with', 
  * Returns the parsed AST on success so the caller can inspect it further.
  * Throws a descriptive Error on any violation.
  */
-export const validateSelectQuery = (query: string): ReturnType<typeof parse> => {
-  let ast: ReturnType<typeof parse>;
+export const validateSelectQuery = (query: string): SqlStatement[] => {
+  let ast: SqlStatement[];
 
   // Replace {{ variable }} template placeholders with $N before parsing so the
   // AST parser sees valid parameterised SQL while still validating the structure.
@@ -17,7 +22,7 @@ export const validateSelectQuery = (query: string): ReturnType<typeof parse> => 
   const normalised = query.replace(/\{\{\s*\w+\s*\}\}/g, () => `$${paramIndex++}`);
 
   try {
-    ast = parse(normalised);
+    ast = parse(normalised) as SqlStatement[];
   } catch (e) {
     throw new Error(`Invalid SQL syntax: ${(e as Error).message}`);
   }

@@ -3,7 +3,6 @@ import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbMan
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
-
 import { Database } from '@tazama-lf/frms-coe-lib/lib/config/database.config';
 import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
 import * as util from 'node:util';
@@ -19,7 +18,7 @@ export const dbInit = async (): Promise<void> => {
     processorConfig.nodeEnv === 'production',
   );
 
-  databaseManager = db as unknown as DatabaseManagerInstance<Required<AppDatabaseServices>>;
+  databaseManager = db as DatabaseManagerInstance<Required<AppDatabaseServices>>;
   configuration = { ...config, ...processorConfig };
   loggerService.log(util.inspect(databaseManager.isReadyCheck()));
 };

@@ -78,6 +78,7 @@ import {
   getAllEvaluationsHandler,
   truncateEvaluationResultsHandler,
   saveEvaluationsInResultsTableHandler,
+  saveRecordInTrsSimulationHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -157,6 +158,7 @@ const routePrivilege = {
   createMask: 'trs_data_engineer_editor',
   updateMask: 'trs_data_engineer_editor',
   reviewMask: 'trs_data_engineer_approver',
+  saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher']
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -488,6 +490,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/trs/evaluations/save', {
     ...SetOptionsBodyAndParams(saveEvaluationsInResultsTableHandler, routePrivilege.getAllEvaluations),
+  });
+
+  fastify.post('/v1/admin/trs-simulation/save', {
+    ...SetOptionsBodyAndParams(saveRecordInTrsSimulationHandler, routePrivilege.saveRecordInTrsSimulation),
   });
 }
 

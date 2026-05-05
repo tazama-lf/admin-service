@@ -3,11 +3,11 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import pgFormat from 'pg-format';
 
 export interface EvaluationRow {
+  iteration: number;
   evaluation: Record<string, unknown>;
   messageid: string;
   tenantid: string;
   credttm: Date;
-  upddttm: Date;
 }
 
 export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {
@@ -18,15 +18,44 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
   }
 
   const resultsTableName = `${tableName}_results`;
+
+  // Check if the results table already exists in the simulation DB
+  const tableExistsResult = await handlePostExecuteSqlStatement<{ exists: boolean }>(
+    {
+      text: `SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = $1
+      ) AS exists`,
+      values: [resultsTableName],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const tableExists = tableExistsResult.rows[0]?.exists ?? false;
+
+  let nextIteration = 1;
+  if (tableExists) {
+    const maxIterationResult = await handlePostExecuteSqlStatement<{ max_iteration: number }>(
+      {
+        text: pgFormat('SELECT COALESCE(MAX(iteration), 0) AS max_iteration FROM %I', resultsTableName),
+        values: [],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+    nextIteration = (maxIterationResult.rows[0]?.max_iteration ?? 0) + 1;
+  }
+
   await handlePostExecuteSqlStatement(
     {
       text: pgFormat(
         `CREATE TABLE IF NOT EXISTS %I (
           evaluation JSONB,
-          messageid TEXT PRIMARY KEY,
+          iteration NUMERIC,
+          messageid TEXT,
           tenantid TEXT,
           credttm TIMESTAMP,
-          upddttm TIMESTAMP
+          PRIMARY KEY (messageid, tenantid)
         )`,
         resultsTableName,
       ),
@@ -35,17 +64,19 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
     'simulation',
   );
 
+  
+
   const values: unknown[] = [];
   const placeholders = evaluations.map((row, i) => {
     const base = i * 5;
-    values.push(JSON.stringify(row.evaluation), row.messageid, row.tenantid, row.credttm, row.upddttm);
+    values.push(JSON.stringify(row.evaluation), nextIteration, row.messageid, row.tenantid, row.credttm);
     return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
   });
 
   await handlePostExecuteSqlStatement(
     {
       text: pgFormat(
-        `INSERT INTO %I (evaluation, messageid, tenantid, credttm, upddttm) VALUES ${placeholders.join(', ')} ON CONFLICT (messageid) DO NOTHING`,
+        `INSERT INTO %I (evaluation, iteration, messageid, tenantid, credttm) VALUES ${placeholders.join(', ')} ON CONFLICT (messageid, tenantid) DO NOTHING`,
         resultsTableName,
       ),
       values,
@@ -56,7 +87,7 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
 
 export const fetchAllEvaluations = async (): Promise<EvaluationRow[]> => {
   const query = `
-    SELECT evaluation, messageid, tenantid, credttm, upddttm, tenantid
+    SELECT evaluation, messageid, tenantid, credttm, tenantid
     FROM evaluation;
   `;
 

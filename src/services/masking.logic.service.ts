@@ -32,15 +32,15 @@ export const handlePostMask = async (mask: Record<string, unknown>, tenantId: st
 
 export const handleGetExcludedTypes = async (tenantId: string): Promise<ExcludedTypeProps[] | null> => {
   try {
-    loggerService.log(`Started handling get job history request for tenant: ${tenantId}`);
+    loggerService.log(`Started handling get excluded types request for tenant: ${tenantId}`);
 
     const result = await getExcludedTypes(tenantId);
 
-    loggerService.log(`Retrieved ${result?.length} job history records successfully.`);
+    loggerService.log(`Retrieved ${result?.length} excluded types successfully.`);
     return result;
   } catch (error: unknown) {
     const errorMessage = error as { message: string };
-    loggerService.log(`Error: getting job history with error message: ${errorMessage.message}`);
+    loggerService.log(`Error: getting excluded types with error message: ${errorMessage.message}`);
     throw new Error(errorMessage.message);
   }
 };

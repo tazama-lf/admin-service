@@ -143,11 +143,11 @@ export const fetchCountFromDlh = async (queries: Array<Record<string, unknown>>,
     throw new Error(`Failed to fetch count from DLH: ${response.statusText}`);
   }
 
-  const data = (await response.json()) as { results?: number[] };
+  const data = (await response.json()) as { results?: Array<{ row_count?: number }> };
 
-  const rowCount = data.results ? data.results.reduce((acc: number, current: number) => acc + current, 0) : 0;
+  const rowCount = data.results ? data.results.reduce((acc: number, current) => acc + (current?.row_count ?? 0), 0) : 0;
 
-  return { row_count: rowCount };
+  return { rowCount };
 };
 
 export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {

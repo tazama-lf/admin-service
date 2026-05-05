@@ -49,5 +49,5 @@ export interface SimulationMessage {
 }
 
 export interface IRecordCount {
-  row_count: number;
+  rowCount: number;
 }

@@ -2,10 +2,10 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { CrudRepository } from '../repository.base';
+import type { ConfigVersion, CrudRepository } from '../repository.base';
 import type { ActiveNetworkMap } from '../../interface/rule.interface';
 
-export const NetworkMapRepo: CrudRepository<NetworkMap> = {
+export const NetworkMapRepo: CrudRepository<NetworkMap, ConfigVersion> = {
   list: async function ({ limit, offset, sort, order, filters, tenantId }): Promise<{ data: NetworkMap[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'cfg', value: '' };
@@ -30,7 +30,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   get: async function ({ cfg, tenantId }): Promise<NetworkMap | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'SELECT configuration FROM network_map WHERE configuration->>cfg = $1 AND tenantId = $2;',
+        text: 'SELECT configuration FROM network_map WHERE cfg = $1 AND tenantId = $2;',
         values: [cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
@@ -73,7 +73,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap> = {
   remove: async function ({ cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
       {
-        text: 'DELETE FROM network_map WHERE configuration->>cfg = $1 AND tenantId = $2;',
+        text: 'DELETE FROM network_map WHERE cfg = $1 AND tenantId = $2;',
         values: [cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',

@@ -69,7 +69,7 @@ import {
 import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults, saveEvaluationsInResultsTable } from './services/simulation-logs.logic.service';
+import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults, saveEvaluationsInResultsTable, saveRecordInTrsSimulation } from './services/simulation-logs.logic.service';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -1840,3 +1840,13 @@ export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply
     loggerService.log('End - Handle get all evaluations request');
   }
 }
+
+export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = req.body as { simulationId: string | undefined; totalRecord: number; recordProcessed: number; simStatus: string; tenantId: string };
+    await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
+    reply.code(200).send();
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
+  }
+};

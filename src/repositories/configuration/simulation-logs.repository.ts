@@ -232,3 +232,23 @@ export const truncateEvaluationResultsInDb = async (): Promise<void> => {
     'evaluation',
   );
 }
+
+export const saveRecordInTrsSimulationInDb = async (simulationData: { simulationId: string | undefined; totalRecord: number; recordProcessed: number; simStatus: string; tenantId: string }): Promise<void> => {
+  const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = simulationData;
+  const query = `
+    INSERT INTO trs_simulation (simulation_id, total_record, record_processed, sim_status, tenant_id, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+    ON CONFLICT (simulation_id) DO UPDATE SET
+      record_processed = EXCLUDED.record_processed,
+      sim_status = EXCLUDED.sim_status,
+      updated_at = NOW();
+  `;
+
+  await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: [simulationId, totalRecord, recordProcessed, simStatus, tenantId],
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+}

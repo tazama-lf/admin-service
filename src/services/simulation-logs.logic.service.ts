@@ -5,6 +5,7 @@ import {
   getSimulationMessagesFromDb,
   fetchDataFromDlh,
   truncateEvaluationResultsInDb,
+  saveRecordInTrsSimulationInDb,
 } from '../repositories/configuration/simulation-logs.repository';
 import { saveEvaluationsInDb, type EvaluationRow } from '../repositories/configuration/evaluation.repository';
 
@@ -43,4 +44,8 @@ export const truncateEvaluationResults = async (): Promise<void> => {
 
 export const saveEvaluationsInResultsTable = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {
   await saveEvaluationsInDb(evaluations, tableName)
+};
+
+export const saveRecordInTrsSimulation = async (simulationData: { simulationId: string | undefined; totalRecord: number; recordProcessed: number; simStatus: string; tenantId: string }): Promise<void> => {
+  await saveRecordInTrsSimulationInDb(simulationData);
 };

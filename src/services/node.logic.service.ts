@@ -216,7 +216,9 @@ export const executeSelectQuery = async (
     const tenantConditions: string[] = [];
     for (const table of tables) {
       const tenantColumn = await resolveTenantColumn(table, dbName);
-      if (tenantColumn === null) continue;
+      if (!tenantColumn) {
+        continue;
+      }
 
       const paramIdx = mutableParams.length + 1;
       mutableParams = [...mutableParams, tenantId];
@@ -225,16 +227,18 @@ export const executeSelectQuery = async (
 
     // 4. Inject all tenant conditions into WHERE clause
     const combinedCondition = tenantConditions.join(' AND ');
-    if (/\bWHERE\b/i.test(modifiedQuery)) {
-      modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${combinedCondition} AND`);
-    } else {
-      const upperCaseQuery = modifiedQuery.toUpperCase();
-      // Find the first clause that should come after WHERE (GROUP BY, ORDER BY, LIMIT, OFFSET, or FETCH)
-      const clauseIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|FETCH\s+(FIRST|NEXT))\b/);
-      if (clauseIndex !== -1) {
-        modifiedQuery = `${modifiedQuery.slice(0, clauseIndex)} WHERE ${combinedCondition} ${modifiedQuery.slice(clauseIndex)}`;
+    if (combinedCondition) {
+      if (/\bWHERE\b/i.test(modifiedQuery)) {
+        modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${combinedCondition} AND`);
       } else {
-        modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${combinedCondition}`;
+        const upperCaseQuery = modifiedQuery.toUpperCase();
+        // Find the first clause that should come after WHERE (GROUP BY, ORDER BY, LIMIT, OFFSET, or FETCH)
+        const clauseIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|FETCH\s+(FIRST|NEXT))\b/);
+        if (clauseIndex !== -1) {
+          modifiedQuery = `${modifiedQuery.slice(0, clauseIndex)} WHERE ${combinedCondition} ${modifiedQuery.slice(clauseIndex)}`;
+        } else {
+          modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${combinedCondition}`;
+        }
       }
     }
   }

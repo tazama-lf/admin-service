@@ -43,7 +43,7 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
       } satisfies PgQueryConfig,
       'simulation',
     );
-    nextIteration = (maxIterationResult.rows[0]?.max_iteration ?? 0) + 1;
+    nextIteration = parseInt(String(maxIterationResult.rows[0]?.max_iteration ?? '0'), 10) + 1;
   }
 
   await handlePostExecuteSqlStatement(
@@ -55,7 +55,7 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
           messageid TEXT,
           tenantid TEXT,
           credttm TIMESTAMP,
-          PRIMARY KEY (messageid, tenantid)
+          PRIMARY KEY (messageid, tenantid, iteration)
         )`,
         resultsTableName,
       ),
@@ -76,7 +76,7 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
   await handlePostExecuteSqlStatement(
     {
       text: pgFormat(
-        `INSERT INTO %I (evaluation, iteration, messageid, tenantid, credttm) VALUES ${placeholders.join(', ')} ON CONFLICT (messageid, tenantid) DO NOTHING`,
+        `INSERT INTO %I (evaluation, iteration, messageid, tenantid, credttm) VALUES ${placeholders.join(', ')} ON CONFLICT (messageid, tenantid, iteration) DO NOTHING`,
         resultsTableName,
       ),
       values,

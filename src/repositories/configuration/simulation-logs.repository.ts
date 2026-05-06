@@ -3,6 +3,14 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
 import pgFormat from 'pg-format';
 
+export interface SimulationItemRow {
+  payload: Record<string, unknown>;
+  endpointPath: string | null;
+  credttm: string | null;
+  tenantId: string | null;
+  msgid: string | null;
+}
+
 type SortField = 'created_at' | 'updated_at';
 
 export const getSimulationLogsFromDb = async (options: SimulationLogQueryOptions): Promise<SimulationLog[]> => {
@@ -111,6 +119,24 @@ export const createSimulationLogsInDb = async (
     } satisfies PgQueryConfig,
     'configuration',
   );
+};
+
+export const fetchSimulationItemsFromTable = async (tableName: string): Promise<SimulationItemRow[]> => {
+  const result = await handlePostExecuteSqlStatement<{ payload: Record<string, unknown>; endpointPath: string | null; credttm: string | null; tenantId: string | null; msgid: string | null }>(
+    {
+      text: pgFormat('SELECT payload, "endpointPath", credttm, "tenantId", msgid FROM %I ORDER BY credttm ASC', tableName),
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return result.rows.map((row) => ({
+    payload: row.payload,
+    endpointPath: row.endpointPath,
+    credttm: row.credttm,
+    tenantId: row.tenantId,
+    msgid: row.msgid,
+  }));
 };
 
 // not being used now

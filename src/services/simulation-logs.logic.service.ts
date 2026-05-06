@@ -6,6 +6,8 @@ import {
   stageItemsInSimTable,
   truncateEvaluationResultsInDb,
   saveRecordInTrsSimulationInDb,
+  fetchSimulationItemsFromTable,
+  type SimulationItemRow,
 } from '../repositories/configuration/simulation-logs.repository';
 import { saveEvaluationsInDb, type EvaluationRow } from '../repositories/configuration/evaluation.repository';
 
@@ -55,3 +57,6 @@ export const saveRecordInTrsSimulation = async (simulationData: {
 }): Promise<void> => {
   await saveRecordInTrsSimulationInDb(simulationData);
 };
+
+export const fetchSimulationItems = async (tableName: string): Promise<SimulationItemRow[]> =>
+  await fetchSimulationItemsFromTable(tableName);

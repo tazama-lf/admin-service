@@ -170,8 +170,8 @@ describe('NetworkMapRepository', () => {
       // Verify database call was made with correct parameters
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
-          values: [inputPayload, mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+          text: 'UPDATE network_map SET configuration = $1 WHERE cfg = $2 AND tenantId = $3 RETURNING configuration;',
+          values: [inputPayload, mockIdentifier.cfg, mockIdentifier.tenantId],
         },
         'configuration',
       );

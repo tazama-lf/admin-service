@@ -77,6 +77,7 @@ import {
   truncateEvaluationResults,
   saveEvaluationsInResultsTable,
   saveRecordInTrsSimulation,
+  fetchSimulationItems,
 } from './services/simulation-logs.logic.service';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
@@ -1452,6 +1453,16 @@ export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: F
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get simulation messages');
+  }
+};
+
+export const fetchSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tableName } = req.query as { tableName: string };
+    const items = await fetchSimulationItems(tableName);
+    reply.code(200).send({ items, count: items.length });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch simulation items');
   }
 };
 

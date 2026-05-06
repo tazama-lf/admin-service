@@ -28,6 +28,7 @@ import {
   updateRuleStatusHandler,
   getSimulationLogsHandler,
   getSimulationMessagesHandler,
+  fetchSimulationItemsHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
@@ -475,6 +476,9 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
+  });
+  fastify.get('/v1/admin/simulation/items', {
+    ...SetOptionsBodyAndParams(fetchSimulationItemsHandler, routePrivilege.getSimulationMessages),
   });
   fastify.post('/v1/dlh/stage', {
     ...SetOptionsBodyAndParams(stageSimulationItemsHandler, routePrivilege.fetchFromDlh),

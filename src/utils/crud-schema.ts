@@ -17,7 +17,7 @@ export interface CrudSchemas {
   Query?: typeof DefaultQuery;
 }
 
-type IdParamConfig = { kind: 'single'; name?: string } | { kind: 'composite'; names: readonly [string, string] };
+type IdParamConfig = { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] };
 
 interface BuildCrudOptions<TEntity, TId extends AllowedId> {
   prefix: string;
@@ -29,19 +29,18 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
 const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
-  tenantId: Type.Optional(Type.String({ default: 'DEFAULT' })),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
-const makeIdSchema = (cfg?: { kind: 'single'; name?: string } | { kind: 'composite'; names: readonly [string, string] }): TObject => {
+const makeIdSchema = (cfg?: IdParamConfig): TObject => {
   const props: Record<string, TSchema> = { cfg: Type.String() };
   if (cfg?.kind === 'composite') {
     const [firstParamKey, secondParamKey] = cfg.names;
     props[firstParamKey] = Type.String();
     props[secondParamKey] = Type.String();
-  } else {
+  } else if (cfg?.kind !== 'cfg') {
     const name = cfg?.kind === 'single' ? (cfg.name ?? 'id') : 'id';
     props[name] = Type.String();
   }
@@ -57,9 +56,23 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
 
     // --- Build path and param schema based on idParam ---
     const singleName: string = idParam?.kind === 'single' ? (idParam.name ?? 'id') : 'id';
-    const idPath = idParam?.kind === 'composite' ? `/:${idParam.names[0]}/:${idParam.names[1]}/:cfg` : `/:${singleName}/:cfg`;
+    const idPath =
+      idParam?.kind === 'composite'
+        ? `/:${idParam.names[0]}/:${idParam.names[1]}/:cfg`
+        : idParam?.kind === 'cfg'
+          ? '/:cfg'
+          : `/:${singleName}/:cfg`;
 
     const IdParam = schemas.Id ?? makeIdSchema(idParam);
+    const makeRepositoryId = (params: Record<string, string>, tenantId: string): TId => {
+      const id =
+        idParam?.kind === 'composite'
+          ? { [idParam.names[0]]: params[idParam.names[0]], [idParam.names[1]]: params[idParam.names[1]], cfg: params.cfg, tenantId }
+          : idParam?.kind === 'cfg'
+            ? { cfg: params.cfg, tenantId }
+            : { [singleName]: params[singleName], cfg: params.cfg, tenantId };
+      return id as unknown as TId;
+    };
 
     const QuerySchema = schemas.Query ?? DefaultQuery;
 
@@ -122,12 +135,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const p = req.params as Record<string, string>;
         const { tenantId } = req as ITenantRequest;
 
-        const id =
-          idParam?.kind === 'composite'
-            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
-            : { id: p[singleName], cfg: p.cfg, tenantId };
-
-        const entity = await repo.get(id as TId);
+        const entity = await repo.get(makeRepositoryId(p, tenantId));
         if (!entity) return await reply.code(404).send({ message: 'Not found' });
         return entity;
       },
@@ -170,12 +178,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       async (req, reply) => {
         const p = req.params as Record<string, string>;
         const { tenantId } = req as ITenantRequest;
-        const id =
-          idParam?.kind === 'composite'
-            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
-            : { id: p[singleName], cfg: p.cfg, tenantId };
 
-        const updated = await repo.update(id as TId, req.body as TEntity);
+        const updated = await repo.update(makeRepositoryId(p, tenantId), req.body as TEntity);
         if (!updated) return await reply.code(404).send({ message: 'Not found' });
         return updated;
       },
@@ -197,12 +201,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       async (req, reply) => {
         const p = req.params as Record<string, string>;
         const { tenantId } = req as ITenantRequest;
-        const id =
-          idParam?.kind === 'composite'
-            ? { [idParam.names[0]]: p[idParam.names[0]], [idParam.names[1]]: p[idParam.names[1]], cfg: p.cfg, tenantId }
-            : { id: p[singleName], cfg: p.cfg, tenantId };
 
-        const ok = await repo.remove(id as TId);
+        const ok = await repo.remove(makeRepositoryId(p, tenantId));
         return { success: ok };
       },
     );

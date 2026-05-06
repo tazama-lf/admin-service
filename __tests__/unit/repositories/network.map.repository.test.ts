@@ -146,7 +146,7 @@ describe('NetworkMapRepository', () => {
   });
 
   describe('update', () => {
-    const mockIdentifier = { id: 'test-id', cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should set updDtTm to a new ISO 8601 timestamp and preserve creDtTm', async () => {
       const mockToISOString = jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);

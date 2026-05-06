@@ -69,7 +69,15 @@ import {
 import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
-import { getSimulationLogs, createSimulationLogs, getSimulationMessages, fetchFromDlh, truncateEvaluationResults, saveEvaluationsInResultsTable, saveRecordInTrsSimulation } from './services/simulation-logs.logic.service';
+import {
+  getSimulationLogs,
+  createSimulationLogs,
+  getSimulationMessages,
+  stageSimulationItems,
+  truncateEvaluationResults,
+  saveEvaluationsInResultsTable,
+  saveRecordInTrsSimulation,
+} from './services/simulation-logs.logic.service';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -1744,7 +1752,7 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     const body = req.body as { action?: string; comments?: string };
 
     if (!body.action || !['approve', 'reject'].includes(body.action)) {
-      reply.code(400).send({ success: false, message: 'Invalid action. Must be \'approve\' or \'reject\'' });
+      reply.code(400).send({ success: false, message: "Invalid action. Must be 'approve' or 'reject'" });
       return;
     }
 
@@ -1769,16 +1777,15 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
-export const fetchFromDlhHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const stageSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const token = req.headers.authorization ?? '';
-    const queries = req.body as Array<Record<string, unknown>>;
+    const items = req.body as Array<Record<string, unknown>>;
 
-    const result = await fetchFromDlh(queries, token);
+    const result = await stageSimulationItems(items);
 
     reply.code(200).send(result);
   } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to fetch data from DLH');
+    ErrorHandler.sendError(reply, error, 'Failed to stage simulation items');
   }
 };
 
@@ -1789,7 +1796,7 @@ export const truncateEvaluationResultsHandler = async (req: FastifyRequest, repl
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');
   }
-}
+};
 
 export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -1809,7 +1816,7 @@ export const saveEvaluationsInResultsTableHandler = async (req: FastifyRequest, 
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to save evaluations');
   }
-}
+};
 
 export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
@@ -1825,9 +1832,9 @@ export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
   }
-}
+};
 
-  export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle get all evaluations request');
   try {
     const { tenantId } = req as ITenantRequest;
@@ -1839,11 +1846,17 @@ export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply
   } finally {
     loggerService.log('End - Handle get all evaluations request');
   }
-}
+};
 
 export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = req.body as { simulationId: string | undefined; totalRecord: number; recordProcessed: number; simStatus: string; tenantId: string };
+    const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = req.body as {
+      simulationId: string | undefined;
+      totalRecord: number;
+      recordProcessed: number;
+      simStatus: string;
+      tenantId: string;
+    };
     await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
     reply.code(200).send();
   } catch (error: unknown) {

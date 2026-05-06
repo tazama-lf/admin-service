@@ -113,6 +113,7 @@ export const createSimulationLogsInDb = async (
   );
 };
 
+// not being used now
 export const getSimulationMessagesFromDb = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> => {
   const result = await handlePostExecuteSqlStatement<{ payload: SimulationMessage }>(
     {
@@ -125,101 +126,44 @@ export const getSimulationMessagesFromDb = async (tenantId: string, tableName: s
   return result.rows.map((row) => row.payload);
 };
 
-interface DlhPageResponse {
-  items: Array<Record<string, unknown>>;
-  total: number;
-  page: number;
-  size: number;
-  pages: number;
-};
-
-const PAGE_SIZE = 100;
-
-export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
-  const DLH_BASE_ENDPOINT = `${process.env.DLH_URL}/extract/page`;
-  if (!process.env.DLH_URL) {
-    throw new Error('DLH endpoint is not defined');
+export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>): Promise<{ tableName: string | null }> => {
+  if (items.length === 0) {
+    return { tableName: null };
   }
 
-  const allItems: Array<Record<string, unknown>> = [];
+  const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
+    {
+      text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
 
-  for (const query of queries) {
+  const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
+  const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
 
-    // First call to page 1 to determine total number of pages
-    const firstResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=1&size=${PAGE_SIZE}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(query),
-    });
+  await handlePostExecuteSqlStatement(
+    {
+      text: pgFormat(
+        'CREATE TABLE IF NOT EXISTS %I (id SERIAL PRIMARY KEY, payload JSONB NOT NULL, credttm TEXT, "endpointPath" TEXT, "tenantId" TEXT, "msgid" TEXT)',
+        nextTableName,
+      ),
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
 
-    if (!firstResponse.ok) {
-      throw new Error(`Failed to fetch data from DLH: ${firstResponse.statusText}`);
-    }
+  const serialized = items.map((doc) => JSON.stringify(doc));
+  const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
+  await handlePostExecuteSqlStatement(
+    {
+      text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
+      values: serialized,
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
 
-    const firstResult = (await firstResponse.json()) as DlhPageResponse;
-    const totalPages = firstResult.pages ?? 1;
-    allItems.push(...(firstResult.items ?? []));
-
-    // Fetch remaining pages
-    for (let page = 2; page <= totalPages; page++) {
-      const pageResponse = await fetch(`${DLH_BASE_ENDPOINT}?page=${page}&size=${PAGE_SIZE}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(query),
-      });
-
-      if (!pageResponse.ok) {
-        throw new Error(`Failed to fetch page ${page} from DLH: ${pageResponse.statusText}`);
-      }
-
-      const pageResult = (await pageResponse.json()) as DlhPageResponse;
-      allItems.push(...(pageResult.items ?? []));
-    }
-  }
-
-  if (allItems.length > 0) {
-    const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
-      {
-        text: 'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = \'public\' AND table_name LIKE \'sim%\'',
-        values: [],
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
-
-    const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
-    const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
-
-    await handlePostExecuteSqlStatement(
-      {
-        text: pgFormat(
-          'CREATE TABLE IF NOT EXISTS %I (id SERIAL PRIMARY KEY, payload JSONB NOT NULL, credttm TEXT, "endpointPath" TEXT, "tenantId" TEXT, "msgid" TEXT)',
-          nextTableName,
-        ),
-        values: [],
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
-
-    const serialized = allItems.map((doc) => JSON.stringify(doc));
-    const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
-    await handlePostExecuteSqlStatement(
-      {
-        text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
-        values: serialized,
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
-
-    return { ...allItems, tableName: nextTableName };
-  }
-
-  return { total: 0 };
+  return { tableName: nextTableName };
 };
 
 export const truncateEvaluationResultsInDb = async (): Promise<void> => {
@@ -231,9 +175,15 @@ export const truncateEvaluationResultsInDb = async (): Promise<void> => {
     } satisfies PgQueryConfig,
     'evaluation',
   );
-}
+};
 
-export const saveRecordInTrsSimulationInDb = async (simulationData: { simulationId: string | undefined; totalRecord: number; recordProcessed: number; simStatus: string; tenantId: string }): Promise<void> => {
+export const saveRecordInTrsSimulationInDb = async (simulationData: {
+  simulationId: string | undefined;
+  totalRecord: number;
+  recordProcessed: number;
+  simStatus: string;
+  tenantId: string;
+}): Promise<void> => {
   const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = simulationData;
   const query = `
     INSERT INTO trs_simulation (simulation_id, total_record, record_processed, sim_status, tenant_id, created_at, updated_at)
@@ -251,4 +201,4 @@ export const saveRecordInTrsSimulationInDb = async (simulationData: { simulation
     } satisfies PgQueryConfig,
     'configuration',
   );
-}
+};

@@ -70,7 +70,7 @@ import {
   createMaskHandler,
   updateMaskHandler,
   getMaskByIdHandler,
-  fetchFromDlhHandler,
+  stageSimulationItemsHandler,
   fetchCountApiFlow,
   findActiveMaskConfigsHandler,
   getExcludedTypesHandler,
@@ -158,7 +158,7 @@ const routePrivilege = {
   createMask: 'trs_data_engineer_editor',
   updateMask: 'trs_data_engineer_editor',
   reviewMask: 'trs_data_engineer_approver',
-  saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher']
+  saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -476,8 +476,8 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
   });
-  fastify.post('/v1/dlh/fetch', {
-    ...SetOptionsBodyAndParams(fetchFromDlhHandler, routePrivilege.fetchFromDlh),
+  fastify.post('/v1/dlh/stage', {
+    ...SetOptionsBodyAndParams(stageSimulationItemsHandler, routePrivilege.fetchFromDlh),
   });
 
   fastify.get('/v1/admin/trs/masking/all-fetch', {

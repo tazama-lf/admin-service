@@ -153,12 +153,22 @@ export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>
     'simulation',
   );
 
-  const serialized = items.map((doc) => JSON.stringify(doc));
-  const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
+  const rows = items.map((doc) => {
+    const { endpointPath, _credttm, _tenantId, _msgid, ...rest } = doc;
+    return {
+      payload: JSON.stringify(rest),
+      endpointPath: typeof endpointPath === 'string' ? endpointPath : null,
+      credttm: typeof _credttm === 'string' ? _credttm : null,
+      tenantId: typeof _tenantId === 'string' ? _tenantId : null,
+      msgid: typeof _msgid === 'string' ? _msgid : null,
+    };
+  });
+  const placeholders = rows.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+  const values = rows.flatMap(({ payload, endpointPath, credttm, tenantId, msgid }) => [payload, endpointPath, credttm, tenantId, msgid]);
   await handlePostExecuteSqlStatement(
     {
-      text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
-      values: serialized,
+      text: pgFormat(`INSERT INTO %I (payload, "endpointPath", credttm, "tenantId", msgid) VALUES ${placeholders}`, nextTableName),
+      values,
     } satisfies PgQueryConfig,
     'simulation',
   );

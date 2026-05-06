@@ -273,6 +273,85 @@ describe('TCS Config Repository', () => {
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
       expect(callArg.values).toContain(JSON.stringify(mockConfigData.schema));
     });
+
+    it('should use default status, publishing_status and relatedTransaction when not provided (without id)', async () => {
+      const configWithDefaults = {
+        ...mockConfigData,
+        status: undefined,
+        publishing_status: undefined,
+        relatedTransaction: undefined,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 10 }],
+        rowCount: 1,
+      } as never);
+
+      await createConfig(configWithDefaults);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      expect(callArg.values).toContain(ConfigStatus.IN_PROGRESS);
+      expect(callArg.values).toContain('inactive');
+      expect(callArg.values).toContain(null);
+    });
+
+    it('should use default status, publishing_status and relatedTransaction when not provided (with id)', async () => {
+      const configWithDefaults = {
+        ...mockConfigData,
+        status: undefined,
+        publishing_status: undefined,
+        relatedTransaction: undefined,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 50 }],
+        rowCount: 1,
+      } as never);
+
+      await createConfig(configWithDefaults, 50);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      expect(callArg.values[0]).toBe(50);
+      expect(callArg.values).toContain(ConfigStatus.IN_PROGRESS);
+      expect(callArg.values).toContain('inactive');
+      expect(callArg.values).toContain(null);
+    });
+
+    it('should handle XML content type with non-string payload', async () => {
+      const xmlConfig = {
+        ...mockConfigData,
+        contentType: ContentType.XML,
+        payload: { not: 'a string' },
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 11 }],
+        rowCount: 1,
+      } as never);
+
+      await createConfig(xmlConfig);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      expect(callArg.values[callArg.values.length - 1]).toBeNull();
+    });
+
+    it('should handle non-XML content type with null payload', async () => {
+      const jsonConfig = {
+        ...mockConfigData,
+        contentType: ContentType.JSON,
+        payload: null,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 12 }],
+        rowCount: 1,
+      } as never);
+
+      await createConfig(jsonConfig);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      expect(callArg.values[callArg.values.length - 1]).toBeNull();
+    });
   });
 
   describe('findConfigById', () => {
@@ -390,6 +469,41 @@ describe('TCS Config Repository', () => {
 
       const result = await findConfigById(1, 'tenant-123');
 
+      expect(result?.mapping).toEqual([{ field: 'test' }]);
+      expect(result?.functions).toEqual([{ name: 'func1' }]);
+    });
+
+    it('should handle XML content type and return payload_xml', async () => {
+      const mockRow = {
+        id: 1,
+        msg_fam: 'pain',
+        transaction_type: 'pain.001.001.11',
+        endpoint_path: '/api/pain001',
+        version: '1.0',
+        content_type: ContentType.XML,
+        schema: { type: 'object' },
+        mapping: [{ field: 'test' }],
+        functions: [{ name: 'func1' }],
+        status: ConfigStatus.IN_PROGRESS,
+        tenant_id: 'tenant-123',
+        created_by: 'user-123',
+        publishing_status: 'inactive',
+        payload_xml: '<xml>test</xml>',
+        payload_json: null,
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+        comments: null,
+        related_transaction: null,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [mockRow],
+        rowCount: 1,
+      } as never);
+
+      const result = await findConfigById(1, 'tenant-123');
+
+      expect(result?.payload).toBe('<xml>test</xml>');
       expect(result?.mapping).toEqual([{ field: 'test' }]);
       expect(result?.functions).toEqual([{ name: 'func1' }]);
     });

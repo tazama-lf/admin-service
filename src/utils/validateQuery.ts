@@ -22,7 +22,7 @@ export const validateSelectQuery = (query: string): SqlStatement[] => {
   const normalised = query.replace(/\{\{\s*\w+\s*\}\}/g, () => `$${paramIndex++}`);
 
   try {
-    ast = parse(normalised) as SqlStatement[];
+    ast = parse(normalised, { locationTracking: true }) as SqlStatement[];
   } catch (e) {
     throw new Error(`Invalid SQL syntax: ${(e as Error).message}`);
   }

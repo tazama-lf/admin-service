@@ -9,104 +9,199 @@ import {
   getNodeByIdFromDb,
 } from '../repositories/configuration/node.repository';
 import { validateSelectQuery } from '../utils/validateQuery';
+import { validateTableName } from '../utils/enrichment-utils';
 import { HttpException, HttpStatus } from '../utils/error';
+import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
+import { handlePostExecuteSqlStatement } from './database.logic.service';
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 /**
- * Recursively extracts all base table names from a parsed SQL AST.
- * Handles subqueries, joins, CTEs, and unions.
- * Returns unique table names (without aliases), handling dotted identifiers.
+ * Extracts all base table names from a parsed SQL AST.
+ * Handles subqueries, joins, CTEs, unions. Excludes CTE aliases.
  */
-function extractTablesFromAST(ast: unknown[]): string[] {
+export function extractTablesFromAST(ast: unknown[]): string[] {
   const tables = new Set<string>();
+  const cteAliases = new Set<string>();
 
-  function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-  }
-
-  function extractTableName(node: Record<string, unknown>): string | null {
-    const { name } = node;
-    if (typeof name === 'string') {
-      return name.replace(/['"`]/g, '');
-    }
-    if (isObject(name) && typeof name.name === 'string') {
-      return name.name.replace(/['"`]/g, '');
-    }
+  function getNameStr(node: Record<string, unknown>): string | null {
+    if (typeof node.name === 'string') return node.name.replace(/['"`]/g, '');
+    if (isObject(node.name) && typeof node.name.name === 'string') return node.name.name.replace(/['"`]/g, '');
     return null;
-  }
-
-  function handleSelectNode(node: Record<string, unknown>): void {
-    if (node.from) traverse(node.from);
-    if (node.where) traverse(node.where);
-    if (node.columns) traverse(node.columns);
-    if (node.groupBy) traverse(node.groupBy);
-    if (node.orderBy) traverse(node.orderBy);
-  }
-
-  function handleJoinNode(node: Record<string, unknown>): void {
-    if (node.from) traverse(node.from);
-    if (node.on) traverse(node.on);
-  }
-
-  function handleWithNode(node: Record<string, unknown>): void {
-    if (node.bind) traverse(node.bind);
-    if (node.in) traverse(node.in);
-  }
-
-  function handleUnionNode(node: Record<string, unknown>): void {
-    if (node.left) traverse(node.left);
-    if (node.right) traverse(node.right);
   }
 
   function traverse(value: unknown): void {
     if (!value) return;
-
-    if (Array.isArray(value)) {
-      value.forEach(traverse);
-      return;
-    }
-
+    if (Array.isArray(value)) { value.forEach(traverse); return; }
     if (!isObject(value)) return;
-    const node = value;
 
-    const nodeType = node.type;
+    const { type } = value;
 
-    // Handle different node types first
-    if (nodeType === 'select') {
-      handleSelectNode(node);
-      return;
-    }
-
-    if (nodeType === 'join' || node.join) {
-      handleJoinNode(node);
-      return;
-    }
-
-    if (nodeType === 'with' || nodeType === 'with recursive') {
-      handleWithNode(node);
-      return;
-    }
-
-    if (nodeType === 'union' || nodeType === 'union all') {
-      handleUnionNode(node);
-      return;
-    }
-
-    // Extract table name from table reference
-    if (nodeType === 'table') {
-      const tableName = extractTableName(node);
-      if (tableName) {
-        tables.add(tableName);
+    if (type === 'with' || type === 'with recursive') {
+      if (Array.isArray(value.bind)) {
+        for (const b of value.bind) {
+          if (isObject(b) && typeof b.alias === 'string') cteAliases.add(b.alias);
+        }
       }
+      traverse(value.bind);
+      traverse(value.in);
       return;
     }
 
-    // Recursively traverse all object properties for unknown node types
-    Object.values(node).forEach(traverse);
+    if (type === 'table') {
+      const name = getNameStr(value);
+      if (name && !cteAliases.has(name)) tables.add(name);
+      return;
+    }
+
+    // For select/join/union/unknown nodes — recurse all child properties
+    Object.values(value).forEach(traverse);
   }
 
   traverse(ast);
   return Array.from(tables);
 }
+
+/**
+ * Returns ORDER BY column names referenced in the outermost SELECT of the AST.
+ */
+function extractOrderByColumns(ast: unknown[]): string[] {
+  const cols: string[] = [];
+
+  function traverse(value: unknown): void {
+    if (!value) return;
+    if (Array.isArray(value)) { value.forEach(traverse); return; }
+    if (!isObject(value)) return;
+
+    if (Array.isArray(value.orderBy)) {
+      for (const item of value.orderBy) {
+        if (!isObject(item)) continue;
+        if (typeof item.name === 'string') cols.push(item.name.replace(/['"`]/g, ''));
+        else if (isObject(item.name) && typeof item.name.name === 'string') cols.push(item.name.name.replace(/['"`]/g, ''));
+      }
+    }
+    Object.values(value).forEach(traverse);
+  }
+
+  traverse(ast);
+  return cols;
+}
+
+/**
+ * Checks whether the outermost SELECT's WHERE already references a tenant column.
+ * Prevents double-filtering when user already scoped by tenant.
+ */
+function whereHasTenantCondition(ast: unknown[], tenantCol: string): boolean {
+  function findColInNode(node: unknown): boolean {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some(findColInNode);
+    if (!isObject(node)) return false;
+    if (node.type === 'ref') {
+      const name = typeof node.name === 'string' ? node.name : isObject(node.name) ? (node.name.name as string) : '';
+      if (name.replace(/['"`]/g, '') === tenantCol) return true;
+    }
+    return Object.values(node).some(findColInNode);
+  }
+
+  // Only check the outermost SELECT's WHERE — not subqueries
+  const [root] = ast;
+  if (!isObject(root)) return false;
+  const selectNode = (root.type === 'with' || root.type === 'with recursive') && isObject(root.in) ? root.in : root;
+  return isObject(selectNode) && !!selectNode.where && findColInNode(selectNode.where);
+}
+
+/**
+ * Splices a tenant condition into the query string at the correct position
+ * using AST location offsets — safe against subquery/CTE WHERE clauses.
+ *
+ * Strategy:
+ *   - Has WHERE: insert "AND col = $n" right after the WHERE expression ends
+ *   - No WHERE:  insert "WHERE col = $n" after the FROM clause ends
+ */
+function injectTenantCondition(
+  sql: string,
+  ast: unknown[],
+  tenantCol: string,
+  paramIdx: number,
+): string {
+  const [root] = ast;
+  if (!isObject(root)) return sql;
+
+  // For WITH nodes, the real SELECT is in `.in`
+  const selectNode = (root.type === 'with' || root.type === 'with recursive') && isObject(root.in) ? root.in : root;
+  if (!isObject(selectNode)) return sql;
+
+  const condition = `${tenantCol} = $${paramIdx}`;
+
+  // Case 1: outermost SELECT already has a WHERE — append after it
+  if (isObject(selectNode.where)) {
+    const loc = selectNode.where._location as { start: number; end: number } | undefined;
+    if (loc) {
+      return `${sql.slice(0, loc.end)} AND ${condition}${sql.slice(loc.end)}`;
+    }
+  }
+
+  // Case 2: no WHERE — find the end of the FROM clause (max _location.end across all FROM items)
+  function maxLocationEnd(node: unknown): number {
+    if (!node || typeof node !== 'object') return 0;
+    const obj = node as Record<string, unknown>;
+    const loc = obj._location as { end?: number } | undefined;
+    let m = loc?.end ?? 0;
+    for (const v of Object.values(obj)) m = Math.max(m, maxLocationEnd(v));
+    return m;
+  }
+
+  const froms = Array.isArray(selectNode.from) ? selectNode.from : [];
+  let fromEnd = 0;
+  for (const f of froms) fromEnd = Math.max(fromEnd, maxLocationEnd(f));
+
+  if (fromEnd > 0) {
+    return `${sql.slice(0, fromEnd)} WHERE ${condition}${sql.slice(fromEnd)}`;
+  }
+
+  // Fallback: append at end (shouldn't happen if query has FROM)
+  return `${sql} WHERE ${condition}`;
+}
+
+/**
+ * Validates that sortBy column exists in at least one of the query's base tables.
+ * Also checks it appears in the ORDER BY clause of the AST (prevents arbitrary column injection).
+ */
+export const resolveSortColumn = async (
+  tableNames: string[],
+  sortBy: string,
+  dbName: string,
+  ast?: unknown[],
+): Promise<string | null> => {
+  if (!sortBy) return null;
+
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(sortBy)) return null;
+
+  if (ast) {
+    const orderByCols = extractOrderByColumns(ast);
+    if (orderByCols.length > 0 && !orderByCols.includes(sortBy)) return null;
+  }
+
+  for (const tableName of tableNames) {
+    try {
+      const columnLookup = await handlePostExecuteSqlStatement<{ column_name: string }>(
+        {
+          text: `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
+          values: [tableName, sortBy],
+        } satisfies PgQueryConfig,
+        dbName,
+      );
+      if (columnLookup.rows.length > 0) return sortBy;
+    } catch {
+      loggerService.error(`Error validating sort column ${sortBy} in table ${tableName}`);
+    }
+  }
+
+  return null;
+}
+
 
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await getNodeByIdFromDb(nodeId, tenantId);
@@ -203,64 +298,54 @@ export const executeSelectQuery = async (
   //    The extractTablesFromAST function traverses the parsed AST to find all base tables.
   //    This handles complex cases like derived tables and subqueries that the regex misses.
   const tables = extractTablesFromAST(ast);
+  if (tables.length === 0) {
+    throw new HttpException('Query must reference at least one base table.', HttpStatus.FORBIDDEN);
+  }
 
-  let modifiedQuery = normalisedQuery;
-  let mutableParams = [...params];
-
-  // Check if query already has a tenant filter to avoid duplicate conditions
-  const hasTenantFilter = /\b(tenant_id|tenantid)\s*=\s*\$/i.test(normalisedQuery);
-
-  if (tables.length > 0 && !hasTenantFilter) {
-    // 3. Resolve tenant columns for all referenced tables and collect tenant conditions.
-    //    Tables with no tenant column are skipped — their rows are returned unfiltered.
-    const tenantConditions: string[] = [];
-    for (const table of tables) {
-      const tenantColumn = await resolveTenantColumn(table, dbName);
-      if (!tenantColumn) {
-        continue;
-      }
-
-      const paramIdx = mutableParams.length + 1;
-      mutableParams = [...mutableParams, tenantId];
-      tenantConditions.push(`${tenantColumn} = $${paramIdx}`);
-    }
-
-    // 4. Inject all tenant conditions into WHERE clause
-    const combinedCondition = tenantConditions.join(' AND ');
-    if (combinedCondition) {
-      if (/\bWHERE\b/i.test(modifiedQuery)) {
-        modifiedQuery = modifiedQuery.replace(/\bWHERE\b/i, `WHERE ${combinedCondition} AND`);
-      } else {
-        const upperCaseQuery = modifiedQuery.toUpperCase();
-        // Find the first clause that should come after WHERE (GROUP BY, ORDER BY, LIMIT, OFFSET, or FETCH)
-        const clauseIndex = upperCaseQuery.search(/\b(GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|FETCH\s+(FIRST|NEXT))\b/);
-        if (clauseIndex !== -1) {
-          modifiedQuery = `${modifiedQuery.slice(0, clauseIndex)} WHERE ${combinedCondition} ${modifiedQuery.slice(clauseIndex)}`;
-        } else {
-          modifiedQuery = `${modifiedQuery.trimEnd()} WHERE ${combinedCondition}`;
-        }
-      }
+  // Validate all table names before any database queries (Issue 1: Complete blocklist via validation)
+  for (const tableName of tables) {
+    try {
+      validateTableName(tableName);
+    } catch (e) {
+      throw new HttpException((e as Error).message, HttpStatus.FORBIDDEN);
     }
   }
 
-  // 7. Hard-cap rows — strip any user-supplied LIMIT/OFFSET/FETCH and enforce our own cap
-  //    Remove LIMIT with optional OFFSET
-  modifiedQuery = modifiedQuery.replace(/\bLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i, '').trimEnd();
-  //    Remove standalone OFFSET clause
-  modifiedQuery = modifiedQuery.replace(/\bOFFSET\s+\d+\s*$/i, '').trimEnd();
-  //    Remove FETCH FIRST/NEXT variants (PostgreSQL standard syntax)
-  modifiedQuery = modifiedQuery.replace(/\bFETCH\s+(FIRST|NEXT)\s+\d+\s+ROWS?\s+ONLY\s*$/i, '').trimEnd();
-  modifiedQuery = `${modifiedQuery} LIMIT 10`;
+  const mutableParams = [...params];
+
+  // 3. For each table that has a tenant column, inject a tenant condition unless
+  //    the user's query already filters by that column (detected via AST).
+  //    Conditions are appended to the inner query text so the outer LIMIT wrapper
+  //    never needs to reference columns that might be absent from the SELECT list.
+  let innerQuery = normalisedQuery;
+  for (const tableName of tables) {
+    const tenantColumn = await resolveTenantColumn(tableName, dbName);
+    if (!tenantColumn) continue;
+    if (whereHasTenantCondition(ast, tenantColumn)) continue;
+
+    const paramIdx = mutableParams.length + 1;
+    mutableParams.push(tenantId);
+    innerQuery = injectTenantCondition(innerQuery, ast, tenantColumn, paramIdx);
+  }
+
+  // 4. Wrap in outer SELECT to enforce LIMIT 10. The inner query is already validated
+  //    and tenant-scoped, so the outer layer is purely for row capping.
+  const modifiedQuery = `SELECT * FROM (${innerQuery}) _q LIMIT 10`;
 
   return await executeQueryNodeInDb(modifiedQuery, dbName, mutableParams);
 };
 
 /**
  * Queries information_schema to find whether this table uses 'tenant_id' or 'tenantId'.
- * tableName is extracted from information_schema (not echoed back as a value) so it is
- * safe to use as an identifier in the query text. The lookup itself uses a bind parameter.
+ * tableName is validated before querying; lookup itself uses a bind parameter.
  */
 async function resolveTenantColumn(tableName: string, dbName: string): Promise<string | null> {
+  try {
+    validateTableName(tableName);
+  } catch (e) {
+    throw new HttpException((e as Error).message, HttpStatus.FORBIDDEN);
+  }
+
   try {
     const result = await executeQueryNodeInDb(
       `SELECT column_name FROM information_schema.columns

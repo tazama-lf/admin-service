@@ -70,7 +70,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           ? { [idParam.names[0]]: params[idParam.names[0]], [idParam.names[1]]: params[idParam.names[1]], cfg: params.cfg, tenantId }
           : idParam?.kind === 'cfg'
             ? { cfg: params.cfg, tenantId }
-            : { id: params[singleName], cfg: params.cfg, tenantId };
+            : { [singleName]: params[singleName], cfg: params.cfg, tenantId };
       return id as unknown as TId;
     };
 

@@ -577,7 +577,7 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 For all GET queries:
  * You can either do a pure GET, which will list all items; 
- * You can do a GET with a query parameter to find, for example, only Active networkmaps: /v1/admin/configuration/network_map?filters[active]=false;
+ * You can do a GET with a query parameter to find, for example, only Active networkmaps: /v1/admin/configuration/network_map?filters[active]=true;
  * Right now, if you specify more than one query param, only the first one will take afffect. 
 
 

@@ -237,12 +237,13 @@ describe('Masking Repository', () => {
       expect(result).toBe(mockInsertedId);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('INSERT INTO trs_masking'),
-          text: expect.stringContaining('RETURNING id'),
           values: ['DEFAULT', 'pain.001.001.11', '11'],
         }),
         'configuration',
       );
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('INSERT INTO trs_masking');
+      expect(callArg.text).toContain('RETURNING id');
     });
 
     it('should throw error when invalid columns are provided', async () => {
@@ -413,13 +414,14 @@ describe('Masking Repository', () => {
       expect(result).toEqual(mockUpdatedData);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('UPDATE trs_masking'),
-          text: expect.stringContaining('SET'),
-          text: expect.stringContaining('WHERE id = $4 AND tenant_id = $5'),
           values: ['STATUS_02_COMPLETED', 5, 'Updated comment', 123, 'DEFAULT'],
         }),
         'configuration',
       );
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('UPDATE trs_masking');
+      expect(callArg.text).toContain('SET');
+      expect(callArg.text).toContain('WHERE id = $4 AND tenant_id = $5');
     });
 
     it('should include updated_at = NOW() in SET clause', async () => {

@@ -344,14 +344,15 @@ describe('Rule Flow Repository', () => {
       expect(result).toEqual(mockRuleFlow);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('SELECT *'),
-          text: expect.stringContaining('FROM trs_rule_flow'),
-          text: expect.stringContaining('WHERE rule_id = $1 AND tenant_id = $2'),
-          text: expect.stringContaining('LIMIT 1'),
           values: [mockRuleId, mockTenantId],
         }),
         'configuration',
       );
+      const sqlArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(sqlArg.text).toContain('SELECT *');
+      expect(sqlArg.text).toContain('FROM trs_rule_flow');
+      expect(sqlArg.text).toContain('WHERE rule_id = $1 AND tenant_id = $2');
+      expect(sqlArg.text).toContain('LIMIT 1');
     });
 
     it('should find rule flow with specific columns', async () => {
@@ -445,13 +446,14 @@ describe('Rule Flow Repository', () => {
       expect(result).toEqual(mockUpdatedFlow);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('UPDATE trs_rule_flow SET'),
-          text: expect.stringContaining('WHERE rule_id = $1 AND tenant_id = $5'),
-          text: expect.stringContaining('RETURNING'),
           values: [mockRuleId, JSON.stringify(mockFlowData.flowJson), mockFlowData.tsFileBase64, mockFlowData.status, mockTenantId],
         }),
         'configuration',
       );
+      const sqlArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(sqlArg.text).toContain('UPDATE trs_rule_flow SET');
+      expect(sqlArg.text).toContain('WHERE rule_id = $1 AND tenant_id = $5');
+      expect(sqlArg.text).toContain('RETURNING');
     });
 
     it('should return null when rule flow not found', async () => {
@@ -569,14 +571,15 @@ describe('Rule Flow Repository', () => {
       expect(result).toEqual(mockStatus);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('SELECT id, rule_id, status'),
-          text: expect.stringContaining('FROM trs_rule_flow'),
-          text: expect.stringContaining('WHERE rule_id = $1 AND tenant_id = $2'),
-          text: expect.stringContaining('LIMIT 1'),
           values: [mockRuleId, mockTenantId],
         }),
         'configuration',
       );
+      const sqlArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(sqlArg.text).toContain('SELECT id, rule_id, status');
+      expect(sqlArg.text).toContain('FROM trs_rule_flow');
+      expect(sqlArg.text).toContain('WHERE rule_id = $1 AND tenant_id = $2');
+      expect(sqlArg.text).toContain('LIMIT 1');
     });
 
     it('should return null when status not found', async () => {

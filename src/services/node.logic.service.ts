@@ -100,7 +100,7 @@ function whereHasTenantCondition(ast: unknown[], tenantCol: string): boolean {
     if (!isObject(node)) return false;
     if (node.type === 'ref') {
       const name = typeof node.name === 'string' ? node.name : isObject(node.name) ? (node.name.name as string) : '';
-      if (name.replace(/['"`]/g, '') === tenantCol) return true;
+      if (name.replace(/['"`]/g, '').toLowerCase() === tenantCol.toLowerCase()) return true;
     }
     return Object.values(node).some(findColInNode);
   }
@@ -135,34 +135,44 @@ function injectTenantCondition(
 
   const condition = `${tenantCol} = $${paramIdx}`;
 
-  // Case 1: outermost SELECT already has a WHERE — append after it
+  // Case 1: outermost SELECT has a WHERE — splice AND condition right after the WHERE expression.
+  // _location is always present when locationTracking:true is passed to parse(); if it's somehow
+  // absent we throw rather than produce double-WHERE malformed SQL.
   if (isObject(selectNode.where)) {
     const loc = selectNode.where._location as { start: number; end: number } | undefined;
-    if (loc) {
-      return `${sql.slice(0, loc.end)} AND ${condition}${sql.slice(loc.end)}`;
-    }
+    if (!loc) throw new Error('AST WHERE node missing _location — cannot safely inject tenant condition');
+    return `${sql.slice(0, loc.end)} AND ${condition}${sql.slice(loc.end)}`;
   }
 
-  // Case 2: no WHERE — find the end of the FROM clause (max _location.end across all FROM items)
-  function maxLocationEnd(node: unknown): number {
-    if (!node || typeof node !== 'object') return 0;
-    const obj = node as Record<string, unknown>;
-    const loc = obj._location as { end?: number } | undefined;
-    let m = loc?.end ?? 0;
-    for (const v of Object.values(obj)) m = Math.max(m, maxLocationEnd(v));
-    return m;
+  // Case 2: no WHERE — find the end of the FROM clause by walking backward from the first
+  // trailing clause keyword (GROUP BY / ORDER BY / HAVING / LIMIT / OFFSET / FETCH).
+  // This handles aliases and JOINs correctly, unlike using FROM item _location.end which
+  // only covers the table-name token and misses alias identifiers.
+  const getLocStart = (node: unknown): number | undefined =>
+    isObject(node) ? (node._location as { start?: number } | undefined)?.start : undefined;
+
+  // Collect the _location.start of the first token after each trailing clause keyword.
+  // These positions are used to anchor a backward scan to find the keyword itself.
+  const anchorStarts: number[] = [];
+  if (Array.isArray(selectNode.groupBy) && selectNode.groupBy.length > 0) { const s = getLocStart(selectNode.groupBy[0]); if (s != null) anchorStarts.push(s); }
+  if (Array.isArray(selectNode.orderBy) && selectNode.orderBy.length > 0) { const s = getLocStart(selectNode.orderBy[0]); if (s != null) anchorStarts.push(s); }
+  if (isObject(selectNode.having)) { const s = getLocStart(selectNode.having); if (s != null) anchorStarts.push(s); }
+  if (isObject(selectNode.limit)) { const s = getLocStart(selectNode.limit); if (s != null) anchorStarts.push(s); }
+
+  if (anchorStarts.length > 0) {
+    // Take the earliest anchor and scan backward to strip the SQL keyword(s) + surrounding
+    // whitespace, giving us the true end of the FROM clause content.
+    const anchor = Math.min(...anchorStarts);
+    const prefix = sql.slice(0, anchor).trimEnd();
+    const fromPart = prefix.replace(/\s+(?:group\s+by|order\s+by|having|limit|offset|fetch(?:\s+(?:first|next))?)$/i, '');
+    // Everything from fromPart.length to anchor is the keyword + whitespace — preserve it.
+    const keywordAndSpace = sql.slice(fromPart.length, anchor).trimStart();
+    return `${fromPart} WHERE ${condition} ${keywordAndSpace}${sql.slice(anchor)}`;
   }
 
-  const froms = Array.isArray(selectNode.from) ? selectNode.from : [];
-  let fromEnd = 0;
-  for (const f of froms) fromEnd = Math.max(fromEnd, maxLocationEnd(f));
-
-  if (fromEnd > 0) {
-    return `${sql.slice(0, fromEnd)} WHERE ${condition}${sql.slice(fromEnd)}`;
-  }
-
-  // Fallback: append at end (shouldn't happen if query has FROM)
-  return `${sql} WHERE ${condition}`;
+  // No trailing clauses — FROM extends to end of statement (e.g. SELECT * FROM users)
+  const stmtEnd = (selectNode._location as { end?: number } | undefined)?.end ?? sql.length;
+  return `${sql.slice(0, stmtEnd)} WHERE ${condition}${sql.slice(stmtEnd)}`;
 }
 
 /**
@@ -285,11 +295,13 @@ export const executeSelectQuery = async (
   // 0. Strip trailing semicolons before any processing
   const normalisedQuery = query.replace(/\s*;\s*$/, '').trim();
 
-  // 1. Parse and validate — rejects non-SELECT, multiple statements, and invalid SQL
-  //    Capture the AST for subsequent table extraction.
+  // 1. Parse and validate — rejects non-SELECT, multiple statements, and invalid SQL.
+  //    validateSelectQuery substitutes {{ var }} → $N before parsing; the returned parsedSql
+  //    is what the AST _location offsets reference — use it (not normalisedQuery) for splicing.
   let ast: Array<{ type: string }>;
+  let parsedSql: string;
   try {
-    ast = validateSelectQuery(normalisedQuery);
+    ({ ast, parsedSql } = validateSelectQuery(normalisedQuery));
   } catch (e) {
     throw new HttpException((e as Error).message, HttpStatus.FORBIDDEN);
   }
@@ -317,7 +329,9 @@ export const executeSelectQuery = async (
   //    the user's query already filters by that column (detected via AST).
   //    Conditions are appended to the inner query text so the outer LIMIT wrapper
   //    never needs to reference columns that might be absent from the SELECT list.
-  let innerQuery = normalisedQuery;
+  // Use parsedSql ({{ var }} → $N substituted) as the base — AST _location offsets
+  // reference this string, not normalisedQuery which may still contain {{ }} placeholders.
+  let innerQuery = parsedSql;
   for (const tableName of tables) {
     const tenantColumn = await resolveTenantColumn(tableName, dbName);
     if (!tenantColumn) continue;

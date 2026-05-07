@@ -118,15 +118,16 @@ describe('validateSelectQuery', () => {
   describe('Template placeholder replacement', () => {
     it('should replace single template placeholder with $1', () => {
       const query = 'SELECT * FROM users WHERE name = {{ userName }}';
-      const result = validateSelectQuery(query);
-      expect(result).toBeDefined();
-      expect(result.length).toBeGreaterThan(0);
+      const { ast, parsedSql } = validateSelectQuery(query);
+      expect(ast.length).toBeGreaterThan(0);
+      expect(parsedSql).toBe('SELECT * FROM users WHERE name = $1');
     });
 
     it('should replace multiple template placeholders with sequential parameters', () => {
       const query = 'SELECT * FROM users WHERE name = {{ userName }} AND age = {{ userAge }}';
-      const result = validateSelectQuery(query);
-      expect(result).toBeDefined();
+      const { ast, parsedSql } = validateSelectQuery(query);
+      expect(ast.length).toBeGreaterThan(0);
+      expect(parsedSql).toBe('SELECT * FROM users WHERE name = $1 AND age = $2');
     });
 
     it('should handle template placeholders with spaces', () => {

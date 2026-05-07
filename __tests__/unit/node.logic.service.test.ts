@@ -34,15 +34,6 @@ describe('Node Logic Service', () => {
   const mockTenantId = 'tenant-123';
   const mockNodeId = 1;
 
-  // Helper function to create mock AST for a simple SELECT query
-  const createMockAST = (tableName: string) => [
-    {
-      type: 'select',
-      columns: [{ expr: { type: 'ref', name: '*' } }],
-      from: [{ type: 'table', name: { name: tableName } }],
-    },
-  ];
-
   beforeEach(() => {
     jest.clearAllMocks();
     // Default mock for validateSelectQuery - returns AST for 'users' table
@@ -261,7 +252,10 @@ describe('Node Logic Service', () => {
 
   describe('executeSelectQuery', () => {
     beforeEach(() => {
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
+      // Restore real validateSelectQuery — _location offsets from the real parser are
+      // required by injectTenantCondition. Tests needing a custom AST mock per-test.
+      const real = jest.requireActual<typeof import('../../src/utils/validateQuery')>('../../src/utils/validateQuery');
+      (validateQuery.validateSelectQuery as jest.Mock).mockImplementation((q: unknown) => real.validateSelectQuery(q as string));
     });
 
     it('should execute a simple SELECT query with LIMIT enforcement', async () => {
@@ -308,7 +302,7 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration', params: ['active'] }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users WHERE status = $1) _q WHERE tenant_id = $2 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE status = $1 AND tenant_id = $2) _q LIMIT 10',
         'configuration',
         ['active', mockTenantId],
       );
@@ -325,7 +319,7 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users ORDER BY created_at DESC) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 ORDER BY created_at DESC) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
@@ -342,13 +336,13 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT status, COUNT(*) FROM users GROUP BY status) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT status, COUNT(*) FROM users WHERE tenant_id = $1 GROUP BY status) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
     });
 
-    it('should replace user-supplied LIMIT with enforced LIMIT', async () => {
+    it('should cap rows while preserving user-supplied LIMIT inside subquery', async () => {
       const mockQuery = 'SELECT * FROM users LIMIT 1000';
       const mockResult = [{ id: 1 }];
 
@@ -359,13 +353,13 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users LIMIT 1000) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 LIMIT 1000) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
     });
 
-    it('should strip LIMIT with OFFSET and enforce cap', async () => {
+    it('should cap rows with LIMIT OFFSET inside subquery', async () => {
       const mockQuery = 'SELECT * FROM users LIMIT 50 OFFSET 100';
       const mockResult = [{ id: 1 }];
 
@@ -376,17 +370,16 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users LIMIT 50 OFFSET 100) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 LIMIT 50 OFFSET 100) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
     });
 
-    it('should strip standalone OFFSET and enforce cap', async () => {
+    it('should cap rows with standalone OFFSET inside subquery', async () => {
       const mockQuery = 'SELECT * FROM users OFFSET 50';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
         .mockResolvedValueOnce(mockResult);
@@ -394,17 +387,16 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users OFFSET 50) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 OFFSET 50) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
     });
 
-    it('should strip FETCH FIRST and enforce cap', async () => {
+    it('should cap rows with FETCH FIRST inside subquery', async () => {
       const mockQuery = 'SELECT * FROM users FETCH FIRST 50 ROWS ONLY';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
         .mockResolvedValueOnce(mockResult);
@@ -412,17 +404,16 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users FETCH FIRST 50 ROWS ONLY) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 FETCH FIRST 50 ROWS ONLY) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
     });
 
-    it('should strip FETCH NEXT and enforce cap', async () => {
+    it('should cap rows with FETCH NEXT inside subquery', async () => {
       const mockQuery = 'SELECT * FROM users FETCH NEXT 100 ROW ONLY';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
         .mockResolvedValueOnce(mockResult);
@@ -430,7 +421,7 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users FETCH NEXT 100 ROW ONLY) _q WHERE tenant_id = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 FETCH NEXT 100 ROW ONLY) _q LIMIT 10',
         'configuration',
         [mockTenantId],
       );
@@ -440,7 +431,6 @@ describe('Node Logic Service', () => {
       const mockQuery = 'SELECT * FROM transaction';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('transaction'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenantId' }]) // tenantId instead of tenant_id
         .mockResolvedValueOnce(mockResult);
@@ -448,7 +438,7 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'event_history' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM transaction) _q WHERE tenantId = $1 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM transaction WHERE tenantId = $1) _q LIMIT 10',
         'event_history',
         [mockTenantId],
       );
@@ -458,7 +448,6 @@ describe('Node Logic Service', () => {
       const mockQuery = 'SELECT * FROM unknown_table';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('unknown_table'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([]) // No tenant column found
         .mockResolvedValueOnce(mockResult);
@@ -466,53 +455,28 @@ describe('Node Logic Service', () => {
       await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM unknown_table) _q  LIMIT 10',
+        'SELECT * FROM (SELECT * FROM unknown_table) _q LIMIT 10',
         'configuration',
         [],
       );
     });
 
     it('should inject tenant filter for base table inside a CTE query', async () => {
-      const mockQuery = `
-        WITH active_users AS (
-          SELECT * FROM users WHERE status = 'active'
-        )
-        SELECT * FROM active_users
-      `;
+      const mockQuery = `WITH active_users AS (SELECT * FROM users WHERE status = 'active') SELECT * FROM active_users`;
       const mockResult = [{ id: 1 }];
 
-      // WITH queries should still extract base tables from CTE bodies.
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue([
-        {
-          type: 'with',
-          bind: [
-            {
-              alias: 'active_users',
-              statement: {
-                type: 'select',
-                from: [{ type: 'table', name: { name: 'users' } }],
-              },
-            },
-          ],
-          in: {
-            type: 'select',
-            from: [{ type: 'table', name: { name: 'active_users' } }],
-          },
-        },
-      ]);
-      (nodeRepository.executeQueryNodeInDb as jest.Mock)
-        .mockResolvedValueOnce([{ column_name: 'tenant_id' }]) // resolveTenantColumn
-        .mockResolvedValueOnce(mockResult); // actual query
+      const mockDb = nodeRepository.executeQueryNodeInDb as jest.MockedFunction<() => Promise<Array<Record<string, unknown>>>>;
+      mockDb.mockResolvedValueOnce([{ column_name: 'tenant_id' }]); // resolveTenantColumn for 'users'
+      mockDb.mockResolvedValueOnce([]);                              // resolveTenantColumn for 'active_users' (CTE alias)
+      mockDb.mockResolvedValueOnce(mockResult);                      // actual query
 
       const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
-      // Should resolve tenant column for base table 'users'
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenCalledWith(
         expect.stringContaining('information_schema.columns'),
         'configuration',
         ['users'],
       );
-      // Should wrap entire query and apply tenant filter on outer query
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
         expect.stringContaining('SELECT * FROM ('),
         'configuration',
@@ -535,11 +499,11 @@ describe('Node Logic Service', () => {
       expect(nodeRepository.executeQueryNodeInDb).not.toHaveBeenCalled();
     });
 
-    it('should always wrap and apply tenant filter even if query already has tenant condition', async () => {
+    it('should skip tenant injection when query already filters by tenant column (case-insensitive)', async () => {
+      // TenantId (mixed case) in WHERE — parser lowercases to 'tenantid', matches 'tenantId' case-insensitively
       const mockQuery = 'SELECT * FROM transaction WHERE TenantId = $1';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('transaction'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenantId' }])
         .mockResolvedValueOnce(mockResult);
@@ -549,20 +513,19 @@ describe('Node Logic Service', () => {
         mockTenantId,
       );
 
-      // New behavior: always wrap and apply outer tenant filter via subquery
+      // tenant condition already present — no injection, params unchanged
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM transaction WHERE TenantId = $1) _q WHERE tenantId = $2 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM transaction WHERE TenantId = $1) _q LIMIT 10',
         'event_history',
-        ['tenant-456', mockTenantId],
+        ['tenant-456'],
       );
       expect(result).toEqual(mockResult);
     });
 
-    it('should always wrap and apply tenant filter even with existing tenant_id condition', async () => {
+    it('should skip tenant injection when query already has tenant_id in WHERE', async () => {
       const mockQuery = 'SELECT * FROM users WHERE status = $1 AND tenant_id = $2';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
         .mockResolvedValueOnce(mockResult);
@@ -572,11 +535,11 @@ describe('Node Logic Service', () => {
         mockTenantId,
       );
 
-      // New behavior: always wrap and apply outer tenant filter via subquery
+      // tenant_id already in WHERE — skip injection, params unchanged
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users WHERE status = $1 AND tenant_id = $2) _q WHERE tenant_id = $3 LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users WHERE status = $1 AND tenant_id = $2) _q LIMIT 10',
         'configuration',
-        ['active', 'tenant-789', mockTenantId],
+        ['active', 'tenant-789'],
       );
       expect(result).toEqual(mockResult);
     });
@@ -584,7 +547,6 @@ describe('Node Logic Service', () => {
     it('should throw when query has no tables', async () => {
       const mockQuery = 'SELECT 1 AS value';
 
-      // Query without FROM clause
       (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue([
         {
           type: 'select',
@@ -603,23 +565,18 @@ describe('Node Logic Service', () => {
       const mockQuery = 'SELECT * FROM users';
       const mockResult = [{ id: 1 }];
 
-      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue(createMockAST('users'));
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockRejectedValueOnce(new Error('Connection error')) // resolveTenantColumn call fails
         .mockResolvedValueOnce(mockResult); // outer query still executes
 
-      // When tenant column lookup fails, gracefully skip tenant filtering for that table
       const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
-      // Query executes without tenant filter due to column lookup failure
       expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
-        'SELECT * FROM (SELECT * FROM users) _q  LIMIT 10',
+        'SELECT * FROM (SELECT * FROM users) _q LIMIT 10',
         'configuration',
         [],
       );
       expect(result).toEqual(mockResult);
     });
-
-
   });
 });

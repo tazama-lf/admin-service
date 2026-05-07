@@ -386,6 +386,46 @@ describe('Rule Logic Service', () => {
       expect(result.total).toBe(2);
     });
 
+    it('should find rules with startDate only', async () => {
+      const payload = {
+        startDate: '2026-01-01',
+      };
+
+      const mockRules = {
+        result: [{ id: 1, rule_name: 'Rule 1', created_at: '2026-01-15' }],
+      };
+
+      (ruleRepository.countRulesWithFiltersInDB as jest.Mock).mockResolvedValue(1);
+      (ruleRepository.findRulesWithFiltersInDB as jest.Mock).mockResolvedValue(mockRules);
+
+      const result = await ruleLogicService.findRulesWithFilters(10, 0, payload, mockTenantId);
+
+      expect(result.data).toEqual(mockRules.result);
+      expect(result.total).toBe(1);
+      const [[whereArg]] = (ruleRepository.countRulesWithFiltersInDB as jest.Mock).mock.calls;
+      expect(whereArg).toContain('created_at) >=');
+    });
+
+    it('should find rules with endDate only', async () => {
+      const payload = {
+        endDate: '2026-01-31',
+      };
+
+      const mockRules = {
+        result: [{ id: 2, rule_name: 'Rule 2', created_at: '2026-01-20' }],
+      };
+
+      (ruleRepository.countRulesWithFiltersInDB as jest.Mock).mockResolvedValue(1);
+      (ruleRepository.findRulesWithFiltersInDB as jest.Mock).mockResolvedValue(mockRules);
+
+      const result = await ruleLogicService.findRulesWithFilters(10, 0, payload, mockTenantId);
+
+      expect(result.data).toEqual(mockRules.result);
+      expect(result.total).toBe(1);
+      const [[whereArg]] = (ruleRepository.countRulesWithFiltersInDB as jest.Mock).mock.calls;
+      expect(whereArg).toContain('created_at) <=');
+    });
+
     it('should find rules with specific createdAt date', async () => {
       const payload = {
         createdAt: '2026-01-15',

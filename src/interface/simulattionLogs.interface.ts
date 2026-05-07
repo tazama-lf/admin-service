@@ -47,3 +47,7 @@ export interface SimulationMessage {
   endpoint: string;
   data: Record<string, unknown>;
 }
+
+export interface IRecordCount {
+  rowCount: number;
+}

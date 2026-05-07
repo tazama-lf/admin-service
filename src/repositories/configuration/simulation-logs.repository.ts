@@ -159,7 +159,7 @@ export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>
 
   const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
     {
-      text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+      text: 'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = \'public\' AND table_name LIKE \'sim%\'',
       values: [],
     } satisfies PgQueryConfig,
     'simulation',

@@ -14,7 +14,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handleGetReportRequestByMsgId, handleGetAllReportsRequest } from './services/report.logic.service';
 import {
   handlePostConfig,
   handleFindConfigByID,
@@ -74,9 +74,14 @@ import {
   getSimulationLogs,
   createSimulationLogs,
   getSimulationMessages,
-  fetchFromDlh,
+  stageSimulationItems,
+  truncateEvaluationResults,
+  saveEvaluationsInResultsTable,
+  saveRecordInTrsSimulation,
+  fetchSimulationItems,
   handleDlhFetchCount,
 } from './services/simulation-logs.logic.service';
+import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1453,6 +1458,16 @@ export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: F
   }
 };
 
+export const fetchSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tableName } = req.query as { tableName: string };
+    const items = await fetchSimulationItems(tableName);
+    reply.code(200).send({ items, count: items.length });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch simulation items');
+  }
+};
+
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
@@ -1888,16 +1903,24 @@ export const getSimulationResultsHandler = async (req: FastifyRequest, reply: Fa
   }
 };
 
-export const fetchFromDlhHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const stageSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const token = req.headers.authorization ?? '';
-    const queries = req.body as Array<Record<string, unknown>>;
+    const items = req.body as Array<Record<string, unknown>>;
 
-    const result = await fetchFromDlh(queries, token);
+    const result = await stageSimulationItems(items);
 
     reply.code(200).send(result);
   } catch (error: unknown) {
-    ErrorHandler.sendError(reply, error, 'Failed to fetch data from DLH');
+    ErrorHandler.sendError(reply, error, 'Failed to stage simulation items');
+  }
+};
+
+export const truncateEvaluationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    await truncateEvaluationResults();
+    reply.code(200).send({ success: true, message: 'Evaluation results truncated successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');
   }
 };
 
@@ -1924,6 +1947,16 @@ export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: F
   }
 };
 
+export const saveEvaluationsInResultsTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { evaluations, tableName } = req.body as { evaluations: EvaluationRow[]; tableName?: string };
+    await saveEvaluationsInResultsTable(evaluations, tableName);
+    reply.code(200).send({ success: true, message: 'Evaluations saved successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save evaluations');
+  }
+};
+
 export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
@@ -1937,5 +1970,35 @@ export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
+  }
+};
+
+export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all evaluations request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const data = await handleGetAllReportsRequest(tenantId);
+    reply.status(200).send({ message: 'Evaluations fetched successfully', data });
+  } catch (err) {
+    const failMessage = `Failed to fetch evaluations. \n${util.inspect(err)}`;
+    reply.status(500).send(failMessage);
+  } finally {
+    loggerService.log('End - Handle get all evaluations request');
+  }
+};
+
+export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = req.body as {
+      simulationId: string | undefined;
+      totalRecord: number;
+      recordProcessed: number;
+      simStatus: string;
+      tenantId: string;
+    };
+    await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
+    reply.code(200).send();
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
   }
 };

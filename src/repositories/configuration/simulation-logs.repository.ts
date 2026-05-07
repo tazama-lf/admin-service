@@ -3,6 +3,14 @@ import { handlePostExecuteSqlStatement } from '../../services/database.logic.ser
 import type { IRecordCount, SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
 import pgFormat from 'pg-format';
 
+export interface SimulationItemRow {
+  payload: Record<string, unknown>;
+  endpointPath: string | null;
+  credttm: string | null;
+  tenantId: string | null;
+  msgid: string | null;
+}
+
 type SortField = 'created_at' | 'updated_at';
 
 export const getSimulationLogsFromDb = async (options: SimulationLogQueryOptions): Promise<SimulationLog[]> => {
@@ -113,6 +121,31 @@ export const createSimulationLogsInDb = async (
   );
 };
 
+export const fetchSimulationItemsFromTable = async (tableName: string): Promise<SimulationItemRow[]> => {
+  const result = await handlePostExecuteSqlStatement<{
+    payload: Record<string, unknown>;
+    endpointPath: string | null;
+    credttm: string | null;
+    tenantId: string | null;
+    msgid: string | null;
+  }>(
+    {
+      text: pgFormat('SELECT payload, "endpointPath", credttm, "tenantId", msgid FROM %I ORDER BY credttm ASC', tableName),
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return result.rows.map((row) => ({
+    payload: row.payload,
+    endpointPath: row.endpointPath,
+    credttm: row.credttm,
+    tenantId: row.tenantId,
+    msgid: row.msgid,
+  }));
+};
+
+// not being used now
 export const getSimulationMessagesFromDb = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> => {
   const result = await handlePostExecuteSqlStatement<{ payload: SimulationMessage }>(
     {
@@ -150,72 +183,89 @@ export const fetchCountFromDlh = async (queries: Array<Record<string, unknown>>,
   return { rowCount };
 };
 
-export const fetchDataFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> => {
-  const DLH_ENDPOINT = process.env.DLH_URL;
-  if (!DLH_ENDPOINT) {
-    throw new Error('DLH endpoint is not defined');
+export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>): Promise<{ tableName: string | null }> => {
+  if (items.length === 0) {
+    return { tableName: null };
   }
-  const response = await fetch(DLH_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(queries),
+
+  const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
+    {
+      text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
+  const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
+
+  await handlePostExecuteSqlStatement(
+    {
+      text: pgFormat(
+        'CREATE TABLE IF NOT EXISTS %I (id SERIAL PRIMARY KEY, payload JSONB NOT NULL, credttm TEXT, "endpointPath" TEXT, "tenantId" TEXT, "msgid" TEXT)',
+        nextTableName,
+      ),
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const rows = items.map((doc) => {
+    const { endpointPath, _credttm, _tenantId, _msgid, ...rest } = doc;
+    return {
+      payload: JSON.stringify(rest),
+      endpointPath: typeof endpointPath === 'string' ? endpointPath : null,
+      credttm: typeof _credttm === 'string' ? _credttm : null,
+      tenantId: typeof _tenantId === 'string' ? _tenantId : null,
+      msgid: typeof _msgid === 'string' ? _msgid : null,
+    };
   });
+  const placeholders = rows.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+  const values = rows.flatMap(({ payload, endpointPath, credttm, tenantId, msgid }) => [payload, endpointPath, credttm, tenantId, msgid]);
+  await handlePostExecuteSqlStatement(
+    {
+      text: pgFormat(`INSERT INTO %I (payload, "endpointPath", credttm, "tenantId", msgid) VALUES ${placeholders}`, nextTableName),
+      values,
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch data from DLH: ${response.statusText}`);
-  }
+  return { tableName: nextTableName };
+};
 
-  const result = (await response.json()) as Record<string, unknown>;
+export const truncateEvaluationResultsInDb = async (): Promise<void> => {
+  const query = 'TRUNCATE TABLE evaluation;';
+  await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: [],
+    } satisfies PgQueryConfig,
+    'evaluation',
+  );
+};
 
-  const results = result.results as Array<{ data: Array<{ document: Record<string, unknown> }> }> | undefined;
-  if (Array.isArray(results)) {
-    const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
-      {
-        text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
-        values: [],
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
+export const saveRecordInTrsSimulationInDb = async (simulationData: {
+  simulationId: string | undefined;
+  totalRecord: number;
+  recordProcessed: number;
+  simStatus: string;
+  tenantId: string;
+}): Promise<void> => {
+  const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = simulationData;
+  const query = `
+    INSERT INTO trs_simulation (simulation_id, total_record, record_processed, sim_status, tenant_id, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+    ON CONFLICT (simulation_id) DO UPDATE SET
+      record_processed = EXCLUDED.record_processed,
+      sim_status = EXCLUDED.sim_status,
+      updated_at = NOW();
+  `;
 
-    const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
-    const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
-
-    await handlePostExecuteSqlStatement(
-      {
-        text: pgFormat(
-          `CREATE TABLE IF NOT EXISTS %I (
-            id SERIAL PRIMARY KEY,
-            payload JSONB NOT NULL,
-            credttm TEXT,
-            "endpointPath" TEXT,
-            "tenantId" TEXT,
-            msgid TEXT
-          )`,
-          nextTableName,
-        ),
-        values: [],
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
-
-    const documents = results.flatMap((r) => (Array.isArray(r.data) ? r.data.map((item) => item.document) : []));
-    if (documents.length > 0) {
-      const serialized = documents.map((doc) => JSON.stringify(doc));
-      const placeholders = serialized.map((_, i) => `($${i + 1})`).join(', ');
-      await handlePostExecuteSqlStatement(
-        {
-          text: pgFormat(`INSERT INTO %I (payload) VALUES ${placeholders}`, nextTableName),
-          values: serialized,
-        } satisfies PgQueryConfig,
-        'simulation',
-      );
-    }
-
-    return { ...result, tableName: nextTableName };
-  }
-
-  return result;
+  await handlePostExecuteSqlStatement(
+    {
+      text: query,
+      values: [simulationId, totalRecord, recordProcessed, simStatus, tenantId],
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
 };

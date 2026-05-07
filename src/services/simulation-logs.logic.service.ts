@@ -1,9 +1,10 @@
-import type { SimulationLog, SimulationLogRequest, SimulationMessage } from '../interface/simulattionLogs.interface';
+import type { IRecordCount, SimulationLog, SimulationLogRequest, SimulationMessage } from '../interface/simulattionLogs.interface';
 import {
   createSimulationLogsInDb,
   getSimulationLogsFromDb,
   getSimulationMessagesFromDb,
   fetchDataFromDlh,
+  fetchCountFromDlh,
 } from '../repositories/configuration/simulation-logs.repository';
 
 export const createSimulationLogs = async ({
@@ -34,3 +35,6 @@ export const getSimulationMessages = async (tenantId: string, tableName: string)
 
 export const fetchFromDlh = async (queries: Array<Record<string, unknown>>, token: string): Promise<Record<string, unknown>> =>
   await fetchDataFromDlh(queries, token);
+
+export const handleDlhFetchCount = async (queries: Array<Record<string, unknown>>, token: string): Promise<IRecordCount> =>
+  await fetchCountFromDlh(queries, token);

@@ -79,6 +79,7 @@ import {
   createSimulationHandler,
   getSimulationStatsHandler,
   getSimulationResultsHandler,
+  fetchCountDlhHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -496,6 +497,10 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.post('/v1/dlh/fetch', {
     ...SetOptionsBodyAndParams(fetchFromDlhHandler, routePrivilege.fetchFromDlh),
+  });
+
+  fastify.post('/v1/admin/dlh/fetch/count', {
+    ...SetOptionsBodyAndParams(fetchCountDlhHandler, routePrivilege.fetchFromDlh),
   });
 
   fastify.get('/v1/admin/trs/masking/all-fetch', {

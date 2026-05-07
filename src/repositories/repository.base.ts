@@ -14,6 +14,10 @@ export interface Node {
   cfg: string;
   tenantId: string;
 }
+export interface ConfigVersion {
+  cfg: string;
+  tenantId: string;
+}
 export interface Connector {
   source: string;
   destination: string;
@@ -21,7 +25,7 @@ export interface Connector {
 }
 
 // Table types one with composite keys and with primary id key
-export type AllowedId = Node | Connector;
+export type AllowedId = Node | ConfigVersion | Connector;
 
 export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   list: (params: ListQuery<StringKeys<TEntity>>) => Promise<{ data: TEntity[]; total: number }>;

@@ -575,6 +575,12 @@ Each repository implementation follows a standardized interface, ensuring consis
 | 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
 | 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
 
+For all GET queries:
+ * You can either do a pure GET, which will list all items; 
+ * You can do a GET with a query parameter to find, for example, only Active networkmaps: /v1/admin/configuration/network_map?filters[active]=true;
+ * Right now, if you specify more than one query param, only the first one will take afffect. 
+
+
 ---
 
 ## 4) Conceptual Flow of Operations
@@ -587,7 +593,7 @@ The result is normalized into a consistent `{ data, total }` format expected by 
 
 ### Get Operation
 
-The `get` method retrieves a single entity record based on the combination of ID, and tenantId. If the record exists, it returns the parsed configuration object.
+The `get` method retrieves a single entity record based on the combination of `cfg` and tenantId. If the record exists, it returns the parsed configuration object.
 
 ### Create Operation
 
@@ -595,11 +601,11 @@ The creation method inserts a new configuration entry into the database. The pay
 
 ### Update Operation
 
-The update process replaces an existing configuration record that matches the composite key (`id`, `payload: configuration`, and `tenantId`). The repository ensures atomic updates by returning the modified record upon success or `null` if the record does not exist.
+The update process replaces an existing configuration record that matches `cfg` and `tenantId`. The repository ensures atomic updates by returning the modified record upon success or `null` if the record does not exist.
 
 ### Delete Operation
 
-The deletion process removes the record from the table matching the same composite identifiers (id and tenantId). It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
+The deletion process removes the record from the table matching the same `cfg` and `tenantId` identifiers. It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
 
 ---
 
@@ -704,7 +710,7 @@ For the configuration entities shown earlier, recommended permission strings inc
 **Notes**
 
 * `tenantId` is established by middleware and injected into every repository call.
-* `id: identifier` is provided as a path segment for GET/PUT/DELETE and included in ID construction.
+* `cfg` is provided as the path segment for generated configuration GET/PUT/DELETE routes and included in ID construction.
 * Capability strings follow the `<METHOD><PREFIX_WITH_SLASHES_AS_UNDERSCORES>` pattern (e.g., `GET_V1_ADMIN_CONFIGURATION_RULE`).
 
 ---

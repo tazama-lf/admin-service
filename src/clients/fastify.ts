@@ -7,8 +7,14 @@ import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { configuration } from '..';
+import qs from 'qs';
 
-const fastify = Fastify();
+const fastify = Fastify({
+  routerOptions: {
+    querystringParser: (str) => qs.parse(str),
+  },
+});
+
 const ajv = new Ajv({
   removeAdditional: 'all',
   useDefaults: true,

@@ -146,7 +146,7 @@ describe('NetworkMapRepository', () => {
   });
 
   describe('update', () => {
-    const mockIdentifier = { id: 'test-id', cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should set updDtTm to a new ISO 8601 timestamp and preserve creDtTm', async () => {
       const mockToISOString = jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
@@ -170,8 +170,8 @@ describe('NetworkMapRepository', () => {
       // Verify database call was made with correct parameters
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'UPDATE network_map SET configuration = $1 WHERE configuration->>name = $2 AND configuration->>cfg = $3 AND tenantId = $4 RETURNING configuration;',
-          values: [inputPayload, mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+          text: 'UPDATE network_map SET configuration = $1 WHERE cfg = $2 AND tenantId = $3 RETURNING configuration;',
+          values: [inputPayload, mockIdentifier.cfg, mockIdentifier.tenantId],
         },
         'configuration',
       );

@@ -139,7 +139,7 @@ const routePrivilege = {
   postTcsDataModelTable: ['editor', 'approver', 'publisher'],
   getTrsRules: ['editor', 'approver', 'exporter', 'publisher'],
   postTrsRule: 'editor',
-  putTrsRule: 'editor',
+  putTrsRule: ['editor', 'aaprover', 'trs_approver'],
   getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getExcludedTypes: 'editor',
   getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
@@ -173,6 +173,7 @@ function Routes(fastify: FastifyInstance): void {
       prefix: '/v1/admin/configuration/network_map',
       repo: NetworkMapRepo,
       schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
+      idParam: { kind: 'cfg' },
     }),
   );
 
@@ -181,6 +182,7 @@ function Routes(fastify: FastifyInstance): void {
       prefix: '/v1/admin/configuration/rule',
       repo: RuleConfigRepo,
       schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      idParam: { kind: 'cfg' },
     }),
   );
 
@@ -189,6 +191,7 @@ function Routes(fastify: FastifyInstance): void {
       prefix: '/v1/admin/configuration/typology',
       repo: TypologyConfigRepo,
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
+      idParam: { kind: 'cfg' },
     }),
   );
 

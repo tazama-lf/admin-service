@@ -77,6 +77,8 @@ import {
   reviewMaskHandler,
   getAllSimulationsHandler,
   createSimulationHandler,
+  getSimulationStatsHandler,
+  getSimulationResultsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -157,6 +159,8 @@ const routePrivilege = {
   reviewMask: 'trs_data_engineer_approver',
   getSimulations: ['editor', 'approver'],
   createSimulation: ['editor', 'approver'],
+  getSimulationStats: ['editor', 'approver'],
+  getSimulationResults: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -405,6 +409,14 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation/all/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllSimulationsHandler, routePrivilege.getSimulations),
+  });
+
+  fastify.get('/v1/admin/trs/simulation/get_simulation_stats', {
+    ...SetOptionsBodyAndParams(getSimulationStatsHandler, routePrivilege.getSimulationStats),
+  });
+
+  fastify.get('/v1/admin/trs/simulation/get_simulation_results', {
+    ...SetOptionsBodyAndParams(getSimulationResultsHandler, routePrivilege.getSimulationResults),
   });
 
   // ====================  RULE SIMULATION OPERATIONS ====================

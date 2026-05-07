@@ -66,7 +66,7 @@ import {
   handleGetExcludedTypes,
   handleReviewMask,
 } from './services/masking.logic.service';
-import { findSimulations, createSimulation } from './services/simulation.logic.service';
+import { findSimulations, createSimulation, getSimulationStats, getSimulationResults } from './services/simulation.logic.service';
 import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { findActiveNetworkMap } from './services/network-map.service';
@@ -1776,7 +1776,7 @@ export const createSimulationHandler = async (req: FastifyRequest, reply: Fastif
     const { tenantId } = req as ITenantRequest;
     const body = req.body as Record<string, unknown>;
     const response = await createSimulation(body, tenantId);
-    reply.code(201).send({ success: true, message: response.message, id: response.id });
+    reply.code(201).send({ success: true, message: response.message, simulation_id: response.simulation_id });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to create simulation');
   }
@@ -1799,6 +1799,86 @@ export const getAllSimulationsHandler = async (req: FastifyRequest, reply: Fasti
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get simulations');
+  }
+};
+
+export const getSimulationStatsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { sim, iteration_no: iterationNo } = req.query as { sim?: string; iteration_no?: string };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+
+    const result = await getSimulationStats(sim.trim().toLowerCase(), iterationNo.trim(), tenantId);
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation stats');
+  }
+};
+
+export const getSimulationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const {
+      sim,
+      iteration_no: iterationNo,
+      limit: qLimit = '10',
+      offset: qOffset = '0',
+      msg_id: msgId,
+      msg_type: msgType,
+      outcome,
+    } = req.query as {
+      sim?: string;
+      iteration_no?: string;
+      limit?: string;
+      offset?: string;
+      msg_id?: string;
+      msg_type?: string;
+      outcome?: string;
+    };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+    if (outcome && outcome !== 'Hit' && outcome !== 'No-Hit') {
+      reply.code(400).send({ success: false, message: '`outcome` must be "Hit" or "No-Hit".' });
+      return;
+    }
+
+    const parsedLimit = parseInt(qLimit, 10) || 10;
+    const parsedOffset = parseInt(qOffset, 10) || 0;
+
+    const result = await getSimulationResults(
+      sim.trim().toLowerCase(),
+      iterationNo.trim(),
+      tenantId,
+      parsedLimit,
+      parsedOffset * parsedLimit,
+      { msg_id: msgId?.trim(), msg_type: msgType?.trim(), outcome: outcome?.trim() },
+    );
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation results');
   }
 };
 

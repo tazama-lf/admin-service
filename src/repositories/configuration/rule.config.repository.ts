@@ -2,14 +2,14 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { RuleConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { ConfigVersion, CrudRepository } from '../repository.base';
+import type { CrudRepository } from '../repository.base';
 
-export const RuleConfigRepo: CrudRepository<RuleConfig, ConfigVersion> = {
+export const RuleConfigRepo: CrudRepository<RuleConfig> = {
   list: async function ({ offset, limit, filters, order, sort, tenantId }): Promise<{ data: RuleConfig[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'ruleid', value: '' };
     if (filters) {
-      const [field, value] = Object.entries(filters)[0];
+      const [[field, value]] = Object.entries(filters);
       filter.field = field;
       filter.value = value;
     }
@@ -27,11 +27,11 @@ export const RuleConfigRepo: CrudRepository<RuleConfig, ConfigVersion> = {
       : { data: [], total: 0 };
   },
 
-  get: async function ({ cfg, tenantId }): Promise<RuleConfig | null> {
+  get: async function ({ id, cfg, tenantId }): Promise<RuleConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'SELECT configuration FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
-        values: [cfg, tenantId],
+        text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -56,26 +56,26 @@ export const RuleConfigRepo: CrudRepository<RuleConfig, ConfigVersion> = {
     return queryRes.rows[0].configuration;
   },
 
-  update: async function ({ cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
+  update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
     const dtTme = new Date().toISOString();
     payload.updDtTm = dtTme;
     payload.tenantId = tenantId;
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'UPDATE rule SET configuration = $1 WHERE rulecfg = $2 AND tenantid = $3 RETURNING configuration;',
-        values: [payload, cfg, tenantId],
+        text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',
+        values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  remove: async function ({ cfg, tenantId }): Promise<boolean> {
+  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
-        text: 'DELETE FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
-        values: [cfg, tenantId],
+        text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

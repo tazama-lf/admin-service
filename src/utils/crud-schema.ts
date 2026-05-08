@@ -34,7 +34,9 @@ const DefaultQuery = Type.Object({
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
-const makeIdSchema = (cfg?: IdParamConfig): TObject => {
+const makeIdSchema = (
+  cfg?: { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] },
+): TObject => {
   const props: Record<string, TSchema> = { cfg: Type.String() };
   if (cfg?.kind === 'composite') {
     const [firstParamKey, secondParamKey] = cfg.names;
@@ -70,7 +72,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           ? { [idParam.names[0]]: params[idParam.names[0]], [idParam.names[1]]: params[idParam.names[1]], cfg: params.cfg, tenantId }
           : idParam?.kind === 'cfg'
             ? { cfg: params.cfg, tenantId }
-            : { [singleName]: params[singleName], cfg: params.cfg, tenantId };
+            : { id: params[singleName], cfg: params.cfg, tenantId };
       return id as unknown as TId;
     };
 

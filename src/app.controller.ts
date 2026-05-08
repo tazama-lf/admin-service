@@ -66,7 +66,6 @@ import {
   handleReviewMask,
 } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
-import { findActiveNetworkMap } from './services/network-map.service';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -1354,31 +1353,6 @@ export const updateRuleHandler = async (req: FastifyRequest, reply: FastifyReply
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to update rule');
-  }
-};
-
-export const getActiveNetworkMapHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    const { tenantId } = req as ITenantRequest;
-
-    const networkMap: unknown = await findActiveNetworkMap(tenantId);
-
-    if (!networkMap) {
-      ErrorHandler.sendError(reply, { status: 404 }, 'No active network map found for this tenant');
-      return;
-    }
-
-    reply.code(200).send({
-      success: true,
-      networkMap,
-    });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('Multiple active network maps')) {
-      ErrorHandler.sendError(reply, { status: 409 }, error.message);
-      return;
-    }
-
-    ErrorHandler.sendError(reply, error, 'Failed to get active network map');
   }
 };
 

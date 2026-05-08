@@ -10,7 +10,7 @@ export const NetworkMapRepo: CrudRepository<NetworkMap, ConfigVersion> = {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'cfg', value: '' };
     if (filters) {
-      const [field, value] = Object.entries(filters)[0];
+      const [[field, value]] = Object.entries(filters);
       filter.field = field;
       filter.value = value;
     }

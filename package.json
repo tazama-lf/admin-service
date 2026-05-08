@@ -33,7 +33,7 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@sinclair/typebox": "^0.34.41",
     "@tazama-lf/auth-lib": "4.0.0-rc.4",
-    "@tazama-lf/frms-coe-lib": "7.0.2-rc.2",
+    "@tazama-lf/frms-coe-lib": "8.0.0-rc.1",
     "@tazama-lf/frms-coe-startup-lib": "3.0.2-rc.2",
     "@tazama-lf/tcs-lib": "1.0.156-rc.2",
     "ajv": "^8.17.1",

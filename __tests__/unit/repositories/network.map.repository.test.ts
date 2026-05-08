@@ -228,4 +228,253 @@ describe('NetworkMapRepository', () => {
       expect(new Date(inputPayload.updDtTm!).getTime()).not.toBeNaN();
     });
   });
+
+  describe('list', () => {
+    const mockListParams = {
+      filters: undefined,
+      limit: 10,
+      offset: 0,
+      order: 'ASC' as const,
+      sort: 'cfg',
+      tenantId: mockTenantId,
+    };
+
+    it('should return empty array when no rows found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.list(mockListParams);
+
+      expect(result).toEqual({ data: [], total: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;`,
+          values: ['cfg', '', 'cfg', 0, 10, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return network maps when rows exist', async () => {
+      const mockConfig1 = createMockNetworkMap();
+      const mockConfig2 = { ...createMockNetworkMap(), cfg: '2.0.0' };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig1 }, { configuration: mockConfig2 }],
+        rowCount: 2,
+      });
+
+      const result = await NetworkMapRepo.list(mockListParams);
+
+      expect(result).toEqual({
+        data: [mockConfig1, mockConfig2],
+        total: 2,
+      });
+    });
+
+    it('should apply filters when provided', async () => {
+      const mockConfig = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig }],
+        rowCount: 1,
+      });
+
+      const paramsWithFilter = {
+        ...mockListParams,
+        filters: { active: 'true' },
+      };
+
+      const result = await NetworkMapRepo.list(paramsWithFilter);
+
+      expect(result).toEqual({
+        data: [mockConfig],
+        total: 1,
+      });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['active', 'true', 'cfg', 0, 10, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should use default sort field when sort is undefined', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paramsWithoutSort = {
+        ...mockListParams,
+        sort: undefined,
+      };
+
+      await NetworkMapRepo.list(paramsWithoutSort);
+
+      // Default sort should be 'cfg'
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['cfg', '', 'cfg', 0, 10, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle DESC order', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paramsWithDescOrder = {
+        ...mockListParams,
+        order: 'DESC' as const,
+      };
+
+      await NetworkMapRepo.list(paramsWithDescOrder);
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('DESC'),
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle pagination with offset and limit', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paginatedParams = {
+        ...mockListParams,
+        offset: 20,
+        limit: 5,
+      };
+
+      await NetworkMapRepo.list(paginatedParams);
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['cfg', '', 'cfg', 20, 5, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+  });
+
+  describe('get', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return network map when found', async () => {
+      const mockConfig = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig }],
+        rowCount: 1,
+      });
+
+      const result = await NetworkMapRepo.get(mockIdentifier);
+
+      expect(result).toEqual(mockConfig);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM network_map WHERE cfg = $1 AND tenantId = $2;',
+          values: ['1.0.0', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when network map is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.get(mockIdentifier);
+
+      expect(result).toBeNull();
+    });
+
+    it('should use correct tenantId in query', async () => {
+      const differentTenantId = 'different-tenant-456';
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      await NetworkMapRepo.get({ cfg: '2.0.0', tenantId: differentTenantId });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['2.0.0', differentTenantId],
+        }),
+        'configuration',
+      );
+    });
+  });
+
+  describe('remove', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return true when network map is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      const result = await NetworkMapRepo.remove(mockIdentifier);
+
+      expect(result).toBe(true);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'DELETE FROM network_map WHERE cfg = $1 AND tenantId = $2;',
+          values: ['1.0.0', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return false when no network map is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
+    });
+
+    it('should use correct tenantId in delete query', async () => {
+      const differentTenantId = 'different-tenant-789';
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      await NetworkMapRepo.remove({ cfg: '3.0.0', tenantId: differentTenantId });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['3.0.0', differentTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle rowCount being null or undefined', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: null,
+      });
+
+      const result = await NetworkMapRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
+    });
+  });
 });

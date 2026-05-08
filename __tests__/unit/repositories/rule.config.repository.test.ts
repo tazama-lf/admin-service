@@ -231,4 +231,253 @@ describe('RuleConfigRepository', () => {
       expect(new Date(inputPayload.updDtTm!).getTime()).not.toBeNaN();
     });
   });
+
+  describe('list', () => {
+    const mockListParams = {
+      filters: undefined,
+      limit: 10,
+      offset: 0,
+      order: 'ASC' as const,
+      sort: 'cfg',
+      tenantId: mockTenantId,
+    };
+
+    it('should return empty array when no rows found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.list(mockListParams);
+
+      expect(result).toEqual({ data: [], total: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;`,
+          values: ['ruleid', '', 'cfg', 0, 10, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return rule configs when rows exist', async () => {
+      const mockConfig1 = createMockRuleConfig();
+      const mockConfig2 = { ...createMockRuleConfig(), id: 'rule-002' };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig1 }, { configuration: mockConfig2 }],
+        rowCount: 2,
+      });
+
+      const result = await RuleConfigRepo.list(mockListParams);
+
+      expect(result).toEqual({
+        data: [mockConfig1, mockConfig2],
+        total: 2,
+      });
+    });
+
+    it('should apply filters when provided', async () => {
+      const mockConfig = createMockRuleConfig();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig }],
+        rowCount: 1,
+      });
+
+      const paramsWithFilter = {
+        ...mockListParams,
+        filters: { id: 'rule-001' },
+      };
+
+      const result = await RuleConfigRepo.list(paramsWithFilter);
+
+      expect(result).toEqual({
+        data: [mockConfig],
+        total: 1,
+      });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['id', 'rule-001', 'cfg', 0, 10, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should use default sort field when sort is undefined', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paramsWithoutSort = {
+        ...mockListParams,
+        sort: undefined,
+      };
+
+      await RuleConfigRepo.list(paramsWithoutSort);
+
+      // Default sort should be 'cfg'
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['ruleid', '', 'cfg', 0, 10, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle DESC order', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paramsWithDescOrder = {
+        ...mockListParams,
+        order: 'DESC' as const,
+      };
+
+      await RuleConfigRepo.list(paramsWithDescOrder);
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('DESC'),
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle pagination with offset and limit', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const paginatedParams = {
+        ...mockListParams,
+        offset: 20,
+        limit: 5,
+      };
+
+      await RuleConfigRepo.list(paginatedParams);
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['ruleid', '', 'cfg', 20, 5, mockTenantId],
+        }),
+        'configuration',
+      );
+    });
+  });
+
+  describe('get', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return rule config when found', async () => {
+      const mockConfig = createMockRuleConfig();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: mockConfig }],
+        rowCount: 1,
+      });
+
+      const result = await RuleConfigRepo.get(mockIdentifier);
+
+      expect(result).toEqual(mockConfig);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
+          values: ['1.0.0', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when rule config is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.get(mockIdentifier);
+
+      expect(result).toBeNull();
+    });
+
+    it('should use correct tenantId in query', async () => {
+      const differentTenantId = 'different-tenant-456';
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      await RuleConfigRepo.get({ cfg: '2.0.0', tenantId: differentTenantId });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['2.0.0', differentTenantId],
+        }),
+        'configuration',
+      );
+    });
+  });
+
+  describe('remove', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return true when rule config is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      const result = await RuleConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(true);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'DELETE FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
+          values: ['1.0.0', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return false when no rule config is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
+    });
+
+    it('should use correct tenantId in delete query', async () => {
+      const differentTenantId = 'different-tenant-789';
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      await RuleConfigRepo.remove({ cfg: '3.0.0', tenantId: differentTenantId });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: ['3.0.0', differentTenantId],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle rowCount being null or undefined', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: null,
+      });
+
+      const result = await RuleConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
+    });
+  });
 });

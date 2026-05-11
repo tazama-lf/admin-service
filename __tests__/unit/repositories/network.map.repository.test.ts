@@ -21,7 +21,7 @@ jest.mock('../../../src', () => ({
   },
 }));
 
-import { findActiveNetworkMapInDb, NetworkMapRepo } from '../../../src/repositories/configuration/network.map.repository';
+import { NetworkMapRepo } from '../../../src/repositories/configuration/network.map.repository';
 
 describe('NetworkMapRepository', () => {
   const mockTenantId = 'test-tenant-123';
@@ -339,48 +339,6 @@ describe('NetworkMapRepository', () => {
       const result = await NetworkMapRepo.remove(mockIdentifier);
 
       expect(result).toBe(false);
-    });
-  });
-
-  describe('findActiveNetworkMapInDb', () => {
-    it('should return the active network map configuration when exactly one is found', async () => {
-      const configuration = createMockNetworkMap();
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ configuration }],
-        rowCount: 1,
-      });
-
-      const result = await findActiveNetworkMapInDb(mockTenantId);
-
-      expect(result).toEqual({ configuration });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: [mockTenantId] }), 'configuration');
-
-      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain('FROM network_map');
-      expect(callArg.text).toContain('tenantId = $1');
-      expect(callArg.text).toContain("configuration->>'active' = 'true'");
-    });
-
-    it('should return null when no active network map is found', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-      });
-
-      const result = await findActiveNetworkMapInDb(mockTenantId);
-
-      expect(result).toBeNull();
-    });
-
-    it('should throw when more than one active network map is found for the tenant', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ configuration: createMockNetworkMap() }, { configuration: { ...createMockNetworkMap(), cfg: '2.0.0' } }],
-        rowCount: 2,
-      });
-
-      await expect(findActiveNetworkMapInDb(mockTenantId)).rejects.toThrow(
-        `Multiple active network maps found for tenant ${mockTenantId}. Expected only one active network map.`,
-      );
     });
   });
 

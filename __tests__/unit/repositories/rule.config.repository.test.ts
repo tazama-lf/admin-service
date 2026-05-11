@@ -502,7 +502,7 @@ describe('RuleConfigRepository', () => {
   });
 
   describe('get', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: 'rule-001', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should return rule config when found', async () => {
       const mockConfig = createMockRuleConfig();
@@ -516,8 +516,8 @@ describe('RuleConfigRepository', () => {
       expect(result).toEqual(mockConfig);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'SELECT configuration FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
-          values: ['1.0.0', mockTenantId],
+          text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+          values: ['rule-001', '1.0.0', mockTenantId],
         },
         'configuration',
       );
@@ -541,11 +541,11 @@ describe('RuleConfigRepository', () => {
         rowCount: 0,
       });
 
-      await RuleConfigRepo.get({ cfg: '2.0.0', tenantId: differentTenantId });
+      await RuleConfigRepo.get({ id: 'rule-001', cfg: '2.0.0', tenantId: differentTenantId });
 
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          values: ['2.0.0', differentTenantId],
+          values: ['rule-001', '2.0.0', differentTenantId],
         }),
         'configuration',
       );
@@ -553,7 +553,7 @@ describe('RuleConfigRepository', () => {
   });
 
   describe('remove', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: 'rule-001', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should return true when rule config is deleted', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -566,8 +566,8 @@ describe('RuleConfigRepository', () => {
       expect(result).toBe(true);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'DELETE FROM rule WHERE rulecfg = $1 AND tenantid = $2;',
-          values: ['1.0.0', mockTenantId],
+          text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+          values: ['rule-001', '1.0.0', mockTenantId],
         },
         'configuration',
       );
@@ -591,11 +591,11 @@ describe('RuleConfigRepository', () => {
         rowCount: 1,
       });
 
-      await RuleConfigRepo.remove({ cfg: '3.0.0', tenantId: differentTenantId });
+      await RuleConfigRepo.remove({ id: 'rule-001', cfg: '3.0.0', tenantId: differentTenantId });
 
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          values: ['3.0.0', differentTenantId],
+          values: ['rule-001', '3.0.0', differentTenantId],
         }),
         'configuration',
       );

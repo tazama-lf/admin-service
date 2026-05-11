@@ -517,7 +517,7 @@ describe('TypologyConfigRepository', () => {
   });
 
   describe('get', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: 'typology-001', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should return typology configuration when found', async () => {
       const mockConfig = createMockTypologyConfig();
@@ -531,8 +531,8 @@ describe('TypologyConfigRepository', () => {
       expect(result).toEqual(mockConfig);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'SELECT configuration FROM typology WHERE typologycfg = $1 AND tenantid = $2;',
-          values: ['1.0.0', mockTenantId],
+          text: 'SELECT configuration FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+          values: ['typology-001', '1.0.0', mockTenantId],
         },
         'configuration',
       );
@@ -556,11 +556,11 @@ describe('TypologyConfigRepository', () => {
         rowCount: 0,
       });
 
-      await TypologyConfigRepo.get({ cfg: '2.0.0', tenantId: differentTenantId });
+      await TypologyConfigRepo.get({ id: 'typology-001', cfg: '2.0.0', tenantId: differentTenantId });
 
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          values: ['2.0.0', differentTenantId],
+          values: ['typology-001', '2.0.0', differentTenantId],
         }),
         'configuration',
       );
@@ -568,7 +568,7 @@ describe('TypologyConfigRepository', () => {
   });
 
   describe('remove', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: 'typology-001', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should return true when typology configuration is deleted', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -581,8 +581,8 @@ describe('TypologyConfigRepository', () => {
       expect(result).toBe(true);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'DELETE FROM typology WHERE typologycfg = $1 AND tenantid = $2;',
-          values: ['1.0.0', mockTenantId],
+          text: 'DELETE FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+          values: ['typology-001', '1.0.0', mockTenantId],
         },
         'configuration',
       );
@@ -606,11 +606,11 @@ describe('TypologyConfigRepository', () => {
         rowCount: 1,
       });
 
-      await TypologyConfigRepo.remove({ cfg: '3.0.0', tenantId: differentTenantId });
+      await TypologyConfigRepo.remove({ id: 'typology-001', cfg: '3.0.0', tenantId: differentTenantId });
 
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
-          values: ['3.0.0', differentTenantId],
+          values: ['typology-001', '3.0.0', differentTenantId],
         }),
         'configuration',
       );

@@ -87,6 +87,93 @@ describe('TypologyConfigRepository', () => {
     jest.restoreAllMocks();
   });
 
+  describe('list', () => {
+    it('should list typology configurations with default sort and no filters', async () => {
+      const firstConfig = createMockTypologyConfig();
+      const secondConfig = { ...createMockTypologyConfig(), id: 'typology-002', cfg: '2.0.0' };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: firstConfig }, { configuration: secondConfig }],
+        rowCount: 2,
+      });
+
+      const result = await TypologyConfigRepo.list({
+        offset: 5,
+        limit: 10,
+        order: 'DESC',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 DESC OFFSET $3 LIMIT $4;",
+          values: ['typologyid', '', 5, 10, 'cfg', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should list with the first provided filter and custom sort', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await TypologyConfigRepo.list({
+        filters: { id: 'typology-002', cfg: '2.0.0' },
+        offset: 0,
+        limit: 25,
+        order: 'ASC',
+        sort: 'id',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [], total: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 ASC OFFSET $3 LIMIT $4;",
+          values: ['id', 'typology-002', 0, 25, 'id', mockTenantId],
+        },
+        'configuration',
+      );
+    });
+  });
+
+  describe('get', () => {
+    const mockIdentifier = { id: 'typology-001', cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return a typology configuration when found', async () => {
+      const configuration = createMockTypologyConfig();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration }],
+        rowCount: 1,
+      });
+
+      const result = await TypologyConfigRepo.get(mockIdentifier);
+
+      expect(result).toEqual(configuration);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+          values: [mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when the typology configuration is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await TypologyConfigRepo.get(mockIdentifier);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('create', () => {
     it('should set both creDtTm and updDtTm to the same ISO 8601 timestamp', async () => {
       // Mock Date.prototype.toISOString to return predictable timestamp
@@ -164,7 +251,7 @@ describe('TypologyConfigRepository', () => {
   });
 
   describe('update', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: '001@1.0.0', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should set updDtTm to a new ISO 8601 timestamp and preserve creDtTm', async () => {
       const mockToISOString = jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
@@ -188,8 +275,8 @@ describe('TypologyConfigRepository', () => {
       // Verify database call was made with correct parameters
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'UPDATE typology SET configuration = $1 WHERE typologycfg = $2 AND tenantid = $3 RETURNING configuration',
-          values: [inputPayload, mockIdentifier.cfg, mockIdentifier.tenantId],
+          text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 AND typologycfg = $3 AND tenantid = $4 RETURNING configuration',
+          values: [inputPayload, mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
         },
         'configuration',
       );
@@ -216,6 +303,18 @@ describe('TypologyConfigRepository', () => {
       expect(mockToISOString).toHaveBeenCalled();
     });
 
+    it('should override payload tenantId with the identifier tenantId', async () => {
+      jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
+      mockHandlePostExecuteSqlStatement.mockResolvedValue(mockUpdateResponse);
+
+      const inputPayload = createMockTypologyConfig();
+      const originalTenantId = inputPayload.tenantId;
+
+      await TypologyConfigRepo.update(mockIdentifier, inputPayload);
+
+      expect(inputPayload.tenantId).toBe(mockIdentifier.tenantId);
+    });
+
     it('should return null when no rows are affected', async () => {
       jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
 
@@ -225,6 +324,39 @@ describe('TypologyConfigRepository', () => {
       const result = await TypologyConfigRepo.update(mockIdentifier, inputPayload);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('remove', () => {
+    const mockIdentifier = { id: 'typology-001', cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return true when a typology configuration is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      const result = await TypologyConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(true);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'DELETE FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+          values: [mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return false when no typology configuration is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await TypologyConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
     });
   });
 

@@ -2,14 +2,14 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { ConfigVersion, CrudRepository } from '../repository.base';
+import type { CrudRepository } from '../repository.base';
 
-export const TypologyConfigRepo: CrudRepository<TypologyConfig, ConfigVersion> = {
+export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
   list: async function ({ filters, limit, offset, order, sort, tenantId }): Promise<{ data: TypologyConfig[]; total: number }> {
     sort ??= 'cfg';
     const filter: { field: string; value: string } = { field: 'typologyid', value: '' };
     if (filters) {
-      const [field, value] = Object.entries(filters)[0];
+      const [[field, value]] = Object.entries(filters);
       filter.field = field;
       filter.value = value;
     }
@@ -27,11 +27,11 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig, ConfigVersion> =
       : { data: [], total: 0 };
   },
 
-  get: async function ({ cfg, tenantId }): Promise<TypologyConfig | null> {
+  get: async function ({ id, cfg, tenantId }): Promise<TypologyConfig | null> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'SELECT configuration FROM typology WHERE typologycfg = $1 AND tenantid = $2;',
-        values: [cfg, tenantId],
+        text: 'SELECT configuration FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
@@ -56,26 +56,26 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig, ConfigVersion> =
     return queryRes.rows[0].configuration;
   },
 
-  update: async function ({ cfg, tenantId }, payload: TypologyConfig): Promise<TypologyConfig | null> {
+  update: async function ({ id, cfg, tenantId }, payload: TypologyConfig): Promise<TypologyConfig | null> {
     const dtTme = new Date().toISOString();
     payload.updDtTm = dtTme;
     payload.tenantId = tenantId;
 
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'UPDATE typology SET configuration = $1 WHERE typologycfg = $2 AND tenantid = $3 RETURNING configuration',
-        values: [payload, cfg, tenantId],
+        text: 'UPDATE typology SET configuration = $1 WHERE typologyid = $2 AND typologycfg = $3 AND tenantid = $4 RETURNING configuration',
+        values: [payload, id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  remove: async function ({ cfg, tenantId }): Promise<boolean> {
+  remove: async function ({ id, cfg, tenantId }): Promise<boolean> {
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
       {
-        text: 'DELETE FROM typology WHERE typologycfg = $1 AND tenantid = $2;',
-        values: [cfg, tenantId],
+        text: 'DELETE FROM typology WHERE typologyid = $1 AND typologycfg = $2 AND tenantid = $3;',
+        values: [id, cfg, tenantId],
       } satisfies PgQueryConfig,
       'configuration',
     );

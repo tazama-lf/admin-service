@@ -35,7 +35,6 @@ import {
   getRuleFlowStatusHandler,
   getDataModelJsonHandler,
   putDataModelJsonHandler,
-  getActiveNetworkMapHandler,
   createCronJobHandler,
   createPullJobHandler,
   createPushJobHandler,
@@ -350,9 +349,6 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.put('/v1/admin/trs/rule/:ruleId', {
     ...SetOptionsBodyAndParams(updateRuleHandler, routePrivilege.putTrsRule),
-  });
-  fastify.get('/v1/admin/network-map/active', {
-    ...SetOptionsBodyAndParams(getActiveNetworkMapHandler, routePrivilege.getActiveNetworkMap),
   });
   fastify.post('/v1/admin/trs/rule-flow/:id', {
     ...SetOptionsBodyAndParams(createRuleFlowHandler, routePrivilege.postTrsRuleFlow),

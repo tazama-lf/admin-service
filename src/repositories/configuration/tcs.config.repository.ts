@@ -236,6 +236,14 @@ export const updateConfig = async (
     setClauses.push(`transaction_type = $${paramIndex++}`);
     values.push(updates.transactionType);
   }
+  if (updates.endpointPath !== undefined) {
+    setClauses.push(`endpoint_path = $${paramIndex++}`);
+    values.push(updates.endpointPath);
+  }
+  if (updates.version !== undefined) {
+    setClauses.push(`version = $${paramIndex++}`);
+    values.push(updates.version);
+  }
   if (updates.contentType !== undefined) {
     setClauses.push(`content_type = $${paramIndex++}`);
     values.push(updates.contentType);

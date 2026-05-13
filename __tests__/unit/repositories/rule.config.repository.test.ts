@@ -79,6 +79,93 @@ describe('RuleConfigRepository', () => {
     jest.restoreAllMocks();
   });
 
+  describe('list', () => {
+    it('should list rule configurations with default sort and no filters', async () => {
+      const firstConfig = createMockRuleConfig();
+      const secondConfig = { ...createMockRuleConfig(), id: 'rule-002', cfg: '2.0.0' };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: firstConfig }, { configuration: secondConfig }],
+        rowCount: 2,
+      });
+
+      const result = await RuleConfigRepo.list({
+        offset: 5,
+        limit: 10,
+        order: 'DESC',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 DESC OFFSET $4 LIMIT $5;",
+          values: ['ruleid', '', 'cfg', 5, 10, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should list with the first provided filter and custom sort', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.list({
+        filters: { id: 'rule-002', cfg: '2.0.0' },
+        offset: 0,
+        limit: 25,
+        order: 'ASC',
+        sort: 'id',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [], total: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;",
+          values: ['id', 'rule-002', 'id', 0, 25, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+  });
+
+  describe('get', () => {
+    const mockIdentifier = { id: 'rule-001', cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return a rule configuration when found', async () => {
+      const configuration = createMockRuleConfig();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration }],
+        rowCount: 1,
+      });
+
+      const result = await RuleConfigRepo.get(mockIdentifier);
+
+      expect(result).toEqual(configuration);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+          values: [mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when the rule configuration is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.get(mockIdentifier);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('create', () => {
     it('should set both creDtTm and updDtTm to the same ISO 8601 timestamp', async () => {
       // Mock Date.prototype.toISOString to return predictable timestamp
@@ -149,7 +236,7 @@ describe('RuleConfigRepository', () => {
   });
 
   describe('update', () => {
-    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+    const mockIdentifier = { id: '001@1.0.0', cfg: '1.0.0', tenantId: mockTenantId };
 
     it('should set updDtTm to a new ISO 8601 timestamp and preserve creDtTm', async () => {
       const mockToISOString = jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
@@ -173,8 +260,8 @@ describe('RuleConfigRepository', () => {
       // Verify database call was made with correct parameters
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         {
-          text: 'UPDATE rule SET configuration = $1 WHERE rulecfg = $2 AND tenantid = $3 RETURNING configuration;',
-          values: [inputPayload, mockIdentifier.cfg, mockIdentifier.tenantId],
+          text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',
+          values: [inputPayload, mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
         },
         'configuration',
       );
@@ -201,6 +288,18 @@ describe('RuleConfigRepository', () => {
       expect(mockToISOString).toHaveBeenCalled();
     });
 
+    it('should override payload tenantId with the identifier tenantId', async () => {
+      jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
+      mockHandlePostExecuteSqlStatement.mockResolvedValue(mockUpdateResponse);
+
+      const inputPayload = createMockRuleConfig();
+      const originalTenantId = inputPayload.tenantId;
+
+      await RuleConfigRepo.update(mockIdentifier, inputPayload);
+
+      expect(inputPayload.tenantId).toBe(mockIdentifier.tenantId);
+    });
+
     it('should return null when no rows are affected', async () => {
       jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
 
@@ -210,6 +309,39 @@ describe('RuleConfigRepository', () => {
       const result = await RuleConfigRepo.update(mockIdentifier, inputPayload);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('remove', () => {
+    const mockIdentifier = { id: 'rule-001', cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return true when a rule configuration is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      const result = await RuleConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(true);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'DELETE FROM rule WHERE ruleid = $1 AND rulecfg = $2 AND tenantid = $3;',
+          values: [mockIdentifier.id, mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return false when no rule configuration is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await RuleConfigRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
     });
   });
 

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
@@ -74,6 +73,93 @@ describe('NetworkMapRepository', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+  });
+
+  describe('list', () => {
+    it('should list network maps with default sort and no filters', async () => {
+      const firstMap = createMockNetworkMap();
+      const secondMap = { ...createMockNetworkMap(), cfg: '2.0.0', active: false };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration: firstMap }, { configuration: secondMap }],
+        rowCount: 2,
+      });
+
+      const result = await NetworkMapRepo.list({
+        offset: 5,
+        limit: 10,
+        order: 'DESC',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [firstMap, secondMap], total: 2 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 DESC OFFSET $4 LIMIT $5;",
+          values: ['cfg', '', 'cfg', 5, 10, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should list with the first provided filter and custom sort', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.list({
+        filters: { active: 'true', cfg: '1.0.0' },
+        offset: 0,
+        limit: 25,
+        order: 'ASC',
+        sort: 'active',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [], total: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: "SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;",
+          values: ['active', 'true', 'active', 0, 25, mockTenantId],
+        },
+        'configuration',
+      );
+    });
+  });
+
+  describe('get', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return a network map when found', async () => {
+      const configuration = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration }],
+        rowCount: 1,
+      });
+
+      const result = await NetworkMapRepo.get(mockIdentifier);
+
+      expect(result).toEqual(configuration);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM network_map WHERE cfg = $1 AND tenantId = $2;',
+          values: [mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when the network map is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.get(mockIdentifier);
+
+      expect(result).toBeNull();
+    });
   });
 
   describe('create', () => {
@@ -198,6 +284,18 @@ describe('NetworkMapRepository', () => {
       expect(mockToISOString).toHaveBeenCalled();
     });
 
+    it('should override payload tenantId with the identifier tenantId', async () => {
+      jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
+      mockHandlePostExecuteSqlStatement.mockResolvedValue(mockUpdateResponse);
+
+      const inputPayload = createMockNetworkMap();
+      const originalTenantId = inputPayload.tenantId;
+
+      await NetworkMapRepo.update(mockIdentifier, inputPayload);
+
+      expect(inputPayload.tenantId).toBe(mockIdentifier.tenantId);
+    });
+
     it('should return null when no rows are affected', async () => {
       jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(mockUpdateDate);
 
@@ -207,6 +305,39 @@ describe('NetworkMapRepository', () => {
       const result = await NetworkMapRepo.update(mockIdentifier, inputPayload);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('remove', () => {
+    const mockIdentifier = { cfg: '1.0.0', tenantId: mockTenantId };
+
+    it('should return true when a network map is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 1,
+      });
+
+      const result = await NetworkMapRepo.remove(mockIdentifier);
+
+      expect(result).toBe(true);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'DELETE FROM network_map WHERE cfg = $1 AND tenantId = $2;',
+          values: [mockIdentifier.cfg, mockIdentifier.tenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return false when no network map is deleted', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.remove(mockIdentifier);
+
+      expect(result).toBe(false);
     });
   });
 

@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import { databaseManager, loggerService } from '../../src';
-import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.service';
+import { handleGetReportRequestByMsgId, handleGetAllReportsRequest } from '../../src/services/report.logic.service';
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
   const original = jest.requireActual('@tazama-lf/frms-coe-lib');
-
-  return {
-    ...original,
-  };
+  return { ...original };
 });
-// Mock the module
+
+jest.mock('../../src/repositories/configuration/evaluation.repository', () => ({
+  fetchAllEvaluations: jest.fn(),
+}));
+
 jest.mock('../../src/', () => ({
   databaseManager: {
     getReportByMessageId: jest.fn(),
@@ -159,5 +160,40 @@ describe('handleGetReportRequestByMsgId', () => {
     const result = await handleGetReportRequestByMsgId(msgid, tenantId);
 
     expect(result).toBe(mockReport);
+  });
+});
+
+describe('handleGetAllReportsRequest', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should successfully retrieve all reports', async () => {
+    const mockEvaluations = [{ evaluation: {}, messageid: 'msg-1', tenantid: 'tenant-1', credttm: new Date(), iteration: 1 }];
+    const { fetchAllEvaluations } = jest.requireMock('../../src/repositories/configuration/evaluation.repository') as {
+      fetchAllEvaluations: jest.Mock;
+    };
+    fetchAllEvaluations.mockResolvedValue(mockEvaluations);
+
+    const result = await handleGetAllReportsRequest('tenant-1');
+
+    expect(result).toEqual(mockEvaluations);
+    expect(loggerService.log).toHaveBeenCalledWith('Started handling get all reports request for tenant tenant-1');
+    expect(loggerService.log).toHaveBeenCalledWith('Completed handling get all reports request');
+  });
+
+  it('should log and throw when fetchAllEvaluations fails', async () => {
+    const { fetchAllEvaluations } = jest.requireMock('../../src/repositories/configuration/evaluation.repository') as {
+      fetchAllEvaluations: jest.Mock;
+    };
+    fetchAllEvaluations.mockRejectedValue(new Error('DB failure'));
+
+    await expect(handleGetAllReportsRequest('tenant-1')).rejects.toThrow('DB failure');
+
+    expect(loggerService.log).toHaveBeenCalledWith(
+      'Failed fetching all reports from database service with error message: DB failure',
+      'handleGetAllReportsRequest()',
+    );
+    expect(loggerService.log).toHaveBeenCalledWith('Completed handling get all reports request');
   });
 });

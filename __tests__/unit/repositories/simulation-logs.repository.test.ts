@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 const mockHandlePostExecuteSqlStatement = jest.fn();
 
@@ -13,7 +13,16 @@ jest.mock('../../../src', () => ({
   },
 }));
 
-import { getSimulationLogsFromDb, createSimulationLogsInDb } from '../../../src/repositories/configuration/simulation-logs.repository';
+import {
+  getSimulationLogsFromDb,
+  createSimulationLogsInDb,
+  fetchSimulationItemsFromTable,
+  getSimulationMessagesFromDb,
+  fetchCountFromDlh,
+  stageItemsInSimTable,
+  truncateEvaluationResultsInDb,
+  saveRecordInTrsSimulationInDb,
+} from '../../../src/repositories/configuration/simulation-logs.repository';
 
 describe('Simulation Logs Repository', () => {
   beforeEach(() => {
@@ -657,6 +666,253 @@ describe('Simulation Logs Repository', () => {
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
       expect(callArg.values).toHaveLength(8);
+    });
+  });
+
+  describe('fetchSimulationItemsFromTable', () => {
+    it('should fetch rows and map all fields correctly', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ payload: { key: 'val' }, endpointPath: '/ep', credttm: '2026-01-01', tenantId: 'tenant-1', msgid: 'msg-1' }],
+        rowCount: 1,
+      });
+
+      const result = await fetchSimulationItemsFromTable('sim001');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        payload: { key: 'val' },
+        endpointPath: '/ep',
+        credttm: '2026-01-01',
+        tenantId: 'tenant-1',
+        msgid: 'msg-1',
+      });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: [] }), 'simulation');
+    });
+
+    it('should return empty array when table has no rows', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+      const result = await fetchSimulationItemsFromTable('sim002');
+      expect(result).toEqual([]);
+    });
+
+    it('should handle null optional fields in rows', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ payload: {}, endpointPath: null, credttm: null, tenantId: null, msgid: null }],
+        rowCount: 1,
+      });
+      const result = await fetchSimulationItemsFromTable('sim003');
+      expect(result[0].endpointPath).toBeNull();
+      expect(result[0].tenantId).toBeNull();
+    });
+  });
+
+  describe('getSimulationMessagesFromDb', () => {
+    it('should return mapped payload rows', async () => {
+      const mockMessage = { id: 'msg-1', data: 'test' };
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [{ payload: mockMessage }], rowCount: 1 });
+
+      const result = await getSimulationMessagesFromDb('tenant-1', 'sim001');
+
+      expect(result).toEqual([mockMessage]);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: ['tenant-1'] }), 'simulation');
+    });
+
+    it('should return empty array when no messages found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+      const result = await getSimulationMessagesFromDb('tenant-1', 'sim002');
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('fetchCountFromDlh', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+      global.fetch = jest.fn() as jest.Mock;
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('should throw when DLH_URL is not set', async () => {
+      delete process.env.DLH_URL;
+      await expect(fetchCountFromDlh([], 'token')).rejects.toThrow('DLH endpoint is not defined');
+    });
+
+    it('should throw when response is not ok', async () => {
+      process.env.DLH_URL = 'http://dlh.test';
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, statusText: 'Bad Gateway' });
+      await expect(fetchCountFromDlh([], 'token')).rejects.toThrow('Failed to fetch count from DLH: Bad Gateway');
+    });
+
+    it('should sum row_count values from results', async () => {
+      process.env.DLH_URL = 'http://dlh.test';
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [{ row_count: 10 }, { row_count: 5 }] }),
+      });
+      const result = await fetchCountFromDlh([{ txtp: 'pacs.002' }], 'token-abc');
+      expect(result).toEqual({ rowCount: 15 });
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://dlh.test/count',
+        expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ Authorization: 'Bearer token-abc' }) }),
+      );
+    });
+
+    it('should return rowCount 0 when results array is missing', async () => {
+      process.env.DLH_URL = 'http://dlh.test';
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+      const result = await fetchCountFromDlh([], 'token');
+      expect(result).toEqual({ rowCount: 0 });
+    });
+
+    it('should treat missing row_count as 0', async () => {
+      process.env.DLH_URL = 'http://dlh.test';
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ results: [{}] }) });
+      const result = await fetchCountFromDlh([], 'token');
+      expect(result).toEqual({ rowCount: 0 });
+    });
+  });
+
+  describe('stageItemsInSimTable', () => {
+    it('should return null tableName when items array is empty', async () => {
+      const result = await stageItemsInSimTable([]);
+      expect(result).toEqual({ tableName: null });
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+    });
+
+    it('should create table and insert items returning next table name', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ count: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const result = await stageItemsInSimTable([{ _credttm: '2026-01-01', _tenantId: 'tenant-1', _msgid: 'msg-1', endpointPath: '/ep' }]);
+
+      expect(result).toEqual({ tableName: 'sim003' });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
+    });
+
+    it('should use null for non-string optional fields', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ count: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await stageItemsInSimTable([{ data: 'only-payload' }]);
+
+      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
+      expect(insertCall.values[1]).toBeNull();
+      expect(insertCall.values[2]).toBeNull();
+      expect(insertCall.values[3]).toBeNull();
+      expect(insertCall.values[4]).toBeNull();
+    });
+
+    it('should insert multiple items in a single statement', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ count: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await stageItemsInSimTable([{ foo: 'a' }, { foo: 'b' }]);
+
+      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
+      expect(insertCall.values).toHaveLength(10);
+    });
+
+    it('should default tableCount to 0 when COUNT returns no rows', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const result = await stageItemsInSimTable([{ foo: 'x' }]);
+      expect(result).toEqual({ tableName: 'sim001' });
+    });
+  });
+
+  describe('truncateEvaluationResultsInDb', () => {
+    it('should execute TRUNCATE TABLE evaluation', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+
+      await truncateEvaluationResultsInDb();
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'TRUNCATE TABLE evaluation;', values: [] }),
+        'evaluation',
+      );
+    });
+
+    it('should propagate errors from the database', async () => {
+      mockHandlePostExecuteSqlStatement.mockRejectedValue(new Error('DB error'));
+      await expect(truncateEvaluationResultsInDb()).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('saveRecordInTrsSimulationInDb', () => {
+    it('should insert or update a simulation record', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 1 });
+
+      await saveRecordInTrsSimulationInDb({
+        simulationId: 'sim-123',
+        totalRecord: 100,
+        recordProcessed: 50,
+        simStatus: 'running',
+        tenantId: 'tenant-1',
+      });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('INSERT INTO trs_simulation'),
+          values: ['sim-123', 100, 50, 'running', 'tenant-1'],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should handle undefined simulationId', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 1 });
+
+      await saveRecordInTrsSimulationInDb({
+        simulationId: undefined,
+        totalRecord: 10,
+        recordProcessed: 10,
+        simStatus: 'completed',
+        tenantId: 'tenant-2',
+      });
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      expect(callArg.values[0]).toBeUndefined();
+    });
+
+    it('should include ON CONFLICT clause', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 1 });
+
+      await saveRecordInTrsSimulationInDb({
+        simulationId: 'sim-xyz',
+        totalRecord: 5,
+        recordProcessed: 5,
+        simStatus: 'completed',
+        tenantId: 'tenant-3',
+      });
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('ON CONFLICT');
+    });
+
+    it('should propagate errors from the database', async () => {
+      mockHandlePostExecuteSqlStatement.mockRejectedValue(new Error('Insert failed'));
+      await expect(
+        saveRecordInTrsSimulationInDb({
+          simulationId: 'sim-err',
+          totalRecord: 1,
+          recordProcessed: 0,
+          simStatus: 'failed',
+          tenantId: 'tenant-4',
+        }),
+      ).rejects.toThrow('Insert failed');
     });
   });
 });

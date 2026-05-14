@@ -11,6 +11,13 @@ export interface EvaluationRow {
   credttm: Date;
 }
 
+export interface EvaluationSourceRow {
+  evaluation: Record<string, unknown>;
+  messageid: string;
+  tenantid: string;
+  credttm: Date;
+}
+
 export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {
   if (evaluations.length === 0) return;
 
@@ -62,21 +69,25 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
 
     await client.query('COMMIT');
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // keep original failure as root cause
+    }
     throw err;
   } finally {
     client.release();
   }
 };
 
-export const fetchAllEvaluations = async (tenantId: string): Promise<EvaluationRow[]> => {
+export const fetchAllEvaluations = async (tenantId: string): Promise<EvaluationSourceRow[]> => {
   const query = `
     SELECT evaluation, messageid, tenantid, credttm
     FROM evaluation
     WHERE tenantid = $1;
   `;
 
-  const result = await handlePostExecuteSqlStatement<EvaluationRow>(
+  const result = await handlePostExecuteSqlStatement<EvaluationSourceRow>(
     {
       text: query,
       values: [tenantId],

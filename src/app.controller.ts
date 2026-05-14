@@ -74,7 +74,7 @@ import {
   createSimulationLogs,
   getSimulationMessages,
   stageSimulationItems,
-  truncateEvaluationResults,
+  deleteEvaluationsByTenant,
   saveEvaluationsInResultsTable,
   saveRecordInTrsSimulation,
   fetchSimulationItems,
@@ -1898,7 +1898,8 @@ export const stageSimulationItemsHandler = async (req: FastifyRequest, reply: Fa
 
 export const truncateEvaluationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    await truncateEvaluationResults();
+    const { tenantId } = req as ITenantRequest;
+    await deleteEvaluationsByTenant(tenantId);
     reply.code(200).send({ success: true, message: 'Evaluation results truncated successfully' });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');

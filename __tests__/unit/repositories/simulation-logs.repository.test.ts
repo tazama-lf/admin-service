@@ -20,7 +20,7 @@ import {
   getSimulationMessagesFromDb,
   fetchCountFromDlh,
   stageItemsInSimTable,
-  truncateEvaluationResultsInDb,
+  deleteEvaluationsByTenantInDb,
   saveRecordInTrsSimulationInDb,
 } from '../../../src/repositories/configuration/simulation-logs.repository';
 
@@ -837,21 +837,21 @@ describe('Simulation Logs Repository', () => {
     });
   });
 
-  describe('truncateEvaluationResultsInDb', () => {
-    it('should execute TRUNCATE TABLE evaluation', async () => {
+  describe('deleteEvaluationsByTenantInDb', () => {
+    it('should execute DELETE FROM evaluation for the given tenant', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
-      await truncateEvaluationResultsInDb();
+      await deleteEvaluationsByTenantInDb('tenant-1');
 
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
-        expect.objectContaining({ text: 'TRUNCATE TABLE evaluation;', values: [] }),
+        expect.objectContaining({ text: 'DELETE FROM evaluation WHERE tenantid = $1', values: ['tenant-1'] }),
         'evaluation',
       );
     });
 
     it('should propagate errors from the database', async () => {
       mockHandlePostExecuteSqlStatement.mockRejectedValue(new Error('DB error'));
-      await expect(truncateEvaluationResultsInDb()).rejects.toThrow('DB error');
+      await expect(deleteEvaluationsByTenantInDb('tenant-1')).rejects.toThrow('DB error');
     });
   });
 

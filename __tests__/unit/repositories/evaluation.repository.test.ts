@@ -1,6 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockHandlePostExecuteSqlStatement = jest.fn();
+const mockClientQuery = jest.fn();
+const mockClientRelease = jest.fn();
+const mockSimulationConnect = jest.fn();
 
 jest.mock('../../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: (...args: unknown[]) => mockHandlePostExecuteSqlStatement(...args),
@@ -8,6 +11,11 @@ jest.mock('../../../src/services/database.logic.service', () => ({
 
 jest.mock('../../../src', () => ({
   loggerService: { log: jest.fn(), error: jest.fn() },
+  databaseManager: {
+    _simulation: {
+      connect: (...args: unknown[]) => mockSimulationConnect(...args),
+    },
+  },
 }));
 
 import { saveEvaluationsInDb, fetchAllEvaluations } from '../../../src/repositories/configuration/evaluation.repository';
@@ -16,6 +24,8 @@ import type { EvaluationRow } from '../../../src/repositories/configuration/eval
 describe('Evaluation Repository', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSimulationConnect.mockResolvedValue({ query: mockClientQuery, release: mockClientRelease });
+    mockClientQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
   describe('saveEvaluationsInDb', () => {
@@ -29,108 +39,90 @@ describe('Evaluation Repository', () => {
 
     it('should return immediately when evaluations array is empty', async () => {
       await saveEvaluationsInDb([]);
-      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+      expect(mockSimulationConnect).not.toHaveBeenCalled();
     });
 
     it('should throw when tableName is not provided', async () => {
       await expect(saveEvaluationsInDb([makeRow('1')])).rejects.toThrow('tableName is required');
-      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+      expect(mockSimulationConnect).not.toHaveBeenCalled();
     });
 
-    it('should create table and insert when results table does not exist', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: false }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    it('should create table and insert within a serializable transaction', async () => {
+      await saveEvaluationsInDb([makeRow('1')], 'sim001');
+
+      expect(mockSimulationConnect).toHaveBeenCalledTimes(1);
+      expect(mockClientRelease).toHaveBeenCalledTimes(1);
+
+      const beginCall = mockClientQuery.mock.calls[0][0] as string;
+      expect(beginCall).toContain('SERIALIZABLE');
+
+      const createCall = mockClientQuery.mock.calls[1][0] as string;
+      expect(createCall).toContain('CREATE TABLE IF NOT EXISTS');
+      expect(createCall).toContain('sim001_results');
+
+      const commitCall = mockClientQuery.mock.calls[4][0] as string;
+      expect(commitCall).toBe('COMMIT');
+    });
+
+    it('should use MAX(iteration)+1 as the next iteration', async () => {
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // CREATE TABLE
+        .mockResolvedValueOnce({ rows: [{ max_iteration: '2' }] }) // SELECT MAX
+        .mockResolvedValueOnce({ rows: [] }) // INSERT
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       await saveEvaluationsInDb([makeRow('1')], 'sim001');
 
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
-
-      const checkCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: string[] };
-      expect(checkCall.values).toContain('sim001_results');
-
-      const createCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[1][1];
-      expect(createCall).toBe('simulation');
-    });
-
-    it('should query max iteration when results table already exists', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: true }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [{ max_iteration: 2 }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
-      await saveEvaluationsInDb([makeRow('1')], 'sim001');
-
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(4);
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[3][0] as { values: unknown[] };
-      expect(insertCall.values[1]).toBe(3);
+      const insertValues = mockClientQuery.mock.calls[3][1] as unknown[];
+      expect(insertValues[1]).toBe(3);
     });
 
     it('should use iteration 1 when max_iteration returns 0', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: true }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [{ max_iteration: 0 }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
+      // Default mock returns { rows: [] } → max_iteration undefined → 0 → nextIteration = 1
       await saveEvaluationsInDb([makeRow('1')], 'sim001');
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[3][0] as { values: unknown[] };
-      expect(insertCall.values[1]).toBe(1);
+      const insertValues = mockClientQuery.mock.calls[3][1] as unknown[];
+      expect(insertValues[1]).toBe(1);
     });
 
-    it('should use exists=false fallback when row has no exists field', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    it('should rollback and rethrow when a query fails', async () => {
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // CREATE TABLE
+        .mockResolvedValueOnce({ rows: [] }) // SELECT MAX
+        .mockRejectedValueOnce(new Error('DB error')); // INSERT fails
 
-      await saveEvaluationsInDb([makeRow('1')], 'sim001');
+      await expect(saveEvaluationsInDb([makeRow('1')], 'sim001')).rejects.toThrow('DB error');
 
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
+      const rollbackCall = mockClientQuery.mock.calls[4][0] as string;
+      expect(rollbackCall).toBe('ROLLBACK');
+      expect(mockClientRelease).toHaveBeenCalledTimes(1);
     });
 
     it('should insert multiple evaluations with correct placeholder count', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: false }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
       await saveEvaluationsInDb([makeRow('a'), makeRow('b')], 'sim002');
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
-      expect(insertCall.values).toHaveLength(10);
+      const insertValues = mockClientQuery.mock.calls[3][1] as unknown[];
+      expect(insertValues).toHaveLength(10);
     });
 
-    it('should include ON CONFLICT DO NOTHING in insert query', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: false }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
+    it('should not use ON CONFLICT in the insert query', async () => {
       await saveEvaluationsInDb([makeRow('1')], 'sim001');
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { text: string };
-      expect(insertCall.text).toContain('ON CONFLICT');
-      expect(insertCall.text).toContain('DO NOTHING');
+      const insertSql = mockClientQuery.mock.calls[3][0] as string;
+      expect(insertSql).not.toContain('ON CONFLICT');
     });
 
     it('should stringify evaluation JSON before inserting', async () => {
-      mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ exists: false }], rowCount: 1 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
       const evalData = { score: 99 };
       await saveEvaluationsInDb(
         [{ iteration: 1, evaluation: evalData, messageid: 'msg-1', tenantid: 'tenant-1', credttm: new Date() }],
         'sim001',
       );
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
-      expect(insertCall.values[0]).toBe(JSON.stringify(evalData));
+      const insertValues = mockClientQuery.mock.calls[3][1] as unknown[];
+      expect(insertValues[0]).toBe(JSON.stringify(evalData));
     });
   });
 

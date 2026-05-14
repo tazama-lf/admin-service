@@ -4,7 +4,7 @@ import {
   getSimulationLogsFromDb,
   getSimulationMessagesFromDb,
   stageItemsInSimTable,
-  truncateEvaluationResultsInDb,
+  deleteEvaluationsByTenantInDb,
   saveRecordInTrsSimulationInDb,
   fetchSimulationItemsFromTable,
   type SimulationItemRow,
@@ -41,8 +41,8 @@ export const getSimulationMessages = async (tenantId: string, tableName: string)
 export const stageSimulationItems = async (items: Array<Record<string, unknown>>): Promise<{ tableName: string | null }> =>
   await stageItemsInSimTable(items);
 
-export const truncateEvaluationResults = async (): Promise<void> => {
-  await truncateEvaluationResultsInDb();
+export const deleteEvaluationsByTenant = async (tenantId: string): Promise<void> => {
+  await deleteEvaluationsByTenantInDb(tenantId);
 };
 
 export const saveEvaluationsInResultsTable = async (evaluations: EvaluationRow[], tableName?: string): Promise<void> => {

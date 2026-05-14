@@ -217,19 +217,20 @@ describe('Simulation Logs Logic Service', () => {
     });
   });
 
-  describe('truncateEvaluationResults', () => {
-    it('should call truncateEvaluationResultsInDb', async () => {
-      (simulationLogsRepository.truncateEvaluationResultsInDb as jest.Mock).mockResolvedValue(undefined);
+  describe('deleteEvaluationsByTenant', () => {
+    it('should call deleteEvaluationsByTenantInDb with tenantId', async () => {
+      (simulationLogsRepository.deleteEvaluationsByTenantInDb as jest.Mock).mockResolvedValue(undefined);
 
-      await simulationLogsService.truncateEvaluationResults();
+      await simulationLogsService.deleteEvaluationsByTenant('tenant-1');
 
-      expect(simulationLogsRepository.truncateEvaluationResultsInDb).toHaveBeenCalledTimes(1);
+      expect(simulationLogsRepository.deleteEvaluationsByTenantInDb).toHaveBeenCalledWith('tenant-1');
+      expect(simulationLogsRepository.deleteEvaluationsByTenantInDb).toHaveBeenCalledTimes(1);
     });
 
     it('should propagate errors from repository', async () => {
-      (simulationLogsRepository.truncateEvaluationResultsInDb as jest.Mock).mockRejectedValue(new Error('Truncate failed'));
+      (simulationLogsRepository.deleteEvaluationsByTenantInDb as jest.Mock).mockRejectedValue(new Error('Truncate failed'));
 
-      await expect(simulationLogsService.truncateEvaluationResults()).rejects.toThrow('Truncate failed');
+      await expect(simulationLogsService.deleteEvaluationsByTenant('tenant-1')).rejects.toThrow('Truncate failed');
     });
   });
 
@@ -282,10 +283,10 @@ describe('Simulation Logs Logic Service', () => {
       const mockItems = [{ payload: {}, endpointPath: '/ep', credttm: '2026-01-01', tenantId: 'tenant-1', msgid: 'msg-1' }];
       (simulationLogsRepository.fetchSimulationItemsFromTable as jest.Mock).mockResolvedValue(mockItems);
 
-      const result = await simulationLogsService.fetchSimulationItems('sim001');
+      const result = await simulationLogsService.fetchSimulationItems('sim001', 'tenant-1');
 
       expect(result).toEqual(mockItems);
-      expect(simulationLogsRepository.fetchSimulationItemsFromTable).toHaveBeenCalledWith('sim001');
+      expect(simulationLogsRepository.fetchSimulationItemsFromTable).toHaveBeenCalledWith('sim001', 'tenant-1');
     });
   });
 

@@ -244,12 +244,11 @@ export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>
   return { tableName: nextTableName };
 };
 
-export const truncateEvaluationResultsInDb = async (): Promise<void> => {
-  const query = 'TRUNCATE TABLE evaluation;';
+export const deleteEvaluationsByTenantInDb = async (tenantId: string): Promise<void> => {
   await handlePostExecuteSqlStatement(
     {
-      text: query,
-      values: [],
+      text: 'DELETE FROM evaluation WHERE tenantid = $1',
+      values: [tenantId],
     } satisfies PgQueryConfig,
     'evaluation',
   );

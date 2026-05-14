@@ -19,6 +19,7 @@ const ALLOWED_SIMULATION_COLUMNS = new Set([
 
 export const createSimulationInDB = async (data: Record<string, unknown>): Promise<string> => {
   const keys = Object.keys(data);
+  if (keys.length === 0) throw new Error('Empty payload for createSimulationInDB');
   const invalid = keys.filter((k) => !ALLOWED_SIMULATION_COLUMNS.has(k));
   if (invalid.length) throw new Error(`Invalid columns for trs_simulation insert: ${invalid.join(', ')}`);
 
@@ -82,7 +83,9 @@ export const findSimulationsInDB = async (tenantId: string, limit: number, offse
 
 const validateSimTableName = (name: string): void => {
   if (!/^[a-z0-9][a-z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid simulation table name: "${name}". Names must start with a lowercase letter or digit and may contain lowercase letters, digits, and underscores.`);
+    throw new Error(
+      `Invalid simulation table name: "${name}". Names must start with a lowercase letter or digit and may contain lowercase letters, digits, and underscores.`,
+    );
   }
 };
 
@@ -90,9 +93,9 @@ export const getSimulationStatsFromDB = async (sim: string, iterationNo: string,
   validateSimTableName(sim);
   const simResults = `${sim}_results`;
 
-  const totalQuery = `SELECT COUNT(*) AS cnt FROM "${sim}"`;
+  const totalQuery = `SELECT COUNT(*) AS cnt FROM "${sim}" WHERE "tenantId" = $1`;
   const totalResult = await handlePostExecuteSqlStatement<{ cnt: string }>(
-    { text: totalQuery, values: [] } satisfies PgQueryConfig,
+    { text: totalQuery, values: [tenantId] } satisfies PgQueryConfig,
     'simulation',
   );
   const totalNoOfRecords = parseInt(totalResult.rows[0]?.cnt ?? '0', 10);
@@ -154,9 +157,10 @@ export const getSimulationStatsFromDB = async (sim: string, iterationNo: string,
       MIN(credttm) AS first_ts,
       MAX(credttm) AS last_ts
     FROM "${sim}"
+    WHERE "tenantId" = $1
   `;
   const timingResult = await handlePostExecuteSqlStatement<{ first_ts: string | null; last_ts: string | null }>(
-    { text: timingQuery, values: [] } satisfies PgQueryConfig,
+    { text: timingQuery, values: [tenantId] } satisfies PgQueryConfig,
     'simulation',
   );
   const firstTs = timingResult.rows[0]?.first_ts ?? null;

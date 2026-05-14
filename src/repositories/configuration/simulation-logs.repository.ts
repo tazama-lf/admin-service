@@ -121,7 +121,7 @@ export const createSimulationLogsInDb = async (
   );
 };
 
-export const fetchSimulationItemsFromTable = async (tableName: string): Promise<SimulationItemRow[]> => {
+export const fetchSimulationItemsFromTable = async (tableName: string, tenantId: string): Promise<SimulationItemRow[]> => {
   const result = await handlePostExecuteSqlStatement<{
     payload: Record<string, unknown>;
     endpointPath: string | null;
@@ -130,8 +130,11 @@ export const fetchSimulationItemsFromTable = async (tableName: string): Promise<
     msgid: string | null;
   }>(
     {
-      text: pgFormat('SELECT payload, "endpointPath", credttm, "tenantId", msgid FROM %I ORDER BY credttm ASC', tableName),
-      values: [],
+      text: pgFormat(
+        'SELECT payload, "endpointPath", credttm, "tenantId", msgid FROM %I WHERE "tenantId" = $1 ORDER BY credttm ASC',
+        tableName,
+      ),
+      values: [tenantId],
     } satisfies PgQueryConfig,
     'simulation',
   );

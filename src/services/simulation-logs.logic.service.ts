@@ -59,8 +59,8 @@ export const saveRecordInTrsSimulation = async (simulationData: {
   await saveRecordInTrsSimulationInDb(simulationData);
 };
 
-export const fetchSimulationItems = async (tableName: string): Promise<SimulationItemRow[]> =>
-  await fetchSimulationItemsFromTable(tableName);
+export const fetchSimulationItems = async (tableName: string, tenantId: string): Promise<SimulationItemRow[]> =>
+  await fetchSimulationItemsFromTable(tableName, tenantId);
 
 export const handleDlhFetchCount = async (queries: Array<Record<string, unknown>>, token: string): Promise<IRecordCount> =>
   await fetchCountFromDlh(queries, token);

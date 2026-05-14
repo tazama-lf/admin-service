@@ -1434,8 +1434,15 @@ export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: F
 
 export const fetchSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { tableName } = req.query as { tableName: string };
-    const items = await fetchSimulationItems(tableName);
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName?: string };
+
+    if (!tableName || tableName.trim() === '') {
+      reply.code(400).send({ error: 'tableName is required' });
+      return;
+    }
+
+    const items = await fetchSimulationItems(tableName, tenantId);
     reply.code(200).send({ items, count: items.length });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to fetch simulation items');

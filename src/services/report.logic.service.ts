@@ -2,7 +2,7 @@
 import type { Evaluation } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TADPReport';
 import { databaseManager, loggerService } from '..';
 import { fetchAllEvaluations } from '../repositories/configuration/evaluation.repository';
-import type { EvaluationRow } from '../repositories/configuration/evaluation.repository';
+import type {  EvaluationSourceRow } from '../repositories/configuration/evaluation.repository';
 export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: string): Promise<Evaluation | undefined> => {
   let report;
   try {
@@ -22,7 +22,7 @@ export const handleGetReportRequestByMsgId = async (msgid: string, tenantId: str
   return report;
 };
 
-export const handleGetAllReportsRequest = async (tenantId: string): Promise<EvaluationRow[]> => {
+export const handleGetAllReportsRequest = async (tenantId: string): Promise<EvaluationSourceRow[]> => {
   let reports;
   try {
     loggerService.log(`Started handling get all reports request for tenant ${tenantId}`);

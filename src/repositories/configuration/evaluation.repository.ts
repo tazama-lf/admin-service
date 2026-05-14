@@ -1,5 +1,6 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { databaseManager } from '../..';
 import pgFormat from 'pg-format';
 
 export interface EvaluationRow {
@@ -19,36 +20,15 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
 
   const resultsTableName = `${tableName}_results`;
 
-  // Check if the results table already exists in the simulation DB
-  const tableExistsResult = await handlePostExecuteSqlStatement<{ exists: boolean }>(
-    {
-      text: `SELECT EXISTS (
-        SELECT FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = $1
-      ) AS exists`,
-      values: [resultsTableName],
-    } satisfies PgQueryConfig,
-    'simulation',
-  );
+  // Acquire a dedicated client so all statements share the same SERIALIZABLE transaction.
+  // This prevents two concurrent callers from reading the same MAX(iteration) and silently
+  // dropping each other's rows via ON CONFLICT DO NOTHING.
+  const client = await databaseManager._simulation.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
 
-  const tableExists = tableExistsResult.rows[0]?.exists ?? false;
-
-  let nextIteration = 1;
-  if (tableExists) {
-    const maxIterationResult = await handlePostExecuteSqlStatement<{ max_iteration: number }>(
-      {
-        text: pgFormat('SELECT COALESCE(MAX(iteration), 0) AS max_iteration FROM %I', resultsTableName),
-        values: [],
-      } satisfies PgQueryConfig,
-      'simulation',
-    );
-    nextIteration = parseInt(String(maxIterationResult.rows[0]?.max_iteration ?? '0'), 10) + 1;
-  }
-
-  await handlePostExecuteSqlStatement(
-    {
-      text: pgFormat(
+    await client.query(
+      pgFormat(
         `CREATE TABLE IF NOT EXISTS %I (
           evaluation JSONB,
           iteration NUMERIC,
@@ -59,28 +39,34 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
         )`,
         resultsTableName,
       ),
-      values: [],
-    } satisfies PgQueryConfig,
-    'simulation',
-  );
+    );
 
-  const values: unknown[] = [];
-  const placeholders = evaluations.map((row, i) => {
-    const base = i * 5;
-    values.push(JSON.stringify(row.evaluation), nextIteration, row.messageid, row.tenantid, row.credttm);
-    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
-  });
+    // Compute the next iteration number inside the same transaction so no concurrent
+    // caller can observe the same MAX value before we commit our own rows.
+    const maxIterationResult = await client.query<{ max_iteration: string }>(
+      pgFormat('SELECT COALESCE(MAX(iteration), 0) AS max_iteration FROM %I', resultsTableName),
+    );
+    const nextIteration = parseInt(maxIterationResult.rows[0]?.max_iteration ?? '0', 10) + 1;
 
-  await handlePostExecuteSqlStatement(
-    {
-      text: pgFormat(
-        `INSERT INTO %I (evaluation, iteration, messageid, tenantid, credttm) VALUES ${placeholders.join(', ')} ON CONFLICT (messageid, tenantid, iteration) DO NOTHING`,
-        resultsTableName,
-      ),
+    const values: unknown[] = [];
+    const placeholders = evaluations.map((row, i) => {
+      const base = i * 5;
+      values.push(JSON.stringify(row.evaluation), nextIteration, row.messageid, row.tenantid, row.credttm);
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+    });
+
+    await client.query(
+      pgFormat(`INSERT INTO %I (evaluation, iteration, messageid, tenantid, credttm) VALUES ${placeholders.join(', ')}`, resultsTableName),
       values,
-    } satisfies PgQueryConfig,
-    'simulation',
-  );
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 export const fetchAllEvaluations = async (tenantId: string): Promise<EvaluationRow[]> => {

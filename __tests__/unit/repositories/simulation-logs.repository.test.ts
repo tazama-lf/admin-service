@@ -876,7 +876,7 @@ describe('Simulation Logs Repository', () => {
       );
     });
 
-    it('should handle undefined simulationId', async () => {
+    it('should generate a UUID when simulationId is undefined', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 1 });
 
       await saveRecordInTrsSimulationInDb({
@@ -888,7 +888,8 @@ describe('Simulation Logs Repository', () => {
       });
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
-      expect(callArg.values[0]).toBeUndefined();
+      expect(typeof callArg.values[0]).toBe('string');
+      expect(callArg.values[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     });
 
     it('should include ON CONFLICT clause', async () => {

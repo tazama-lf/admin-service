@@ -2,6 +2,7 @@ import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { IRecordCount, SimulationLog, SimulationLogQueryOptions, SimulationMessage } from '../../interface/simulattionLogs.interface';
 import pgFormat from 'pg-format';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface SimulationItemRow {
   payload: Record<string, unknown>;
@@ -262,6 +263,7 @@ export const saveRecordInTrsSimulationInDb = async (simulationData: {
   tenantId: string;
 }): Promise<void> => {
   const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = simulationData;
+  const resolvedSimulationId = simulationId ?? uuidv4();
   const query = `
     INSERT INTO trs_simulation (simulation_id, total_record, record_processed, sim_status, tenant_id, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -274,7 +276,7 @@ export const saveRecordInTrsSimulationInDb = async (simulationData: {
   await handlePostExecuteSqlStatement(
     {
       text: query,
-      values: [simulationId, totalRecord, recordProcessed, simStatus, tenantId],
+      values: [resolvedSimulationId, totalRecord, recordProcessed, simStatus, tenantId],
     } satisfies PgQueryConfig,
     'configuration',
   );

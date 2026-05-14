@@ -81,8 +81,8 @@ export const findSimulationsInDB = async (tenantId: string, limit: number, offse
 };
 
 const validateSimTableName = (name: string): void => {
-  if (!/^[a-z][a-z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid simulation table name: "${name}". Only lowercase letters, digits, and underscores are allowed.`);
+  if (!/^[a-z0-9][a-z0-9_]*$/.test(name)) {
+    throw new Error(`Invalid simulation table name: "${name}". Names must start with a lowercase letter or digit and may contain lowercase letters, digits, and underscores.`);
   }
 };
 

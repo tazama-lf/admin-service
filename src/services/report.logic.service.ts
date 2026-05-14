@@ -27,7 +27,7 @@ export const handleGetAllReportsRequest = async (tenantId: string): Promise<Eval
   try {
     loggerService.log(`Started handling get all reports request for tenant ${tenantId}`);
 
-    reports = await fetchAllEvaluations();
+    reports = await fetchAllEvaluations(tenantId);
   } catch (error) {
     const errorMessage = error as { message: string };
     loggerService.log(

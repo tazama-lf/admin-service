@@ -138,37 +138,37 @@ describe('Evaluation Repository', () => {
     it('should return all evaluation rows', async () => {
       const mockRows = [
         { evaluation: { score: 100 }, messageid: 'msg-1', tenantid: 'tenant-1', credttm: new Date() },
-        { evaluation: { score: 50 }, messageid: 'msg-2', tenantid: 'tenant-2', credttm: new Date() },
+        { evaluation: { score: 50 }, messageid: 'msg-2', tenantid: 'tenant-1', credttm: new Date() },
       ];
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: mockRows, rowCount: 2 });
 
-      const result = await fetchAllEvaluations();
+      const result = await fetchAllEvaluations('tenant-1');
 
       expect(result).toEqual(mockRows);
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: [] }), 'evaluation');
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: ['tenant-1'] }), 'evaluation');
     });
 
     it('should return empty array when no evaluations exist', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
-      const result = await fetchAllEvaluations();
+      const result = await fetchAllEvaluations('tenant-1');
 
       expect(result).toEqual([]);
     });
 
-    it('should query the evaluation table', async () => {
+    it('should query the evaluation table with WHERE tenantid clause', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
-      await fetchAllEvaluations();
+      await fetchAllEvaluations('tenant-1');
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain('evaluation');
+      expect(callArg.text).toContain('WHERE tenantid = $1');
     });
 
     it('should propagate database errors', async () => {
       mockHandlePostExecuteSqlStatement.mockRejectedValue(new Error('DB error'));
 
-      await expect(fetchAllEvaluations()).rejects.toThrow('DB error');
+      await expect(fetchAllEvaluations('tenant-1')).rejects.toThrow('DB error');
     });
   });
 });

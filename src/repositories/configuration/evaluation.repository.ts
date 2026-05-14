@@ -83,16 +83,17 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
   );
 };
 
-export const fetchAllEvaluations = async (): Promise<EvaluationRow[]> => {
+export const fetchAllEvaluations = async (tenantId: string): Promise<EvaluationRow[]> => {
   const query = `
-    SELECT evaluation, messageid, tenantid, credttm, tenantid
-    FROM evaluation;
+    SELECT evaluation, messageid, tenantid, credttm
+    FROM evaluation
+    WHERE tenantid = $1;
   `;
 
   const result = await handlePostExecuteSqlStatement<EvaluationRow>(
     {
       text: query,
-      values: [],
+      values: [tenantId],
     } satisfies PgQueryConfig,
     'evaluation',
   );

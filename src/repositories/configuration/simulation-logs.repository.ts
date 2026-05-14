@@ -188,16 +188,24 @@ export const stageItemsInSimTable = async (items: Array<Record<string, unknown>>
     return { tableName: null };
   }
 
-  const tableCountResult = await handlePostExecuteSqlStatement<{ count: string }>(
+  await handlePostExecuteSqlStatement(
     {
-      text: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'sim%'",
+      text: 'CREATE SEQUENCE IF NOT EXISTS sim_table_seq',
       values: [],
     } satisfies PgQueryConfig,
     'simulation',
   );
 
-  const tableCount = parseInt(tableCountResult.rows[0]?.count ?? '0', 10);
-  const nextTableName = `sim${String(tableCount + 1).padStart(3, '0')}`;
+  const seqResult = await handlePostExecuteSqlStatement<{ id: string }>(
+    {
+      text: "SELECT NEXTVAL('sim_table_seq') AS id",
+      values: [],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const seqId = parseInt(seqResult.rows[0]?.id ?? '1', 10);
+  const nextTableName = `sim${String(seqId).padStart(3, '0')}`;
 
   await handlePostExecuteSqlStatement(
     {

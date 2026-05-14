@@ -785,25 +785,27 @@ describe('Simulation Logs Repository', () => {
 
     it('should create table and insert items returning next table name', async () => {
       mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ count: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: '3' }], rowCount: 1 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await stageItemsInSimTable([{ _credttm: '2026-01-01', _tenantId: 'tenant-1', _msgid: 'msg-1', endpointPath: '/ep' }]);
 
       expect(result).toEqual({ tableName: 'sim003' });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(4);
     });
 
     it('should use null for non-string optional fields', async () => {
       mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ count: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: '1' }], rowCount: 1 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       await stageItemsInSimTable([{ data: 'only-payload' }]);
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
+      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[3][0] as { values: unknown[] };
       expect(insertCall.values[1]).toBeNull();
       expect(insertCall.values[2]).toBeNull();
       expect(insertCall.values[3]).toBeNull();
@@ -812,18 +814,20 @@ describe('Simulation Logs Repository', () => {
 
     it('should insert multiple items in a single statement', async () => {
       mockHandlePostExecuteSqlStatement
-        .mockResolvedValueOnce({ rows: [{ count: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: '1' }], rowCount: 1 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       await stageItemsInSimTable([{ foo: 'a' }, { foo: 'b' }]);
 
-      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[2][0] as { values: unknown[] };
+      const insertCall = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[3][0] as { values: unknown[] };
       expect(insertCall.values).toHaveLength(10);
     });
 
-    it('should default tableCount to 0 when COUNT returns no rows', async () => {
+    it('should default seqId to 1 when NEXTVAL returns no rows', async () => {
       mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 });

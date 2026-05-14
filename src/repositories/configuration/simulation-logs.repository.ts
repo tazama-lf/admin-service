@@ -149,7 +149,7 @@ export const fetchSimulationItemsFromTable = async (tableName: string): Promise<
 export const getSimulationMessagesFromDb = async (tenantId: string, tableName: string): Promise<SimulationMessage[]> => {
   const result = await handlePostExecuteSqlStatement<{ payload: SimulationMessage }>(
     {
-      text: pgFormat('SELECT payload FROM %I WHERE tenantId = $1 order by credttm', tableName),
+      text: pgFormat('SELECT payload FROM %I WHERE "tenantId" = $1 order by credttm', tableName),
       values: [tenantId],
     } satisfies PgQueryConfig,
     'simulation',

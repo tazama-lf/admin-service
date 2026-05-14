@@ -85,7 +85,7 @@ export const saveEvaluationsInDb = async (evaluations: EvaluationRow[], tableNam
 
 export const fetchAllEvaluations = async (): Promise<EvaluationRow[]> => {
   const query = `
-    SELECT evaluation, messageid, tenantid, credttm, tenantid
+    SELECT evaluation, messageid, tenantid, credttm
     FROM evaluation;
   `;
 

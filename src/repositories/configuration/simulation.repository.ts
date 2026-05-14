@@ -141,11 +141,11 @@ export const getSimulationStatsFromDB = async (sim: string, iterationNo: string,
   let runDateTime: string | null = null;
   if (rawRunDateTime) {
     const d = new Date(rawRunDateTime);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const min = String(d.getUTCMinutes()).padStart(2, '0');
     runDateTime = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
   }
 
@@ -216,9 +216,9 @@ export const getSimulationResultsFromDB = async (
   }
 
   if (filters.outcome === 'Hit') {
-    filterClauses.push('r.msg_id IS NOT NULL');
+    filterClauses.push("(r.msg_id IS NOT NULL AND r.evaluation->'report'->>'status' != 'NALT')");
   } else if (filters.outcome === 'No-Hit') {
-    filterClauses.push('r.msg_id IS NULL');
+    filterClauses.push("(r.msg_id IS NULL OR r.evaluation->'report'->>'status' = 'NALT')");
   }
 
   const filterSQL = filterClauses.length > 0 ? `AND ${filterClauses.join(' AND ')}` : '';
@@ -245,7 +245,7 @@ export const getSimulationResultsFromDB = async (
     SELECT
       s.msgid AS msg_id,
       s.payload->>'TxTp' AS msg_type,
-      CASE WHEN r.msg_id IS NOT NULL THEN 'Hit' ELSE 'No-Hit' END AS outcome,
+      CASE WHEN r.msg_id IS NOT NULL AND r.evaluation->'report'->>'status' != 'NALT' THEN 'Hit' ELSE 'No-Hit' END AS outcome,
       s.credttm AS time,
       r.evaluation AS evaluation
     FROM "${sim}" s

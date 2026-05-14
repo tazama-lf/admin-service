@@ -1963,12 +1963,12 @@ export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: Fasti
 
 export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    const { simulationId, totalRecord, recordProcessed, simStatus, tenantId } = req.body as {
+    const { tenantId } = req as ITenantRequest;
+    const { simulationId, totalRecord, recordProcessed, simStatus } = req.body as {
       simulationId: string | undefined;
       totalRecord: number;
       recordProcessed: number;
       simStatus: string;
-      tenantId: string;
     };
     await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
     reply.code(200).send();

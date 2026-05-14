@@ -123,7 +123,7 @@ describe('Evaluation Repository', () => {
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-      const evalData = { score: 99, rule: 'test' };
+      const evalData = { score: 99 };
       await saveEvaluationsInDb(
         [{ iteration: 1, evaluation: evalData, messageid: 'msg-1', tenantid: 'tenant-1', credttm: new Date() }],
         'sim001',

@@ -440,7 +440,7 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/reports/getreportbymsgid', {
     ...SetOptionsBodyAndParams(reportRequestHandler, routePrivilege.getReport, undefined, GetReportSchema),
   });
-  fastify.get('/v1/dlh/truncate-evaluations', {
+  fastify.delete('/v1/dlh/truncate-evaluations', {
     ...SetOptionsBodyAndParams(truncateEvaluationResultsHandler, routePrivilege.fetchFromDlh),
   });
   fastify.get('/v1/admin/event-flow-control/entity', {

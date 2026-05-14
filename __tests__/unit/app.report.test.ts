@@ -178,6 +178,7 @@ describe('handleGetAllReportsRequest', () => {
     const result = await handleGetAllReportsRequest('tenant-1');
 
     expect(result).toEqual(mockEvaluations);
+    expect(fetchAllEvaluations).toHaveBeenCalledWith('tenant-1');
     expect(loggerService.log).toHaveBeenCalledWith('Started handling get all reports request for tenant tenant-1');
     expect(loggerService.log).toHaveBeenCalledWith('Completed handling get all reports request');
   });

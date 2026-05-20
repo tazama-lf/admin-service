@@ -9,7 +9,7 @@ This handover captures completed work items linked to `fatimali03` in `tazama-lf
 | PR | Title | Merged At |
 |---|---|---|
 | [#285](https://github.com/tazama-lf/admin-service/pull/285) | fix: restore optimistic locking for TCS config updates | 2026-04-13 |
-| [#282](https://github.com/tazama-lf/admin-service/pull/282) | feat: paysys routeprivilege fixes | 2026-04-07 |
+| [#282](https://github.com/tazama-lf/admin-service/pull/282) | feat: paysys route privilege fixes | 2026-04-07 |
 | [#281](https://github.com/tazama-lf/admin-service/pull/281) | fix: route privilege admin-service level | 2026-04-07 |
 | [#269](https://github.com/tazama-lf/admin-service/pull/269) | feat: Test cases and bug fixes | 2026-04-01 |
 | [#268](https://github.com/tazama-lf/admin-service/pull/268) | feat: updated config | 2026-03-29 |

@@ -6,17 +6,15 @@ This handover captures completed work items linked to `fatimali03` in `tazama-lf
 
 ## Completed PRs (Merged)
 
-_Note: PR titles below are copied verbatim from GitHub._
-
 | PR | Title | Merged At |
 |---|---|---|
 | [#285](https://github.com/tazama-lf/admin-service/pull/285) | fix: restore optimistic locking for TCS config updates | 2026-04-13 |
 | [#282](https://github.com/tazama-lf/admin-service/pull/282) | feat: paysys routeprivilege fixes | 2026-04-07 |
-| [#281](https://github.com/tazama-lf/admin-service/pull/281) | fix: route priveldge admin-service level | 2026-04-07 |
+| [#281](https://github.com/tazama-lf/admin-service/pull/281) | fix: route privilege admin-service level | 2026-04-07 |
 | [#269](https://github.com/tazama-lf/admin-service/pull/269) | feat: Testcases, and Bug Fixes | 2026-04-01 |
 | [#268](https://github.com/tazama-lf/admin-service/pull/268) | feat: updated config | 2026-03-29 |
-| [#267](https://github.com/tazama-lf/admin-service/pull/267) | fix: route priviledge | 2026-03-29 |
-| [#266](https://github.com/tazama-lf/admin-service/pull/266) | fix: stablizing code for TCS | 2026-03-29 |
+| [#267](https://github.com/tazama-lf/admin-service/pull/267) | fix: route privilege | 2026-03-29 |
+| [#266](https://github.com/tazama-lf/admin-service/pull/266) | fix: stabilizing code for TCS | 2026-03-29 |
 | [#261](https://github.com/tazama-lf/admin-service/pull/261) | feat: Common files changed PR | 2026-03-23 |
 | [#260](https://github.com/tazama-lf/admin-service/pull/260) | feat: all new code TCS and TRS | 2026-03-23 |
 | [#257](https://github.com/tazama-lf/admin-service/pull/257) | feat: implementation of connection-studio and Rule-studio following repository pattern for queries | 2026-03-05 |

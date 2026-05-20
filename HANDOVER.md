@@ -32,7 +32,7 @@ This handover captures completed work items linked to `fatimali03` in `tazama-lf
 | [#173](https://github.com/tazama-lf/admin-service/issues/173) | Use tenantId from KeyCloak claim to ring-fence Tazama conditions by tenant | Closed |
 
 ## Key Delivery Themes
-- **TCS migration and feature enablement** (PRs #247, #256, #257, #260, #261).
+- **TCS migration and feature delivery** (PRs #247, #256, #257, #260, #261).
 - **Route privilege and RBAC hardening** (PRs #267, #281, #282; Issue #271).
 - **Configuration stability and concurrency safety** via optimistic locking and related fixes (PR #285; Issue #273).
 - **Tenant isolation and multi-tenant support** (PR #187; Issues #173 and #174).

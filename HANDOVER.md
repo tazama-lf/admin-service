@@ -6,6 +6,8 @@ This handover captures completed work items linked to `fatimali03` in `tazama-lf
 
 ## Completed PRs (Merged)
 
+_Note: PR titles below are copied verbatim from GitHub._
+
 | PR | Title | Merged At |
 |---|---|---|
 | [#285](https://github.com/tazama-lf/admin-service/pull/285) | fix: restore optimistic locking for TCS config updates | 2026-04-13 |

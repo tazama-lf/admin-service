@@ -69,6 +69,10 @@ import {
   updateMaskHandler,
   getMaskByIdHandler,
   reviewMaskHandler,
+  updateSimulationHandler,
+  createSimulationHandler,
+  getSimulationByIdHandler,
+  getSimulationsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -144,6 +148,10 @@ const routePrivilege = {
   createMask: 'trs_data_engineer_editor',
   updateMask: 'trs_data_engineer_editor',
   reviewMask: 'trs_data_engineer_approver',
+  createSimulationSuites: ['editor', 'approver'],
+  getSimulationSuites: ['editor', 'approver'],
+  getSimulationSuiteById: ['editor', 'approver'],
+  updateSimulationSuite: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -445,6 +453,24 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.get('/v1/admin/simulation-logs/:ruleId', {
     ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),
+  });
+
+  // Simulation Studio
+
+  fastify.post('/v1/admin/trs/simulation-studio/suites', {
+    ...SetOptionsBodyAndParams(createSimulationHandler, routePrivilege.createSimulationSuites),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites', {
+    ...SetOptionsBodyAndParams(getSimulationsHandler, routePrivilege.getSimulationSuites),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id', {
+    ...SetOptionsBodyAndParams(getSimulationByIdHandler, routePrivilege.getSimulationSuiteById),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/suites/:id', {
+    ...SetOptionsBodyAndParams(updateSimulationHandler, routePrivilege.updateSimulationSuite),
   });
 }
 

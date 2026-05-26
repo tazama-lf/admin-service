@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+process.env.ACTIVE_CONDITIONS_ONLY = 'true';
+
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as simulationSuitesRepository from '../../src/repositories/simulation-studio/suites.repository';

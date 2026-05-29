@@ -1,7 +1,7 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import * as util from 'node:util';
-import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
+import type { AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import type { ITenantRequest } from './interface/ITenantRequest';
@@ -67,8 +67,20 @@ import {
 } from './services/masking.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import {
+  getSimulationSuites,
+  getSimulationSuiteById,
+  createSimulationSuite,
+  updateSimulationSuite,
+} from './services/simulation-suites.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
+import type {
+  SimulationSuitesQueryDto,
+  CreateSimulationSuiteDto,
+  UpdateSimulationSuiteDto,
+  SimulationSuiteIdParamsDto,
+} from './interface/simulation-suites.interface';
 import {
   handleCreatePushJob,
   handleGetAllJobs,
@@ -281,7 +293,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const updateData = req.body as Record<string, unknown>;
     const { tenantId } = req as ITenantRequest;
 
-    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
+    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData);
     reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to update config');
@@ -1703,5 +1715,190 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     ErrorHandler.sendError(reply, error, 'Failed to review masking configuration');
   } finally {
     loggerService.log('End - Handle review mask request');
+  }
+};
+
+// Simulation Studio
+
+/**
+ * WIZARD STEP 1: POST - Create Simulation Suite with Rule & Details
+ *
+ * Flow:
+ * 1. User fills "Rule & Details" form (Step 1 of 7)
+ * 2. POST to /v1/admin/simulation-studio/suites with:
+ *    - name: "Suite Name"
+ *    - description: "..." (optional)
+ *    - rule_name: "Selected Rule"
+ *    - rule_version: "v1.0"
+ *    - primary_txtp: "pacs.008"
+ *    - primary_txtp_version: "v1.0"
+ * 3. Suite created in DB with status="DRAFT", wizard_progress.currentStep=1
+ * 4. Response includes suite ID for use in subsequent PATCH requests
+ *
+ * Example Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "id": 123,
+ *     "name": "Test Suite",
+ *     "wizard_progress": { "currentStep": 1, "completedSteps": [1] },
+ *     ...
+ *   }
+ * }
+ */
+export const createSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create simulation suite');
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const payload = req.body as CreateSimulationSuiteDto;
+
+    const simulation = await createSimulationSuite(payload, tenantId, userId, userEmail);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite created successfully',
+      data: simulation,
+    };
+
+    reply.status(201).send(body);
+    loggerService.log('End - Create simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to create simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to create simulation suite');
+  }
+};
+
+export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suites');
+    const { tenantId } = req as ITenantRequest;
+    const query = req.query as SimulationSuitesQueryDto;
+
+    // Parse query parameters
+    const options = {
+      tenantId,
+      search: query.search,
+      status: query.status,
+      ruleName: query.rule_name,
+      txtp: query.txtp,
+      updatedFrom: query.updated_from ? new Date(query.updated_from) : undefined,
+      updatedTo: query.updated_to ? new Date(query.updated_to) : undefined,
+      limit: query.limit ?? 20,
+      offset: query.offset ?? 0,
+    };
+
+    const result = await getSimulationSuites(options);
+
+    const body = {
+      success: true,
+      message: 'Simulation suites retrieved successfully',
+      suites: result.data,
+      total: result.total,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Get simulation suites');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suites. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites');
+  }
+};
+
+export const getSimulationByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suite by ID');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({
+        success: false,
+        message: 'Invalid simulation suite ID',
+      });
+      return;
+    }
+
+    const simulation = await getSimulationSuiteById(simulationId, tenantId);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite retrieved successfully',
+      suite: simulation,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Get simulation suite by ID');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suite');
+  }
+};
+
+/**
+ * WIZARD STEPS 2-7: PATCH - Update Simulation Suite with Additional Data
+ *
+ * Flow for each step transition:
+ * 1. User completes Step N (2, 3, 4, 5, 6, or 7) on UI
+ * 2. PATCH to /v1/admin/simulation-studio/suites/:id with:
+ *    - wizard_progress: { currentStep: N, completedSteps: [1, 2, ..., N-1], stepNData: {...} }
+ *    - Other fields to update (status, metadata, etc.)
+ * 3. Suite updated in DB with new wizard progress
+ * 4. Response includes updated suite for UI validation
+ *
+ * Step Descriptions:
+ * - Step 1: Rule & Details (done via POST)
+ * - Step 2: TXTP Selection
+ * - Step 3: Trigger Data
+ * - Step 4: Enrichment Data
+ * - Step 5: Preview & Save
+ * - Step 6: Simulation Results
+ * - Step 7: Final confirmation
+ *
+ * Example PATCH body for Step 2:
+ * {
+ *   "wizard_progress": {
+ *     "currentStep": 2,
+ *     "completedSteps": [1],
+ *     "step2Data": { "txtp": "pacs.008", ... }
+ *   }
+ * }
+ */
+export const updateSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update simulation suite');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+    const payload = req.body as UpdateSimulationSuiteDto;
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({
+        success: false,
+        message: 'Invalid simulation suite ID',
+      });
+      return;
+    }
+
+    const updatedSimulation = await updateSimulationSuite(simulationId, tenantId, payload);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite updated successfully',
+      suite: updatedSimulation,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Update simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to update simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to update simulation suite');
   }
 };

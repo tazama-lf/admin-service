@@ -33,7 +33,7 @@ const mapRowToConfig = (row: ConfigRow): Config => {
     relatedTransaction: row.related_transaction,
   };
 
-  return mapped as unknown as Config;
+  return mapped;
 };
 
 export const createConfig = async (config: ConfigData, id?: number): Promise<number> => {
@@ -242,7 +242,7 @@ export const updateConfig = async (
 
     if (updates.contentType === ContentType.XML && updates.payload !== undefined) {
       setClauses.push(`payload_xml = $${paramIndex++}::xml`);
-      values.push(updates.payload as string);
+      values.push(updates.payload);
       setClauses.push('payload_json = NULL');
     } else if (updates.payload !== undefined) {
       setClauses.push(`payload_json = $${paramIndex++}`);
@@ -351,7 +351,7 @@ export const updateConfig = async (
     relatedTransaction: row.related_transaction,
   };
 
-  return updatedConfig as unknown as Config;
+  return updatedConfig;
 };
 
 export const findAllTransactionTypes = async (tenantId: string): Promise<Array<Record<string, unknown>>> => {

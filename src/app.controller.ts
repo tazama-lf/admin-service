@@ -14,7 +14,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handleGetReportRequestByMsgId, handleGetAllReportsRequest } from './services/report.logic.service';
 import {
   handlePostConfig,
   handleFindConfigByID,
@@ -63,10 +63,24 @@ import {
   handlePostMask,
   handleUpdateMask,
   handleGetMaskById,
+  handleGetExcludedTypes,
   handleReviewMask,
 } from './services/masking.logic.service';
+import { findSimulations, createSimulation, getSimulationStats, getSimulationResults } from './services/simulation.logic.service';
+import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
-import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import {
+  getSimulationLogs,
+  createSimulationLogs,
+  getSimulationMessages,
+  stageSimulationItems,
+  deleteEvaluationsByTenant,
+  saveEvaluationsInResultsTable,
+  saveRecordInTrsSimulation,
+  fetchSimulationItems,
+  handleDlhFetchCount,
+} from './services/simulation-logs.logic.service';
+import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import {
@@ -1402,6 +1416,39 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
+export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName: string };
+
+    const messages = await getSimulationMessages(tenantId, tableName);
+
+    reply.code(200).send({
+      success: true,
+      messages,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation messages');
+  }
+};
+
+export const fetchSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName?: string };
+
+    if (!tableName || tableName.trim() === '') {
+      reply.code(400).send({ error: 'tableName is required' });
+      return;
+    }
+
+    const items = await fetchSimulationItems(tableName, tenantId);
+    reply.code(200).send({ items, count: items.length });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch simulation items');
+  }
+};
+
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
@@ -1443,6 +1490,24 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
     ErrorHandler.sendError(reply, error, 'Failed to get transaction types');
   } finally {
     loggerService.log('End - Handle get transaction types request');
+  }
+};
+
+export const getExcludedTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get excluded types request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const excludedTypes = await handleGetExcludedTypes(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      excludedTypes,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get excluded types');
+  } finally {
+    loggerService.log('End - Handle get excluded types request');
   }
 };
 
@@ -1703,5 +1768,219 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
     ErrorHandler.sendError(reply, error, 'Failed to review masking configuration');
   } finally {
     loggerService.log('End - Handle review mask request');
+  }
+};
+
+// ==================== SIMULATION OPERATIONS ====================
+
+export const createSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, unknown>;
+    const response = await createSimulation(body, tenantId);
+    reply.code(201).send({ success: true, message: response.message, simulation_id: response.simulation_id });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create simulation');
+  }
+};
+
+export const getAllSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const result = await findSimulations(parsedLimit, parsedOffset, tenantId);
+    reply.code(200).send({
+      success: true,
+      simulations: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulations');
+  }
+};
+
+export const getSimulationStatsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { sim, iteration_no: iterationNo } = req.query as { sim?: string; iteration_no?: string };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+
+    const result = await getSimulationStats(sim.trim().toLowerCase(), iterationNo.trim(), tenantId);
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation stats');
+  }
+};
+
+export const getSimulationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const {
+      sim,
+      iteration_no: iterationNo,
+      limit: qLimit = '10',
+      offset: qOffset = '0',
+      msg_id: msgId,
+      msg_type: msgType,
+      outcome,
+    } = req.query as {
+      sim?: string;
+      iteration_no?: string;
+      limit?: string;
+      offset?: string;
+      msg_id?: string;
+      msg_type?: string;
+      outcome?: string;
+    };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+    if (outcome && outcome !== 'Hit' && outcome !== 'No-Hit') {
+      reply.code(400).send({ success: false, message: '`outcome` must be "Hit" or "No-Hit".' });
+      return;
+    }
+
+    const parsedLimit = parseInt(qLimit, 10) || 10;
+    const parsedOffset = parseInt(qOffset, 10) || 0;
+
+    const result = await getSimulationResults(
+      sim.trim().toLowerCase(),
+      iterationNo.trim(),
+      tenantId,
+      parsedLimit,
+      parsedOffset * parsedLimit,
+      { msg_id: msgId?.trim(), msg_type: msgType?.trim(), outcome: outcome?.trim() },
+    );
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation results');
+  }
+};
+
+export const stageSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const items = req.body as Array<Record<string, unknown>>;
+
+    const result = await stageSimulationItems(items);
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to stage simulation items');
+  }
+};
+
+export const truncateEvaluationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    await deleteEvaluationsByTenant(tenantId);
+    reply.code(200).send({ success: true, message: 'Evaluation results truncated successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');
+  }
+};
+
+export const fetchCountDlhHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const token = req.headers.authorization ?? '';
+    const queries = req.body as Array<Record<string, unknown>>;
+
+    const result = await handleDlhFetchCount(queries, token);
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch count from DLH');
+  }
+};
+
+export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const tuples = req.body as MaskTuple[];
+    const result = await findActiveConfigsByTuples(tuples);
+    reply.code(200).send({ success: true, masks: result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to find active masking configurations');
+  }
+};
+
+export const saveEvaluationsInResultsTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { evaluations, tableName } = req.body as { evaluations: EvaluationRow[]; tableName?: string };
+    await saveEvaluationsInResultsTable(evaluations, tableName);
+    reply.code(200).send({ success: true, message: 'Evaluations saved successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save evaluations');
+  }
+};
+
+export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const body = (authReq.body ?? {}) as Record<string, string>;
+    const result = await findMasksWithFilters(Number.MAX_SAFE_INTEGER, 0, body, tenantId);
+    reply.code(200).send({
+      success: true,
+      masks: result.data,
+      total: result.total,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
+  }
+};
+
+export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all evaluations request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const data = await handleGetAllReportsRequest(tenantId);
+    reply.status(200).send({ message: 'Evaluations fetched successfully', data });
+  } catch (err) {
+    const failMessage = `Failed to fetch evaluations. \n${util.inspect(err)}`;
+    reply.status(500).send(failMessage);
+  } finally {
+    loggerService.log('End - Handle get all evaluations request');
+  }
+};
+
+export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { simulationId, totalRecord, recordProcessed, simStatus } = req.body as {
+      simulationId: string | undefined;
+      totalRecord: number;
+      recordProcessed: number;
+      simStatus: string;
+    };
+    await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
+    reply.code(200).send();
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
   }
 };

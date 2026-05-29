@@ -21,6 +21,7 @@ import {
   createMasking,
   findMaskByIdInDB,
   updateMaskingInDB,
+  getExcludedTypes,
 } from '../../../src/repositories/configuration/masking.repository';
 
 describe('Masking Repository', () => {
@@ -527,6 +528,69 @@ describe('Masking Repository', () => {
       expect(callArg.text).toContain('tokenize');
       expect(callArg.text).toContain('created_at');
       expect(callArg.text).toContain('updated_at');
+    });
+  });
+
+  describe('getExcludedTypes', () => {
+    const mockExcludedRows = [
+      { masking_id: 'uuid-1', txtp: 'pain.001.001.11', txtp_version: '11', record_status: 'Exists' },
+      { masking_id: null, txtp: 'pacs.008.001.10', txtp_version: '10', record_status: 'Not Exists' },
+    ];
+
+    it('should return excluded types for a tenant', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: mockExcludedRows,
+        rowCount: 2,
+      });
+
+      const result = await getExcludedTypes('tenant-123');
+
+      expect(result).toEqual(mockExcludedRows);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('tcs_config'),
+          values: ['tenant-123'],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should join trs_masking on txtp and txtp_version', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: mockExcludedRows, rowCount: 2 });
+
+      await getExcludedTypes('tenant-123');
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('LEFT JOIN trs_masking');
+      expect(callArg.text).toContain('tc.transaction_type = tm.txtp');
+      expect(callArg.text).toContain('tc.version = tm.txtp_version');
+    });
+
+    it('should include record_status CASE expression', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+
+      await getExcludedTypes('tenant-123');
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('record_status');
+      expect(callArg.text).toContain("'Exists'");
+      expect(callArg.text).toContain("'Not Exists'");
+    });
+
+    it('should return empty array when no records found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+
+      const result = await getExcludedTypes('unknown-tenant');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should filter by tenant_id using $1 parameter', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: mockExcludedRows, rowCount: 2 });
+
+      await getExcludedTypes('my-tenant');
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.objectContaining({ values: ['my-tenant'] }), 'configuration');
     });
   });
 });

@@ -975,6 +975,26 @@ describe('TCS Config Logic Service', () => {
         payload: mockConfig.payload_xml,
       });
     });
+
+    it('should retrieve config with XML payload when content type is XML', async () => {
+      const mockConfig = {
+        schema: { type: 'object' },
+        mapping: { field: 'value' },
+        content_type: 'application/xml',
+        payload_xml: '<root><data>test</data></root>',
+        payload_json: null,
+      };
+
+      (tcsConfigRepository.getSchemaByTransactionType as jest.Mock).mockResolvedValue(mockConfig);
+
+      const result = await tcsConfigService.handleGetConfigByTransactionType('pacs.008.001.10', '1.0.0', mockTenantId);
+
+      expect(result).toEqual({
+        schema: mockConfig.schema,
+        mapping: mockConfig.mapping,
+        payload: mockConfig.payload_xml,
+      });
+    });
   });
 
   describe('handleGetRelatedTransactions', () => {

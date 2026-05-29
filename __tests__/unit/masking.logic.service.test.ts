@@ -20,6 +20,7 @@ jest.mock('../../src/repositories/configuration/masking.repository', () => ({
   createMasking: jest.fn(),
   updateMaskingInDB: jest.fn(),
   findMaskByIdInDB: jest.fn(),
+  getExcludedTypes: jest.fn(),
 }));
 
 import * as maskingLogicService from '../../src/services/masking.logic.service';
@@ -482,6 +483,44 @@ describe('Masking Logic Service', () => {
       await maskingLogicService.handleReviewMask(123, mockTenantId, 'approve', '   ');
 
       expect(maskingRepository.updateMaskingInDB).toHaveBeenCalledWith(123, mockTenantId, { status: 'STATUS_04_APPROVED' });
+    });
+  });
+
+  describe('handleGetExcludedTypes', () => {
+    const mockExcludedTypes = [
+      { masking_id: 'uuid-1', txtp: 'pain.001.001.11', txtp_version: '11', record_status: 'Exists' },
+      { masking_id: null, txtp: 'pacs.008.001.10', txtp_version: '10', record_status: 'Not Exists' },
+    ];
+
+    it('should return excluded types successfully', async () => {
+      (maskingRepository.getExcludedTypes as jest.Mock).mockResolvedValue(mockExcludedTypes);
+
+      const result = await maskingLogicService.handleGetExcludedTypes(mockTenantId);
+
+      expect(maskingRepository.getExcludedTypes).toHaveBeenCalledWith(mockTenantId);
+      expect(result).toEqual(mockExcludedTypes);
+    });
+
+    it('should return empty array when no excluded types found', async () => {
+      (maskingRepository.getExcludedTypes as jest.Mock).mockResolvedValue([]);
+
+      const result = await maskingLogicService.handleGetExcludedTypes(mockTenantId);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return null when repository returns null', async () => {
+      (maskingRepository.getExcludedTypes as jest.Mock).mockResolvedValue(null);
+
+      const result = await maskingLogicService.handleGetExcludedTypes(mockTenantId);
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw an error when getExcludedTypes fails', async () => {
+      (maskingRepository.getExcludedTypes as jest.Mock).mockRejectedValue(new Error('DB query failed'));
+
+      await expect(maskingLogicService.handleGetExcludedTypes(mockTenantId)).rejects.toThrow('DB query failed');
     });
   });
 });

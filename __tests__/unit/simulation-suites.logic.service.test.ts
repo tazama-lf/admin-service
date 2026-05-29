@@ -103,8 +103,8 @@ describe('Simulation Suites Logic Service', () => {
 
     it('should validate name length', async () => {
       await expect(
-        simulationSuitesService.createSimulationSuite({ name: 'A'.repeat(31) } as any, mockTenantId, mockUserId, mockUserEmail),
-      ).rejects.toThrow('Simulation suite name cannot exceed 30 characters');
+        simulationSuitesService.createSimulationSuite({ name: 'A'.repeat(51) } as any, mockTenantId, mockUserId, mockUserEmail),
+      ).rejects.toThrow('Simulation suite name cannot exceed 50 characters');
     });
 
     it('should validate description length', async () => {

@@ -75,7 +75,12 @@ import {
 } from './services/simulation-suites.logic.service';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
-import type { SimulationSuitesQueryDto, CreateSimulationSuiteDto, UpdateSimulationSuiteDto } from './interface/simulation-suites.interface';
+import type {
+  SimulationSuitesQueryDto,
+  CreateSimulationSuiteDto,
+  UpdateSimulationSuiteDto,
+  SimulationSuiteIdParamsDto,
+} from './interface/simulation-suites.interface';
 import {
   handleCreatePushJob,
   handleGetAllJobs,
@@ -1791,12 +1796,8 @@ export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyR
     const body = {
       success: true,
       message: 'Simulation suites retrieved successfully',
-      data: result.data,
-      pagination: {
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-      },
+      suites: result.data,
+      total: result.total,
     };
 
     reply.status(200).send(body);
@@ -1812,7 +1813,7 @@ export const getSimulationByIdHandler = async (req: FastifyRequest, reply: Fasti
   try {
     loggerService.log('Start - Get simulation suite by ID');
     const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as { id: string };
+    const { id } = req.params as SimulationSuiteIdParamsDto;
     const simulationId = parseInt(id, 10);
 
     if (!id || isNaN(simulationId)) {
@@ -1828,7 +1829,7 @@ export const getSimulationByIdHandler = async (req: FastifyRequest, reply: Fasti
     const body = {
       success: true,
       message: 'Simulation suite retrieved successfully',
-      data: simulation,
+      suite: simulation,
     };
 
     reply.status(200).send(body);
@@ -1873,7 +1874,7 @@ export const updateSimulationHandler = async (req: FastifyRequest, reply: Fastif
   try {
     loggerService.log('Start - Update simulation suite');
     const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as { id: string };
+    const { id } = req.params as SimulationSuiteIdParamsDto;
     const simulationId = parseInt(id, 10);
     const payload = req.body as UpdateSimulationSuiteDto;
 
@@ -1890,7 +1891,7 @@ export const updateSimulationHandler = async (req: FastifyRequest, reply: Fastif
     const body = {
       success: true,
       message: 'Simulation suite updated successfully',
-      data: updatedSimulation,
+      suite: updatedSimulation,
     };
 
     reply.status(200).send(body);

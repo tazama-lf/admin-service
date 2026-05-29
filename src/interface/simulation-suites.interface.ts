@@ -13,6 +13,9 @@ export enum SimulationType {
   INTEGRATION_TESTING = 'INTEGRATION_TESTING',
 }
 
+export const SIMULATION_SUITE_NAME_MAX_LENGTH = 50;
+export const SIMULATION_SUITE_DESCRIPTION_MAX_LENGTH = 300;
+
 /**
  * Wizard step tracking for multi-step simulation suite creation
  * Steps: 1=Rule & Details, 2=TXTP Selection, 3=Trigger Data, 4=Enrichment Data, 5=Preview & Save, 6=Simulation Results
@@ -54,7 +57,7 @@ export interface SimulationSuite {
  */
 export interface CreateSimulationSuiteDto {
   name: string; // Required: Simulation Suite Name
-  description?: string; // Optional: Suite description (max 500 chars)
+  description?: string; // Optional: Suite description (max 300 chars)
   simulation_type?: SimulationType; // Optional: SINGLE_RULE (default) or INTEGRATION_TESTING
   rule_repo?: string; // Optional: Rule repository
   rule_name?: string; // Optional: Associated rule name
@@ -97,6 +100,10 @@ export interface SimulationSuitesQueryDto {
   updated_to?: string; // Filter by updated date to (inclusive) - ISO format
   offset?: number; // Offset (0-based)
   limit?: number; // Limit
+}
+
+export interface SimulationSuiteIdParamsDto {
+  id: string;
 }
 
 export interface SimulationSuitesQueryOptions {

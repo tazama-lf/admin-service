@@ -154,8 +154,8 @@ describe('Simulation Suites API Handlers', () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          data: result.data,
-          pagination: { total: 1, limit: 10, offset: 0 },
+          suites: result.data,
+          total: 1,
         }),
       );
     });
@@ -192,7 +192,7 @@ describe('Simulation Suites API Handlers', () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          data: mockSuite,
+          suite: mockSuite,
         }),
       );
     });
@@ -239,7 +239,7 @@ describe('Simulation Suites API Handlers', () => {
         expect.objectContaining({
           success: true,
           message: 'Simulation suite updated successfully',
-          data: updatedSuite,
+          suite: updatedSuite,
         }),
       );
     });

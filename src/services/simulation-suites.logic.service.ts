@@ -13,6 +13,7 @@ import {
   updateSimulationSuiteInDb,
 } from '../repositories/simulation-studio/suites.repository';
 import { HttpException, HttpStatus } from '../utils/error';
+import { validateSimulationSuiteLengthConstraints } from '../utils/simulation-suite-validation';
 
 /**
  * Get all simulation suites with optional filters and pagination
@@ -74,13 +75,7 @@ export const createSimulationSuite = async (
       throw new HttpException('Simulation suite name is required', HttpStatus.BAD_REQUEST);
     }
 
-    if (payload.name.length > 30) {
-      throw new HttpException('Simulation suite name cannot exceed 30 characters', HttpStatus.BAD_REQUEST);
-    }
-
-    if (payload.description && payload.description.length > 300) {
-      throw new HttpException('Simulation suite description cannot exceed 300 characters', HttpStatus.BAD_REQUEST);
-    }
+    validateSimulationSuiteLengthConstraints(payload);
 
     const suite = await createSimulationSuiteInDb(payload, tenantId, userId, userEmail);
     return suite;
@@ -120,13 +115,7 @@ export const updateSimulationSuite = async (id: number, tenantId: string, payloa
       throw new HttpException('Simulation suite name cannot be empty', HttpStatus.BAD_REQUEST);
     }
 
-    if (payload.name && payload.name.length > 50) {
-      throw new HttpException('Simulation suite name cannot exceed 50 characters', HttpStatus.BAD_REQUEST);
-    }
-
-    if (payload.description && payload.description.length > 300) {
-      throw new HttpException('Simulation suite description cannot exceed 300 characters', HttpStatus.BAD_REQUEST);
-    }
+    validateSimulationSuiteLengthConstraints(payload);
 
     const updatedSuite = await updateSimulationSuiteInDb(id, tenantId, payload);
 

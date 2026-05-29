@@ -34,7 +34,10 @@ export function extractTablesFromAST(ast: unknown[]): string[] {
 
   function traverse(value: unknown): void {
     if (!value) return;
-    if (Array.isArray(value)) { value.forEach(traverse); return; }
+    if (Array.isArray(value)) {
+      value.forEach(traverse);
+      return;
+    }
     if (!isObject(value)) return;
 
     const { type } = value;
@@ -72,7 +75,10 @@ function extractOrderByColumns(ast: unknown[]): string[] {
 
   function traverse(value: unknown): void {
     if (!value) return;
-    if (Array.isArray(value)) { value.forEach(traverse); return; }
+    if (Array.isArray(value)) {
+      value.forEach(traverse);
+      return;
+    }
     if (!isObject(value)) return;
 
     if (Array.isArray(value.orderBy)) {
@@ -120,12 +126,7 @@ function whereHasTenantCondition(ast: unknown[], tenantCol: string): boolean {
  *   - Has WHERE: insert "AND col = $n" right after the WHERE expression ends
  *   - No WHERE:  insert "WHERE col = $n" after the FROM clause ends
  */
-function injectTenantCondition(
-  sql: string,
-  ast: unknown[],
-  tenantCol: string,
-  paramIdx: number,
-): string {
+function injectTenantCondition(sql: string, ast: unknown[], tenantCol: string, paramIdx: number): string {
   const [root] = ast;
   if (!isObject(root)) return sql;
 
@@ -154,10 +155,22 @@ function injectTenantCondition(
   // Collect the _location.start of the first token after each trailing clause keyword.
   // These positions are used to anchor a backward scan to find the keyword itself.
   const anchorStarts: number[] = [];
-  if (Array.isArray(selectNode.groupBy) && selectNode.groupBy.length > 0) { const s = getLocStart(selectNode.groupBy[0]); if (s != null) anchorStarts.push(s); }
-  if (Array.isArray(selectNode.orderBy) && selectNode.orderBy.length > 0) { const s = getLocStart(selectNode.orderBy[0]); if (s != null) anchorStarts.push(s); }
-  if (isObject(selectNode.having)) { const s = getLocStart(selectNode.having); if (s != null) anchorStarts.push(s); }
-  if (isObject(selectNode.limit)) { const s = getLocStart(selectNode.limit); if (s != null) anchorStarts.push(s); }
+  if (Array.isArray(selectNode.groupBy) && selectNode.groupBy.length > 0) {
+    const s = getLocStart(selectNode.groupBy[0]);
+    if (s != null) anchorStarts.push(s);
+  }
+  if (Array.isArray(selectNode.orderBy) && selectNode.orderBy.length > 0) {
+    const s = getLocStart(selectNode.orderBy[0]);
+    if (s != null) anchorStarts.push(s);
+  }
+  if (isObject(selectNode.having)) {
+    const s = getLocStart(selectNode.having);
+    if (s != null) anchorStarts.push(s);
+  }
+  if (isObject(selectNode.limit)) {
+    const s = getLocStart(selectNode.limit);
+    if (s != null) anchorStarts.push(s);
+  }
 
   if (anchorStarts.length > 0) {
     // Take the earliest anchor and scan backward to strip the SQL keyword(s) + surrounding
@@ -179,12 +192,7 @@ function injectTenantCondition(
  * Validates that sortBy column exists in at least one of the query's base tables.
  * Also checks it appears in the ORDER BY clause of the AST (prevents arbitrary column injection).
  */
-export const resolveSortColumn = async (
-  tableNames: string[],
-  sortBy: string,
-  dbName: string,
-  ast?: unknown[],
-): Promise<string | null> => {
+export const resolveSortColumn = async (tableNames: string[], sortBy: string, dbName: string, ast?: unknown[]): Promise<string | null> => {
   if (!sortBy) return null;
 
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(sortBy)) return null;
@@ -198,7 +206,7 @@ export const resolveSortColumn = async (
     try {
       const columnLookup = await handlePostExecuteSqlStatement<{ column_name: string }>(
         {
-          text: `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
+          text: 'SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1',
           values: [tableName, sortBy],
         } satisfies PgQueryConfig,
         dbName,
@@ -210,8 +218,7 @@ export const resolveSortColumn = async (
   }
 
   return null;
-}
-
+};
 
 export const getNodeById = async (nodeId: number, tenantId: string): Promise<Node[] | null> => {
   const queryRes = await getNodeByIdFromDb(nodeId, tenantId);

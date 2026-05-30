@@ -1,271 +1,582 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { HttpException, HttpStatus } from '../../src/utils/error';
 
-jest.mock('../../src/repositories/configuration/node.repository');
-jest.mock('../../src/utils/error', () => ({
-  HttpException: class HttpException extends Error {
-    status: number;
-    constructor(message: string, status: number) {
-      super(message);
-      this.status = status;
-    }
-  },
-  HttpStatus: { CONFLICT: 409, INTERNAL_SERVER_ERROR: 500 },
-}));
+// Mock the logger service
 jest.mock('../../src', () => ({
-  loggerService: { log: jest.fn(), error: jest.fn() },
+  loggerService: {
+    log: jest.fn(),
+    error: jest.fn(),
+  },
 }));
 
-import * as nodeRepository from '../../src/repositories/configuration/node.repository';
-import { getNodeById, createNode, deleteNodeById, findAllNodes, executeSelectQuery } from '../../src/services/node.logic.service';
-import type { Node } from '../../src/interface/node.interface';
+// Mock the repository
+jest.mock('../../src/repositories/configuration/node.repository', () => ({
+  getNodeByIdFromDb: jest.fn(),
+  insertNodesIntoDb: jest.fn(),
+  deleteNodeByIdFromDB: jest.fn(),
+  getAllNodes: jest.fn(),
+  getNodeByName: jest.fn(),
+  executeQueryNodeInDb: jest.fn(),
+}));
 
-const makeNode = (id = 1): Node => ({
-  id,
-  tenant_id: 'tenant-1',
-  node_json: { name: 'TestNode', type: 'processor', category: 'general' },
-  created_by: 'user-1',
-  order: 1,
-});
+// Mock the validateQuery utility
+jest.mock('../../src/utils/validateQuery', () => ({
+  validateSelectQuery: jest.fn(),
+}));
+
+import * as nodeLogicService from '../../src/services/node.logic.service';
+import * as nodeRepository from '../../src/repositories/configuration/node.repository';
+import * as validateQuery from '../../src/utils/validateQuery';
 
 describe('Node Logic Service', () => {
+  const mockTenantId = 'tenant-123';
+  const mockNodeId = 1;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default mock for validateSelectQuery - returns AST for 'users' table
+    (validateQuery.validateSelectQuery as jest.Mock).mockImplementation(() => [
+      {
+        type: 'select',
+        columns: [{ expr: { type: 'ref', name: '*' } }],
+        from: [{ type: 'table', name: { name: 'users' } }],
+      },
+    ]);
   });
 
   describe('getNodeById', () => {
-    it('should return nodes when found', async () => {
-      const mockNode = makeNode(1);
-      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue([mockNode]);
+    it('should return node when found', async () => {
+      const mockNodes = [{ id: mockNodeId, tenant_id: mockTenantId, node_json: { name: 'test' } }];
+      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue(mockNodes);
 
-      const result = await getNodeById(1, 'tenant-1');
+      const result = await nodeLogicService.getNodeById(mockNodeId, mockTenantId);
 
-      expect(result).toEqual([mockNode]);
-      expect(nodeRepository.getNodeByIdFromDb).toHaveBeenCalledWith(1, 'tenant-1');
+      expect(nodeRepository.getNodeByIdFromDb).toHaveBeenCalledWith(mockNodeId, mockTenantId);
+      expect(result).toEqual(mockNodes);
     });
 
     it('should return null when no node found', async () => {
-      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue(null);
+      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue([]);
 
-      const result = await getNodeById(999, 'tenant-1');
+      const result = await nodeLogicService.getNodeById(mockNodeId, mockTenantId);
 
       expect(result).toBeNull();
     });
 
-    it('should return null when repository returns empty array', async () => {
-      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue([]);
+    it('should return null when result is null', async () => {
+      (nodeRepository.getNodeByIdFromDb as jest.Mock).mockResolvedValue(null);
 
-      const result = await getNodeById(1, 'tenant-1');
+      const result = await nodeLogicService.getNodeById(mockNodeId, mockTenantId);
 
       expect(result).toBeNull();
     });
   });
 
   describe('createNode', () => {
-    it('should create nodes successfully when names are unique', async () => {
-      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue(null);
-      (nodeRepository.insertNodesIntoDb as jest.Mock).mockResolvedValue([makeNode(1)]);
+    it('should create a single node successfully', async () => {
+      const mockNodeData = [
+        {
+          tenant_id: mockTenantId,
+          node_json: { name: 'test-node', type: 'processor' },
+          created_by: 'user-123',
+          order: 1,
+        },
+      ];
+      const mockCreatedNode = [{ id: 1, ...mockNodeData[0] }];
 
-      const nodeData = [{ tenant_id: 'tenant-1', node_json: { name: 'TestNode' }, created_by: 'user-1', order: 1 }];
-      const result = await createNode(nodeData);
+      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue([]);
+      (nodeRepository.insertNodesIntoDb as jest.Mock).mockResolvedValue(mockCreatedNode);
 
-      expect(result).toHaveLength(1);
-      expect(nodeRepository.insertNodesIntoDb).toHaveBeenCalledTimes(1);
+      const result = await nodeLogicService.createNode(mockNodeData);
+
+      expect(nodeRepository.getNodeByName).toHaveBeenCalledWith('test-node', mockTenantId);
+      expect(nodeRepository.insertNodesIntoDb).toHaveBeenCalledWith(mockNodeData);
+      expect(result).toEqual(mockCreatedNode);
     });
 
-    it('should throw CONFLICT when node name already exists', async () => {
-      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue([makeNode(1)]);
+    it('should create multiple nodes successfully', async () => {
+      const mockNodeData = [
+        {
+          tenant_id: mockTenantId,
+          node_json: { name: 'node-1', type: 'processor' },
+          created_by: 'user-123',
+          order: 1,
+        },
+        {
+          tenant_id: mockTenantId,
+          node_json: { name: 'node-2', type: 'processor' },
+          created_by: 'user-123',
+          order: 2,
+        },
+      ];
+      const mockCreatedNodes = mockNodeData.map((node, idx) => ({ id: idx + 1, ...node }));
 
-      const nodeData = [{ tenant_id: 'tenant-1', node_json: { name: 'TestNode' }, created_by: 'user-1', order: 1 }];
+      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue([]);
+      (nodeRepository.insertNodesIntoDb as jest.Mock).mockResolvedValue(mockCreatedNodes);
 
-      await expect(createNode(nodeData)).rejects.toThrow('already exists');
+      const result = await nodeLogicService.createNode(mockNodeData);
+
+      expect(nodeRepository.getNodeByName).toHaveBeenCalledTimes(2);
+      expect(result).toEqual(mockCreatedNodes);
     });
 
-    it('should throw INTERNAL_SERVER_ERROR when insert returns no data', async () => {
-      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue(null);
+    it('should throw error when node name already exists', async () => {
+      const mockNodeData = [
+        {
+          tenant_id: mockTenantId,
+          node_json: { name: 'existing-node', type: 'processor' },
+          created_by: 'user-123',
+          order: 1,
+        },
+      ];
+
+      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue([{ id: 1, name: 'existing-node' }]);
+
+      await expect(nodeLogicService.createNode(mockNodeData)).rejects.toThrow(
+        new HttpException(`Node with name "existing-node" already exists for tenant "${mockTenantId}"`, HttpStatus.CONFLICT),
+      );
+
+      expect(nodeRepository.insertNodesIntoDb).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when no data returned from insert', async () => {
+      const mockNodeData = [
+        {
+          tenant_id: mockTenantId,
+          node_json: { name: 'test-node', type: 'processor' },
+          created_by: 'user-123',
+          order: 1,
+        },
+      ];
+
+      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue([]);
       (nodeRepository.insertNodesIntoDb as jest.Mock).mockResolvedValue([]);
 
-      const nodeData = [{ tenant_id: 'tenant-1', node_json: { name: 'TestNode' }, created_by: 'user-1', order: 1 }];
-
-      await expect(createNode(nodeData)).rejects.toThrow('Failed to create node(s)');
-    });
-
-    it('should wrap a single object in array', async () => {
-      (nodeRepository.getNodeByName as jest.Mock).mockResolvedValue(null);
-      (nodeRepository.insertNodesIntoDb as jest.Mock).mockResolvedValue([makeNode(1)]);
-
-      const result = await createNode([{ tenant_id: 'tenant-1', node_json: { name: 'Single' }, created_by: 'user-1', order: 1 }]);
-
-      expect(result).toHaveLength(1);
+      await expect(nodeLogicService.createNode(mockNodeData)).rejects.toThrow(
+        new HttpException('Failed to create node(s): No data returned', HttpStatus.INTERNAL_SERVER_ERROR),
+      );
     });
   });
 
   describe('deleteNodeById', () => {
-    it('should call deleteNodeByIdFromDB with correct arguments', async () => {
+    it('should delete node successfully', async () => {
       (nodeRepository.deleteNodeByIdFromDB as jest.Mock).mockResolvedValue(undefined);
 
-      await deleteNodeById(5, 'tenant-1');
+      await nodeLogicService.deleteNodeById(mockNodeId, mockTenantId);
 
-      expect(nodeRepository.deleteNodeByIdFromDB).toHaveBeenCalledWith(5, 'tenant-1');
-    });
-
-    it('should propagate errors from repository', async () => {
-      (nodeRepository.deleteNodeByIdFromDB as jest.Mock).mockRejectedValue(new Error('Delete failed'));
-
-      await expect(deleteNodeById(5, 'tenant-1')).rejects.toThrow('Delete failed');
+      expect(nodeRepository.deleteNodeByIdFromDB).toHaveBeenCalledWith(mockNodeId, mockTenantId);
     });
   });
 
   describe('findAllNodes', () => {
-    it('should find nodes with tenantId filter', async () => {
-      const mockNodes = [makeNode(1), makeNode(2)];
+    it('should find all nodes with tenant filter', async () => {
+      const mockNodes = [
+        { id: 1, tenant_id: mockTenantId, node_json: { name: 'node-1' } },
+        { id: 2, tenant_id: mockTenantId, node_json: { name: 'node-2' } },
+      ];
+
       (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue(mockNodes);
 
-      const result = await findAllNodes('tenant-1');
+      const result = await nodeLogicService.findAllNodes(mockTenantId);
 
+      expect(nodeRepository.getAllNodes).toHaveBeenCalledWith(
+        'WHERE tenant_id IN ($1, $2)',
+        ['default', mockTenantId],
+        'created_at',
+        'desc',
+      );
       expect(result).toEqual(mockNodes);
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[0]).toContain('tenant_id IN');
-      expect(callArg[1]).toContain('default');
-      expect(callArg[1]).toContain('tenant-1');
     });
 
-    it('should apply type filter when provided', async () => {
-      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue([]);
+    it('should find nodes with type filter', async () => {
+      const mockNodes = [{ id: 1, tenant_id: mockTenantId, node_json: { type: 'processor' } }];
 
-      await findAllNodes('tenant-1', { type: 'processor' });
+      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue(mockNodes);
 
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[0]).toContain("node_json->>'type'");
+      const result = await nodeLogicService.findAllNodes(mockTenantId, { type: 'processor' });
+
+      expect(nodeRepository.getAllNodes).toHaveBeenCalledWith(
+        "WHERE tenant_id IN ($1, $2) AND node_json->>'type' = $3",
+        ['default', mockTenantId, 'processor'],
+        'created_at',
+        'desc',
+      );
+      expect(result).toEqual(mockNodes);
     });
 
-    it('should apply category filter when provided', async () => {
-      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue([]);
+    it('should find nodes with category filter', async () => {
+      const mockNodes = [{ id: 1, tenant_id: mockTenantId, node_json: { category: 'input' } }];
 
-      await findAllNodes('tenant-1', { category: 'general' });
+      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue(mockNodes);
 
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[0]).toContain("node_json->>'category'");
+      const result = await nodeLogicService.findAllNodes(mockTenantId, { category: 'input' });
+
+      expect(nodeRepository.getAllNodes).toHaveBeenCalledWith(
+        "WHERE tenant_id IN ($1, $2) AND node_json->>'category' = $3",
+        ['default', mockTenantId, 'input'],
+        'created_at',
+        'desc',
+      );
+      expect(result).toEqual(mockNodes);
     });
 
-    it('should use default sort when not provided', async () => {
-      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue([]);
+    it('should find nodes with custom sort', async () => {
+      const mockNodes = [{ id: 1, tenant_id: mockTenantId }];
 
-      await findAllNodes('tenant-1');
+      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue(mockNodes);
 
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[2]).toBe('created_at');
-      expect(callArg[3]).toBe('desc');
+      const result = await nodeLogicService.findAllNodes(mockTenantId, { sortBy: 'updated_at', sortOrder: 'asc' });
+
+      expect(nodeRepository.getAllNodes).toHaveBeenCalledWith(
+        'WHERE tenant_id IN ($1, $2)',
+        ['default', mockTenantId],
+        'updated_at',
+        'asc',
+      );
+      expect(result).toEqual(mockNodes);
     });
 
-    it('should use custom sort when provided', async () => {
-      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue([]);
+    it('should handle empty tenant id', async () => {
+      const mockNodes = [{ id: 1, tenant_id: 'default' }];
 
-      await findAllNodes('tenant-1', { sortBy: 'updated_at', sortOrder: 'asc' });
+      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue(mockNodes);
 
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[2]).toBe('updated_at');
-      expect(callArg[3]).toBe('asc');
-    });
+      const result = await nodeLogicService.findAllNodes('');
 
-    it('should combine type and category filters', async () => {
-      (nodeRepository.getAllNodes as jest.Mock).mockResolvedValue([]);
-
-      await findAllNodes('tenant-1', { type: 'processor', category: 'general' });
-
-      const callArg = (nodeRepository.getAllNodes as jest.Mock).mock.calls[0];
-      expect(callArg[0]).toContain("node_json->>'type'");
-      expect(callArg[0]).toContain("node_json->>'category'");
+      expect(nodeRepository.getAllNodes).toHaveBeenCalledWith('WHERE tenant_id = $1', ['default'], 'created_at', 'desc');
+      expect(result).toEqual(mockNodes);
     });
   });
 
   describe('executeSelectQuery', () => {
     beforeEach(() => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValue([]);
+      // Restore real validateSelectQuery — _location offsets from the real parser are
+      // required by injectTenantCondition. Tests needing a custom AST mock per-test.
+      const real = jest.requireActual<typeof import('../../src/utils/validateQuery')>('../../src/utils/validateQuery');
+      (validateQuery.validateSelectQuery as jest.Mock).mockImplementation((q: unknown) => real.validateSelectQuery(q as string));
     });
 
-    it('should execute valid SELECT query', async () => {
-      const mockRows = [{ id: 1, tenant_id: 'tenant-1' }];
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValue(mockRows);
+    it('should execute a simple SELECT query with LIMIT enforcement', async () => {
+      const mockQuery = 'SELECT * FROM users';
+      const mockResult = [{ id: 1, name: 'John' }];
 
-      const result = await executeSelectQuery({ query: 'SELECT * FROM trs_nodes', dbName: 'configuration' }, 'tenant-1');
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }]) // resolveTenantColumn
+        .mockResolvedValueOnce(mockResult); // actual query
 
-      expect(result).toEqual(mockRows);
-    });
+      const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration', params: [] }, mockTenantId);
 
-    it('should throw for INSERT queries', async () => {
-      await expect(executeSelectQuery({ query: 'INSERT INTO trs_nodes VALUES (1)', dbName: 'configuration' }, 'tenant-1')).rejects.toThrow(
-        'Only SELECT queries are allowed.',
+      expect(validateQuery.validateSelectQuery).toHaveBeenCalledWith(mockQuery);
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('information_schema.columns'),
+        'configuration',
+        ['users'],
       );
+      expect(result).toEqual(mockResult);
     });
 
-    it('should throw for DELETE queries', async () => {
-      await expect(executeSelectQuery({ query: 'DELETE FROM trs_nodes', dbName: 'configuration' }, 'tenant-1')).rejects.toThrow(
-        'Only SELECT queries are allowed.',
-      );
-    });
+    it('should strip trailing semicolons before processing', async () => {
+      const mockQuery = 'SELECT * FROM users;';
+      const mockResult = [{ id: 1 }];
 
-    it('should throw for DROP queries', async () => {
-      await expect(executeSelectQuery({ query: 'DROP TABLE trs_nodes', dbName: 'configuration' }, 'tenant-1')).rejects.toThrow(
-        'Only SELECT queries are allowed.',
-      );
-    });
-
-    it('should inject tenant_id into WHERE clause when one exists', async () => {
       (nodeRepository.executeQueryNodeInDb as jest.Mock)
         .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
-        .mockResolvedValueOnce([{ id: 1 }]);
+        .mockResolvedValueOnce(mockResult);
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes WHERE id = 1', dbName: 'configuration' }, 'tenant-1');
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
-      const secondCallArg = (nodeRepository.executeQueryNodeInDb as jest.Mock).mock.calls[1][0] as string;
-      expect(secondCallArg).toContain("tenant_id = 'tenant-1'");
+      expect(validateQuery.validateSelectQuery).toHaveBeenCalledWith('SELECT * FROM users');
     });
 
-    it('should add WHERE clause when query has no WHERE', async () => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValueOnce([{ column_name: 'tenant_id' }]).mockResolvedValueOnce([]);
+    it('should inject tenant filter into WHERE clause', async () => {
+      const mockQuery = 'SELECT * FROM users WHERE status = $1';
+      const mockResult = [{ id: 1 }];
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes', dbName: 'configuration' }, 'tenant-1');
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }]) // resolveTenantColumn
+        .mockResolvedValueOnce(mockResult); // actual query
 
-      const secondCallArg = (nodeRepository.executeQueryNodeInDb as jest.Mock).mock.calls[1][0] as string;
-      expect(secondCallArg).toContain('WHERE');
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration', params: ['active'] }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE status = $1 AND tenant_id = $2) _q LIMIT 10',
+        'configuration',
+        ['active', mockTenantId],
+      );
     });
 
-    it('should add LIMIT 5 when query has no LIMIT', async () => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    it('should inject tenant filter when no WHERE clause exists', async () => {
+      const mockQuery = 'SELECT * FROM users ORDER BY created_at DESC';
+      const mockResult = [{ id: 1 }];
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes', dbName: 'configuration' }, 'tenant-1');
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
 
-      const secondCallArg = (nodeRepository.executeQueryNodeInDb as jest.Mock).mock.calls[1][0] as string;
-      expect(secondCallArg).toContain('LIMIT 5');
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 ORDER BY created_at DESC) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
     });
 
-    it('should inject before ORDER BY when present', async () => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValueOnce([{ column_name: 'tenant_id' }]).mockResolvedValueOnce([]);
+    it('should inject tenant filter before GROUP BY', async () => {
+      const mockQuery = 'SELECT status, COUNT(*) FROM users GROUP BY status';
+      const mockResult = [{ status: 'active', count: 5 }];
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes ORDER BY id', dbName: 'configuration' }, 'tenant-1');
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
 
-      const secondCallArg = (nodeRepository.executeQueryNodeInDb as jest.Mock).mock.calls[1][0] as string;
-      expect(secondCallArg).toContain('WHERE');
-      expect(secondCallArg).toContain('ORDER BY');
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT status, COUNT(*) FROM users WHERE tenant_id = $1 GROUP BY status) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
     });
 
-    it('should use default tenant_id column when schema query fails', async () => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockRejectedValueOnce(new Error('Schema error')).mockResolvedValueOnce([]);
+    it('should cap rows while preserving user-supplied LIMIT inside subquery', async () => {
+      const mockQuery = 'SELECT * FROM users LIMIT 1000';
+      const mockResult = [{ id: 1 }];
 
-      const { loggerService } = jest.requireMock('../../src') as { loggerService: { error: jest.Mock } };
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes', dbName: 'configuration' }, 'tenant-1');
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
 
-      expect(loggerService.error).toHaveBeenCalled();
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 LIMIT 1000) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
     });
 
-    it('should pass custom params to executeQueryNodeInDb', async () => {
-      (nodeRepository.executeQueryNodeInDb as jest.Mock).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    it('should cap rows with LIMIT OFFSET inside subquery', async () => {
+      const mockQuery = 'SELECT * FROM users LIMIT 50 OFFSET 100';
+      const mockResult = [{ id: 1 }];
 
-      await executeSelectQuery({ query: 'SELECT * FROM trs_nodes', dbName: 'configuration', params: [1, 2] }, 'tenant-1');
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
 
-      const secondCall = (nodeRepository.executeQueryNodeInDb as jest.Mock).mock.calls[1];
-      expect(secondCall[3]).toEqual([1, 2]);
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 LIMIT 50 OFFSET 100) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
+    });
+
+    it('should cap rows with standalone OFFSET inside subquery', async () => {
+      const mockQuery = 'SELECT * FROM users OFFSET 50';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 OFFSET 50) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
+    });
+
+    it('should cap rows with FETCH FIRST inside subquery', async () => {
+      const mockQuery = 'SELECT * FROM users FETCH FIRST 50 ROWS ONLY';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 FETCH FIRST 50 ROWS ONLY) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
+    });
+
+    it('should cap rows with FETCH NEXT inside subquery', async () => {
+      const mockQuery = 'SELECT * FROM users FETCH NEXT 100 ROW ONLY';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1 FETCH NEXT 100 ROW ONLY) _q LIMIT 10',
+        'configuration',
+        [mockTenantId],
+      );
+    });
+
+    it('should use tenantId column when detected', async () => {
+      const mockQuery = 'SELECT * FROM transaction';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenantId' }]) // tenantId instead of tenant_id
+        .mockResolvedValueOnce(mockResult);
+
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'event_history' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM transaction WHERE tenantId = $1) _q LIMIT 10',
+        'event_history',
+        [mockTenantId],
+      );
+    });
+
+    it('should skip tenant filter when no tenant column is found', async () => {
+      const mockQuery = 'SELECT * FROM unknown_table';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([]) // No tenant column found
+        .mockResolvedValueOnce(mockResult);
+
+      await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM unknown_table) _q LIMIT 10',
+        'configuration',
+        [],
+      );
+    });
+
+    it('should inject tenant filter for base table inside a CTE query', async () => {
+      const mockQuery = `WITH active_users AS (SELECT * FROM users WHERE status = 'active') SELECT * FROM active_users`;
+      const mockResult = [{ id: 1 }];
+
+      const mockDb = nodeRepository.executeQueryNodeInDb as jest.MockedFunction<() => Promise<Array<Record<string, unknown>>>>;
+      mockDb.mockResolvedValueOnce([{ column_name: 'tenant_id' }]); // resolveTenantColumn for 'users'
+      mockDb.mockResolvedValueOnce([]);                              // resolveTenantColumn for 'active_users' (CTE alias)
+      mockDb.mockResolvedValueOnce(mockResult);                      // actual query
+
+      const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenCalledWith(
+        expect.stringContaining('information_schema.columns'),
+        'configuration',
+        ['users'],
+      );
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        expect.stringContaining('SELECT * FROM ('),
+        'configuration',
+        [mockTenantId],
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should throw error when validation fails', async () => {
+      const mockQuery = 'INSERT INTO users VALUES (1)';
+
+      (validateQuery.validateSelectQuery as jest.Mock).mockImplementation(() => {
+        throw new Error('Only SELECT queries are allowed. Got: insert');
+      });
+
+      await expect(nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId)).rejects.toThrow(
+        new HttpException('Only SELECT queries are allowed. Got: insert', HttpStatus.FORBIDDEN),
+      );
+
+      expect(nodeRepository.executeQueryNodeInDb).not.toHaveBeenCalled();
+    });
+
+    it('should skip tenant injection when query already filters by tenant column (case-insensitive)', async () => {
+      // TenantId (mixed case) in WHERE — parser lowercases to 'tenantid', matches 'tenantId' case-insensitively
+      const mockQuery = 'SELECT * FROM transaction WHERE TenantId = $1';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenantId' }])
+        .mockResolvedValueOnce(mockResult);
+
+      const result = await nodeLogicService.executeSelectQuery(
+        { query: mockQuery, dbName: 'event_history', params: ['tenant-456'] },
+        mockTenantId,
+      );
+
+      // tenant condition already present — no injection, params unchanged
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM transaction WHERE TenantId = $1) _q LIMIT 10',
+        'event_history',
+        ['tenant-456'],
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should skip tenant injection when query already has tenant_id in WHERE', async () => {
+      const mockQuery = 'SELECT * FROM users WHERE status = $1 AND tenant_id = $2';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      const result = await nodeLogicService.executeSelectQuery(
+        { query: mockQuery, dbName: 'configuration', params: ['active', 'tenant-789'] },
+        mockTenantId,
+      );
+
+      // tenant_id already in WHERE — skip injection, params unchanged
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users WHERE status = $1 AND tenant_id = $2) _q LIMIT 10',
+        'configuration',
+        ['active', 'tenant-789'],
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should throw when query has no tables', async () => {
+      const mockQuery = 'SELECT 1 AS value';
+
+      (validateQuery.validateSelectQuery as jest.Mock).mockReturnValue([
+        {
+          type: 'select',
+          columns: [{ expr: { type: 'integer', value: 1 }, alias: { name: 'value' } }],
+        },
+      ]);
+
+      await expect(nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId)).rejects.toThrow(
+        new HttpException('Query must reference at least one base table.', HttpStatus.FORBIDDEN),
+      );
+
+      expect(nodeRepository.executeQueryNodeInDb).not.toHaveBeenCalled();
+    });
+
+    it('should skip tenant filter when tenant column lookup fails', async () => {
+      const mockQuery = 'SELECT * FROM users';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockRejectedValueOnce(new Error('Connection error')) // resolveTenantColumn call fails
+        .mockResolvedValueOnce(mockResult); // outer query still executes
+
+      const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+
+      expect(nodeRepository.executeQueryNodeInDb).toHaveBeenLastCalledWith(
+        'SELECT * FROM (SELECT * FROM users) _q LIMIT 10',
+        'configuration',
+        [],
+      );
+      expect(result).toEqual(mockResult);
     });
   });
 });

@@ -48,7 +48,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-optional-chain': 'warn',
       '@typescript-eslint/restrict-template-expressions': 'error',
       '@typescript-eslint/strict-boolean-expressions': 'off',
-      '@stylistic/quotes': ['error', 'single'],
+      '@stylistic/quotes': ['error', 'single', { avoidEscape: true }],
       'complexity': ['warn', { max: 25 }],
       'max-depth': ['warn', { max: 5 }],
       'max-lines': 'off',

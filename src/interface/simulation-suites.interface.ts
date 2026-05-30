@@ -56,17 +56,17 @@ export interface SimulationSuite {
  * Subsequent steps use PATCH API to update wizard_progress
  */
 export interface CreateSimulationSuiteDto {
-  name: string; // Required: Simulation Suite Name
-  description?: string; // Optional: Suite description (max 300 chars)
-  simulation_type?: SimulationType; // Optional: SINGLE_RULE (default) or INTEGRATION_TESTING
-  rule_repo?: string; // Optional: Rule repository
-  rule_name?: string; // Optional: Associated rule name
-  rule_version?: string; // Optional: Rule version
-  primary_txtp?: string; // Optional: Primary transaction type (e.g., pacs.008)
-  primary_txtp_version?: string; // Optional: TXTP version
-  clone_source_suite_id?: number; // Optional: Source suite ID if cloning
-  wizard_progress?: WizardProgress; // Optional: Initialize wizard progress
-  metadata?: Record<string, unknown>; // Optional: Custom metadata
+  name: string;
+  description?: string;
+  simulation_type?: SimulationType;
+  rule_repo: string;
+  rule_name: string;
+  rule_version: string;
+  primary_txtp: string;
+  primary_txtp_version: string;
+  clone_source_suite_id?: number;
+  wizard_progress?: WizardProgress;
+  metadata?: Record<string, unknown>;
 }
 
 /**

@@ -73,6 +73,12 @@ import {
   createSimulationHandler,
   getSimulationByIdHandler,
   getSimulationsHandler,
+  getSuiteGenerationsHandler,
+  getLatestSuiteGenerationHandler,
+  getGenerationContextConfigsHandler,
+  updateContextTxtpConfigHandler,
+  upsertFieldStrategiesHandler,
+  getFieldStrategiesHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -152,6 +158,12 @@ const routePrivilege = {
   getSimulationSuites: ['editor', 'approver'],
   getSimulationSuiteById: ['editor', 'approver'],
   updateSimulationSuite: ['editor', 'approver'],
+  getSuiteGenerations: ['editor', 'approver'],
+  getLatestSuiteGeneration: ['editor', 'approver'],
+  getGenerationContextConfigs: ['editor', 'approver'],
+  updateContextTxtpConfig: ['editor', 'approver'],
+  upsertFieldStrategies: ['editor', 'approver'],
+  getFieldStrategies: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -471,6 +483,30 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.patch('/v1/admin/trs/simulation-studio/suites/:id', {
     ...SetOptionsBodyAndParams(updateSimulationHandler, routePrivilege.updateSimulationSuite),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations', {
+    ...SetOptionsBodyAndParams(getSuiteGenerationsHandler, routePrivilege.getSuiteGenerations),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations/latest', {
+    ...SetOptionsBodyAndParams(getLatestSuiteGenerationHandler, routePrivilege.getLatestSuiteGeneration),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs', {
+    ...SetOptionsBodyAndParams(getGenerationContextConfigsHandler, routePrivilege.getGenerationContextConfigs),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/suites/:suiteId/context-configs/:configId', {
+    ...SetOptionsBodyAndParams(updateContextTxtpConfigHandler, routePrivilege.updateContextTxtpConfig),
+  });
+
+  fastify.put('/v1/admin/trs/simulation-studio/suites/:suiteId/context-configs/:configId/field-strategies', {
+    ...SetOptionsBodyAndParams(upsertFieldStrategiesHandler, routePrivilege.upsertFieldStrategies),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/context-configs/:configId/field-strategies', {
+    ...SetOptionsBodyAndParams(getFieldStrategiesHandler, routePrivilege.getFieldStrategies),
   });
 }
 

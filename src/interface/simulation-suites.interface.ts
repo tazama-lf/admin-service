@@ -126,3 +126,36 @@ export interface SimulationSuitesListResponse {
   limit?: number;
   offset?: number;
 }
+
+export interface UpdateSuiteDraftDto {
+  screen: number;
+  data: Record<string, unknown>;
+}
+
+export interface GenerateSuiteContextDto {
+  count?: number;
+}
+
+export interface GeneratedContextRow {
+  row_index: number;
+  txtp: string;
+  payload: Record<string, unknown>;
+}
+
+export interface GenerateSuiteContextResponse {
+  rows: GeneratedContextRow[];
+  count: number;
+}
+
+export type SimulationRunStatus = 'ENV_PROVISIONING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface RunSuiteResponse {
+  runId: string;
+  status: SimulationRunStatus;
+  phase: string;
+}
+
+export interface RunSuiteStatusResponse extends RunSuiteResponse {
+  error_message?: string;
+  partialResults?: Array<Record<string, unknown>>;
+}

@@ -88,7 +88,19 @@ import type {
   CreateSimulationSuiteDto,
   UpdateSimulationSuiteDto,
   SimulationSuiteIdParamsDto,
+  UpdateSuiteDraftDto,
+  GenerateSuiteContextDto,
 } from './interface/simulation-suites.interface';
+import {
+  createSimulationSuite,
+  getSimulationSuites,
+  getSimulationSuiteById,
+  updateSimulationSuite,
+  saveSimulationSuiteDraft,
+  generateSimulationSuiteContext,
+  runSimulationSuite,
+  getSimulationSuiteRunStatus,
+} from './services/simulation-suites.logic.service';
 import {
   handleCreatePushJob,
   handleGetAllJobs,
@@ -1988,5 +2000,238 @@ export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, repl
     reply.code(200).send();
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
+  }
+};
+
+// ==================== SIMULATION STUDIO SUITES OPERATIONS ====================
+
+export const createSimulationSuiteHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create simulation suite');
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const payload = req.body as CreateSimulationSuiteDto;
+
+    const simulation = await createSimulationSuite(payload, tenantId, userId, userEmail);
+
+    reply.status(201).send({
+      success: true,
+      message: 'Simulation suite created successfully',
+      data: simulation,
+    });
+    loggerService.log('End - Create simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to create simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to create simulation suite');
+  }
+};
+
+export const getSimulationSuitesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suites');
+    const { tenantId } = req as ITenantRequest;
+    const query = req.query as SimulationSuitesQueryDto;
+
+    const limit = query.limit ?? 20;
+    const ruleName = query.rule_name ?? query.rule;
+    const offset = query.offset ?? (query.page && query.page > 0 ? (query.page - 1) * limit : 0);
+
+    const result = await getSimulationSuites({
+      tenantId,
+      search: query.search,
+      status: query.status,
+      ruleName,
+      txtp: query.txtp,
+      updatedFrom: query.updated_from ? new Date(query.updated_from) : undefined,
+      updatedTo: query.updated_to ? new Date(query.updated_to) : undefined,
+      limit,
+      offset,
+    });
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation suites retrieved successfully',
+      suites: result.data,
+      total: result.total,
+    });
+    loggerService.log('End - Get simulation suites');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suites. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites');
+  }
+};
+
+export const getSimulationSuiteByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suite by ID');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const simulation = await getSimulationSuiteById(simulationId, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation suite retrieved successfully',
+      suite: simulation,
+    });
+    loggerService.log('End - Get simulation suite by ID');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suite');
+  }
+};
+
+export const updateSimulationSuiteHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update simulation suite');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+    const payload = req.body as UpdateSimulationSuiteDto;
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const updatedSimulation = await updateSimulationSuite(simulationId, tenantId, payload);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation suite updated successfully',
+      suite: updatedSimulation,
+    });
+    loggerService.log('End - Update simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to update simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to update simulation suite');
+  }
+};
+
+export const putSimulationSuiteDraftHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Save simulation suite draft');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+    const payload = req.body as UpdateSuiteDraftDto;
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const updatedSimulation = await saveSimulationSuiteDraft(simulationId, tenantId, payload);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation suite draft saved successfully',
+      suite: updatedSimulation,
+    });
+    loggerService.log('End - Save simulation suite draft');
+  } catch (err) {
+    const failMessage = `Failed to save simulation suite draft. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to save simulation suite draft');
+  }
+};
+
+export const generateSimulationContextHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate simulation suite context');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+    const query = req.query as GenerateSuiteContextDto;
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const context = await generateSimulationSuiteContext(simulationId, tenantId, query);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation context generated successfully',
+      rows: context.rows,
+      count: context.count,
+    });
+    loggerService.log('End - Generate simulation suite context');
+  } catch (err) {
+    const failMessage = `Failed to generate simulation suite context. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to generate simulation suite context');
+  }
+};
+
+export const runSimulationSuiteHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Run simulation suite');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const runState = await runSimulationSuite(simulationId, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation run started successfully',
+      ...runState,
+    });
+    loggerService.log('End - Run simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to run simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to run simulation suite');
+  }
+};
+
+export const getSimulationRunStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suite run status');
+    const { tenantId } = req as ITenantRequest;
+    const { id, runId } = req.params as { id: string; runId: string };
+    const simulationId = parseInt(id, 10);
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    if (!runId?.trim()) {
+      reply.status(400).send({ success: false, message: 'Invalid run ID' });
+      return;
+    }
+
+    const runStatus = await getSimulationSuiteRunStatus(simulationId, runId, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Simulation run status retrieved successfully',
+      ...runStatus,
+    });
+    loggerService.log('End - Get simulation suite run status');
+  } catch (err) {
+    const failMessage = `Failed to get simulation suite run status. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to get simulation suite run status');
   }
 };

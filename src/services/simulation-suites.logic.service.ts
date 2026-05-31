@@ -5,7 +5,14 @@ import type {
   UpdateSimulationSuiteDto,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
+  UpdateSuiteDraftDto,
+  GenerateSuiteContextDto,
+  GenerateSuiteContextResponse,
+  GeneratedContextRow,
+  RunSuiteResponse,
+  RunSuiteStatusResponse,
 } from '../interface/simulation-suites.interface';
+import { SimulationSuiteStatus } from '../interface/simulation-suites.interface';
 import {
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,
@@ -33,7 +40,7 @@ export const getSimulationSuites = async (options: SimulationSuitesQueryOptions)
 /**
  * Get a specific simulation suite by ID
  */
-export const getSimulationSuiteById = async (id: number, tenantId: string): Promise<SimulationSuite | null> => {
+export const getSimulationSuiteById = async (id: number, tenantId: string): Promise<SimulationSuite> => {
   try {
     const suite = await getSimulationSuiteByIdFromDb(id, tenantId);
     if (!suite) {
@@ -133,4 +140,157 @@ export const updateSimulationSuite = async (id: number, tenantId: string, payloa
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+};
+
+const parseRunCount = (runCount: unknown): number => {
+  if (typeof runCount === 'number' && Number.isFinite(runCount)) {
+    return runCount;
+  }
+  if (typeof runCount === 'string') {
+    const parsed = parseInt(runCount, 10);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+};
+
+export const saveSimulationSuiteDraft = async (id: number, tenantId: string, payload: UpdateSuiteDraftDto): Promise<SimulationSuite> => {
+  if (!Number.isInteger(payload.screen) || payload.screen < 1 || payload.screen > 5) {
+    throw new HttpException('screen must be an integer between 1 and 5', HttpStatus.BAD_REQUEST);
+  }
+
+  const suite = await getSimulationSuiteById(id, tenantId);
+  const currentWizardProgress = asRecord(suite.wizard_progress);
+  const currentMetadata = asRecord(suite.metadata);
+  const currentWizardDraft = asRecord(currentMetadata.wizardDraft);
+  const screenKey = `screen${payload.screen}`;
+
+  const completedStepsRaw = currentWizardProgress.completedSteps;
+  const completedSteps = Array.isArray(completedStepsRaw)
+    ? completedStepsRaw.filter((step): step is number => typeof step === 'number' && Number.isInteger(step))
+    : [];
+  const updatedCompletedSteps = Array.from(new Set([...completedSteps, payload.screen])).sort((a, b) => a - b);
+
+  const currentStepRaw = currentWizardProgress.currentStep;
+  const currentStep = typeof currentStepRaw === 'number' && Number.isFinite(currentStepRaw) ? currentStepRaw : 1;
+
+  return await updateSimulationSuite(id, tenantId, {
+    wizard_progress: {
+      ...currentWizardProgress,
+      currentStep: Math.max(currentStep, payload.screen),
+      completedSteps: updatedCompletedSteps,
+      [screenKey]: true,
+    },
+    metadata: {
+      ...currentMetadata,
+      wizardDraft: {
+        ...currentWizardDraft,
+        [screenKey]: payload.data,
+      },
+    },
+  });
+};
+
+export const generateSimulationSuiteContext = async (
+  id: number,
+  tenantId: string,
+  payload: GenerateSuiteContextDto,
+): Promise<GenerateSuiteContextResponse> => {
+  const suite = await getSimulationSuiteById(id, tenantId);
+  const safeCount = Math.max(1, Math.min(100, payload.count ?? 5));
+
+  const metadata = asRecord(suite.metadata);
+  const wizardDraft = asRecord(metadata.wizardDraft);
+  const screen2 = asRecord(wizardDraft.screen2);
+  const txtpConfigs = Array.isArray(screen2.txtpConfigs) ? screen2.txtpConfigs : [];
+  const txtpFromDraft = txtpConfigs.find((config) => config && typeof config === 'object') as Record<string, unknown> | undefined;
+
+  const suitePrimaryTxtp = typeof suite.primary_txtp === 'string' && suite.primary_txtp.length ? suite.primary_txtp : undefined;
+  const draftPrimaryTxtp = txtpFromDraft && typeof txtpFromDraft.txtp === 'string' ? txtpFromDraft.txtp : undefined;
+  const baseTxtp = suitePrimaryTxtp ?? draftPrimaryTxtp ?? 'unknown.txtp';
+
+  const rows: GeneratedContextRow[] = Array.from({ length: safeCount }, (_, index) => ({
+    row_index: index + 1,
+    txtp: baseTxtp,
+    payload: {
+      suiteId: suite.id,
+      txtp: baseTxtp,
+      generatedIndex: index + 1,
+    },
+  }));
+
+  return {
+    rows,
+    count: rows.length,
+  };
+};
+
+export const runSimulationSuite = async (id: number, tenantId: string): Promise<RunSuiteResponse> => {
+  const suite = await getSimulationSuiteById(id, tenantId);
+  const runId = `run-${id}-${Date.now()}`;
+
+  const metadata = asRecord(suite.metadata);
+  const simulationRuns = asRecord(metadata.simulationRuns);
+
+  const runState: Record<string, unknown> = {
+    runId,
+    status: 'ENV_PROVISIONING',
+    phase: 'ENV_PROVISIONING',
+    started_at: new Date().toISOString(),
+    partialResults: [],
+  };
+
+  await updateSimulationSuite(id, tenantId, {
+    status: SimulationSuiteStatus.RUNNING,
+    run_count: parseRunCount(suite.run_count) + 1,
+    last_run_at: new Date(),
+    metadata: {
+      ...metadata,
+      lastRunId: runId,
+      simulationRuns: {
+        ...simulationRuns,
+        [runId]: runState,
+      },
+    },
+  });
+
+  return {
+    runId,
+    status: 'ENV_PROVISIONING',
+    phase: 'ENV_PROVISIONING',
+  };
+};
+
+export const getSimulationSuiteRunStatus = async (id: number, runId: string, tenantId: string): Promise<RunSuiteStatusResponse> => {
+  const suite = await getSimulationSuiteById(id, tenantId);
+  const metadata = asRecord(suite.metadata);
+  const simulationRuns = asRecord(metadata.simulationRuns);
+  const runState = asRecord(simulationRuns[runId]);
+
+  if (!Object.keys(runState).length) {
+    throw new HttpException(`Run with id ${runId} not found for suite ${id}`, HttpStatus.NOT_FOUND);
+  }
+
+  const status = typeof runState.status === 'string' ? runState.status : 'ENV_PROVISIONING';
+  const phase = typeof runState.phase === 'string' ? runState.phase : 'ENV_PROVISIONING';
+  const errorMessage = typeof runState.error_message === 'string' ? runState.error_message : undefined;
+  const partialResults = Array.isArray(runState.partialResults)
+    ? runState.partialResults.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+    : [];
+
+  return {
+    runId,
+    status: status as RunSuiteStatusResponse['status'],
+    phase,
+    error_message: errorMessage,
+    partialResults,
+  };
 };

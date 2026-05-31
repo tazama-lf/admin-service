@@ -3,11 +3,17 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+jest.mock('pgsql-ast-parser', () => ({ parse: jest.fn() }), { virtual: true });
+
 jest.mock('../../src/services/simulation-suites.logic.service', () => ({
   createSimulationSuite: jest.fn(),
   getSimulationSuites: jest.fn(),
   getSimulationSuiteById: jest.fn(),
   updateSimulationSuite: jest.fn(),
+  saveSimulationSuiteDraft: jest.fn(),
+  generateSimulationSuiteContext: jest.fn(),
+  runSimulationSuite: jest.fn(),
+  getSimulationSuiteRunStatus: jest.fn(),
 }));
 
 jest.mock('../../src/handlers/errorHandler', () => ({
@@ -25,15 +31,24 @@ jest.mock('../../src', () => ({
 }));
 
 import {
-  createSimulationHandler,
-  getSimulationsHandler,
-  getSimulationByIdHandler,
-  updateSimulationHandler,
+  createSimulationSuiteHandler,
+  getSimulationSuitesHandler,
+  getSimulationSuiteByIdHandler,
+  updateSimulationSuiteHandler,
+  putSimulationSuiteDraftHandler,
+  generateSimulationContextHandler,
+  runSimulationSuiteHandler,
+  getSimulationRunStatusHandler,
 } from '../../src/app.controller';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import { ErrorHandler } from '../../src/handlers/errorHandler';
 
-describe('Simulation Suites API Handlers', () => {
+const mockedSimulationSuitesService = simulationSuitesService as unknown as Record<
+  string,
+  jest.MockedFunction<(...args: any[]) => Promise<any>>
+>;
+
+describe('Simulation Studio Suites API Handlers', () => {
   const mockTenantId = 'tenant-123';
 
   const mockSuite = {
@@ -46,7 +61,7 @@ describe('Simulation Suites API Handlers', () => {
     updated_at: new Date('2026-05-01T00:00:00.000Z'),
   };
 
-  const buildReply = (): Partial<FastifyReply> => ({
+  const buildReply = (): any => ({
     status: jest.fn().mockReturnThis(),
     send: jest.fn(),
   });
@@ -55,9 +70,9 @@ describe('Simulation Suites API Handlers', () => {
     jest.clearAllMocks();
   });
 
-  describe('createSimulationHandler', () => {
+  describe('createSimulationSuiteHandler', () => {
     it('should create simulation suite and return 201', async () => {
-      (simulationSuitesService.createSimulationSuite as jest.Mock).mockResolvedValue(mockSuite);
+      mockedSimulationSuitesService.createSimulationSuite.mockResolvedValue(mockSuite);
 
       const req = {
         tenantId: mockTenantId,
@@ -73,10 +88,10 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await createSimulationHandler(req, reply as FastifyReply);
+      await createSimulationSuiteHandler(req, reply as FastifyReply);
 
       expect(simulationSuitesService.createSimulationSuite).toHaveBeenCalledWith(
-        req.body,
+        req.body as any,
         mockTenantId,
         'client-001',
         'creator@example.com',
@@ -93,7 +108,7 @@ describe('Simulation Suites API Handlers', () => {
 
     it('should delegate errors to ErrorHandler', async () => {
       const error = new Error('Create failed');
-      (simulationSuitesService.createSimulationSuite as jest.Mock).mockRejectedValue(error);
+      mockedSimulationSuitesService.createSimulationSuite.mockRejectedValue(error);
 
       const req = {
         tenantId: mockTenantId,
@@ -106,16 +121,16 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await createSimulationHandler(req, reply as FastifyReply);
+      await createSimulationSuiteHandler(req, reply as FastifyReply);
 
-      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to create simulation suite');
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply as any, error, 'Failed to create simulation suite');
     });
   });
 
-  describe('getSimulationsHandler', () => {
+  describe('getSimulationSuitesHandler', () => {
     it('should return list with pagination and mapped query options', async () => {
       const result = { data: [mockSuite], total: 1, limit: 10, offset: 0 };
-      (simulationSuitesService.getSimulationSuites as jest.Mock).mockResolvedValue(result);
+      mockedSimulationSuitesService.getSimulationSuites.mockResolvedValue(result);
 
       const req = {
         tenantId: mockTenantId,
@@ -132,7 +147,7 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await getSimulationsHandler(req, reply as FastifyReply);
+      await getSimulationSuitesHandler(req, reply as FastifyReply);
 
       expect(simulationSuitesService.getSimulationSuites).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -146,7 +161,7 @@ describe('Simulation Suites API Handlers', () => {
         }),
       );
 
-      const calledWith = (simulationSuitesService.getSimulationSuites as jest.Mock).mock.calls[0][0];
+      const calledWith = mockedSimulationSuitesService.getSimulationSuites.mock.calls[0][0] as any;
       expect(calledWith.updatedFrom).toBeInstanceOf(Date);
       expect(calledWith.updatedTo).toBeInstanceOf(Date);
 
@@ -159,9 +174,36 @@ describe('Simulation Suites API Handlers', () => {
         }),
       );
     });
+
+    it('should honor rule/page aliases when rule_name/offset are omitted', async () => {
+      const result = { data: [mockSuite], total: 1, limit: 10, offset: 10 };
+      mockedSimulationSuitesService.getSimulationSuites.mockResolvedValue(result);
+
+      const req = {
+        tenantId: mockTenantId,
+        query: {
+          rule: 'Rule Alias',
+          page: 2,
+          limit: 10,
+        },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await getSimulationSuitesHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.getSimulationSuites).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: mockTenantId,
+          ruleName: 'Rule Alias',
+          offset: 10,
+          limit: 10,
+        }),
+      );
+      expect(reply.status).toHaveBeenCalledWith(200);
+    });
   });
 
-  describe('getSimulationByIdHandler', () => {
+  describe('getSimulationSuiteByIdHandler', () => {
     it('should return 400 for invalid id', async () => {
       const req = {
         tenantId: mockTenantId,
@@ -169,7 +211,7 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await getSimulationByIdHandler(req, reply as FastifyReply);
+      await getSimulationSuiteByIdHandler(req, reply as FastifyReply);
 
       expect(reply.status).toHaveBeenCalledWith(400);
       expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid simulation suite ID' });
@@ -177,7 +219,7 @@ describe('Simulation Suites API Handlers', () => {
     });
 
     it('should return simulation suite for valid id', async () => {
-      (simulationSuitesService.getSimulationSuiteById as jest.Mock).mockResolvedValue(mockSuite);
+      mockedSimulationSuitesService.getSimulationSuiteById.mockResolvedValue(mockSuite);
 
       const req = {
         tenantId: mockTenantId,
@@ -185,7 +227,7 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await getSimulationByIdHandler(req, reply as FastifyReply);
+      await getSimulationSuiteByIdHandler(req, reply as FastifyReply);
 
       expect(simulationSuitesService.getSimulationSuiteById).toHaveBeenCalledWith(101, mockTenantId);
       expect(reply.status).toHaveBeenCalledWith(200);
@@ -198,7 +240,7 @@ describe('Simulation Suites API Handlers', () => {
     });
   });
 
-  describe('updateSimulationHandler', () => {
+  describe('updateSimulationSuiteHandler', () => {
     it('should return 400 for invalid id', async () => {
       const req = {
         tenantId: mockTenantId,
@@ -207,7 +249,7 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await updateSimulationHandler(req, reply as FastifyReply);
+      await updateSimulationSuiteHandler(req, reply as FastifyReply);
 
       expect(reply.status).toHaveBeenCalledWith(400);
       expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid simulation suite ID' });
@@ -219,7 +261,7 @@ describe('Simulation Suites API Handlers', () => {
         ...mockSuite,
         description: 'Step 2 saved',
       };
-      (simulationSuitesService.updateSimulationSuite as jest.Mock).mockResolvedValue(updatedSuite);
+      mockedSimulationSuitesService.updateSimulationSuite.mockResolvedValue(updatedSuite);
 
       const req = {
         tenantId: mockTenantId,
@@ -231,9 +273,9 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await updateSimulationHandler(req, reply as FastifyReply);
+      await updateSimulationSuiteHandler(req, reply as FastifyReply);
 
-      expect(simulationSuitesService.updateSimulationSuite).toHaveBeenCalledWith(101, mockTenantId, req.body);
+      expect(simulationSuitesService.updateSimulationSuite).toHaveBeenCalledWith(101, mockTenantId, req.body as any);
       expect(reply.status).toHaveBeenCalledWith(200);
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -246,7 +288,7 @@ describe('Simulation Suites API Handlers', () => {
 
     it('should delegate update errors to ErrorHandler', async () => {
       const error = new Error('Update failed');
-      (simulationSuitesService.updateSimulationSuite as jest.Mock).mockRejectedValue(error);
+      mockedSimulationSuitesService.updateSimulationSuite.mockRejectedValue(error);
 
       const req = {
         tenantId: mockTenantId,
@@ -255,9 +297,133 @@ describe('Simulation Suites API Handlers', () => {
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
-      await updateSimulationHandler(req, reply as FastifyReply);
+      await updateSimulationSuiteHandler(req, reply as FastifyReply);
 
-      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to update simulation suite');
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply as any, error, 'Failed to update simulation suite');
+    });
+  });
+
+  describe('putSimulationSuiteDraftHandler', () => {
+    it('should save draft and return 200', async () => {
+      const updatedSuite = { ...mockSuite, wizard_progress: { currentStep: 2, completedSteps: [1, 2] } };
+      mockedSimulationSuitesService.saveSimulationSuiteDraft.mockResolvedValue(updatedSuite);
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+        body: { screen: 2, data: { txtpConfigs: [] } },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await putSimulationSuiteDraftHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.saveSimulationSuiteDraft).toHaveBeenCalledWith(101, mockTenantId, req.body as any);
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Simulation suite draft saved successfully',
+          suite: updatedSuite,
+        }),
+      );
+    });
+  });
+
+  describe('generateSimulationContextHandler', () => {
+    it('should generate suite context and return 200', async () => {
+      mockedSimulationSuitesService.generateSimulationSuiteContext.mockResolvedValue({
+        rows: [{ row_index: 1, txtp: 'pacs.008', payload: { generatedIndex: 1 } }],
+        count: 1,
+      });
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+        query: { count: 1 },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await generateSimulationContextHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.generateSimulationSuiteContext).toHaveBeenCalledWith(101, mockTenantId, { count: 1 });
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          count: 1,
+        }),
+      );
+    });
+  });
+
+  describe('runSimulationSuiteHandler', () => {
+    it('should start run and return run state', async () => {
+      mockedSimulationSuitesService.runSimulationSuite.mockResolvedValue({
+        runId: 'run-101-123',
+        status: 'ENV_PROVISIONING',
+        phase: 'ENV_PROVISIONING',
+      });
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await runSimulationSuiteHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.runSimulationSuite).toHaveBeenCalledWith(101, mockTenantId);
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          runId: 'run-101-123',
+          status: 'ENV_PROVISIONING',
+        }),
+      );
+    });
+  });
+
+  describe('getSimulationRunStatusHandler', () => {
+    it('should return 400 for missing runId', async () => {
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101', runId: '' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await getSimulationRunStatusHandler(req, reply as FastifyReply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid run ID' });
+      expect(simulationSuitesService.getSimulationSuiteRunStatus).not.toHaveBeenCalled();
+    });
+
+    it('should return run status payload for valid suite and run ids', async () => {
+      mockedSimulationSuitesService.getSimulationSuiteRunStatus.mockResolvedValue({
+        runId: 'run-101-123',
+        status: 'RUNNING',
+        phase: 'TRANSACTION_LOOP',
+        partialResults: [],
+      });
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101', runId: 'run-101-123' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await getSimulationRunStatusHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.getSimulationSuiteRunStatus).toHaveBeenCalledWith(101, 'run-101-123', mockTenantId);
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          status: 'RUNNING',
+          phase: 'TRANSACTION_LOOP',
+        }),
+      );
     });
   });
 });

@@ -79,6 +79,14 @@ import {
   createSimulationHandler,
   getSimulationStatsHandler,
   getSimulationResultsHandler,
+  createSimulationSuiteHandler,
+  getSimulationSuitesHandler,
+  getSimulationSuiteByIdHandler,
+  updateSimulationSuiteHandler,
+  putSimulationSuiteDraftHandler,
+  generateSimulationContextHandler,
+  runSimulationSuiteHandler,
+  getSimulationRunStatusHandler,
   fetchCountDlhHandler,
   getAllEvaluationsHandler,
   truncateEvaluationResultsHandler,
@@ -168,6 +176,13 @@ const routePrivilege = {
   getSimulationStats: ['editor', 'approver'],
   getSimulationResults: ['editor', 'approver'],
   saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
+  getSimulationSuites: ['editor', 'approver'],
+  getSimulationSuiteById: ['editor', 'approver'],
+  createSimulationSuites: ['editor', 'approver'],
+  updateSimulationSuite: ['editor', 'approver'],
+  generateSimulationContext: ['editor', 'approver'],
+  runSimulationSuite: ['editor', 'approver'],
+  getSimulationRunStatus: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -424,6 +439,40 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation/get_simulation_results', {
     ...SetOptionsBodyAndParams(getSimulationResultsHandler, routePrivilege.getSimulationResults),
+  });
+
+  // ====================  SIMULATION STUDIO SUITES OPERATIONS ====================
+
+  fastify.post('/v1/admin/trs/simulation-studio/suites', {
+    ...SetOptionsBodyAndParams(createSimulationSuiteHandler, routePrivilege.createSimulationSuites),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites', {
+    ...SetOptionsBodyAndParams(getSimulationSuitesHandler, routePrivilege.getSimulationSuites),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id', {
+    ...SetOptionsBodyAndParams(getSimulationSuiteByIdHandler, routePrivilege.getSimulationSuiteById),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/suites/:id', {
+    ...SetOptionsBodyAndParams(updateSimulationSuiteHandler, routePrivilege.updateSimulationSuite),
+  });
+
+  fastify.put('/v1/admin/trs/simulation-studio/suites/:id/draft', {
+    ...SetOptionsBodyAndParams(putSimulationSuiteDraftHandler, routePrivilege.updateSimulationSuite),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/suites/:id/generate/context', {
+    ...SetOptionsBodyAndParams(generateSimulationContextHandler, routePrivilege.generateSimulationContext),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/suites/:id/run', {
+    ...SetOptionsBodyAndParams(runSimulationSuiteHandler, routePrivilege.runSimulationSuite),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/runs/:runId/status', {
+    ...SetOptionsBodyAndParams(getSimulationRunStatusHandler, routePrivilege.getSimulationRunStatus),
   });
 
   // ====================  RULE SIMULATION OPERATIONS ====================

@@ -14,7 +14,7 @@ import {
   handleUpdateExpiryDateForConditionsOfAccount,
   handleUpdateExpiryDateForConditionsOfEntity,
 } from './services/event-flow.logic.service';
-import { handleGetReportRequestByMsgId } from './services/report.logic.service';
+import { handleGetReportRequestByMsgId, handleGetAllReportsRequest } from './services/report.logic.service';
 import {
   handlePostConfig,
   handleFindConfigByID,
@@ -63,16 +63,24 @@ import {
   handlePostMask,
   handleUpdateMask,
   handleGetMaskById,
+  handleGetExcludedTypes,
   handleReviewMask,
 } from './services/masking.logic.service';
+import { findSimulations, createSimulation, getSimulationStats, getSimulationResults } from './services/simulation.logic.service';
+import { findActiveConfigsByTuples, type MaskTuple } from './repositories/configuration/tcs.config.repository';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
-import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
 import {
-  getSimulationSuites,
-  getSimulationSuiteById,
-  createSimulationSuite,
-  updateSimulationSuite,
-} from './services/simulation-suites.logic.service';
+  getSimulationLogs,
+  createSimulationLogs,
+  getSimulationMessages,
+  stageSimulationItems,
+  deleteEvaluationsByTenant,
+  saveEvaluationsInResultsTable,
+  saveRecordInTrsSimulation,
+  fetchSimulationItems,
+  handleDlhFetchCount,
+} from './services/simulation-logs.logic.service';
+import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import type {
@@ -1414,6 +1422,39 @@ export const getSimulationLogsHandler = async (req: FastifyRequest, reply: Fasti
   }
 };
 
+export const getSimulationMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName: string };
+
+    const messages = await getSimulationMessages(tenantId, tableName);
+
+    reply.code(200).send({
+      success: true,
+      messages,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation messages');
+  }
+};
+
+export const fetchSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { tableName } = req.query as { tableName?: string };
+
+    if (!tableName || tableName.trim() === '') {
+      reply.code(400).send({ error: 'tableName is required' });
+      return;
+    }
+
+    const items = await fetchSimulationItems(tableName, tenantId);
+    reply.code(200).send({ items, count: items.length });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch simulation items');
+  }
+};
+
 export const getRuleFlowStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
@@ -1455,6 +1496,24 @@ export const getTransactionTypesHandler = async (req: FastifyRequest, reply: Fas
     ErrorHandler.sendError(reply, error, 'Failed to get transaction types');
   } finally {
     loggerService.log('End - Handle get transaction types request');
+  }
+};
+
+export const getExcludedTypesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get excluded types request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const excludedTypes = await handleGetExcludedTypes(tenantId);
+
+    reply.status(200).send({
+      success: true,
+      excludedTypes,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get excluded types');
+  } finally {
+    loggerService.log('End - Handle get excluded types request');
   }
 };
 
@@ -1718,191 +1777,216 @@ export const reviewMaskHandler = async (req: FastifyRequest, reply: FastifyReply
   }
 };
 
-// Simulation Studio
+// ==================== SIMULATION OPERATIONS ====================
 
-/**
- * WIZARD STEP 1: POST - Create Simulation Suite with Rule & Details
- *
- * Flow:
- * 1. User fills "Rule & Details" form (Step 1 of 7)
- * 2. POST to /v1/admin/simulation-studio/suites with:
- *    - name: "Suite Name"
- *    - description: "..." (optional)
- *    - rule_name: "Selected Rule"
- *    - rule_version: "v1.0"
- *    - primary_txtp: "pacs.008"
- *    - primary_txtp_version: "v1.0"
- * 3. Suite created in DB with status="DRAFT", wizard_progress.currentStep=1
- * 4. Response includes suite ID for use in subsequent PATCH requests
- *
- * Example Response:
- * {
- *   "success": true,
- *   "data": {
- *     "id": 123,
- *     "name": "Test Suite",
- *     "wizard_progress": { "currentStep": 1, "completedSteps": [1] },
- *     ...
- *   }
- * }
- */
 export const createSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    loggerService.log('Start - Create simulation suite');
+    const { tenantId } = req as ITenantRequest;
+    const body = req.body as Record<string, unknown>;
+    const response = await createSimulation(body, tenantId);
+    reply.code(201).send({ success: true, message: response.message, simulation_id: response.simulation_id });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to create simulation');
+  }
+};
+
+export const getAllSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { offset = '0', limit = '10' } = req.params as { offset?: string; limit?: string };
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const result = await findSimulations(parsedLimit, parsedOffset, tenantId);
+    reply.code(200).send({
+      success: true,
+      simulations: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulations');
+  }
+};
+
+export const getSimulationStatsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const { sim, iteration_no: iterationNo } = req.query as { sim?: string; iteration_no?: string };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+
+    const result = await getSimulationStats(sim.trim().toLowerCase(), iterationNo.trim(), tenantId);
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation stats');
+  }
+};
+
+export const getSimulationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    const {
+      sim,
+      iteration_no: iterationNo,
+      limit: qLimit = '10',
+      offset: qOffset = '0',
+      msg_id: msgId,
+      msg_type: msgType,
+      outcome,
+    } = req.query as {
+      sim?: string;
+      iteration_no?: string;
+      limit?: string;
+      offset?: string;
+      msg_id?: string;
+      msg_type?: string;
+      outcome?: string;
+    };
+
+    if (!sim?.trim()) {
+      reply.code(400).send({ success: false, message: '`sim` query parameter is required.' });
+      return;
+    }
+    if (!iterationNo?.trim()) {
+      reply.code(400).send({ success: false, message: '`iteration_no` query parameter is required.' });
+      return;
+    }
+    if (!/^\d+$/.test(iterationNo)) {
+      reply.code(400).send({ success: false, message: '`iteration_no` must be a numeric string.' });
+      return;
+    }
+    if (outcome && outcome !== 'Hit' && outcome !== 'No-Hit') {
+      reply.code(400).send({ success: false, message: '`outcome` must be "Hit" or "No-Hit".' });
+      return;
+    }
+
+    const parsedLimit = parseInt(qLimit, 10) || 10;
+    const parsedOffset = parseInt(qOffset, 10) || 0;
+
+    const result = await getSimulationResults(
+      sim.trim().toLowerCase(),
+      iterationNo.trim(),
+      tenantId,
+      parsedLimit,
+      parsedOffset * parsedLimit,
+      { msg_id: msgId?.trim(), msg_type: msgType?.trim(), outcome: outcome?.trim() },
+    );
+    reply.code(200).send({ success: true, ...result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get simulation results');
+  }
+};
+
+export const stageSimulationItemsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const items = req.body as Array<Record<string, unknown>>;
+
+    const result = await stageSimulationItems(items);
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to stage simulation items');
+  }
+};
+
+export const truncateEvaluationResultsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { tenantId } = req as ITenantRequest;
+    await deleteEvaluationsByTenant(tenantId);
+    reply.code(200).send({ success: true, message: 'Evaluation results truncated successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to truncate evaluation results');
+  }
+};
+
+export const fetchCountDlhHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const token = req.headers.authorization ?? '';
+    const queries = req.body as Array<Record<string, unknown>>;
+
+    const result = await handleDlhFetchCount(queries, token);
+
+    reply.code(200).send(result);
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch count from DLH');
+  }
+};
+
+export const findActiveMaskConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const tuples = req.body as MaskTuple[];
+    const result = await findActiveConfigsByTuples(tuples);
+    reply.code(200).send({ success: true, masks: result });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to find active masking configurations');
+  }
+};
+
+export const saveEvaluationsInResultsTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    const { evaluations, tableName } = req.body as { evaluations: EvaluationRow[]; tableName?: string };
+    await saveEvaluationsInResultsTable(evaluations, tableName);
+    reply.code(200).send({ success: true, message: 'Evaluations saved successfully' });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save evaluations');
+  }
+};
+
+export const fetchCountApiFlow = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
     const authReq = req as AuthenticatedRequest;
     const { tenantId } = req as ITenantRequest;
-    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
-    const userEmail = authReq.user?.preferred_username ?? undefined;
-    const payload = req.body as CreateSimulationSuiteDto;
-
-    const simulation = await createSimulationSuite(payload, tenantId, userId, userEmail);
-
-    const body = {
+    const body = (authReq.body ?? {}) as Record<string, string>;
+    const result = await findMasksWithFilters(Number.MAX_SAFE_INTEGER, 0, body, tenantId);
+    reply.code(200).send({
       success: true,
-      message: 'Simulation suite created successfully',
-      data: simulation,
-    };
-
-    reply.status(201).send(body);
-    loggerService.log('End - Create simulation suite');
-  } catch (err) {
-    const failMessage = `Failed to create simulation suite. \n${util.inspect(err)}`;
-    loggerService.error(failMessage);
-    ErrorHandler.sendError(reply, err, 'Failed to create simulation suite');
-  }
-};
-
-export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    loggerService.log('Start - Get simulation suites');
-    const { tenantId } = req as ITenantRequest;
-    const query = req.query as SimulationSuitesQueryDto;
-
-    const limit = query.limit ?? 20;
-    const ruleName = query.rule_name ?? query.rule;
-    const offset = query.offset ?? (query.page && query.page > 0 ? (query.page - 1) * limit : 0);
-
-    // Parse query parameters
-    const options = {
-      tenantId,
-      search: query.search,
-      status: query.status,
-      ruleName,
-      txtp: query.txtp,
-      updatedFrom: query.updated_from ? new Date(query.updated_from) : undefined,
-      updatedTo: query.updated_to ? new Date(query.updated_to) : undefined,
-      limit,
-      offset,
-    };
-
-    const result = await getSimulationSuites(options);
-
-    const body = {
-      success: true,
-      message: 'Simulation suites retrieved successfully',
-      suites: result.data,
+      masks: result.data,
       total: result.total,
-    };
-
-    reply.status(200).send(body);
-    loggerService.log('End - Get simulation suites');
-  } catch (err) {
-    const failMessage = `Failed to retrieve simulation suites. \n${util.inspect(err)}`;
-    loggerService.error(failMessage);
-    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites');
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to fetch masks');
   }
 };
 
-export const getSimulationByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const getAllEvaluationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get all evaluations request');
   try {
-    loggerService.log('Start - Get simulation suite by ID');
     const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as SimulationSuiteIdParamsDto;
-    const simulationId = parseInt(id, 10);
-
-    if (!id || isNaN(simulationId)) {
-      reply.status(400).send({
-        success: false,
-        message: 'Invalid simulation suite ID',
-      });
-      return;
-    }
-
-    const simulation = await getSimulationSuiteById(simulationId, tenantId);
-
-    const body = {
-      success: true,
-      message: 'Simulation suite retrieved successfully',
-      suite: simulation,
-    };
-
-    reply.status(200).send(body);
-    loggerService.log('End - Get simulation suite by ID');
+    const data = await handleGetAllReportsRequest(tenantId);
+    reply.status(200).send({ message: 'Evaluations fetched successfully', data });
   } catch (err) {
-    const failMessage = `Failed to retrieve simulation suite. \n${util.inspect(err)}`;
-    loggerService.error(failMessage);
-    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suite');
+    const failMessage = `Failed to fetch evaluations. \n${util.inspect(err)}`;
+    reply.status(500).send(failMessage);
+  } finally {
+    loggerService.log('End - Handle get all evaluations request');
   }
 };
 
-/**
- * WIZARD STEPS 2-7: PATCH - Update Simulation Suite with Additional Data
- *
- * Flow for each step transition:
- * 1. User completes Step N (2, 3, 4, 5, 6, or 7) on UI
- * 2. PATCH to /v1/admin/simulation-studio/suites/:id with:
- *    - wizard_progress: { currentStep: N, completedSteps: [1, 2, ..., N-1], stepNData: {...} }
- *    - Other fields to update (status, metadata, etc.)
- * 3. Suite updated in DB with new wizard progress
- * 4. Response includes updated suite for UI validation
- *
- * Step Descriptions:
- * - Step 1: Rule & Details (done via POST)
- * - Step 2: TXTP Selection
- * - Step 3: Trigger Data
- * - Step 4: Enrichment Data
- * - Step 5: Preview & Save
- * - Step 6: Simulation Results
- * - Step 7: Final confirmation
- *
- * Example PATCH body for Step 2:
- * {
- *   "wizard_progress": {
- *     "currentStep": 2,
- *     "completedSteps": [1],
- *     "step2Data": { "txtp": "pacs.008", ... }
- *   }
- * }
- */
-export const updateSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    loggerService.log('Start - Update simulation suite');
     const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as SimulationSuiteIdParamsDto;
-    const simulationId = parseInt(id, 10);
-    const payload = req.body as UpdateSimulationSuiteDto;
-
-    if (!id || isNaN(simulationId)) {
-      reply.status(400).send({
-        success: false,
-        message: 'Invalid simulation suite ID',
-      });
-      return;
-    }
-
-    const updatedSimulation = await updateSimulationSuite(simulationId, tenantId, payload);
-
-    const body = {
-      success: true,
-      message: 'Simulation suite updated successfully',
-      suite: updatedSimulation,
+    const { simulationId, totalRecord, recordProcessed, simStatus } = req.body as {
+      simulationId: string | undefined;
+      totalRecord: number;
+      recordProcessed: number;
+      simStatus: string;
     };
-
-    reply.status(200).send(body);
-    loggerService.log('End - Update simulation suite');
-  } catch (err) {
-    const failMessage = `Failed to update simulation suite. \n${util.inspect(err)}`;
-    loggerService.error(failMessage);
-    ErrorHandler.sendError(reply, err, 'Failed to update simulation suite');
+    await saveRecordInTrsSimulation({ simulationId, totalRecord, recordProcessed, simStatus, tenantId });
+    reply.code(200).send();
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
   }
 };

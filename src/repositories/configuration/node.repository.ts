@@ -80,7 +80,6 @@ export const getAllNodes = async (
 
 export const executeQueryNodeInDb = async (
   query: string,
-  tenantId: string,
   dbName: string,
   params: unknown[] = [],
 ): Promise<Array<Record<string, unknown>>> => {

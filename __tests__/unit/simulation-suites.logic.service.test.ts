@@ -183,6 +183,18 @@ describe('Simulation Suites Logic Service', () => {
   });
 
   describe('saveSimulationSuiteDraft', () => {
+    it('should reject draft save when screen is outside allowed range', async () => {
+      await expect(
+        simulationSuitesService.saveSimulationSuiteDraft(1, mockTenantId, {
+          screen: 0,
+          data: {},
+        }),
+      ).rejects.toThrow('screen must be an integer between 1 and 5');
+
+      expect(simulationSuitesRepository.getSimulationSuiteByIdFromDb).not.toHaveBeenCalled();
+      expect(simulationSuitesRepository.updateSimulationSuiteInDb).not.toHaveBeenCalled();
+    });
+
     it('should merge draft payload into wizard_progress and metadata.wizardDraft', async () => {
       mockedSimulationSuitesRepository.getSimulationSuiteByIdFromDb.mockResolvedValue(mockSuite);
       mockedSimulationSuitesRepository.updateSimulationSuiteInDb.mockResolvedValue({

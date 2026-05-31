@@ -1778,17 +1778,21 @@ export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyR
     const { tenantId } = req as ITenantRequest;
     const query = req.query as SimulationSuitesQueryDto;
 
+    const limit = query.limit ?? 20;
+    const ruleName = query.rule_name ?? query.rule;
+    const offset = query.offset ?? (query.page && query.page > 0 ? (query.page - 1) * limit : 0);
+
     // Parse query parameters
     const options = {
       tenantId,
       search: query.search,
       status: query.status,
-      ruleName: query.rule_name,
+      ruleName,
       txtp: query.txtp,
       updatedFrom: query.updated_from ? new Date(query.updated_from) : undefined,
       updatedTo: query.updated_to ? new Date(query.updated_to) : undefined,
-      limit: query.limit ?? 20,
-      offset: query.offset ?? 0,
+      limit,
+      offset,
     };
 
     const result = await getSimulationSuites(options);

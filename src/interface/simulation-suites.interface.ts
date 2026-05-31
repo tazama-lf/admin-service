@@ -13,8 +13,8 @@ export enum SimulationType {
   INTEGRATION_TESTING = 'INTEGRATION_TESTING',
 }
 
-export const SIMULATION_SUITE_NAME_MAX_LENGTH = 50;
-export const SIMULATION_SUITE_DESCRIPTION_MAX_LENGTH = 300;
+export const SIMULATION_SUITE_NAME_MAX_LENGTH = 120;
+export const SIMULATION_SUITE_DESCRIPTION_MAX_LENGTH = 500;
 
 /**
  * Wizard step tracking for multi-step simulation suite creation
@@ -57,7 +57,7 @@ export interface SimulationSuite {
  */
 export interface CreateSimulationSuiteDto {
   name: string; // Required: Simulation Suite Name
-  description?: string; // Optional: Suite description (max 300 chars)
+  description?: string; // Optional: Suite description (max 500 chars)
   simulation_type?: SimulationType; // Optional: SINGLE_RULE (default) or INTEGRATION_TESTING
   rule_repo?: string; // Optional: Rule repository
   rule_name?: string; // Optional: Associated rule name
@@ -95,11 +95,13 @@ export interface SimulationSuitesQueryDto {
   search?: string; // Search by suite name (case-insensitive contains)
   status?: SimulationSuiteStatus; // Filter by status
   rule_name?: string; // Filter by associated rule name
+  rule?: string; // Alias for rule_name
   txtp?: string; // Filter by transaction type (TXTP)
   updated_from?: string; // Filter by updated date from (inclusive) - ISO format
   updated_to?: string; // Filter by updated date to (inclusive) - ISO format
   offset?: number; // Offset (0-based)
   limit?: number; // Limit
+  page?: number; // Page number (1-based); converted to offset when offset is not supplied
 }
 
 export interface SimulationSuiteIdParamsDto {

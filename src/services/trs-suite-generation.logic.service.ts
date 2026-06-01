@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { ContentType } from '@tazama-lf/tcs-lib';
 import type {
   SuiteGeneration,
   SuiteContextTxtpConfig,
@@ -75,7 +76,9 @@ export const createContextTxtpConfig = async (
     try {
       const row = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
       schema = row.schema as Record<string, unknown>;
-      samplePayload = (row.content_type === 'JSON' ? row.payload_json : row.payload_xml) as Record<string, unknown> | undefined;
+      samplePayload = (row.content_type === (ContentType.XML as string) ? row.payload_xml : row.payload_json) as
+        | Record<string, unknown>
+        | undefined;
     } catch {
       return null;
     }

@@ -50,7 +50,7 @@ describe('Suites Repository', () => {
 
     expect(result.total).toBe(1);
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].wizard_progress).toEqual({ currentStep: 1 });
+    expect(result.data[0].wizard_progress).toEqual({ currentStep: 1, completedSteps: [1] });
     expect(result.data[0].metadata).toEqual({ source: 'ui' });
 
     const countQuery = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { text: string };
@@ -111,7 +111,7 @@ describe('Suites Repository', () => {
 
     const result = await getSimulationSuiteByIdFromDb(2, 'tenant-a');
 
-    expect(result?.wizard_progress).toEqual({ currentStep: 1 });
+    expect(result?.wizard_progress).toEqual({ currentStep: 1, completedSteps: [1] });
     expect(result?.metadata).toEqual({ source: 'api' });
     expect(result?.last_run_at).toBeUndefined();
   });
@@ -265,7 +265,7 @@ describe('Suites Repository', () => {
     const result = await getSimulationSuitesFromDb({ tenantId: 'tenant-a' } as any);
 
     expect(result.total).toBe(1);
-    expect(result.data[0].wizard_progress).toEqual({ currentStep: 3 });
+    expect(result.data[0].wizard_progress).toEqual({ currentStep: 3, completedSteps: [1, 2, 3] });
     expect(result.data[0].metadata).toEqual({ updatedBy: 'svc' });
     expect(result.data[0].last_run_at).toBeUndefined();
   });

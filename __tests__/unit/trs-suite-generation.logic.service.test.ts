@@ -324,4 +324,53 @@ describe('error propagation', () => {
 
     await expect(getLatestGenerationForSuite(42)).rejects.toMatchObject({ status: 500 });
   });
+
+  it('createSuiteGeneration wraps non-Error thrown value', async () => {
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockRejectedValue('string error');
+
+    await expect(createSuiteGeneration(mockSuite, 'user-1')).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('createContextTxtpConfig wraps non-Error thrown value from insert', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({ schema: {}, content_type: 'JSON', payload_json: {} });
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('updateContextTxtpConfig wraps non-Error thrown value', async () => {
+    (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(updateContextTxtpConfig(1, { message_count: 5 })).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('upsertContextFieldStrategies wraps non-Error thrown value', async () => {
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(upsertContextFieldStrategies(1, [{ field_path: 'a', strategy_code: 'null' }])).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('getGenerationsForSuite wraps non-Error thrown value', async () => {
+    (generationsRepo.getGenerationsBySuiteId as jest.Mock).mockRejectedValue('string error');
+
+    await expect(getGenerationsForSuite(42)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('getContextConfigsForGeneration wraps non-Error thrown value', async () => {
+    (contextConfigRepo.getContextTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue('string error');
+
+    await expect(getContextConfigsForGeneration(1)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('getLatestGenerationForSuite wraps non-Error thrown value', async () => {
+    (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockRejectedValue('string error');
+
+    await expect(getLatestGenerationForSuite(42)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('getFieldStrategiesForContextConfig wraps non-Error thrown value', async () => {
+    (fieldStrategyRepo.getFieldStrategiesByContextConfigId as jest.Mock).mockRejectedValue('string error');
+
+    await expect(getFieldStrategiesForContextConfig(1)).rejects.toMatchObject({ status: 500 });
+  });
 });

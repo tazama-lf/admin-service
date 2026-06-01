@@ -88,8 +88,7 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
   return {
     data: result.rows.map((row) => ({
       ...row,
-      wizard_progress:
-        typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
+      wizard_progress: normalizeWizardProgress(row.wizard_progress),
       metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),
@@ -99,6 +98,16 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
     limit,
     offset,
   };
+};
+
+const normalizeWizardProgress = (raw: unknown): Record<string, unknown> => {
+  const wp = (typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : raw) as Record<string, unknown>;
+  // Migrate legacy format { step, completed } → { currentStep, completedSteps }
+  if (!Array.isArray(wp.completedSteps)) {
+    const step = typeof wp.currentStep === 'number' ? wp.currentStep : typeof wp.step === 'number' ? wp.step : 1;
+    return { ...wp, currentStep: step, completedSteps: Array.from({ length: step }, (_, i) => i + 1) };
+  }
+  return wp;
 };
 
 export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string): Promise<SimulationSuite | null> => {
@@ -126,8 +135,7 @@ export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string)
   const [row] = result.rows;
   return {
     ...row,
-    wizard_progress:
-      typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
+    wizard_progress: normalizeWizardProgress(row.wizard_progress),
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),

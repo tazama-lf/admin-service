@@ -19,8 +19,9 @@ export class HttpException extends Error {
 export const HttpStatus = {
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  PRECONDITION_REQUIRED: 428,
   INTERNAL_SERVER_ERROR: 500,
-  FORBIDDEN: 403,
 };

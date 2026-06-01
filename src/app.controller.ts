@@ -73,7 +73,17 @@ import {
   createSimulationSuite,
   updateSimulationSuite,
 } from './services/simulation-suites.logic.service';
+import {
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  getContextConfigsForGeneration,
+  updateContextTxtpConfig,
+  upsertContextFieldStrategies,
+  getFieldStrategiesForContextConfig,
+} from './services/trs-suite-generation.logic.service';
+import type { UpdateContextTxtpConfigDto, UpsertFieldStrategyDto } from './interface/suite-generation.interface';
 import { decodeInnerToken } from './utils/decode-token';
+import { assertPreviousStepComplete } from './utils/wizard-step-guard';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import type {
   SimulationSuitesQueryDto,
@@ -1900,5 +1910,171 @@ export const updateSimulationHandler = async (req: FastifyRequest, reply: Fastif
     const failMessage = `Failed to update simulation suite. \n${util.inspect(err)}`;
     loggerService.error(failMessage);
     ErrorHandler.sendError(reply, err, 'Failed to update simulation suite');
+  }
+};
+
+export const getSuiteGenerationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get suite generations');
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const suiteId = parseInt(id, 10);
+
+    if (!id || isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const generations = await getGenerationsForSuite(suiteId);
+
+    reply.status(200).send({ success: true, data: generations });
+    loggerService.log('End - Get suite generations');
+  } catch (err) {
+    const failMessage = `Failed to retrieve suite generations. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve suite generations');
+  }
+};
+
+export const getLatestSuiteGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get latest suite generation');
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const suiteId = parseInt(id, 10);
+
+    if (!id || isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const generation = await getLatestGenerationForSuite(suiteId);
+
+    if (!generation) {
+      reply.status(404).send({ success: false, message: 'No generation found for suite' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: generation });
+    loggerService.log('End - Get latest suite generation');
+  } catch (err) {
+    const failMessage = `Failed to retrieve latest suite generation. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve latest suite generation');
+  }
+};
+
+export const getGenerationContextConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get generation context txtp configs');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const configs = await getContextConfigsForGeneration(genId);
+
+    reply.status(200).send({ success: true, data: configs });
+    loggerService.log('End - Get generation context txtp configs');
+  } catch (err) {
+    const failMessage = `Failed to retrieve context txtp configs. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve context txtp configs');
+  }
+};
+
+// ── Step 2 helpers ────────────────────────────────────────────────────────────
+
+const parseStep2Params = (params: { suiteId: string; configId: string }): { suiteId: number; configId: number } | null => {
+  const suiteId = parseInt(params.suiteId, 10);
+  const configId = parseInt(params.configId, 10);
+  if (isNaN(suiteId) || isNaN(configId)) return null;
+  return { suiteId, configId };
+};
+
+// ── Step 2: PATCH context txtp config (message_count, faker_seed, generator_profile) ──
+
+export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update context txtp config');
+    const { tenantId } = req as ITenantRequest;
+    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
+
+    if (!parsed) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
+      return;
+    }
+
+    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
+    assertPreviousStepComplete(suite!.wizard_progress, 1);
+
+    const dto = req.body as UpdateContextTxtpConfigDto;
+    const updated = await updateContextTxtpConfig(parsed.configId, dto);
+
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Update context txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to update context txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to update context txtp config');
+  }
+};
+
+// ── Step 2: PUT field strategies (upsert array) ──────────────────────────────
+
+export const upsertFieldStrategiesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Upsert field strategies');
+    const { tenantId } = req as ITenantRequest;
+    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
+
+    if (!parsed) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
+      return;
+    }
+
+    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
+    assertPreviousStepComplete(suite!.wizard_progress, 1);
+
+    const { strategies } = req.body as { strategies: UpsertFieldStrategyDto[] };
+
+    if (!Array.isArray(strategies) || strategies.length === 0) {
+      reply.status(400).send({ success: false, message: 'strategies array is required and cannot be empty' });
+      return;
+    }
+
+    const result = await upsertContextFieldStrategies(parsed.configId, strategies);
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Upsert field strategies');
+  } catch (err) {
+    loggerService.error(`Failed to upsert field strategies. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to upsert field strategies');
+  }
+};
+
+// ── Step 2: GET field strategies for a context config ────────────────────────
+
+export const getFieldStrategiesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get field strategies');
+    const { tenantId } = req as ITenantRequest;
+    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
+
+    if (!parsed) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
+      return;
+    }
+
+    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
+    assertPreviousStepComplete(suite!.wizard_progress, 1);
+
+    const strategies = await getFieldStrategiesForContextConfig(parsed.configId);
+
+    reply.status(200).send({ success: true, data: strategies });
+    loggerService.log('End - Get field strategies');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve field strategies. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve field strategies');
   }
 };

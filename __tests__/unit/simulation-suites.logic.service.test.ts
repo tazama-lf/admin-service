@@ -5,8 +5,10 @@ process.env.ACTIVE_CONDITIONS_ONLY = 'true';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as simulationSuitesRepository from '../../src/repositories/simulation-studio/suites.repository';
+import * as trsGenService from '../../src/services/trs-suite-generation.logic.service';
 
 jest.mock('../../src/repositories/simulation-studio/suites.repository');
+jest.mock('../../src/services/trs-suite-generation.logic.service');
 
 describe('Simulation Suites Logic Service', () => {
   const mockTenantId = 'tenant-123';
@@ -35,6 +37,8 @@ describe('Simulation Suites Logic Service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 1, suite_id: 1 });
+    (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue(null);
   });
 
   describe('getSimulationSuites', () => {

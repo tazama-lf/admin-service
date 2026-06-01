@@ -131,7 +131,7 @@ describe('createContextTxtpConfig', () => {
   it('fetches schema from tcs_config and inserts context config row', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({
       schema: { type: 'object' },
-      content_type: 'JSON',
+      content_type: 'application/json',
       payload_json: { test: 'payload' },
     });
     (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
@@ -153,10 +153,10 @@ describe('createContextTxtpConfig', () => {
     expect(result).toBeNull();
   });
 
-  it('uses payload_xml branch when content_type is not JSON', async () => {
+  it('uses payload_xml branch when content_type is application/xml', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({
       schema: { type: 'object' },
-      content_type: 'XML',
+      content_type: 'application/xml',
       payload_xml: { xml: 'data' },
     });
     (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
@@ -171,7 +171,7 @@ describe('createContextTxtpConfig', () => {
   it('wraps createContextTxtpConfigInDb error in HttpException', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({
       schema: {},
-      content_type: 'JSON',
+      content_type: 'application/json',
       payload_json: {},
     });
     (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('insert failed'));
@@ -332,7 +332,7 @@ describe('error propagation', () => {
   });
 
   it('createContextTxtpConfig wraps non-Error thrown value from insert', async () => {
-    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({ schema: {}, content_type: 'JSON', payload_json: {} });
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue({ schema: {}, content_type: 'application/json', payload_json: {} });
     (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
 
     await expect(createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });

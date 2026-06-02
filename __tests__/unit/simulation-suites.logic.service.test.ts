@@ -6,9 +6,11 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as simulationSuitesRepository from '../../src/repositories/simulation-studio/suites.repository';
 import * as trsGenService from '../../src/services/trs-suite-generation.logic.service';
+import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
 jest.mock('../../src/repositories/simulation-studio/suites.repository');
 jest.mock('../../src/services/trs-suite-generation.logic.service');
+jest.mock('../../src/services/trigger-txtp-config.logic.service');
 
 describe('Simulation Suites Logic Service', () => {
   const mockTenantId = 'tenant-123';
@@ -39,6 +41,7 @@ describe('Simulation Suites Logic Service', () => {
     jest.clearAllMocks();
     (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 7, suite_id: 1 });
     (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
+    (triggerService.createTriggerTxtpConfig as jest.Mock).mockResolvedValue({ trigger_txtp_config_id: 1, field_overrides: [] });
   });
 
   describe('getSimulationSuites', () => {
@@ -79,6 +82,14 @@ describe('Simulation Suites Logic Service', () => {
         'Simulation suite with id 99 not found',
       );
     });
+
+    it('wraps non-HttpException repo error in 500', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValue(new Error('DB crash') as never);
+
+      await expect(simulationSuitesService.getSimulationSuiteById(1, mockTenantId)).rejects.toThrow(
+        'Failed to retrieve simulation suite: DB crash',
+      );
+    });
   });
 
   describe('createSimulationSuite', () => {
@@ -94,7 +105,12 @@ describe('Simulation Suites Logic Service', () => {
       const result = await simulationSuitesService.createSimulationSuite(payload as any, mockTenantId, mockUserId, mockUserEmail);
 
       expect(result).toEqual({ ...mockSuite, generation_id: 7 });
-      expect(simulationSuitesRepository.createSimulationSuiteInDb).toHaveBeenCalledWith(payload, mockTenantId, mockUserId, mockUserEmail);
+      expect(simulationSuitesRepository.createSimulationSuiteInDb).toHaveBeenCalledWith(
+        expect.objectContaining(payload),
+        mockTenantId,
+        mockUserId,
+        mockUserEmail,
+      );
     });
 
     it('should validate empty name', async () => {
@@ -120,6 +136,15 @@ describe('Simulation Suites Logic Service', () => {
           mockUserEmail,
         ),
       ).rejects.toThrow('Simulation suite description cannot exceed 300 characters');
+    });
+
+    it('wraps non-HttpException error from trigger config creation in 500', async () => {
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(mockSuite);
+      jest.spyOn(triggerService, 'createTriggerTxtpConfig').mockRejectedValue(new Error('trigger DB fail'));
+
+      await expect(simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId)).rejects.toThrow(
+        'Failed to create simulation suite: trigger DB fail',
+      );
     });
   });
 

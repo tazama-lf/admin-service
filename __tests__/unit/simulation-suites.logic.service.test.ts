@@ -37,8 +37,8 @@ describe('Simulation Suites Logic Service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 1, suite_id: 1 });
-    (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue(null);
+    (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 7, suite_id: 1 });
+    (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
   });
 
   describe('getSimulationSuites', () => {
@@ -93,7 +93,7 @@ describe('Simulation Suites Logic Service', () => {
 
       const result = await simulationSuitesService.createSimulationSuite(payload as any, mockTenantId, mockUserId, mockUserEmail);
 
-      expect(result).toEqual(mockSuite);
+      expect(result).toEqual({ ...mockSuite, generation_id: 7 });
       expect(simulationSuitesRepository.createSimulationSuiteInDb).toHaveBeenCalledWith(payload, mockTenantId, mockUserId, mockUserEmail);
     });
 

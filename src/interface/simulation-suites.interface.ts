@@ -48,6 +48,7 @@ export interface SimulationSuite {
   created_by_email?: string;
   created_at: Date;
   updated_at: Date;
+  generation_id?: number;
 }
 
 /**

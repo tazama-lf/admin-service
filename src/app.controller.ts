@@ -89,15 +89,13 @@ import {
 import {
   getGenerationsForSuite,
   getLatestGenerationForSuite,
-  getContextConfigsForGeneration,
-  updateContextTxtpConfig,
-  upsertContextFieldStrategies,
-  getFieldStrategiesForContextConfig,
+  addContextTxtpConfig,
+  getContextConfigsWithStrategies,
+  bulkUpdateContextConfigs,
 } from './services/trs-suite-generation.logic.service';
-import type { UpdateContextTxtpConfigDto, UpsertFieldStrategyDto } from './interface/suite-generation.interface';
+import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/suite-generation.interface';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
-import { assertPreviousStepComplete } from './utils/wizard-step-guard';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
 import type {
   SimulationSuitesQueryDto,
@@ -2038,7 +2036,7 @@ export const getGenerationContextConfigsHandler = async (req: FastifyRequest, re
       return;
     }
 
-    const configs = await getContextConfigsForGeneration(genId);
+    const configs = await getContextConfigsWithStrategies(genId);
 
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get generation context txtp configs');
@@ -2049,98 +2047,57 @@ export const getGenerationContextConfigsHandler = async (req: FastifyRequest, re
   }
 };
 
-// ── Step 2 helpers ────────────────────────────────────────────────────────────
+// ── Step 2: POST new context txtp config (Add TXTP) ─────────────────────────
 
-const parseStep2Params = (params: { suiteId: string; configId: string }): { suiteId: number; configId: number } | null => {
-  const suiteId = parseInt(params.suiteId, 10);
-  const configId = parseInt(params.configId, 10);
-  if (isNaN(suiteId) || isNaN(configId)) return null;
-  return { suiteId, configId };
+export const addContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Add context txtp config');
+    const { tenantId } = req as ITenantRequest;
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const dto = req.body as AddContextTxtpConfigDto;
+    const created = await addContextTxtpConfig(generationId, dto, tenantId);
+
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Add context txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to add context txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to add context txtp config');
+  }
 };
 
-// ── Step 2: PATCH context txtp config (message_count, faker_seed, generator_profile) ──
+// ── Step 2: PATCH bulk update context configs (message_count + field strategies) ──
 
 export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    loggerService.log('Start - Update context txtp config');
-    const { tenantId } = req as ITenantRequest;
-    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
+    loggerService.log('Start - Bulk update context txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
 
-    if (!parsed) {
-      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
       return;
     }
 
-    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
-    assertPreviousStepComplete(suite!.wizard_progress, 1);
+    const items = req.body as BulkConfigItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
 
-    const dto = req.body as UpdateContextTxtpConfigDto;
-    const updated = await updateContextTxtpConfig(parsed.configId, dto);
+    const updated = await bulkUpdateContextConfigs(generationId, items);
 
     reply.status(200).send({ success: true, data: updated });
-    loggerService.log('End - Update context txtp config');
+    loggerService.log('End - Bulk update context txtp configs');
   } catch (err) {
-    loggerService.error(`Failed to update context txtp config. \n${util.inspect(err)}`);
-    ErrorHandler.sendError(reply, err, 'Failed to update context txtp config');
-  }
-};
-
-// ── Step 2: PUT field strategies (upsert array) ──────────────────────────────
-
-export const upsertFieldStrategiesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    loggerService.log('Start - Upsert field strategies');
-    const { tenantId } = req as ITenantRequest;
-    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
-
-    if (!parsed) {
-      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
-      return;
-    }
-
-    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
-    assertPreviousStepComplete(suite!.wizard_progress, 1);
-
-    const { strategies } = req.body as { strategies: UpsertFieldStrategyDto[] };
-
-    if (!Array.isArray(strategies) || strategies.length === 0) {
-      reply.status(400).send({ success: false, message: 'strategies array is required and cannot be empty' });
-      return;
-    }
-
-    const result = await upsertContextFieldStrategies(parsed.configId, strategies);
-
-    reply.status(200).send({ success: true, data: result });
-    loggerService.log('End - Upsert field strategies');
-  } catch (err) {
-    loggerService.error(`Failed to upsert field strategies. \n${util.inspect(err)}`);
-    ErrorHandler.sendError(reply, err, 'Failed to upsert field strategies');
-  }
-};
-
-// ── Step 2: GET field strategies for a context config ────────────────────────
-
-export const getFieldStrategiesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  try {
-    loggerService.log('Start - Get field strategies');
-    const { tenantId } = req as ITenantRequest;
-    const parsed = parseStep2Params(req.params as { suiteId: string; configId: string });
-
-    if (!parsed) {
-      reply.status(400).send({ success: false, message: 'Invalid suite ID or context config ID' });
-      return;
-    }
-
-    const suite = await getSimulationSuiteById(parsed.suiteId, tenantId);
-    assertPreviousStepComplete(suite!.wizard_progress, 1);
-
-    const strategies = await getFieldStrategiesForContextConfig(parsed.configId);
-
-    reply.status(200).send({ success: true, data: strategies });
-    loggerService.log('End - Get field strategies');
-  } catch (err) {
-    loggerService.error(`Failed to retrieve field strategies. \n${util.inspect(err)}`);
-    ErrorHandler.sendError(reply, err, 'Failed to retrieve field strategies');
+    loggerService.error(`Failed to bulk update context txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update context txtp configs');
   }
 };
 

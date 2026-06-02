@@ -298,7 +298,7 @@ export const updateConfig = async (
   setClauses.push('updated_at = NOW()');
 
   // Optimistic lock: update only when updated_at still matches the token returned by the previous read.
-  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} AND updated_at = $${paramIndex + 2}::timestamptz`;
+  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
 
   const query = `
     UPDATE tcs_config

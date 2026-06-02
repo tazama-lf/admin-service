@@ -71,7 +71,7 @@ export const createSimulationSuite = async (
       await createContextTxtpConfig(generation.id, suite.primary_txtp, suite.primary_txtp_version, tenantId);
     }
 
-    return suite;
+    return { ...suite, generation_id: generation.id };
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(

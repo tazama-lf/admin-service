@@ -83,6 +83,12 @@ export interface UpdateContextTxtpConfigDto {
   generator_profile?: Record<string, unknown>;
 }
 
+export interface AddContextTxtpConfigDto {
+  txtp: string;
+  txtp_version: string;
+  message_count?: number;
+}
+
 // ── Context Field Strategies ─────────────────────────────────────────────────
 
 export interface ContextFieldStrategy {
@@ -108,4 +114,23 @@ export interface UpsertFieldStrategyDto {
   generator_type?: string;
   generator_options?: Record<string, unknown>;
   is_required_override?: boolean;
+}
+
+export interface ContextTxtpConfigWithStrategies {
+  context_txtp_config_id: number;
+  txtp: string;
+  txtp_version: string;
+  message_count: number;
+  display_order: number;
+  schema_snapshot: Record<string, unknown>;
+  sample_payload_snapshot?: Record<string, unknown>;
+  field_strategies: ContextFieldStrategy[];
+}
+
+export interface BulkConfigItemDto {
+  context_txtp_config_id: number;
+  message_count?: number;
+  faker_seed?: number;
+  generator_profile?: Record<string, unknown>;
+  field_strategies?: UpsertFieldStrategyDto[];
 }

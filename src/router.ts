@@ -98,7 +98,7 @@ const routePrivilege = {
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
-  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'], // data engineer roles were given because this API is consumed on simulation sandbox as well (data scientist role uses it)
   putTcsConfigWrite: ['editor', 'approver', 'exporter', 'publisher'],
   postTcsConfigMapping: 'editor',
   deleteTcsConfigMapping: 'editor',

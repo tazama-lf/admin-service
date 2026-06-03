@@ -6,8 +6,76 @@ import {
   getNextGenerationNumber,
   getGenerationsBySuiteId,
   getLatestGenerationBySuiteId,
+  updateGenerationCountsInDb,
+  getGenerationSummaryFromDb,
+  type GenerationSummary,
 } from '../repositories/simulation-studio/suite-generations.repository';
+import { handlePostExecuteSqlStatement } from './database.logic.service';
+import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { HttpException, HttpStatus } from '../utils/error';
+
+export type { GenerationSummary };
+
+// ── Count recalculation ──────────────────────────────────────────────────────
+
+/**
+ * Recalculates context_count, trigger_count, enrichment_table_count for a generation
+ * by summing message_count from each config table, then saves to trs_suite_generations.
+ * Called after each bulk PATCH on context / trigger / enrichment steps.
+ */
+export const recalculateGenerationCounts = async (generationId: number): Promise<void> => {
+  try {
+    const [ctxRes, trigRes, enrRes] = await Promise.all([
+      handlePostExecuteSqlStatement<{ total: string }>(
+        {
+          text: 'SELECT COALESCE(SUM(message_count), 0) AS total FROM trs_suite_context_txtp_configs WHERE generation_id = $1',
+          values: [generationId],
+        } satisfies PgQueryConfig,
+        'simulation',
+      ),
+      handlePostExecuteSqlStatement<{ total: string }>(
+        {
+          text: 'SELECT COALESCE(SUM(message_count), 0) AS total FROM trs_suite_trigger_txtp_configs WHERE generation_id = $1',
+          values: [generationId],
+        } satisfies PgQueryConfig,
+        'simulation',
+      ),
+      handlePostExecuteSqlStatement<{ total: string }>(
+        {
+          text: 'SELECT COALESCE(SUM(row_count), 0) AS total FROM trs_suite_enrichment_tables WHERE generation_id = $1',
+          values: [generationId],
+        } satisfies PgQueryConfig,
+        'simulation',
+      ),
+    ]);
+
+    await updateGenerationCountsInDb(generationId, {
+      context_count: parseInt(ctxRes.rows[0].total, 10),
+      trigger_count: parseInt(trigRes.rows[0].total, 10),
+      enrichment_table_count: parseInt(enrRes.rows[0].total, 10),
+    });
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to recalculate generation counts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+
+export const getGenerationSummary = async (generationId: number): Promise<GenerationSummary | null> => {
+  try {
+    return await getGenerationSummaryFromDb(generationId);
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to retrieve generation summary: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
 
 // Re-export context config service for app.controller consumers
 export {

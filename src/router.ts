@@ -90,6 +90,7 @@ import {
   getEnrichmentTablesHandler,
   bulkUpdateEnrichmentTablesHandler,
   deleteEnrichmentTableHandler,
+  getGenerationSummaryHandler,
   getAllSimulationsHandler,
   createTrsSimulationHandler,
   getSimulationStatsHandler,
@@ -193,6 +194,7 @@ const routePrivilege = {
   createEnrichmentTable: ['editor', 'approver'],
   bulkUpdateEnrichmentTables: ['editor', 'approver'],
   deleteEnrichmentTable: ['editor', 'approver'],
+  getGenerationSummary: ['editor', 'approver'],
   getSimulations: ['editor', 'approver'],
   createSimulation: ['editor', 'approver'],
   getSimulationStats: ['editor', 'approver'],
@@ -591,6 +593,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.delete('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables/:tableId', {
     ...SetOptionsBodyAndParams(deleteEnrichmentTableHandler, routePrivilege.deleteEnrichmentTable),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/summary', {
+    ...SetOptionsBodyAndParams(getGenerationSummaryHandler, routePrivilege.getGenerationSummary),
   });
 
   fastify.get('/v1/admin/simulation/messages', {

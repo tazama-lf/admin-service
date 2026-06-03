@@ -134,3 +134,105 @@ export interface BulkConfigItemDto {
   generator_profile?: Record<string, unknown>;
   field_strategies?: UpsertFieldStrategyDto[];
 }
+
+// ── Trigger TXTP Config ──────────────────────────────────────────────────────
+
+export type TriggerOverrideType = 'static' | 'range' | 'generated' | 'remove' | 'null';
+export type TriggerExpectedBand = 'good' | 'neutral' | 'bad' | 'error';
+
+export interface SuiteTriggerTxtpConfig {
+  id: number;
+  generation_id: number;
+  txtp: string;
+  txtp_version: string;
+  display_order: number;
+  message_count: number;
+  link_to_context_pairs: boolean;
+  payload_template_json: Record<string, unknown>;
+  expected_independent_variable?: number;
+  expected_result_band?: TriggerExpectedBand;
+  notes?: string;
+  faker_seed?: number;
+  generator_profile: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface CreateTriggerTxtpConfigDto {
+  generation_id: number;
+  txtp: string;
+  txtp_version: string;
+  display_order: number;
+  message_count: number;
+  payload_template_json: Record<string, unknown>;
+  link_to_context_pairs?: boolean;
+  expected_independent_variable?: number;
+  expected_result_band?: TriggerExpectedBand;
+  notes?: string;
+  faker_seed?: number;
+  generator_profile?: Record<string, unknown>;
+}
+
+export interface UpdateTriggerTxtpConfigDto {
+  message_count?: number;
+  link_to_context_pairs?: boolean;
+  payload_template_json?: Record<string, unknown>;
+  expected_independent_variable?: number;
+  expected_result_band?: TriggerExpectedBand;
+  notes?: string;
+  faker_seed?: number;
+  generator_profile?: Record<string, unknown>;
+}
+
+export interface AddTriggerTxtpConfigDto {
+  txtp: string;
+  txtp_version: string;
+  message_count?: number;
+}
+
+export interface TriggerFieldOverride {
+  id: number;
+  trigger_txtp_config_id: number;
+  field_path: string;
+  override_type: TriggerOverrideType;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface UpsertTriggerFieldOverrideDto {
+  field_path: string;
+  override_type: TriggerOverrideType;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options?: Record<string, unknown>;
+}
+
+export interface TriggerTxtpConfigWithOverrides {
+  trigger_txtp_config_id: number;
+  txtp: string;
+  txtp_version: string;
+  message_count: number;
+  display_order: number;
+  payload_template_json: Record<string, unknown>;
+  link_to_context_pairs: boolean;
+  expected_result_band?: TriggerExpectedBand;
+  notes?: string;
+  field_overrides: TriggerFieldOverride[];
+}
+
+export interface BulkTriggerConfigItemDto {
+  trigger_txtp_config_id: number;
+  message_count?: number;
+  link_to_context_pairs?: boolean;
+  payload_template_json?: Record<string, unknown>;
+  expected_result_band?: TriggerExpectedBand;
+  notes?: string;
+  faker_seed?: number;
+  generator_profile?: Record<string, unknown>;
+  field_overrides?: UpsertTriggerFieldOverrideDto[];
+}

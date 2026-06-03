@@ -93,7 +93,17 @@ import {
   getContextConfigsWithStrategies,
   bulkUpdateContextConfigs,
 } from './services/trs-suite-generation.logic.service';
-import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/suite-generation.interface';
+import {
+  addTriggerTxtpConfig,
+  getTriggerConfigsWithOverrides,
+  bulkUpdateTriggerConfigs,
+} from './services/trigger-txtp-config.logic.service';
+import type {
+  AddContextTxtpConfigDto,
+  BulkConfigItemDto,
+  AddTriggerTxtpConfigDto,
+  BulkTriggerConfigItemDto,
+} from './interface/suite-generation.interface';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -2098,6 +2108,81 @@ export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply:
   } catch (err) {
     loggerService.error(`Failed to bulk update context txtp configs. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to bulk update context txtp configs');
+  }
+};
+
+// ── Step 3: GET all trigger configs + field strategies ───────────────────────
+
+export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const configs = await getTriggerConfigsWithOverrides(generationId);
+    reply.status(200).send({ success: true, data: configs });
+    loggerService.log('End - Get trigger txtp configs');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve trigger txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve trigger txtp configs');
+  }
+};
+
+// ── Step 3: POST new trigger txtp config (Add TXTP) ──────────────────────────
+
+export const addTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Add trigger txtp config');
+    const { tenantId } = req as ITenantRequest;
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const dto = req.body as AddTriggerTxtpConfigDto;
+    const created = await addTriggerTxtpConfig(generationId, dto, tenantId);
+
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Add trigger txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to add trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to add trigger txtp config');
+  }
+};
+
+// ── Step 3: PATCH bulk update trigger configs ─────────────────────────────────
+
+export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Bulk update trigger txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const items = req.body as BulkTriggerConfigItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
+
+    const updated = await bulkUpdateTriggerConfigs(generationId, items);
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Bulk update trigger txtp configs');
+  } catch (err) {
+    loggerService.error(`Failed to bulk update trigger txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update trigger txtp configs');
   }
 };
 

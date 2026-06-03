@@ -83,6 +83,9 @@ import {
   getGenerationContextConfigsHandler,
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
+  getTriggerConfigsHandler,
+  addTriggerTxtpConfigHandler,
+  bulkUpdateTriggerConfigsHandler,
   getAllSimulationsHandler,
   createTrsSimulationHandler,
   getSimulationStatsHandler,
@@ -179,6 +182,9 @@ const routePrivilege = {
   getGenerationContextConfigs: ['editor', 'approver'],
   addContextTxtpConfig: ['editor', 'approver'],
   updateContextTxtpConfig: ['editor', 'approver'],
+  getTriggerConfigs: ['editor', 'approver'],
+  addTriggerTxtpConfig: ['editor', 'approver'],
+  bulkUpdateTriggerConfigs: ['editor', 'approver'],
   getSimulations: ['editor', 'approver'],
   createSimulation: ['editor', 'approver'],
   getSimulationStats: ['editor', 'approver'],
@@ -550,6 +556,19 @@ function Routes(fastify: FastifyInstance): void {
   fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs', {
     ...SetOptionsBodyAndParams(updateContextTxtpConfigHandler, routePrivilege.updateContextTxtpConfig),
   });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
+    ...SetOptionsBodyAndParams(getTriggerConfigsHandler, routePrivilege.getTriggerConfigs),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
+    ...SetOptionsBodyAndParams(addTriggerTxtpConfigHandler, routePrivilege.addTriggerTxtpConfig),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
+    ...SetOptionsBodyAndParams(bulkUpdateTriggerConfigsHandler, routePrivilege.bulkUpdateTriggerConfigs),
+  });
+
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
   });

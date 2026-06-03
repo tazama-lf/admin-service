@@ -27,6 +27,15 @@ import {
   upsertFieldStrategyInDb,
   getFieldStrategiesByContextConfigId,
 } from '../../src/repositories/simulation-studio/context-field-strategies.repository';
+import {
+  createTriggerTxtpConfigInDb,
+  updateTriggerTxtpConfigInDb,
+  getTriggerTxtpConfigsByGenerationId,
+} from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
+import {
+  upsertTriggerFieldOverrideInDb,
+  getTriggerFieldOverridesByConfigId,
+} from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
 
 const mockDb = db.handlePostExecuteSqlStatement as jest.Mock;
 
@@ -319,5 +328,278 @@ describe('getFieldStrategiesByContextConfigId', () => {
   it('returns empty array when no rows', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await getFieldStrategiesByContextConfigId(1)).toEqual([]);
+  });
+});
+
+// ── createSuiteGenerationInDb — optional fields branch ───────────────────────
+
+describe('createSuiteGenerationInDb — optional fields', () => {
+  it('uses SINGLE_RULE default when simulation_type absent', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(['SINGLE_RULE']) }), 'simulation');
+  });
+
+  it('passes null for optional rule_repo, rule_version, userEmail when absent', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[3]).toBeNull(); // rule_repo
+    expect(callValues[4]).toBeNull(); // rule_version
+    expect(callValues[8]).toBeNull(); // userEmail
+  });
+});
+
+// ── trigger-txtp-configs.repository ─────────────────────────────────────────
+
+const triggerConfigRow = {
+  id: 20,
+  generation_id: 1,
+  txtp: 'pacs.008',
+  txtp_version: '001.08',
+  display_order: 1,
+  message_count: 1,
+  link_to_context_pairs: false,
+  payload_template_json: JSON.stringify({ amount: 100 }),
+  expected_independent_variable: null,
+  expected_result_band: null,
+  notes: null,
+  faker_seed: null,
+  generator_profile: '{}',
+  created_at: '2026-05-01T00:00:00.000Z',
+};
+
+const triggerOverrideRow = {
+  id: 1,
+  trigger_txtp_config_id: 20,
+  field_path: 'amount',
+  override_type: 'null',
+  static_value: null,
+  range_min: null,
+  range_max: null,
+  generator_type: null,
+  generator_options: '{}',
+  created_at: '2026-05-01T00:00:00.000Z',
+};
+
+describe('createTriggerTxtpConfigInDb', () => {
+  it('inserts row and returns mapped trigger config', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+
+    const result = await createTriggerTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 1,
+      payload_template_json: { amount: 100 },
+    });
+
+    expect(result.id).toBe(20);
+    expect(result.txtp).toBe('pacs.008');
+    expect(result.payload_template_json).toEqual({ amount: 100 });
+    expect(result.link_to_context_pairs).toBe(false);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('INSERT INTO trs_suite_trigger_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('parses payload_template_json when stored as object (not string)', async () => {
+    const rowWithObj = { ...triggerConfigRow, payload_template_json: { amount: 100 } };
+    mockDb.mockResolvedValue({ rows: [rowWithObj] });
+
+    const result = await createTriggerTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 1,
+      payload_template_json: { amount: 100 },
+    });
+
+    expect(result.payload_template_json).toEqual({ amount: 100 });
+  });
+
+  it('handles optional fields: expected_result_band, notes, faker_seed', async () => {
+    const rowWithOptionals = {
+      ...triggerConfigRow,
+      expected_result_band: 'good',
+      notes: 'boundary case',
+      faker_seed: 42,
+    };
+    mockDb.mockResolvedValue({ rows: [rowWithOptionals] });
+
+    const result = await createTriggerTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 1,
+      payload_template_json: {},
+      expected_result_band: 'good',
+      notes: 'boundary case',
+      faker_seed: 42,
+    });
+
+    expect(result.expected_result_band).toBe('good');
+    expect(result.notes).toBe('boundary case');
+    expect(result.faker_seed).toBe(42);
+  });
+});
+
+describe('updateTriggerTxtpConfigInDb', () => {
+  it('updates message_count and returns updated row', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, message_count: 3 }] });
+
+    const result = await updateTriggerTxtpConfigInDb(20, { message_count: 3 });
+
+    expect(result!.message_count).toBe(3);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('UPDATE trs_suite_trigger_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('updates link_to_context_pairs', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, link_to_context_pairs: true }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { link_to_context_pairs: true });
+    expect(result!.link_to_context_pairs).toBe(true);
+  });
+
+  it('updates payload_template_json', async () => {
+    const updated = { ...triggerConfigRow, payload_template_json: JSON.stringify({ amount: 999 }) };
+    mockDb.mockResolvedValue({ rows: [updated] });
+    const result = await updateTriggerTxtpConfigInDb(20, { payload_template_json: { amount: 999 } });
+    expect(result!.payload_template_json).toEqual({ amount: 999 });
+  });
+
+  it('updates expected_result_band and notes', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, expected_result_band: 'bad', notes: 'edge' }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { expected_result_band: 'bad', notes: 'edge' });
+    expect(result!.expected_result_band).toBe('bad');
+    expect(result!.notes).toBe('edge');
+  });
+
+  it('updates faker_seed and generator_profile', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, faker_seed: 99 }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { faker_seed: 99, generator_profile: { type: 'bic' } });
+    expect(result!.faker_seed).toBe(99);
+  });
+
+  it('fetches existing row when no fields to update', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+    const result = await updateTriggerTxtpConfigInDb(20, {});
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('SELECT') }), 'simulation');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when no fields and row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await updateTriggerTxtpConfigInDb(99, {})).toBeNull();
+  });
+
+  it('returns null when UPDATE finds no row', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await updateTriggerTxtpConfigInDb(99, { message_count: 5 })).toBeNull();
+  });
+});
+
+describe('getTriggerTxtpConfigsByGenerationId', () => {
+  it('returns mapped trigger configs array', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+    const result = await getTriggerTxtpConfigsByGenerationId(1);
+    expect(result).toHaveLength(1);
+    expect(result[0].generation_id).toBe(1);
+  });
+
+  it('returns empty array when no rows', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getTriggerTxtpConfigsByGenerationId(1)).toEqual([]);
+  });
+});
+
+// ── trigger-field-strategies.repository ─────────────────────────────────────
+
+describe('upsertTriggerFieldOverrideInDb', () => {
+  it('upserts row and returns mapped override', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+
+    const result = await upsertTriggerFieldOverrideInDb(20, {
+      field_path: 'amount',
+      override_type: 'null',
+    });
+
+    expect(result.id).toBe(1);
+    expect(result.trigger_txtp_config_id).toBe(20);
+    expect(result.override_type).toBe('null');
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('ON CONFLICT') }), 'simulation');
+  });
+
+  it('handles static override type', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'static', static_value: '"999"' }] });
+
+    const result = await upsertTriggerFieldOverrideInDb(20, {
+      field_path: 'amount',
+      override_type: 'static',
+      static_value: '999',
+    });
+
+    expect(result.override_type).toBe('static');
+  });
+
+  it('handles range override type', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'range', range_min: 1, range_max: 100 }] });
+
+    const result = await upsertTriggerFieldOverrideInDb(20, {
+      field_path: 'amount',
+      override_type: 'range',
+      range_min: 1,
+      range_max: 100,
+    });
+
+    expect(result.range_min).toBe(1);
+    expect(result.range_max).toBe(100);
+  });
+
+  it('handles generator_options as object (not string)', async () => {
+    const rowWithObj = { ...triggerOverrideRow, generator_options: { type: 'bic' } };
+    mockDb.mockResolvedValue({ rows: [rowWithObj] });
+
+    const result = await upsertTriggerFieldOverrideInDb(20, {
+      field_path: 'bic',
+      override_type: 'generated',
+      generator_type: 'iso20022.bic',
+      generator_options: { type: 'bic' },
+    });
+
+    expect(result.generator_options).toEqual({ type: 'bic' });
+  });
+
+  it('handles remove override type', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'remove' }] });
+    const result = await upsertTriggerFieldOverrideInDb(20, { field_path: 'field.a', override_type: 'remove' });
+    expect(result.override_type).toBe('remove');
+  });
+});
+
+describe('getTriggerFieldOverridesByConfigId', () => {
+  it('returns mapped overrides array', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+
+    const result = await getTriggerFieldOverridesByConfigId(20);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].field_path).toBe('amount');
+    expect(result[0].override_type).toBe('null');
+  });
+
+  it('returns empty array when no rows', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getTriggerFieldOverridesByConfigId(20)).toEqual([]);
   });
 });

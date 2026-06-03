@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-
+process.env.PORT = '3000';
 process.env.ACTIVE_CONDITIONS_ONLY = 'true';
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
@@ -8,9 +8,21 @@ import * as simulationSuitesRepository from '../../src/repositories/simulation-s
 import * as trsGenService from '../../src/services/trs-suite-generation.logic.service';
 import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
-jest.mock('../../src/repositories/simulation-studio/suites.repository');
-jest.mock('../../src/services/trs-suite-generation.logic.service');
-jest.mock('../../src/services/trigger-txtp-config.logic.service');
+jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
+  getSimulationSuitesFromDb: jest.fn(),
+  getSimulationSuiteByIdFromDb: jest.fn(),
+  createSimulationSuiteInDb: jest.fn(),
+  updateSimulationSuiteInDb: jest.fn(),
+}));
+
+jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
+  createSuiteGeneration: jest.fn(),
+  createContextTxtpConfig: jest.fn(),
+}));
+
+jest.mock('../../src/services/trigger-txtp-config.logic.service', () => ({
+  createTriggerTxtpConfig: jest.fn(),
+}));
 
 describe('Simulation Suites Logic Service', () => {
   const mockTenantId = 'tenant-123';

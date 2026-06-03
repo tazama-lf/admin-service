@@ -139,7 +139,7 @@ describe('Suites Repository', () => {
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
     expect(callArg.values[3]).toBe('SINGLE_RULE');
     expect(callArg.values[4]).toBe('DRAFT');
-    expect(callArg.values[13]).toBe(JSON.stringify({ currentStep: 1, completedSteps: [1] }));
+    expect(callArg.values[14]).toBe(JSON.stringify({ currentStep: 1, completedSteps: [1] }));
   });
 
   it('createSimulationSuiteInDb should keep provided wizard progress and user email', async () => {
@@ -172,9 +172,9 @@ describe('Suites Repository', () => {
 
     expect(result.name).toBe('Suite B');
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
-    expect(callArg.values[13]).toBe(JSON.stringify({ currentStep: 2, completedSteps: [1, 2] }));
-    expect(callArg.values[14]).toBe(JSON.stringify({ channel: 'wizard' }));
-    expect(callArg.values[16]).toBe('user-a@example.com');
+    expect(callArg.values[14]).toBe(JSON.stringify({ currentStep: 2, completedSteps: [1, 2] }));
+    expect(callArg.values[15]).toBe(JSON.stringify({ channel: 'wizard' }));
+    expect(callArg.values[17]).toBe('user-a@example.com');
   });
 
   it('updateSimulationSuiteInDb should return existing record when payload has no updates', async () => {
@@ -302,6 +302,135 @@ describe('Suites Repository', () => {
     expect(result.data).toEqual([]);
   });
 
+  it('createSimulationSuiteInDb passes rule_config as JSON string and returns it parsed', async () => {
+    const ruleConfig = { threshold: 1000, band: 'high' };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 5,
+          tenant_id: 'tenant-a',
+          name: 'Suite E',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: JSON.stringify(ruleConfig),
+          wizard_progress: '{"currentStep":1,"completedSteps":[1]}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await createSimulationSuiteInDb({ name: 'Suite E', rule_config: ruleConfig } as any, 'tenant-a', 'user-a');
+
+    const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
+    // rule_config is at index 8 (0-based) in the INSERT values
+    expect(callArg.values[8]).toBe(JSON.stringify(ruleConfig));
+    expect(result.rule_config).toEqual(ruleConfig);
+  });
+
+  it('createSimulationSuiteInDb returns undefined rule_config when column is null', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 6,
+          tenant_id: 'tenant-a',
+          name: 'Suite F',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: null,
+          wizard_progress: '{}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await createSimulationSuiteInDb({ name: 'Suite F' } as any, 'tenant-a', 'user-a');
+
+    const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
+    expect(callArg.values[8]).toBeNull(); // no rule_config passed
+    expect(result.rule_config).toBeUndefined();
+  });
+
+  it('updateSimulationSuiteInDb updates rule_config and returns it parsed', async () => {
+    const ruleConfig = { limit: 500 };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 1,
+          tenant_id: 'tenant-a',
+          name: 'Suite A',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: JSON.stringify(ruleConfig),
+          wizard_progress: '{}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await updateSimulationSuiteInDb(1, 'tenant-a', { rule_config: ruleConfig } as any);
+
+    const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('rule_config');
+    expect(callArg.values).toContain(JSON.stringify(ruleConfig));
+    expect(result!.rule_config).toEqual(ruleConfig);
+  });
+
+  it('getSimulationSuiteByIdFromDb returns rule_config parsed from string', async () => {
+    const ruleConfig = { mode: 'strict' };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 3,
+          tenant_id: 'tenant-a',
+          name: 'Suite G',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: JSON.stringify(ruleConfig),
+          wizard_progress: '{"currentStep":1,"completedSteps":[1]}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+          last_run_at: null,
+        },
+      ],
+    });
+
+    const result = await getSimulationSuiteByIdFromDb(3, 'tenant-a');
+
+    expect(result?.rule_config).toEqual(ruleConfig);
+  });
+
+  it('getSimulationSuitesFromDb returns rule_config parsed from string', async () => {
+    const ruleConfig = { velocity: 10 };
+    mockHandlePostExecuteSqlStatement.mockResolvedValueOnce({ rows: [{ total: '1' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 12,
+          tenant_id: 'tenant-a',
+          name: 'Suite H',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: JSON.stringify(ruleConfig),
+          wizard_progress: { currentStep: 1, completedSteps: [1] },
+          metadata: {},
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+          last_run_at: null,
+        },
+      ],
+    });
+
+    const result = await getSimulationSuitesFromDb({ tenantId: 'tenant-a' } as any);
+
+    expect(result.data[0].rule_config).toEqual(ruleConfig);
+  });
+
   it('createSimulationSuiteInDb should preserve object wizard and metadata in returned row', async () => {
     mockHandlePostExecuteSqlStatement.mockResolvedValue({
       rows: [
@@ -359,5 +488,95 @@ describe('Suites Repository', () => {
 
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
     expect(callArg.values).toContain(null);
+  });
+
+  it('createSimulationSuiteInDb returns rule_config unchanged when already object', async () => {
+    const ruleConfig = { threshold: 500 };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 7,
+          tenant_id: 'tenant-a',
+          name: 'X',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: ruleConfig,
+          wizard_progress: '{}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    } as never);
+    const result = await createSimulationSuiteInDb({ name: 'X' } as any, 'tenant-a', 'user-a');
+    expect(result.rule_config).toEqual(ruleConfig);
+  });
+
+  it('getSimulationSuiteByIdFromDb returns rule_config unchanged when already object', async () => {
+    const ruleConfig = { mode: 'fast' };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 8,
+          tenant_id: 'tenant-a',
+          name: 'Y',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: ruleConfig,
+          wizard_progress: '{"currentStep":1,"completedSteps":[1]}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+          last_run_at: null,
+        },
+      ],
+    } as never);
+    const result = await getSimulationSuiteByIdFromDb(8, 'tenant-a');
+    expect(result?.rule_config).toEqual(ruleConfig);
+  });
+
+  it('getSimulationSuitesFromDb returns rule_config unchanged when already object', async () => {
+    const ruleConfig = { cap: 999 };
+    mockHandlePostExecuteSqlStatement.mockResolvedValueOnce({ rows: [{ total: '1' }] } as never).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 13,
+          tenant_id: 'tenant-a',
+          name: 'Z',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: ruleConfig,
+          wizard_progress: { currentStep: 1, completedSteps: [1] },
+          metadata: {},
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+          last_run_at: null,
+        },
+      ],
+    } as never);
+    const result = await getSimulationSuitesFromDb({ tenantId: 'tenant-a' } as any);
+    expect(result.data[0].rule_config).toEqual(ruleConfig);
+  });
+
+  it('updateSimulationSuiteInDb returns rule_config unchanged when already object', async () => {
+    const ruleConfig = { version: 2 };
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          id: 9,
+          tenant_id: 'tenant-a',
+          name: 'W',
+          simulation_type: 'SINGLE_RULE',
+          status: 'DRAFT',
+          rule_config: ruleConfig,
+          wizard_progress: '{}',
+          metadata: '{}',
+          created_at: '2026-06-01T00:00:00.000Z',
+          updated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    } as never);
+    const result = await updateSimulationSuiteInDb(9, 'tenant-a', { name: 'W' } as any);
+    expect(result?.rule_config).toEqual(ruleConfig);
   });
 });

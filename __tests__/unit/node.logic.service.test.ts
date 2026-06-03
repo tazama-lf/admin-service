@@ -26,9 +26,14 @@ jest.mock('../../src/utils/validateQuery', () => ({
   validateSelectQuery: jest.fn(),
 }));
 
+jest.mock('../../src/services/database.logic.service', () => ({
+  handlePostExecuteSqlStatement: jest.fn(),
+}));
+
 import * as nodeLogicService from '../../src/services/node.logic.service';
 import * as nodeRepository from '../../src/repositories/configuration/node.repository';
 import * as validateQuery from '../../src/utils/validateQuery';
+import { handlePostExecuteSqlStatement } from '../../src/services/database.logic.service';
 
 describe('Node Logic Service', () => {
   const mockTenantId = 'tenant-123';
@@ -575,6 +580,114 @@ describe('Node Logic Service', () => {
         [],
       );
       expect(result).toEqual(mockResult);
+    });
+
+    it('throws 403 when table name is a reserved keyword', async () => {
+      // 'user' is in RESERVED_KEYWORDS — validateTableName throws, executeSelectQuery wraps as 403
+      const mockQuery = 'SELECT * FROM "user"';
+
+      await expect(nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId)).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+      });
+    });
+
+    it('injects tenant filter before HAVING clause', async () => {
+      // Real SQL with HAVING — real parser produces AST with _location offsets for having
+      const mockQuery = 'SELECT name FROM orders GROUP BY name HAVING COUNT(*) > 1';
+      const mockResult = [{ name: 'alice' }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('injects tenant filter before LIMIT clause', async () => {
+      // Real SQL with LIMIT — real parser produces AST with _location offsets for limit
+      const mockQuery = 'SELECT id FROM products LIMIT 5';
+      const mockResult = [{ id: 1 }];
+
+      (nodeRepository.executeQueryNodeInDb as jest.Mock)
+        .mockResolvedValueOnce([{ column_name: 'tenant_id' }])
+        .mockResolvedValueOnce(mockResult);
+
+      const result = await nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId);
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('extractTablesFromAST', () => {
+    it('handles node.name.name pattern (nested name object)', () => {
+      const ast = [
+        {
+          type: 'select',
+          from: [{ type: 'table', name: { name: 'orders' } }],
+        },
+      ];
+      const result = nodeLogicService.extractTablesFromAST(ast);
+      expect(result).toContain('orders');
+    });
+
+    it('handles string node.name pattern', () => {
+      const ast = [
+        {
+          type: 'select',
+          from: [{ type: 'table', name: 'products' }],
+        },
+      ];
+      const result = nodeLogicService.extractTablesFromAST(ast);
+      expect(result).toContain('products');
+    });
+  });
+
+  describe('resolveSortColumn', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('returns null when sortBy is empty', async () => {
+      const result = await nodeLogicService.resolveSortColumn(['users'], '', 'configuration');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when sortBy has invalid characters', async () => {
+      const result = await nodeLogicService.resolveSortColumn(['users'], 'col; DROP TABLE', 'configuration');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when sortBy not in ORDER BY of AST', async () => {
+      const ast = [{ type: 'select', orderBy: [{ name: 'created_at' }] }];
+      const result = await nodeLogicService.resolveSortColumn(['users'], 'name', 'configuration', ast);
+      expect(result).toBeNull();
+    });
+
+    it('returns sortBy when column exists in table', async () => {
+      (handlePostExecuteSqlStatement as jest.Mock).mockResolvedValue({ rows: [{ column_name: 'name' }] });
+      const result = await nodeLogicService.resolveSortColumn(['users'], 'name', 'configuration');
+      expect(result).toBe('name');
+    });
+
+    it('returns null when column not found in any table', async () => {
+      (handlePostExecuteSqlStatement as jest.Mock).mockResolvedValue({ rows: [] });
+      const result = await nodeLogicService.resolveSortColumn(['users'], 'nonexistent', 'configuration');
+      expect(result).toBeNull();
+    });
+
+    it('skips table and continues when DB throws during column lookup', async () => {
+      (handlePostExecuteSqlStatement as jest.Mock)
+        .mockRejectedValueOnce(new Error('DB error'))
+        .mockResolvedValueOnce({ rows: [{ column_name: 'name' }] });
+      const result = await nodeLogicService.resolveSortColumn(['bad_table', 'users'], 'name', 'configuration');
+      expect(result).toBe('name');
+    });
+
+    it('skips AST ORDER BY check when orderByCols is empty', async () => {
+      const ast = [{ type: 'select', orderBy: [] }];
+      (handlePostExecuteSqlStatement as jest.Mock).mockResolvedValue({ rows: [{ column_name: 'name' }] });
+      const result = await nodeLogicService.resolveSortColumn(['users'], 'name', 'configuration', ast);
+      expect(result).toBe('name');
     });
   });
 });

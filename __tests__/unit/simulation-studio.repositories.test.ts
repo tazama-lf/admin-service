@@ -36,6 +36,16 @@ import {
   upsertTriggerFieldOverrideInDb,
   getTriggerFieldOverridesByConfigId,
 } from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
+import {
+  createEnrichmentTableInDb,
+  updateEnrichmentTableInDb,
+  getEnrichmentTablesByGenerationId,
+  deleteEnrichmentTableInDb,
+} from '../../src/repositories/simulation-studio/enrichment-tables.repository';
+import {
+  upsertEnrichmentFieldStrategyInDb,
+  getEnrichmentFieldStrategiesByTableId,
+} from '../../src/repositories/simulation-studio/enrichment-field-strategies.repository';
 
 const mockDb = db.handlePostExecuteSqlStatement as jest.Mock;
 
@@ -601,5 +611,261 @@ describe('getTriggerFieldOverridesByConfigId', () => {
   it('returns empty array when no rows', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await getTriggerFieldOverridesByConfigId(20)).toEqual([]);
+  });
+});
+
+// ── enrichment-tables.repository ─────────────────────────────────────────────
+
+const enrichmentTableRow = {
+  id: 30,
+  generation_id: 1,
+  table_name: 'account_enrichment',
+  table_order: 1,
+  row_count: 13,
+  payload_template_json: JSON.stringify({ name: 'feeba', country: 'Pak' }),
+  schema_template_json: null,
+  faker_profile: '{}',
+  created_at: '2026-06-01T00:00:00.000Z',
+};
+
+const enrichmentStrategyRow = {
+  id: 1,
+  enrichment_table_id: 30,
+  column_name: 'name',
+  column_type: null,
+  strategy_code: 'null',
+  static_value: null,
+  range_min: null,
+  range_max: null,
+  generator_type: null,
+  generator_options: '{}',
+  created_at: '2026-06-01T00:00:00.000Z',
+};
+
+describe('createEnrichmentTableInDb', () => {
+  it('inserts row and returns mapped enrichment table', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+
+    const result = await createEnrichmentTableInDb({
+      generation_id: 1,
+      table_name: 'account_enrichment',
+      row_count: 13,
+      payload_template_json: { name: 'feeba', country: 'Pak' },
+    });
+
+    expect(result.id).toBe(30);
+    expect(result.table_name).toBe('account_enrichment');
+    expect(result.row_count).toBe(13);
+    expect(result.payload_template_json).toEqual({ name: 'feeba', country: 'Pak' });
+    expect(result.faker_profile).toEqual({});
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('INSERT INTO trs_suite_enrichment_tables') }),
+      'simulation',
+    );
+  });
+
+  it('uses default table_order=1 when not provided', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    await createEnrichmentTableInDb({ generation_id: 1, table_name: 'cnic', row_count: 5 });
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[2]).toBe(1); // table_order default
+  });
+
+  it('handles null payload_template_json', async () => {
+    const rowNoPayload = { ...enrichmentTableRow, payload_template_json: null };
+    mockDb.mockResolvedValue({ rows: [rowNoPayload] });
+    const result = await createEnrichmentTableInDb({ generation_id: 1, table_name: 'x', row_count: 1 });
+    expect(result.payload_template_json).toBeUndefined();
+  });
+
+  it('parses payload_template_json when already an object', async () => {
+    const rowObjPayload = { ...enrichmentTableRow, payload_template_json: { name: 'feeba' } };
+    mockDb.mockResolvedValue({ rows: [rowObjPayload] });
+    const result = await createEnrichmentTableInDb({ generation_id: 1, table_name: 'x', row_count: 1 });
+    expect(result.payload_template_json).toEqual({ name: 'feeba' });
+  });
+
+  it('parses faker_profile when already an object', async () => {
+    const rowObjFaker = { ...enrichmentTableRow, faker_profile: { locale: 'ur' } };
+    mockDb.mockResolvedValue({ rows: [rowObjFaker] });
+    const result = await createEnrichmentTableInDb({ generation_id: 1, table_name: 'x', row_count: 1 });
+    expect(result.faker_profile).toEqual({ locale: 'ur' });
+  });
+
+  it('defaults faker_profile to {} when null', async () => {
+    const rowNullFaker = { ...enrichmentTableRow, faker_profile: null };
+    mockDb.mockResolvedValue({ rows: [rowNullFaker] });
+    const result = await createEnrichmentTableInDb({ generation_id: 1, table_name: 'x', row_count: 1 });
+    expect(result.faker_profile).toEqual({});
+  });
+});
+
+describe('updateEnrichmentTableInDb', () => {
+  it('updates row_count and returns mapped row', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...enrichmentTableRow, row_count: 5 }] });
+    const result = await updateEnrichmentTableInDb(30, { row_count: 5 });
+    expect(result!.row_count).toBe(5);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('UPDATE trs_suite_enrichment_tables') }),
+      'simulation',
+    );
+  });
+
+  it('updates payload_template_json', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    await updateEnrichmentTableInDb(30, { payload_template_json: { city: 'Karachi' } });
+    const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callArg).toContain(JSON.stringify({ city: 'Karachi' }));
+  });
+
+  it('updates schema_template_json', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    await updateEnrichmentTableInDb(30, { schema_template_json: { col: 'VARCHAR' } });
+    const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callArg).toContain(JSON.stringify({ col: 'VARCHAR' }));
+  });
+
+  it('updates faker_profile', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    await updateEnrichmentTableInDb(30, { faker_profile: { locale: 'ur' } });
+    const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callArg).toContain(JSON.stringify({ locale: 'ur' }));
+  });
+
+  it('fetches existing row when no fields to update', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    const result = await updateEnrichmentTableInDb(30, {});
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('SELECT') }), 'simulation');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when no fields and row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await updateEnrichmentTableInDb(99, {})).toBeNull();
+  });
+
+  it('returns null when UPDATE finds no row', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await updateEnrichmentTableInDb(99, { row_count: 5 })).toBeNull();
+  });
+});
+
+describe('getEnrichmentTablesByGenerationId', () => {
+  it('returns mapped array ordered by table_order', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
+    const result = await getEnrichmentTablesByGenerationId(1);
+    expect(result).toHaveLength(1);
+    expect(result[0].generation_id).toBe(1);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('ORDER BY table_order ASC') }),
+      'simulation',
+    );
+  });
+
+  it('returns empty array when no rows', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getEnrichmentTablesByGenerationId(1)).toEqual([]);
+  });
+});
+
+describe('deleteEnrichmentTableInDb', () => {
+  it('returns true when row deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ id: 30 }] });
+    expect(await deleteEnrichmentTableInDb(30)).toBe(true);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_enrichment_tables') }),
+      'simulation',
+    );
+  });
+
+  it('returns false when row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await deleteEnrichmentTableInDb(999)).toBe(false);
+  });
+});
+
+// ── enrichment-field-strategies.repository ───────────────────────────────────
+
+describe('upsertEnrichmentFieldStrategyInDb', () => {
+  it('upserts row with column_name and returns mapped strategy', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentStrategyRow] });
+
+    const result = await upsertEnrichmentFieldStrategyInDb(30, {
+      column_name: 'name',
+      strategy_code: 'null',
+    });
+
+    expect(result.id).toBe(1);
+    expect(result.enrichment_table_id).toBe(30);
+    expect(result.column_name).toBe('name');
+    expect(result.strategy_code).toBe('null');
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('ON CONFLICT (enrichment_table_id, column_name)') }),
+      'simulation',
+    );
+  });
+
+  it('handles column_type', async () => {
+    const rowWithType = { ...enrichmentStrategyRow, column_type: 'VARCHAR(128)' };
+    mockDb.mockResolvedValue({ rows: [rowWithType] });
+    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', column_type: 'VARCHAR(128)', strategy_code: 'null' });
+    expect(result.column_type).toBe('VARCHAR(128)');
+  });
+
+  it('handles static strategy', async () => {
+    const staticRow = { ...enrichmentStrategyRow, strategy_code: 'static', static_value: '"Ahmad"' };
+    mockDb.mockResolvedValue({ rows: [staticRow] });
+    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', strategy_code: 'static', static_value: 'Ahmad' });
+    expect(result.strategy_code).toBe('static');
+  });
+
+  it('handles range strategy', async () => {
+    const rangeRow = { ...enrichmentStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 };
+    mockDb.mockResolvedValue({ rows: [rangeRow] });
+    const result = await upsertEnrichmentFieldStrategyInDb(30, {
+      column_name: 'age',
+      strategy_code: 'range',
+      range_min: 1,
+      range_max: 100,
+    });
+    expect(result.range_min).toBe(1);
+    expect(result.range_max).toBe(100);
+  });
+
+  it('handles generator_options as object (not string)', async () => {
+    const rowWithObj = { ...enrichmentStrategyRow, generator_options: { type: 'name' } };
+    mockDb.mockResolvedValue({ rows: [rowWithObj] });
+    const result = await upsertEnrichmentFieldStrategyInDb(30, {
+      column_name: 'name',
+      strategy_code: 'generated',
+      generator_type: 'faker.name',
+      generator_options: { type: 'name' },
+    });
+    expect(result.generator_options).toEqual({ type: 'name' });
+  });
+
+  it('handles copy strategy', async () => {
+    const copyRow = { ...enrichmentStrategyRow, strategy_code: 'copy' };
+    mockDb.mockResolvedValue({ rows: [copyRow] });
+    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', strategy_code: 'copy' });
+    expect(result.strategy_code).toBe('copy');
+  });
+});
+
+describe('getEnrichmentFieldStrategiesByTableId', () => {
+  it('returns mapped strategies ordered by column_name', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentStrategyRow] });
+    const result = await getEnrichmentFieldStrategiesByTableId(30);
+    expect(result).toHaveLength(1);
+    expect(result[0].column_name).toBe('name');
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('ORDER BY column_name ASC') }),
+      'simulation',
+    );
+  });
+
+  it('returns empty array when no rows', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getEnrichmentFieldStrategiesByTableId(30)).toEqual([]);
   });
 });

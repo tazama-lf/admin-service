@@ -86,6 +86,10 @@ import {
   getTriggerConfigsHandler,
   addTriggerTxtpConfigHandler,
   bulkUpdateTriggerConfigsHandler,
+  createEnrichmentTableHandler,
+  getEnrichmentTablesHandler,
+  bulkUpdateEnrichmentTablesHandler,
+  deleteEnrichmentTableHandler,
   getAllSimulationsHandler,
   createTrsSimulationHandler,
   getSimulationStatsHandler,
@@ -185,6 +189,10 @@ const routePrivilege = {
   getTriggerConfigs: ['editor', 'approver'],
   addTriggerTxtpConfig: ['editor', 'approver'],
   bulkUpdateTriggerConfigs: ['editor', 'approver'],
+  getEnrichmentTables: ['editor', 'approver'],
+  createEnrichmentTable: ['editor', 'approver'],
+  bulkUpdateEnrichmentTables: ['editor', 'approver'],
+  deleteEnrichmentTable: ['editor', 'approver'],
   getSimulations: ['editor', 'approver'],
   createSimulation: ['editor', 'approver'],
   getSimulationStats: ['editor', 'approver'],
@@ -567,6 +575,22 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
     ...SetOptionsBodyAndParams(bulkUpdateTriggerConfigsHandler, routePrivilege.bulkUpdateTriggerConfigs),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables', {
+    ...SetOptionsBodyAndParams(getEnrichmentTablesHandler, routePrivilege.getEnrichmentTables),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables', {
+    ...SetOptionsBodyAndParams(createEnrichmentTableHandler, routePrivilege.createEnrichmentTable),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables', {
+    ...SetOptionsBodyAndParams(bulkUpdateEnrichmentTablesHandler, routePrivilege.bulkUpdateEnrichmentTables),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables/:tableId', {
+    ...SetOptionsBodyAndParams(deleteEnrichmentTableHandler, routePrivilege.deleteEnrichmentTable),
   });
 
   fastify.get('/v1/admin/simulation/messages', {

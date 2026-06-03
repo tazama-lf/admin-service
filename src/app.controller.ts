@@ -98,11 +98,18 @@ import {
   getTriggerConfigsWithOverrides,
   bulkUpdateTriggerConfigs,
 } from './services/trigger-txtp-config.logic.service';
+import {
+  createEnrichmentTable,
+  getEnrichmentTablesWithStrategies,
+  bulkUpdateEnrichmentTables,
+  deleteEnrichmentTable,
+} from './services/enrichment-table.logic.service';
 import type {
   AddContextTxtpConfigDto,
   BulkConfigItemDto,
   AddTriggerTxtpConfigDto,
   BulkTriggerConfigItemDto,
+  BulkEnrichmentUpdateItemDto,
 } from './interface/suite-generation.interface';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
@@ -2183,6 +2190,117 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
   } catch (err) {
     loggerService.error(`Failed to bulk update trigger txtp configs. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to bulk update trigger txtp configs');
+  }
+};
+
+// ── Step 4: POST create enrichment table ─────────────────────────────────────
+
+export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create enrichment table');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const {
+      table_name: tableName,
+      row_count: rowCount,
+      payload_template_json: payloadTemplateJson,
+      schema_template_json: schemaTemplateJson,
+    } = req.body as {
+      table_name: string;
+      row_count?: number;
+      payload_template_json?: Record<string, unknown>;
+      schema_template_json?: Record<string, unknown>;
+    };
+
+    if (!tableName || typeof tableName !== 'string') {
+      reply.status(400).send({ success: false, message: 'table_name is required' });
+      return;
+    }
+
+    const created = await createEnrichmentTable(generationId, tableName, rowCount ?? 1, payloadTemplateJson, schemaTemplateJson);
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Create enrichment table');
+  } catch (err) {
+    loggerService.error(`Failed to create enrichment table. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create enrichment table');
+  }
+};
+
+// ── Step 4: GET all enrichment tables with field strategies ───────────────────
+
+export const getEnrichmentTablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get enrichment tables');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const tables = await getEnrichmentTablesWithStrategies(generationId);
+    reply.status(200).send({ success: true, data: tables });
+    loggerService.log('End - Get enrichment tables');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve enrichment tables. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve enrichment tables');
+  }
+};
+
+// ── Step 4: PATCH bulk update enrichment tables ───────────────────────────────
+
+export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Bulk update enrichment tables');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const items = req.body as BulkEnrichmentUpdateItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
+
+    const updated = await bulkUpdateEnrichmentTables(generationId, items);
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Bulk update enrichment tables');
+  } catch (err) {
+    loggerService.error(`Failed to bulk update enrichment tables. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update enrichment tables');
+  }
+};
+
+// ── Step 4: DELETE enrichment table ──────────────────────────────────────────
+
+export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete enrichment table');
+    const { tableId: tableIdStr } = req.params as { tableId: string };
+    const tableId = parseInt(tableIdStr, 10);
+
+    if (isNaN(tableId)) {
+      reply.status(400).send({ success: false, message: 'Invalid table ID' });
+      return;
+    }
+
+    await deleteEnrichmentTable(tableId);
+    reply.status(200).send({ success: true, message: 'Enrichment table deleted' });
+    loggerService.log('End - Delete enrichment table');
+  } catch (err) {
+    loggerService.error(`Failed to delete enrichment table. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete enrichment table');
   }
 };
 

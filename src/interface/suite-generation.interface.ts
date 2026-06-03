@@ -236,3 +236,80 @@ export interface BulkTriggerConfigItemDto {
   generator_profile?: Record<string, unknown>;
   field_overrides?: UpsertTriggerFieldOverrideDto[];
 }
+
+// ── Enrichment Tables ────────────────────────────────────────────────────────
+
+export type EnrichmentFieldStrategyCode = 'static' | 'range' | 'generated' | 'null' | 'copy';
+
+export interface SuiteEnrichmentTable {
+  id: number;
+  generation_id: number;
+  table_name: string;
+  table_order: number;
+  row_count: number;
+  payload_template_json?: Record<string, unknown>;
+  schema_template_json?: Record<string, unknown>;
+  faker_profile: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface CreateEnrichmentTableDto {
+  generation_id: number;
+  table_name: string;
+  table_order?: number;
+  row_count: number;
+  payload_template_json?: Record<string, unknown>;
+  schema_template_json?: Record<string, unknown>;
+  faker_profile?: Record<string, unknown>;
+}
+
+export interface UpdateEnrichmentTableDto {
+  row_count?: number;
+  payload_template_json?: Record<string, unknown>;
+  schema_template_json?: Record<string, unknown>;
+  faker_profile?: Record<string, unknown>;
+}
+
+export interface EnrichmentFieldStrategy {
+  id: number;
+  enrichment_table_id: number;
+  column_name: string;
+  column_type?: string;
+  strategy_code: EnrichmentFieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface UpsertEnrichmentFieldStrategyDto {
+  column_name: string;
+  column_type?: string;
+  strategy_code: EnrichmentFieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options?: Record<string, unknown>;
+}
+
+export interface EnrichmentTableWithStrategies {
+  enrichment_table_id: number;
+  table_name: string;
+  table_order: number;
+  row_count: number;
+  payload_template_json?: Record<string, unknown>;
+  schema_template_json?: Record<string, unknown>;
+  field_strategies: EnrichmentFieldStrategy[];
+}
+
+export interface BulkEnrichmentUpdateItemDto {
+  enrichment_table_id: number;
+  row_count?: number;
+  payload_template_json?: Record<string, unknown>;
+  schema_template_json?: Record<string, unknown>;
+  faker_profile?: Record<string, unknown>;
+  field_strategies?: UpsertEnrichmentFieldStrategyDto[];
+}

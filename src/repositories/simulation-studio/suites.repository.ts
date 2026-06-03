@@ -92,7 +92,7 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
         ? typeof row.rule_config === 'string'
           ? (JSON.parse(row.rule_config) as Record<string, unknown>)
           : row.rule_config
-        : undefined,
+        : {},
       wizard_progress: normalizeWizardProgress(row.wizard_progress),
       metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
       created_at: new Date(row.created_at),
@@ -144,7 +144,7 @@ export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string)
       ? typeof row.rule_config === 'string'
         ? (JSON.parse(row.rule_config) as Record<string, unknown>)
         : row.rule_config
-      : undefined,
+      : {},
     wizard_progress: normalizeWizardProgress(row.wizard_progress),
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
     created_at: new Date(row.created_at),
@@ -213,7 +213,7 @@ export const createSimulationSuiteInDb = async (
       ? typeof row.rule_config === 'string'
         ? (JSON.parse(row.rule_config) as Record<string, unknown>)
         : row.rule_config
-      : undefined,
+      : {},
     wizard_progress:
       typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
@@ -303,7 +303,7 @@ export const updateSimulationSuiteInDb = async (
       ? typeof row.rule_config === 'string'
         ? (JSON.parse(row.rule_config) as Record<string, unknown>)
         : row.rule_config
-      : undefined,
+      : {},
     wizard_progress:
       typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,

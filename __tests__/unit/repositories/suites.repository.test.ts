@@ -329,7 +329,7 @@ describe('Suites Repository', () => {
     expect(result.rule_config).toEqual(ruleConfig);
   });
 
-  it('createSimulationSuiteInDb returns undefined rule_config when column is null', async () => {
+  it('createSimulationSuiteInDb returns empty object rule_config when column is null', async () => {
     mockHandlePostExecuteSqlStatement.mockResolvedValue({
       rows: [
         {
@@ -351,7 +351,7 @@ describe('Suites Repository', () => {
 
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
     expect(callArg.values[8]).toBeNull(); // no rule_config passed
-    expect(result.rule_config).toBeUndefined();
+    expect(result.rule_config).toEqual({});
   });
 
   it('updateSimulationSuiteInDb updates rule_config and returns it parsed', async () => {

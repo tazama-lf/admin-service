@@ -36,7 +36,7 @@ export interface SimulationSuite {
   rule_repo?: string;
   rule_name?: string;
   rule_version?: string;
-  rule_config?: Record<string, unknown>;
+  rule_config: Record<string, unknown>;
   primary_txtp?: string;
   primary_txtp_version?: string;
   clone_source_suite_id?: number;
@@ -64,7 +64,7 @@ export interface CreateSimulationSuiteDto {
   rule_repo: string;
   rule_name: string;
   rule_version: string;
-  rule_config?: Record<string, unknown>;
+  rule_config: Record<string, unknown>;
   primary_txtp: string;
   primary_txtp_version: string;
   clone_source_suite_id?: number;

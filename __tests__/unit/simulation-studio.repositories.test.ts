@@ -42,10 +42,6 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../../src/repositories/simulation-studio/enrichment-tables.repository';
-import {
-  upsertEnrichmentFieldStrategyInDb,
-  getEnrichmentFieldStrategiesByTableId,
-} from '../../src/repositories/simulation-studio/enrichment-field-strategies.repository';
 
 const mockDb = db.handlePostExecuteSqlStatement as jest.Mock;
 
@@ -667,20 +663,6 @@ const enrichmentTableRow = {
   created_at: '2026-06-01T00:00:00.000Z',
 };
 
-const enrichmentStrategyRow = {
-  id: 1,
-  enrichment_table_id: 30,
-  column_name: 'name',
-  column_type: null,
-  strategy_code: 'null',
-  static_value: null,
-  range_min: null,
-  range_max: null,
-  generator_type: null,
-  generator_options: '{}',
-  created_at: '2026-06-01T00:00:00.000Z',
-};
-
 describe('createEnrichmentTableInDb', () => {
   it('inserts row and returns mapped enrichment table', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
@@ -820,91 +802,5 @@ describe('deleteEnrichmentTableInDb', () => {
   it('returns false when row not found', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await deleteEnrichmentTableInDb(999)).toBe(false);
-  });
-});
-
-// ── enrichment-field-strategies.repository ───────────────────────────────────
-
-describe('upsertEnrichmentFieldStrategyInDb', () => {
-  it('upserts row with column_name and returns mapped strategy', async () => {
-    mockDb.mockResolvedValue({ rows: [enrichmentStrategyRow] });
-
-    const result = await upsertEnrichmentFieldStrategyInDb(30, {
-      column_name: 'name',
-      strategy_code: 'null',
-    });
-
-    expect(result.id).toBe(1);
-    expect(result.enrichment_table_id).toBe(30);
-    expect(result.column_name).toBe('name');
-    expect(result.strategy_code).toBe('null');
-    expect(mockDb).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('ON CONFLICT (enrichment_table_id, column_name)') }),
-      'simulation',
-    );
-  });
-
-  it('handles column_type', async () => {
-    const rowWithType = { ...enrichmentStrategyRow, column_type: 'VARCHAR(128)' };
-    mockDb.mockResolvedValue({ rows: [rowWithType] });
-    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', column_type: 'VARCHAR(128)', strategy_code: 'null' });
-    expect(result.column_type).toBe('VARCHAR(128)');
-  });
-
-  it('handles static strategy', async () => {
-    const staticRow = { ...enrichmentStrategyRow, strategy_code: 'static', static_value: '"Ahmad"' };
-    mockDb.mockResolvedValue({ rows: [staticRow] });
-    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', strategy_code: 'static', static_value: 'Ahmad' });
-    expect(result.strategy_code).toBe('static');
-  });
-
-  it('handles range strategy', async () => {
-    const rangeRow = { ...enrichmentStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 };
-    mockDb.mockResolvedValue({ rows: [rangeRow] });
-    const result = await upsertEnrichmentFieldStrategyInDb(30, {
-      column_name: 'age',
-      strategy_code: 'range',
-      range_min: 1,
-      range_max: 100,
-    });
-    expect(result.range_min).toBe(1);
-    expect(result.range_max).toBe(100);
-  });
-
-  it('handles generator_options as object (not string)', async () => {
-    const rowWithObj = { ...enrichmentStrategyRow, generator_options: { type: 'name' } };
-    mockDb.mockResolvedValue({ rows: [rowWithObj] });
-    const result = await upsertEnrichmentFieldStrategyInDb(30, {
-      column_name: 'name',
-      strategy_code: 'generated',
-      generator_type: 'faker.name',
-      generator_options: { type: 'name' },
-    });
-    expect(result.generator_options).toEqual({ type: 'name' });
-  });
-
-  it('handles copy strategy', async () => {
-    const copyRow = { ...enrichmentStrategyRow, strategy_code: 'copy' };
-    mockDb.mockResolvedValue({ rows: [copyRow] });
-    const result = await upsertEnrichmentFieldStrategyInDb(30, { column_name: 'name', strategy_code: 'copy' });
-    expect(result.strategy_code).toBe('copy');
-  });
-});
-
-describe('getEnrichmentFieldStrategiesByTableId', () => {
-  it('returns mapped strategies ordered by column_name', async () => {
-    mockDb.mockResolvedValue({ rows: [enrichmentStrategyRow] });
-    const result = await getEnrichmentFieldStrategiesByTableId(30);
-    expect(result).toHaveLength(1);
-    expect(result[0].column_name).toBe('name');
-    expect(mockDb).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('ORDER BY column_name ASC') }),
-      'simulation',
-    );
-  });
-
-  it('returns empty array when no rows', async () => {
-    mockDb.mockResolvedValue({ rows: [] });
-    expect(await getEnrichmentFieldStrategiesByTableId(30)).toEqual([]);
   });
 });

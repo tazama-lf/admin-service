@@ -100,9 +100,9 @@ import {
 } from './services/trigger-txtp-config.logic.service';
 import {
   createEnrichmentTable,
-  getEnrichmentTablesWithStrategies,
   bulkUpdateEnrichmentTables,
   deleteEnrichmentTable,
+  getEnrichmentTables,
 } from './services/enrichment-table.logic.service';
 import type {
   AddContextTxtpConfigDto,
@@ -2245,7 +2245,7 @@ export const getEnrichmentTablesHandler = async (req: FastifyRequest, reply: Fas
       return;
     }
 
-    const tables = await getEnrichmentTablesWithStrategies(generationId);
+    const tables = await getEnrichmentTables(generationId);
     reply.status(200).send({ success: true, data: tables });
     loggerService.log('End - Get enrichment tables');
   } catch (err) {

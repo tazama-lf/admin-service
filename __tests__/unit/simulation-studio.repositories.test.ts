@@ -172,6 +172,45 @@ describe('getLatestGenerationBySuiteId', () => {
   });
 });
 
+// ── suite-generations.repository — optional fields branches ──────────────────
+
+describe('createSuiteGenerationInDb — optional fields', () => {
+  it('uses SINGLE_RULE default when simulation_type absent', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[2]).toBe('SINGLE_RULE');
+  });
+
+  it('uses provided simulation_type when given', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[2]).toBe('INTEGRATION_TESTING');
+  });
+
+  it('passes non-null rule_repo and rule_version when provided', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+    await createSuiteGenerationInDb(
+      { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_repo: 'repo-a', rule_version: 'v1' },
+      1,
+      'user-1',
+    );
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[3]).toBe('repo-a');
+    expect(callValues[4]).toBe('v1');
+  });
+
+  it('passes null for optional rule_repo and rule_version when absent', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[3]).toBeNull();
+    expect(callValues[4]).toBeNull();
+    expect(callValues[8]).toBeNull();
+  });
+});
+
 // ── context-txtp-configs.repository ──────────────────────────────────────────
 
 describe('createContextTxtpConfigInDb', () => {

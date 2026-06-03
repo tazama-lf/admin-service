@@ -211,7 +211,7 @@ describe('Simulation Logs Repository', () => {
       });
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain('ORDER BY undefined DESC');
+      expect(callArg.text).toContain('ORDER BY created_at DESC');
     });
 
     it('should get simulation logs with limit', async () => {

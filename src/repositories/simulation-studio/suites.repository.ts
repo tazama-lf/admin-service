@@ -63,7 +63,7 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
   // Get paginated results
   let query = `
     SELECT 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version,
+      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     FROM trs_simulation_suites
@@ -88,6 +88,11 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
   return {
     data: result.rows.map((row) => ({
       ...row,
+      rule_config: row.rule_config
+        ? typeof row.rule_config === 'string'
+          ? (JSON.parse(row.rule_config) as Record<string, unknown>)
+          : row.rule_config
+        : {},
       wizard_progress: normalizeWizardProgress(row.wizard_progress),
       metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
       created_at: new Date(row.created_at),
@@ -113,7 +118,7 @@ const normalizeWizardProgress = (raw: unknown): Record<string, unknown> => {
 export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string): Promise<SimulationSuite | null> => {
   const query = `
     SELECT 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version,
+      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     FROM trs_simulation_suites
@@ -135,6 +140,11 @@ export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string)
   const [row] = result.rows;
   return {
     ...row,
+    rule_config: row.rule_config
+      ? typeof row.rule_config === 'string'
+        ? (JSON.parse(row.rule_config) as Record<string, unknown>)
+        : row.rule_config
+      : {},
     wizard_progress: normalizeWizardProgress(row.wizard_progress),
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
     created_at: new Date(row.created_at),
@@ -151,14 +161,14 @@ export const createSimulationSuiteInDb = async (
 ): Promise<SimulationSuite> => {
   const query = `
     INSERT INTO trs_simulation_suites (
-      tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version,
+      tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW()
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW()
     )
     RETURNING 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version,
+      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
   `;
@@ -181,6 +191,7 @@ export const createSimulationSuiteInDb = async (
         payload.rule_repo ?? null,
         payload.rule_name ?? null,
         payload.rule_version ?? null,
+        payload.rule_config ? JSON.stringify(payload.rule_config) : null,
         payload.primary_txtp ?? null,
         payload.primary_txtp_version ?? null,
         payload.clone_source_suite_id ?? null,
@@ -198,6 +209,11 @@ export const createSimulationSuiteInDb = async (
   const [row] = result.rows;
   return {
     ...row,
+    rule_config: row.rule_config
+      ? typeof row.rule_config === 'string'
+        ? (JSON.parse(row.rule_config) as Record<string, unknown>)
+        : row.rule_config
+      : {},
     wizard_progress:
       typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,
@@ -231,6 +247,7 @@ export const updateSimulationSuiteInDb = async (
     { key: 'rule_repo', column: 'rule_repo', transform: nullableValue },
     { key: 'rule_name', column: 'rule_name', transform: nullableValue },
     { key: 'rule_version', column: 'rule_version', transform: nullableValue },
+    { key: 'rule_config', column: 'rule_config', transform: (value: unknown) => (value ? JSON.stringify(value) : null) },
     { key: 'primary_txtp', column: 'primary_txtp', transform: nullableValue },
     { key: 'primary_txtp_version', column: 'primary_txtp_version', transform: nullableValue },
     { key: 'iteration_count', column: 'iteration_count' },
@@ -260,7 +277,7 @@ export const updateSimulationSuiteInDb = async (
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex++} AND tenant_id = $${paramIndex++}
     RETURNING 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version,
+      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
   `;
@@ -282,6 +299,11 @@ export const updateSimulationSuiteInDb = async (
   const [row] = result.rows;
   return {
     ...row,
+    rule_config: row.rule_config
+      ? typeof row.rule_config === 'string'
+        ? (JSON.parse(row.rule_config) as Record<string, unknown>)
+        : row.rule_config
+      : {},
     wizard_progress:
       typeof row.wizard_progress === 'string' ? (JSON.parse(row.wizard_progress) as Record<string, unknown>) : row.wizard_progress,
     metadata: typeof row.metadata === 'string' ? (JSON.parse(row.metadata) as Record<string, unknown>) : row.metadata,

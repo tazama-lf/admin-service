@@ -83,9 +83,6 @@ export interface CreateRuleHandlerReqBody {
   ruleRequest: RuleRequest;
 }
 
-export interface ActiveNetworkMap {
-  configuration: unknown;
-}
 export interface CloneRuleHandlerReqBody {
   payload: {
     ruleName: string;

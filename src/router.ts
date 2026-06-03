@@ -148,7 +148,6 @@ const routePrivilege = {
   putTrsRule: ['editor', 'aaprover', 'trs_approver'],
   getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getExcludedTypes: 'editor',
-  getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],
   postNodes: 'editor',
   deleteNodes: 'editor',

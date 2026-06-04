@@ -2298,8 +2298,9 @@ export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, rep
 export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     loggerService.log('Start - Delete enrichment table');
-    const { tableId: tableIdStr } = req.params as { tableId: string };
+    const { tableId: tableIdStr, generationId: generationIdStr } = req.params as { tableId: string; generationId: string };
     const tableId = parseInt(tableIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
 
     if (isNaN(tableId)) {
       reply.status(400).send({ success: false, message: 'Invalid table ID' });
@@ -2307,6 +2308,7 @@ export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     await deleteEnrichmentTable(tableId);
+    void recalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Enrichment table deleted' });
     loggerService.log('End - Delete enrichment table');
   } catch (err) {
@@ -2380,13 +2382,19 @@ export const updateWizardProgressHandler = async (req: FastifyRequest, reply: Fa
 export const deleteContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     loggerService.log('Start - Delete context txtp config');
-    const { configId: configIdStr } = req.params as { configId: string };
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
     const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
     if (isNaN(configId)) {
       reply.status(400).send({ success: false, message: 'Invalid config ID' });
       return;
     }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
     await deleteContextTxtpConfig(configId);
+    void recalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Context txtp config deleted' });
     loggerService.log('End - Delete context txtp config');
   } catch (err) {
@@ -2400,13 +2408,19 @@ export const deleteContextTxtpConfigHandler = async (req: FastifyRequest, reply:
 export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     loggerService.log('Start - Delete trigger txtp config');
-    const { configId: configIdStr } = req.params as { configId: string };
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
     const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
     if (isNaN(configId)) {
       reply.status(400).send({ success: false, message: 'Invalid config ID' });
       return;
     }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
     await deleteTriggerTxtpConfig(configId);
+    void recalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Trigger txtp config deleted' });
     loggerService.log('End - Delete trigger txtp config');
   } catch (err) {

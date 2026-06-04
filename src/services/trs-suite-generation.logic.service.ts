@@ -8,13 +8,55 @@ import {
   getLatestGenerationBySuiteId,
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
+  updateWizardProgressInDb,
   type GenerationSummary,
+  resumeGenerationInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
+import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { HttpException, HttpStatus } from '../utils/error';
+// Re-export context config service for app.controller consumers
+export {
+  createConfigWithDefaultStrategies,
+  createContextTxtpConfig,
+  addContextTxtpConfig,
+  getContextConfigsWithStrategies,
+  bulkUpdateContextConfigs,
+  getFieldStrategiesForContextConfig,
+  deleteContextTxtpConfig,
+} from './context-txtp-config.logic.service';
 
 export type { GenerationSummary };
+
+// ── Wizard progress ───────────────────────────────────────────────────────────
+
+export const updateWizardProgress = async (generationId: number, currentStep: number, completedSteps: number[]): Promise<void> => {
+  try {
+    await updateWizardProgressInDb(generationId, currentStep, completedSteps);
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to update wizard progress: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+// ── Delete trigger txtp config ────────────────────────────────────────────────
+
+export const deleteTriggerTxtpConfig = async (configId: number): Promise<void> => {
+  try {
+    const deleted = await deleteTriggerTxtpConfigInDb(configId);
+    if (!deleted) throw new HttpException(`Trigger txtp config ${configId} not found`, HttpStatus.NOT_FOUND);
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to delete trigger txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
 
 // ── Count recalculation ──────────────────────────────────────────────────────
 
@@ -77,16 +119,6 @@ export const getGenerationSummary = async (generationId: number): Promise<Genera
   }
 };
 
-// Re-export context config service for app.controller consumers
-export {
-  createConfigWithDefaultStrategies,
-  createContextTxtpConfig,
-  addContextTxtpConfig,
-  getContextConfigsWithStrategies,
-  bulkUpdateContextConfigs,
-  getFieldStrategiesForContextConfig,
-} from './context-txtp-config.logic.service';
-
 // ── Suite Generation ─────────────────────────────────────────────────────────
 
 export const createSuiteGeneration = async (suite: SimulationSuite, userId: string, userEmail?: string): Promise<SuiteGeneration> => {
@@ -131,6 +163,17 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
   } catch (error) {
     throw new HttpException(
       `Failed to retrieve latest generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
+  try {
+    return await resumeGenerationInDb(suiteId);
+  } catch (error) {
+    throw new HttpException(
+      `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

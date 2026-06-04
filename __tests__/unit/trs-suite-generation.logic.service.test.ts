@@ -7,6 +7,7 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   getNextGenerationNumber: jest.fn(),
   getGenerationsBySuiteId: jest.fn(),
   getLatestGenerationBySuiteId: jest.fn(),
+  resumeGenerationInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/context-txtp-configs.repository', () => ({
@@ -39,6 +40,7 @@ import {
   createSuiteGeneration,
   getGenerationsForSuite,
   getLatestGenerationForSuite,
+  resumeGeneration,
 } from '../../src/services/trs-suite-generation.logic.service';
 import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
 import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
@@ -186,5 +188,22 @@ describe('getLatestGenerationForSuite', () => {
   it('wraps non-Error thrown value', async () => {
     (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockRejectedValue('string error');
     await expect(getLatestGenerationForSuite(42)).rejects.toMatchObject({ status: 500 });
+  });
+  // ── resumeGeneration ────────────────────────────────────────────────────────
+
+  describe('resumeGeneration', () => {
+    it('delegates to resumeGenerationInDb', async () => {
+      const resumed = { id: 1, suite_id: 42 } as any;
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockResolvedValue(resumed);
+
+      await expect(resumeGeneration(42)).resolves.toBe(resumed);
+      expect(generationsRepo.resumeGenerationInDb).toHaveBeenCalledWith(42);
+    });
+
+    it('wraps repository errors in HttpException 500', async () => {
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockRejectedValue(new Error('db down'));
+
+      await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
+    });
   });
 });

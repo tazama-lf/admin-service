@@ -19,11 +19,13 @@ import {
   getLatestGenerationBySuiteId,
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
+  updateWizardProgressInDb,
 } from '../../src/repositories/simulation-studio/suite-generations.repository';
 import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
+  deleteContextTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -33,6 +35,7 @@ import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
+  deleteTriggerTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
   upsertTriggerFieldOverrideInDb,
@@ -313,6 +316,38 @@ describe('getContextTxtpConfigsByGenerationId', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].generation_id).toBe(1);
+  });
+});
+
+describe('deleteContextTxtpConfigInDb', () => {
+  it('returns true when row deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ id: 10 }] } as never);
+    expect(await deleteContextTxtpConfigInDb(10)).toBe(true);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_context_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('returns false when row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteContextTxtpConfigInDb(999)).toBe(false);
+  });
+});
+
+describe('deleteTriggerTxtpConfigInDb', () => {
+  it('returns true when row deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ id: 20 }] } as never);
+    expect(await deleteTriggerTxtpConfigInDb(20)).toBe(true);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_trigger_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('returns false when row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteTriggerTxtpConfigInDb(999)).toBe(false);
   });
 });
 
@@ -925,5 +960,51 @@ describe('getGenerationSummaryFromDb', () => {
 
     expect(result!.associated_rule).toBeNull();
     expect(result!.primary_txtp).toBeNull();
+  });
+});
+
+// ── updateWizardProgressInDb ─────────────────────────────────────────────────
+
+describe('updateWizardProgressInDb', () => {
+  it('updates wizard_snapshot with currentStep and completedSteps array', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+
+    await updateWizardProgressInDb(7, 3, [1, 2, 3]);
+
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('UPDATE trs_suite_generations');
+    expect(callArg.text).toContain('wizard_snapshot');
+    expect(callArg.text).toContain('currentStep');
+    expect(callArg.text).toContain('completedSteps');
+    expect(callArg.values[0]).toBe(3);
+    expect(callArg.values[1]).toBe(JSON.stringify([1, 2, 3]));
+    expect(callArg.values[2]).toBe(7);
+  });
+
+  it('serializes completedSteps array as JSON', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+
+    await updateWizardProgressInDb(7, 5, [1, 2, 3, 4, 5]);
+
+    const callArg = mockDb.mock.calls[0][0] as { values: unknown[] };
+    expect(callArg.values[1]).toBe('[1,2,3,4,5]');
+  });
+
+  it('handles step 1 with single completed step', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+
+    await updateWizardProgressInDb(7, 1, [1]);
+
+    const callArg = mockDb.mock.calls[0][0] as { values: unknown[] };
+    expect(callArg.values[0]).toBe(1);
+    expect(callArg.values[1]).toBe('[1]');
+    expect(callArg.values[2]).toBe(7);
+  });
+
+  it('includes updated_at = NOW() in SET clause', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    await updateWizardProgressInDb(7, 2, [1, 2]);
+    const callArg = mockDb.mock.calls[0][0] as { text: string };
+    expect(callArg.text).toContain('updated_at = NOW()');
   });
 });

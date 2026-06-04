@@ -113,6 +113,29 @@ export const getGenerationsBySuiteId = async (suiteId: number): Promise<SuiteGen
   return result.rows.map(mapRowToGeneration);
 };
 
+export const updateWizardProgressInDb = async (generationId: number, currentStep: number, completedSteps: number[]): Promise<void> => {
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `
+        UPDATE trs_suite_generations
+        SET wizard_snapshot = jsonb_set(
+              jsonb_set(
+                wizard_snapshot,
+                '{currentStep}',
+                $1::jsonb
+              ),
+              '{completedSteps}',
+              $2::jsonb
+            ),
+            updated_at = NOW()
+        WHERE id = $3
+      `,
+      values: [currentStep, JSON.stringify(completedSteps), generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};
+
 export const updateGenerationCountsInDb = async (
   generationId: number,
   counts: { context_count?: number; trigger_count?: number; enrichment_table_count?: number },
@@ -235,6 +258,19 @@ export const getLatestGenerationBySuiteId = async (suiteId: number): Promise<Sui
 
   const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
     { text: query, values: [suiteId] } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (result.rows.length === 0) return null;
+  return mapRowToGeneration(result.rows[0]);
+};
+
+export const resumeGenerationInDb = async (suiteId: number): Promise<SuiteGeneration | null> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: "Select * FROM trs_suite_generations WHERE suite_id = $1 AND status IN ('DRAFT') ORDER BY generation_number DESC LIMIT 1",
+      values: [suiteId],
+    } satisfies PgQueryConfig,
     'simulation',
   );
 

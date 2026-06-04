@@ -92,8 +92,12 @@ import {
   addContextTxtpConfig,
   getContextConfigsWithStrategies,
   bulkUpdateContextConfigs,
+  deleteContextTxtpConfig,
   recalculateGenerationCounts,
   getGenerationSummary,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  resumeGeneration,
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
@@ -2295,8 +2299,9 @@ export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, rep
 export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     loggerService.log('Start - Delete enrichment table');
-    const { tableId: tableIdStr } = req.params as { tableId: string };
+    const { tableId: tableIdStr, generationId: generationIdStr } = req.params as { tableId: string; generationId: string };
     const tableId = parseInt(tableIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
 
     if (isNaN(tableId)) {
       reply.status(400).send({ success: false, message: 'Invalid table ID' });
@@ -2304,6 +2309,7 @@ export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     await deleteEnrichmentTable(tableId);
+    void recalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Enrichment table deleted' });
     loggerService.log('End - Delete enrichment table');
   } catch (err) {
@@ -2336,6 +2342,109 @@ export const getGenerationSummaryHandler = async (req: FastifyRequest, reply: Fa
   } catch (err) {
     loggerService.error(`Failed to retrieve generation summary. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to retrieve generation summary');
+  }
+};
+
+// ── PATCH wizard progress ─────────────────────────────────────────────────────
+
+export const updateWizardProgressHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update wizard progress');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const { current_step_num: currentStepNum, completed_step_num: completedStepNum } = req.body as {
+      current_step_num: number;
+      completed_step_num: number;
+    };
+    if (!currentStepNum || typeof currentStepNum !== 'number') {
+      reply.status(400).send({ success: false, message: 'current_step_num is required' });
+      return;
+    }
+    if (!completedStepNum || typeof completedStepNum !== 'number') {
+      reply.status(400).send({ success: false, message: 'completed_step_num is required' });
+      return;
+    }
+    const completedSteps = Array.from({ length: completedStepNum }, (_, i) => i + 1);
+    await updateWizardProgress(generationId, currentStepNum, completedSteps);
+    reply.status(200).send({ success: true, message: `Step ${currentStepNum} saved, steps 1-${completedStepNum} complete` });
+    loggerService.log('End - Update wizard progress');
+  } catch (err) {
+    loggerService.error(`Failed to update wizard progress. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to update wizard progress');
+  }
+};
+
+// ── DELETE context txtp config ────────────────────────────────────────────────
+
+export const deleteContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete context txtp config');
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
+    const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    await deleteContextTxtpConfig(configId);
+    void recalculateGenerationCounts(generationId);
+    reply.status(200).send({ success: true, message: 'Context txtp config deleted' });
+    loggerService.log('End - Delete context txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to delete context txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete context txtp config');
+  }
+};
+
+// ── DELETE trigger txtp config ────────────────────────────────────────────────
+
+export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete trigger txtp config');
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
+    const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    await deleteTriggerTxtpConfig(configId);
+    void recalculateGenerationCounts(generationId);
+    reply.status(200).send({ success: true, message: 'Trigger txtp config deleted' });
+    loggerService.log('End - Delete trigger txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to delete trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete trigger txtp config');
+  }
+};
+
+export const resumeGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Resume generation');
+    const { suiteId: suiteIdStr } = req.params as { suiteId: string };
+    const suiteId = parseInt(suiteIdStr, 10);
+    if (isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID' });
+      return;
+    }
+    const resumeGenerationResult = await resumeGeneration(suiteId);
+    reply.status(200).send({ success: true, message: 'Generation resumed', data: resumeGenerationResult });
+    loggerService.log('End - Resume generation');
+  } catch (err) {
+    loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to resume generation');
   }
 };
 

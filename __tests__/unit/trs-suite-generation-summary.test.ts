@@ -9,6 +9,11 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   getLatestGenerationBySuiteId: jest.fn(),
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),
+  updateWizardProgressInDb: jest.fn(),
+}));
+
+jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
+  deleteTriggerTxtpConfigInDb: jest.fn(),
 }));
 
 jest.mock('../../src/services/database.logic.service', () => ({
@@ -25,8 +30,14 @@ jest.mock('../../src', () => ({
 
 import { HttpException } from '../../src/utils/error';
 import * as generationsRepo from '../../src/repositories/simulation-studio/suite-generations.repository';
+import * as triggerRepo from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import * as dbService from '../../src/services/database.logic.service';
-import { recalculateGenerationCounts, getGenerationSummary } from '../../src/services/trs-suite-generation.logic.service';
+import {
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+} from '../../src/services/trs-suite-generation.logic.service';
 
 const mockSummary = {
   generation_id: 7,
@@ -134,5 +145,80 @@ describe('getGenerationSummary', () => {
     const err = new HttpException('not found', 404);
     (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(err);
     await expect(getGenerationSummary(7)).rejects.toBe(err);
+  });
+});
+
+// ── updateWizardProgress ──────────────────────────────────────────────────────
+
+describe('updateWizardProgress', () => {
+  it('calls updateWizardProgressInDb with generationId, currentStep and completedSteps', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await updateWizardProgress(7, 3, [1, 2, 3]);
+
+    expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(7, 3, [1, 2, 3]);
+  });
+
+  it('handles step 1 with single completed step', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await updateWizardProgress(7, 1, [1]);
+
+    expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(7, 1, [1]);
+  });
+
+  it('handles multiple completed steps', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await updateWizardProgress(7, 5, [1, 2, 3, 4, 5]);
+
+    expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(7, 5, [1, 2, 3, 4, 5]);
+  });
+
+  it('wraps DB error in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(updateWizardProgress(7, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('not found', 404);
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(err);
+    await expect(updateWizardProgress(7, 2, [1, 2])).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(updateWizardProgress(7, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── deleteTriggerTxtpConfig ───────────────────────────────────────────────────
+
+describe('deleteTriggerTxtpConfig', () => {
+  it('deletes trigger config successfully', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+    await expect(deleteTriggerTxtpConfig(20)).resolves.toBeUndefined();
+    expect(triggerRepo.deleteTriggerTxtpConfigInDb).toHaveBeenCalledWith(20);
+  });
+
+  it('throws 404 when config not found', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
+    await expect(deleteTriggerTxtpConfig(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('wraps DB error in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('forbidden', 403);
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(err);
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toMatchObject({ status: 500 });
   });
 });

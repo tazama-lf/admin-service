@@ -108,6 +108,14 @@ export const updateContextTxtpConfigInDb = async (id: number, dto: UpdateContext
   return result.rows.length ? mapRowToContextConfig(result.rows[0]) : null;
 };
 
+export const deleteContextTxtpConfigInDb = async (id: number): Promise<boolean> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: 'DELETE FROM trs_suite_context_txtp_configs WHERE id = $1 RETURNING id', values: [id] } satisfies PgQueryConfig,
+    'simulation',
+  );
+  return result.rows.length > 0;
+};
+
 export const getContextTxtpConfigsByGenerationId = async (generationId: number): Promise<SuiteContextTxtpConfig[]> => {
   const query = `
     SELECT *

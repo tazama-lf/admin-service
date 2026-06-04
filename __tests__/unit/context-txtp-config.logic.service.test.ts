@@ -6,6 +6,7 @@ jest.mock('../../src/repositories/simulation-studio/context-txtp-configs.reposit
   createContextTxtpConfigInDb: jest.fn(),
   updateContextTxtpConfigInDb: jest.fn(),
   getContextTxtpConfigsByGenerationId: jest.fn(),
+  deleteContextTxtpConfigInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/context-field-strategies.repository', () => ({
@@ -37,6 +38,7 @@ import {
   getContextConfigsWithStrategies,
   bulkUpdateContextConfigs,
   getFieldStrategiesForContextConfig,
+  deleteContextTxtpConfig,
 } from '../../src/services/context-txtp-config.logic.service';
 import type { SuiteContextTxtpConfig, ContextFieldStrategy } from '../../src/interface/suite-generation.interface';
 
@@ -412,5 +414,36 @@ describe('getFieldStrategiesForContextConfig', () => {
   it('wraps non-Error thrown value', async () => {
     (fieldStrategyRepo.getFieldStrategiesByContextConfigId as jest.Mock).mockRejectedValue('string error');
     await expect(getFieldStrategiesForContextConfig(10)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── deleteContextTxtpConfig ───────────────────────────────────────────────────
+
+describe('deleteContextTxtpConfig', () => {
+  it('deletes context config successfully (field strategies cascade via FK)', async () => {
+    (contextConfigRepo.deleteContextTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+    await expect(deleteContextTxtpConfig(10)).resolves.toBeUndefined();
+    expect(contextConfigRepo.deleteContextTxtpConfigInDb).toHaveBeenCalledWith(10);
+  });
+
+  it('throws 404 when config not found', async () => {
+    (contextConfigRepo.deleteContextTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
+    await expect(deleteContextTxtpConfig(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('wraps DB error in HttpException 500', async () => {
+    (contextConfigRepo.deleteContextTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(deleteContextTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('forbidden', 403);
+    (contextConfigRepo.deleteContextTxtpConfigInDb as jest.Mock).mockRejectedValue(err);
+    await expect(deleteContextTxtpConfig(10)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value', async () => {
+    (contextConfigRepo.deleteContextTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(deleteContextTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
   });
 });

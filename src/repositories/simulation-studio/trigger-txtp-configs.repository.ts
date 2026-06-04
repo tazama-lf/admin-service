@@ -132,6 +132,14 @@ export const updateTriggerTxtpConfigInDb = async (id: number, dto: UpdateTrigger
   return result.rows.length ? mapRow(result.rows[0]) : null;
 };
 
+export const deleteTriggerTxtpConfigInDb = async (id: number): Promise<boolean> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: 'DELETE FROM trs_suite_trigger_txtp_configs WHERE id = $1 RETURNING id', values: [id] } satisfies PgQueryConfig,
+    'simulation',
+  );
+  return result.rows.length > 0;
+};
+
 export const getTriggerTxtpConfigsByGenerationId = async (generationId: number): Promise<SuiteTriggerTxtpConfig[]> => {
   const query = `
     SELECT *

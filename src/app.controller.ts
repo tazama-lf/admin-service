@@ -2229,6 +2229,7 @@ export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     const created = await createEnrichmentTable(generationId, tableName, rowCount ?? 1, payloadTemplateJson, schemaTemplateJson);
+    void recalculateGenerationCounts(generationId);
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Create enrichment table');
   } catch (err) {

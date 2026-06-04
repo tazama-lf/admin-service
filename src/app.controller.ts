@@ -92,6 +92,8 @@ import {
   addContextTxtpConfig,
   getContextConfigsWithStrategies,
   bulkUpdateContextConfigs,
+  recalculateGenerationCounts,
+  getGenerationSummary,
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
@@ -2109,6 +2111,7 @@ export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply:
     }
 
     const updated = await bulkUpdateContextConfigs(generationId, items);
+    void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update context txtp configs');
@@ -2185,6 +2188,8 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
     }
 
     const updated = await bulkUpdateTriggerConfigs(generationId, items);
+    void recalculateGenerationCounts(generationId);
+
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update trigger txtp configs');
   } catch (err) {
@@ -2274,6 +2279,8 @@ export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, rep
     }
 
     const updated = await bulkUpdateEnrichmentTables(generationId, items);
+    void recalculateGenerationCounts(generationId);
+
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update enrichment tables');
   } catch (err) {
@@ -2301,6 +2308,33 @@ export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: F
   } catch (err) {
     loggerService.error(`Failed to delete enrichment table. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to delete enrichment table');
+  }
+};
+
+// ── Step 5: GET generation summary ───────────────────────────────────────────
+
+export const getGenerationSummaryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get generation summary');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const summary = await getGenerationSummary(generationId);
+    if (!summary) {
+      reply.status(404).send({ success: false, message: 'Generation not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: summary });
+    loggerService.log('End - Get generation summary');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve generation summary. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve generation summary');
   }
 };
 

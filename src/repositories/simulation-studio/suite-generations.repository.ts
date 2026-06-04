@@ -113,6 +113,117 @@ export const getGenerationsBySuiteId = async (suiteId: number): Promise<SuiteGen
   return result.rows.map(mapRowToGeneration);
 };
 
+export const updateGenerationCountsInDb = async (
+  generationId: number,
+  counts: { context_count?: number; trigger_count?: number; enrichment_table_count?: number },
+): Promise<void> => {
+  const updates: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (counts.context_count !== undefined) {
+    updates.push(`context_count = $${idx++}`);
+    values.push(counts.context_count);
+  }
+  if (counts.trigger_count !== undefined) {
+    updates.push(`trigger_count = $${idx++}`);
+    values.push(counts.trigger_count);
+  }
+  if (counts.enrichment_table_count !== undefined) {
+    updates.push(`enrichment_table_count = $${idx++}`);
+    values.push(counts.enrichment_table_count);
+  }
+
+  if (updates.length === 0) return;
+
+  values.push(generationId);
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `UPDATE trs_suite_generations SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx}`,
+      values,
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};
+
+export interface GenerationSummary {
+  generation_id: number;
+  generation_number: number;
+  status: string;
+  suite_name: string;
+  associated_rule: string | null;
+  primary_txtp: string | null;
+  context_txtp_configs: Array<{ txtp: string; txtp_version: string; message_count: number }>;
+  enrichment_table_names: string[];
+  context_count: number;
+  trigger_count: number;
+  enrichment_table_count: number;
+  iteration_number: number;
+}
+
+export const getGenerationSummaryFromDb = async (generationId: number): Promise<GenerationSummary | null> => {
+  const genResult = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `
+        SELECT
+          g.id AS generation_id,
+          g.generation_number,
+          g.status,
+          g.context_count,
+          g.trigger_count,
+          g.enrichment_table_count,
+          s.name AS suite_name,
+          s.rule_name AS associated_rule,
+          s.primary_txtp,
+          s.iteration_count AS iteration_number
+        FROM trs_suite_generations g
+        JOIN trs_simulation_suites s ON s.id = g.suite_id
+        WHERE g.id = $1
+      `,
+      values: [generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (genResult.rows.length === 0) return null;
+  const [gen] = genResult.rows;
+
+  const ctxResult = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: 'SELECT txtp, txtp_version, message_count FROM trs_suite_context_txtp_configs WHERE generation_id = $1 ORDER BY display_order ASC',
+      values: [generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const enrichResult = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: 'SELECT table_name FROM trs_suite_enrichment_tables WHERE generation_id = $1 ORDER BY table_order ASC',
+      values: [generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return {
+    generation_id: gen.generation_id as number,
+    generation_number: gen.generation_number as number,
+    status: gen.status as string,
+    suite_name: gen.suite_name as string,
+    associated_rule: gen.associated_rule as string | null,
+    primary_txtp: gen.primary_txtp as string | null,
+    context_txtp_configs: ctxResult.rows.map((r) => ({
+      txtp: r.txtp as string,
+      txtp_version: r.txtp_version as string,
+      message_count: r.message_count as number,
+    })),
+    enrichment_table_names: enrichResult.rows.map((r) => r.table_name as string),
+    context_count: gen.context_count as number,
+    trigger_count: gen.trigger_count as number,
+    enrichment_table_count: gen.enrichment_table_count as number,
+    iteration_number: gen.iteration_number as number,
+  };
+};
+
 export const getLatestGenerationBySuiteId = async (suiteId: number): Promise<SuiteGeneration | null> => {
   const query = `
     SELECT *

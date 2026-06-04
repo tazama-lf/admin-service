@@ -17,6 +17,8 @@ import {
   getNextGenerationNumber,
   getGenerationsBySuiteId,
   getLatestGenerationBySuiteId,
+  updateGenerationCountsInDb,
+  getGenerationSummaryFromDb,
 } from '../../src/repositories/simulation-studio/suite-generations.repository';
 import {
   createContextTxtpConfigInDb,
@@ -802,5 +804,126 @@ describe('deleteEnrichmentTableInDb', () => {
   it('returns false when row not found', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await deleteEnrichmentTableInDb(999)).toBe(false);
+  });
+});
+
+// ── updateGenerationCountsInDb ────────────────────────────────────────────────
+
+describe('updateGenerationCountsInDb', () => {
+  it('updates context_count only', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await updateGenerationCountsInDb(1, { context_count: 100 });
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('context_count');
+    expect(callArg.text).not.toContain('trigger_count');
+    expect(callArg.values).toContain(100);
+    expect(callArg.values).toContain(1);
+  });
+
+  it('updates trigger_count only', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await updateGenerationCountsInDb(1, { trigger_count: 10 });
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('trigger_count');
+    expect(callArg.values).toContain(10);
+  });
+
+  it('updates enrichment_table_count only', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await updateGenerationCountsInDb(1, { enrichment_table_count: 3 });
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('enrichment_table_count');
+    expect(callArg.values).toContain(3);
+  });
+
+  it('updates all three counts in one call', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await updateGenerationCountsInDb(7, { context_count: 100, trigger_count: 10, enrichment_table_count: 2 });
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('context_count');
+    expect(callArg.text).toContain('trigger_count');
+    expect(callArg.text).toContain('enrichment_table_count');
+    expect(callArg.values).toContain(7);
+  });
+
+  it('does nothing when counts object is empty', async () => {
+    await updateGenerationCountsInDb(1, {});
+    expect(mockDb).not.toHaveBeenCalled();
+  });
+
+  it('includes updated_at = NOW() in SET clause', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await updateGenerationCountsInDb(1, { context_count: 5 });
+    const callArg = mockDb.mock.calls[0][0] as { text: string };
+    expect(callArg.text).toContain('updated_at = NOW()');
+  });
+});
+
+// ── getGenerationSummaryFromDb ────────────────────────────────────────────────
+
+describe('getGenerationSummaryFromDb', () => {
+  const summaryGenRow = {
+    generation_id: 7,
+    generation_number: 1,
+    status: 'DRAFT',
+    context_count: 100,
+    trigger_count: 10,
+    enrichment_table_count: 1,
+    suite_name: 'Q3 Edge Cases',
+    associated_rule: 'Rule 001',
+    primary_txtp: 'pacs.008',
+    iteration_number: 0,
+  };
+
+  it('returns null when generation not found', async () => {
+    mockDb.mockResolvedValueOnce({ rows: [] } as never);
+    const result = await getGenerationSummaryFromDb(999);
+    expect(result).toBeNull();
+  });
+
+  it('returns summary with context configs and enrichment table names', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [summaryGenRow] } as never)
+      .mockResolvedValueOnce({ rows: [{ txtp: 'pacs.008', txtp_version: '001.08', message_count: 100 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ table_name: 'account_enrichment' }] } as never);
+
+    const result = await getGenerationSummaryFromDb(7);
+
+    expect(result).not.toBeNull();
+    expect(result!.generation_id).toBe(7);
+    expect(result!.suite_name).toBe('Q3 Edge Cases');
+    expect(result!.associated_rule).toBe('Rule 001');
+    expect(result!.primary_txtp).toBe('pacs.008');
+    expect(result!.context_txtp_configs).toHaveLength(1);
+    expect(result!.context_txtp_configs[0]).toEqual({ txtp: 'pacs.008', txtp_version: '001.08', message_count: 100 });
+    expect(result!.enrichment_table_names).toEqual(['account_enrichment']);
+    expect(result!.context_count).toBe(100);
+    expect(result!.trigger_count).toBe(10);
+    expect(result!.enrichment_table_count).toBe(1);
+  });
+
+  it('returns empty arrays when no context configs or enrichment tables', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [summaryGenRow] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const result = await getGenerationSummaryFromDb(7);
+
+    expect(result!.context_txtp_configs).toEqual([]);
+    expect(result!.enrichment_table_names).toEqual([]);
+  });
+
+  it('handles null associated_rule and primary_txtp', async () => {
+    const rowNoRule = { ...summaryGenRow, associated_rule: null, primary_txtp: null };
+    mockDb
+      .mockResolvedValueOnce({ rows: [rowNoRule] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const result = await getGenerationSummaryFromDb(7);
+
+    expect(result!.associated_rule).toBeNull();
+    expect(result!.primary_txtp).toBeNull();
   });
 });

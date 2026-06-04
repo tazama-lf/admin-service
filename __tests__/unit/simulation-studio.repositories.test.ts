@@ -25,6 +25,7 @@ import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
+  deleteContextTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -34,6 +35,7 @@ import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
+  deleteTriggerTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
   upsertTriggerFieldOverrideInDb,
@@ -314,6 +316,38 @@ describe('getContextTxtpConfigsByGenerationId', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].generation_id).toBe(1);
+  });
+});
+
+describe('deleteContextTxtpConfigInDb', () => {
+  it('returns true when row deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ id: 10 }] } as never);
+    expect(await deleteContextTxtpConfigInDb(10)).toBe(true);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_context_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('returns false when row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteContextTxtpConfigInDb(999)).toBe(false);
+  });
+});
+
+describe('deleteTriggerTxtpConfigInDb', () => {
+  it('returns true when row deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ id: 20 }] } as never);
+    expect(await deleteTriggerTxtpConfigInDb(20)).toBe(true);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_trigger_txtp_configs') }),
+      'simulation',
+    );
+  });
+
+  it('returns false when row not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteTriggerTxtpConfigInDb(999)).toBe(false);
   });
 });
 

@@ -30,11 +30,13 @@ jest.mock('../../src', () => ({
 
 import { HttpException } from '../../src/utils/error';
 import * as generationsRepo from '../../src/repositories/simulation-studio/suite-generations.repository';
+import * as triggerRepo from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import * as dbService from '../../src/services/database.logic.service';
 import {
   recalculateGenerationCounts,
   getGenerationSummary,
   updateWizardProgress,
+  deleteTriggerTxtpConfig,
 } from '../../src/services/trs-suite-generation.logic.service';
 
 const mockSummary = {
@@ -187,5 +189,36 @@ describe('updateWizardProgress', () => {
   it('wraps non-Error thrown value in HttpException 500', async () => {
     (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue('string error');
     await expect(updateWizardProgress(7, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── deleteTriggerTxtpConfig ───────────────────────────────────────────────────
+
+describe('deleteTriggerTxtpConfig', () => {
+  it('deletes trigger config successfully', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+    await expect(deleteTriggerTxtpConfig(20)).resolves.toBeUndefined();
+    expect(triggerRepo.deleteTriggerTxtpConfigInDb).toHaveBeenCalledWith(20);
+  });
+
+  it('throws 404 when config not found', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
+    await expect(deleteTriggerTxtpConfig(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('wraps DB error in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('forbidden', 403);
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(err);
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(deleteTriggerTxtpConfig(20)).rejects.toMatchObject({ status: 500 });
   });
 });

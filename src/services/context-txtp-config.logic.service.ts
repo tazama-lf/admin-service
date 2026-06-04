@@ -9,6 +9,7 @@ import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
+  deleteContextTxtpConfigInDb,
 } from '../repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -198,6 +199,21 @@ export const bulkUpdateContextConfigs = async (
     if (error instanceof HttpException) throw error;
     throw new HttpException(
       `Failed to bulk update context configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+// ── Delete context txtp config ───────────────────────────────────────────────
+
+export const deleteContextTxtpConfig = async (configId: number): Promise<void> => {
+  try {
+    const deleted = await deleteContextTxtpConfigInDb(configId);
+    if (!deleted) throw new HttpException(`Context txtp config ${configId} not found`, HttpStatus.NOT_FOUND);
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to delete context txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

@@ -91,6 +91,9 @@ import {
   bulkUpdateEnrichmentTablesHandler,
   deleteEnrichmentTableHandler,
   getGenerationSummaryHandler,
+  updateWizardProgressHandler,
+  deleteContextTxtpConfigHandler,
+  deleteTriggerTxtpConfigHandler,
   getAllSimulationsHandler,
   createTrsSimulationHandler,
   getSimulationStatsHandler,
@@ -195,6 +198,9 @@ const routePrivilege = {
   bulkUpdateEnrichmentTables: ['editor', 'approver'],
   deleteEnrichmentTable: ['editor', 'approver'],
   getGenerationSummary: ['editor', 'approver'],
+  updateWizardProgress: ['editor', 'approver'],
+  deleteContextTxtpConfig: ['editor', 'approver'],
+  deleteTriggerTxtpConfig: ['editor', 'approver'],
   getSimulations: ['editor', 'approver'],
   createSimulation: ['editor', 'approver'],
   getSimulationStats: ['editor', 'approver'],
@@ -533,7 +539,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getSimulationLogsHandler, routePrivilege.getSimulationLogs),
   });
 
-  // Simulation Studio
+  //---------------------------------------- Simulation Studio ---------------------------------------------
 
   fastify.post('/v1/admin/trs/simulation-studio/suites', {
     ...SetOptionsBodyAndParams(createSimulationHandler, routePrivilege.createSimulationSuites),
@@ -598,6 +604,20 @@ function Routes(fastify: FastifyInstance): void {
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/summary', {
     ...SetOptionsBodyAndParams(getGenerationSummaryHandler, routePrivilege.getGenerationSummary),
   });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/wizard-progress', {
+    ...SetOptionsBodyAndParams(updateWizardProgressHandler, routePrivilege.updateWizardProgress),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs/:configId', {
+    ...SetOptionsBodyAndParams(deleteContextTxtpConfigHandler, routePrivilege.deleteContextTxtpConfig),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs/:configId', {
+    ...SetOptionsBodyAndParams(deleteTriggerTxtpConfigHandler, routePrivilege.deleteTriggerTxtpConfig),
+  });
+
+  //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------
 
   fastify.get('/v1/admin/simulation/messages', {
     ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),

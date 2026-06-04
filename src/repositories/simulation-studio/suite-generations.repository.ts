@@ -113,6 +113,29 @@ export const getGenerationsBySuiteId = async (suiteId: number): Promise<SuiteGen
   return result.rows.map(mapRowToGeneration);
 };
 
+export const updateWizardProgressInDb = async (generationId: number, currentStep: number, completedSteps: number[]): Promise<void> => {
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `
+        UPDATE trs_suite_generations
+        SET wizard_snapshot = jsonb_set(
+              jsonb_set(
+                wizard_snapshot,
+                '{currentStep}',
+                $1::jsonb
+              ),
+              '{completedSteps}',
+              $2::jsonb
+            ),
+            updated_at = NOW()
+        WHERE id = $3
+      `,
+      values: [currentStep, JSON.stringify(completedSteps), generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};
+
 export const updateGenerationCountsInDb = async (
   generationId: number,
   counts: { context_count?: number; trigger_count?: number; enrichment_table_count?: number },

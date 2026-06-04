@@ -2085,6 +2085,7 @@ export const addContextTxtpConfigHandler = async (req: FastifyRequest, reply: Fa
 
     const dto = req.body as AddContextTxtpConfigDto;
     const created = await addContextTxtpConfig(generationId, dto, tenantId);
+    void recalculateGenerationCounts(generationId);
 
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Add context txtp config');
@@ -2114,7 +2115,7 @@ export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply:
     }
 
     const updated = await bulkUpdateContextConfigs(generationId, items);
-    void recalculateGenerationCounts(generationId);
+    // void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update context txtp configs');
@@ -2162,6 +2163,7 @@ export const addTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: Fa
 
     const dto = req.body as AddTriggerTxtpConfigDto;
     const created = await addTriggerTxtpConfig(generationId, dto, tenantId);
+    void recalculateGenerationCounts(generationId);
 
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Add trigger txtp config');
@@ -2191,7 +2193,6 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
     }
 
     const updated = await bulkUpdateTriggerConfigs(generationId, items);
-    void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update trigger txtp configs');
@@ -2232,6 +2233,7 @@ export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     const created = await createEnrichmentTable(generationId, tableName, rowCount ?? 1, payloadTemplateJson, schemaTemplateJson);
+    void recalculateGenerationCounts(generationId);
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Create enrichment table');
   } catch (err) {
@@ -2282,7 +2284,6 @@ export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, rep
     }
 
     const updated = await bulkUpdateEnrichmentTables(generationId, items);
-    void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update enrichment tables');

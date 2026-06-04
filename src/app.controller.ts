@@ -97,6 +97,7 @@ import {
   getGenerationSummary,
   updateWizardProgress,
   deleteTriggerTxtpConfig,
+  resumeGeneration,
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
@@ -2426,6 +2427,24 @@ export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply:
   } catch (err) {
     loggerService.error(`Failed to delete trigger txtp config. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to delete trigger txtp config');
+  }
+};
+
+export const resumeGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Resume generation');
+    const { suiteId: suiteIdStr } = req.params as { suiteId: string };
+    const suiteId = parseInt(suiteIdStr, 10);
+    if (isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID' });
+      return;
+    }
+    const resumeGenerationResult = await resumeGeneration(suiteId);
+    reply.status(200).send({ success: true, message: 'Generation resumed', data: resumeGenerationResult });
+    loggerService.log('End - Resume generation');
+  } catch (err) {
+    loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to resume generation');
   }
 };
 

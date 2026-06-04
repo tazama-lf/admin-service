@@ -264,3 +264,16 @@ export const getLatestGenerationBySuiteId = async (suiteId: number): Promise<Sui
   if (result.rows.length === 0) return null;
   return mapRowToGeneration(result.rows[0]);
 };
+
+export const resumeGenerationInDb = async (suiteId: number): Promise<SuiteGeneration | null> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: "Select * FROM trs_suite_generations WHERE suite_id = $1 AND status IN ('DRAFT') ORDER BY generation_number DESC LIMIT 1",
+      values: [suiteId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (result.rows.length === 0) return null;
+  return mapRowToGeneration(result.rows[0]);
+};

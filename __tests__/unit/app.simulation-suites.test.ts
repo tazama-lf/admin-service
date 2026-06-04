@@ -10,6 +10,10 @@ jest.mock('../../src/services/simulation-suites.logic.service', () => ({
   updateSimulationSuite: jest.fn(),
 }));
 
+jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
+  resumeGeneration: jest.fn(),
+}));
+
 jest.mock('../../src/handlers/errorHandler', () => ({
   ErrorHandler: {
     sendError: jest.fn(),
@@ -29,8 +33,10 @@ import {
   getSimulationsHandler,
   getSimulationByIdHandler,
   updateSimulationHandler,
+  resumeGenerationHandler,
 } from '../../src/app.controller';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
+import * as trsSuiteGenerationService from '../../src/services/trs-suite-generation.logic.service';
 import { ErrorHandler } from '../../src/handlers/errorHandler';
 
 describe('Simulation Suites API Handlers', () => {
@@ -258,6 +264,55 @@ describe('Simulation Suites API Handlers', () => {
       await updateSimulationHandler(req, reply as FastifyReply);
 
       expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to update simulation suite');
+    });
+  });
+
+  describe('resumeGenerationHandler', () => {
+    it('should return 400 for invalid suiteId', async () => {
+      const req = {
+        params: { suiteId: 'abc' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await resumeGenerationHandler(req, reply as FastifyReply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid suite ID' });
+      expect(trsSuiteGenerationService.resumeGeneration).not.toHaveBeenCalled();
+    });
+
+    it('should resume generation and return 200', async () => {
+      const resumeResult = {
+        generation_id: 10,
+        generation_number: 2,
+        status: 'IN_PROGRESS',
+      };
+      (trsSuiteGenerationService.resumeGeneration as jest.Mock).mockResolvedValue(resumeResult);
+
+      const req = {
+        params: { suiteId: '101' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await resumeGenerationHandler(req, reply as FastifyReply);
+
+      expect(trsSuiteGenerationService.resumeGeneration).toHaveBeenCalledWith(101);
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith({ success: true, message: 'Generation resumed', data: resumeResult });
+    });
+
+    it('should delegate errors to ErrorHandler', async () => {
+      const error = new Error('Resume failed');
+      (trsSuiteGenerationService.resumeGeneration as jest.Mock).mockRejectedValue(error);
+
+      const req = {
+        params: { suiteId: '101' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await resumeGenerationHandler(req, reply as FastifyReply);
+
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to resume generation');
     });
   });
 });

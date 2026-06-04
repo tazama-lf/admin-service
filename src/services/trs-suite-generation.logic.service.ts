@@ -10,6 +10,7 @@ import {
   getGenerationSummaryFromDb,
   updateWizardProgressInDb,
   type GenerationSummary,
+  resumeGenerationInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
@@ -162,6 +163,17 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
   } catch (error) {
     throw new HttpException(
       `Failed to retrieve latest generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
+  try {
+    return await resumeGenerationInDb(suiteId);
+  } catch (error) {
+    throw new HttpException(
+      `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

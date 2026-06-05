@@ -1,20 +1,20 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 
-export interface FakerSymmetricDataType {
+export interface FakerSemanticDataType {
   id: number;
   name: string;
 }
 
-const mapRow = (row: Record<string, unknown>): FakerSymmetricDataType => ({
+const mapRow = (row: Record<string, unknown>): FakerSemanticDataType => ({
   id: row.id as number,
   name: row.name as string,
 });
 
-export const getFakerSymmetricDataFromDb = async (): Promise<FakerSymmetricDataType[]> => {
+export const getFakerSemanticDataFromDb = async (): Promise<FakerSemanticDataType[]> => {
   const query = `
         SELECT id, name
-        FROM trs_faker_symmetric_data_types
+        FROM trs_faker_semantic_data_types
         ORDER BY id ASC
     `;
 

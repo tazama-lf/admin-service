@@ -1,13 +1,13 @@
-import { getFakerSymmetricDataFromDb, type FakerSymmetricDataType } from '../repositories/simulation-studio/faker-semantic-data.repository';
+import { getFakerSemanticDataFromDb, type FakerSemanticDataType } from '../repositories/simulation-studio/faker-semantic-data.repository';
 
 import { HttpException, HttpStatus } from '../utils/error';
 
-export const getFakerSymmetricData = async (): Promise<FakerSymmetricDataType[]> => {
+export const getFakerSemanticData = async (): Promise<FakerSemanticDataType[]> => {
   try {
-    return await getFakerSymmetricDataFromDb();
+    return await getFakerSemanticDataFromDb();
   } catch (error) {
     throw new HttpException(
-      `Failed to get faker symmetric data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      `Failed to get faker semantic data: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

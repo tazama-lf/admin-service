@@ -140,7 +140,7 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
-import { getFakerSymmetricData } from './services/faker-semantic-data.logic.service';
+import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -2449,15 +2449,15 @@ export const resumeGenerationHandler = async (req: FastifyRequest, reply: Fastif
   }
 };
 
-export const getFakerSymmetricDataHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const getFakerSemanticDataHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
-    loggerService.log('Start - Get faker symmetric data');
-    const data = await getFakerSymmetricData();
+    loggerService.log('Start - Get faker semantic data');
+    const data = await getFakerSemanticData();
     reply.status(200).send({ success: true, data });
-    loggerService.log('End - Get faker symmetric data');
+    loggerService.log('End - Get faker semantic data');
   } catch (err) {
-    loggerService.error(`Failed to get faker symmetric data. \n${util.inspect(err)}`);
-    ErrorHandler.sendError(reply, err, 'Failed to get faker symmetric data');
+    loggerService.error(`Failed to get faker semantic data. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get faker semantic data');
   }
 };
 

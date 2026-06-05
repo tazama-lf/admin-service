@@ -20,6 +20,8 @@ import {
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
   updateWizardProgressInDb,
+  getGenerationByIdFromDb,
+  cloneGenerationDataInDb,
 } from '../../src/repositories/simulation-studio/suite-generations.repository';
 import {
   createContextTxtpConfigInDb,
@@ -1006,5 +1008,102 @@ describe('updateWizardProgressInDb', () => {
     await updateWizardProgressInDb(7, 2, [1, 2]);
     const callArg = mockDb.mock.calls[0][0] as { text: string };
     expect(callArg.text).toContain('updated_at = NOW()');
+  });
+});
+
+// ── getGenerationByIdFromDb ───────────────────────────────────────────────────
+
+describe('getGenerationByIdFromDb', () => {
+  it('returns mapped generation when found', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] } as never);
+    const result = await getGenerationByIdFromDb(1);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('SELECT * FROM trs_suite_generations WHERE id = $1') }),
+      'simulation',
+    );
+  });
+
+  it('returns null when not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await getGenerationByIdFromDb(999)).toBeNull();
+  });
+});
+
+// ── cloneGenerationDataInDb ───────────────────────────────────────────────────
+
+describe('cloneGenerationDataInDb', () => {
+  it('inserts new generation row with target suite id and generation number', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99, suite_id: 5, generation_number: 2 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const result = await cloneGenerationDataInDb(1, 5, 2, 'user-1', 'user@test.com');
+
+    expect(result.id).toBe(99);
+    expect(result.suite_id).toBe(5);
+    expect(result.generation_number).toBe(2);
+    // First DB call inserts into trs_suite_generations
+    const firstCall = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(firstCall.text).toContain('INSERT INTO trs_suite_generations');
+    expect(firstCall.values[0]).toBe(5); // targetSuiteId
+    expect(firstCall.values[1]).toBe(2); // targetGenerationNumber
+    expect(firstCall.values[2]).toBe('user-1');
+  });
+
+  it('clones context txtp configs and their field strategies', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ old_id: 10, new_id: 20 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    // Second call = context txtp clone WITH/SELECT
+    const ctxCall = mockDb.mock.calls[1][0] as { text: string };
+    expect(ctxCall.text).toContain('trs_suite_context_txtp_configs');
+
+    // Third call = field strategy insert for mapped config
+    const fsCall = mockDb.mock.calls[2][0] as { text: string; values: unknown[] };
+    expect(fsCall.text).toContain('trs_suite_context_field_strategies');
+    expect(fsCall.values[0]).toBe(20); // newId
+    expect(fsCall.values[1]).toBe(10); // oldId
+  });
+
+  it('clones trigger txtp configs and their field overrides', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ old_id: 30, new_id: 40 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    const trigCall = mockDb.mock.calls[2][0] as { text: string };
+    expect(trigCall.text).toContain('trs_suite_trigger_txtp_configs');
+
+    const overrideCall = mockDb.mock.calls[3][0] as { text: string; values: unknown[] };
+    expect(overrideCall.text).toContain('trs_suite_trigger_field_overrides');
+    expect(overrideCall.values[0]).toBe(40);
+    expect(overrideCall.values[1]).toBe(30);
+  });
+
+  it('clones enrichment tables', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    const enrichCall = mockDb.mock.calls[3][0] as { text: string };
+    expect(enrichCall.text).toContain('trs_suite_enrichment_tables');
   });
 });

@@ -91,6 +91,8 @@ import {
   bulkUpdateEnrichmentTablesHandler,
   deleteEnrichmentTableHandler,
   getGenerationSummaryHandler,
+  cloneGenerationHandler,
+  cloneSuiteHandler,
   updateWizardProgressHandler,
   deleteContextTxtpConfigHandler,
   deleteTriggerTxtpConfigHandler,
@@ -199,6 +201,8 @@ const routePrivilege = {
   bulkUpdateEnrichmentTables: ['editor', 'approver'],
   deleteEnrichmentTable: ['editor', 'approver'],
   getGenerationSummary: ['editor', 'approver'],
+  cloneGeneration: ['editor', 'approver'],
+  cloneSuite: ['editor', 'approver'],
   updateWizardProgress: ['editor', 'approver'],
   deleteContextTxtpConfig: ['editor', 'approver'],
   deleteTriggerTxtpConfig: ['editor', 'approver'],
@@ -208,6 +212,7 @@ const routePrivilege = {
   getSimulationResults: ['editor', 'approver'],
   saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
   resumeGeneration: ['editor', 'approver'],
+  getFakerSemanticData: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -609,6 +614,14 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/wizard-progress', {
     ...SetOptionsBodyAndParams(updateWizardProgressHandler, routePrivilege.updateWizardProgress),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/generations/:id/clone', {
+    ...SetOptionsBodyAndParams(cloneGenerationHandler, routePrivilege.cloneGeneration),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/suites/:id/clone', {
+    ...SetOptionsBodyAndParams(cloneSuiteHandler, routePrivilege.cloneSuite),
   });
 
   fastify.delete('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs/:configId', {

@@ -9,6 +9,7 @@ jest.mock('../../src/services/simulation-suites.logic.service', () => ({
   getSimulationSuitesCounts: jest.fn(),
   getSimulationSuiteById: jest.fn(),
   updateSimulationSuite: jest.fn(),
+  cloneSuite: jest.fn(),
 }));
 
 jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
@@ -38,6 +39,7 @@ import {
   updateSimulationHandler,
   resumeGenerationHandler,
   updateGenerationStatusHandler,
+  cloneSuiteHandler,
 } from '../../src/app.controller';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as trsSuiteGenerationService from '../../src/services/trs-suite-generation.logic.service';
@@ -439,6 +441,108 @@ describe('Simulation Suites API Handlers', () => {
       await updateGenerationStatusHandler(req, reply as FastifyReply);
 
       expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to update generation status');
+    });
+  });
+
+  describe('cloneSuiteHandler', () => {
+    it('should return 400 for invalid suiteId', async () => {
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: 'xyz' },
+        user: { clientId: 'client-001', preferred_username: 'user@test.com' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await cloneSuiteHandler(req, reply as FastifyReply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid suite ID' });
+      expect(simulationSuitesService.cloneSuite).not.toHaveBeenCalled();
+    });
+
+    it('should clone suite and return 201', async () => {
+      const clonedResult = {
+        original_suite_id: 101,
+        cloned_suite_id: 102,
+        original_generation_id: 1,
+        cloned_generation_id: 2,
+      };
+      (simulationSuitesService.cloneSuite as jest.Mock).mockResolvedValue(clonedResult);
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+        user: {
+          clientId: 'client-001',
+          preferred_username: 'cloner@test.com',
+        },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await cloneSuiteHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.cloneSuite).toHaveBeenCalledWith(101, mockTenantId, 'client-001', 'cloner@test.com');
+      expect(reply.status).toHaveBeenCalledWith(201);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: clonedResult,
+        }),
+      );
+    });
+
+    it('should work without userEmail', async () => {
+      const clonedResult = {
+        original_suite_id: 101,
+        cloned_suite_id: 103,
+        original_generation_id: 1,
+        cloned_generation_id: 3,
+      };
+      (simulationSuitesService.cloneSuite as jest.Mock).mockResolvedValue(clonedResult);
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+        user: {
+          clientId: 'client-002',
+        },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await cloneSuiteHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.cloneSuite).toHaveBeenCalledWith(101, mockTenantId, 'client-002', undefined);
+      expect(reply.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should delegate errors to ErrorHandler', async () => {
+      const error = new Error('Clone failed');
+      (simulationSuitesService.cloneSuite as jest.Mock).mockRejectedValue(error);
+
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '101' },
+        user: { clientId: 'client-001' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await cloneSuiteHandler(req, reply as FastifyReply);
+
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to clone suite');
+    });
+
+    it('should handle zero as invalid suiteId', async () => {
+      const req = {
+        tenantId: mockTenantId,
+        params: { id: '0' },
+        user: { clientId: 'client-001' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await cloneSuiteHandler(req, reply as FastifyReply);
+
+      // 0 parses successfully, so it will try to call cloneSuite
+      expect(simulationSuitesService.cloneSuite).toHaveBeenCalledWith(0, mockTenantId, 'client-001', undefined);
     });
   });
 });

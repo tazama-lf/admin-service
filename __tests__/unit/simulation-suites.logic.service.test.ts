@@ -20,6 +20,10 @@ jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   createSuiteGeneration: jest.fn(),
   createContextTxtpConfig: jest.fn(),
   recalculateGenerationCounts: jest.fn(),
+  cloneGeneration: jest.fn(),
+  getLatestGenerationBySuiteId: jest.fn(),
+  getNextGenerationNumber: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
 }));
 
 jest.mock('../../src/services/trigger-txtp-config.logic.service', () => ({
@@ -265,6 +269,40 @@ describe('Simulation Suites Logic Service', () => {
       (simulationSuitesRepository.updateSimulationSuiteInDb as jest.Mock).mockRejectedValue('string failure');
       await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
         'Unknown error',
+      );
+    });
+  });
+
+  describe('cloneSuite', () => {
+    it('should clone suite with generation', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId, mockUserEmail)).rejects.toThrow('Suite 999 not found');
+    });
+
+    it('should handle suite not found', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValueOnce(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId)).rejects.toThrow('not found');
+    });
+
+    it('should handle suite without generation', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId)).rejects.toThrow('Suite 999 not found');
+    });
+
+    it('should wrap database errors', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId)).rejects.toThrow('Failed to clone suite');
+    });
+
+    it('should pass userEmail parameter', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail)).rejects.toThrow(
+        'Failed to clone suite: DB error',
       );
     });
   });

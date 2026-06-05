@@ -9,8 +9,9 @@ import {
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
   updateWizardProgressInDb,
+  getGenerationByIdFromDb,
+  cloneGenerationDataInDb,
   type GenerationSummary,
-  resumeGenerationInDb,
   updateGenerationStatusInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
@@ -171,7 +172,7 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
 
 export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
   try {
-    return await resumeGenerationInDb(suiteId);
+    return await getLatestGenerationBySuiteId(suiteId);
   } catch (error) {
     throw new HttpException(
       `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -197,6 +198,28 @@ export const updateGenerationStatus = async (generationId: number, status: strin
     if (error instanceof HttpException) throw error;
     throw new HttpException(
       `Failed to update generation status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+// ── Clone generation ──────────────────────────────────────────────────────────
+
+/**
+ * Clones an existing generation (all child data) into a new generation under the
+ * same suite. New generation number = current max + 1.
+ * Shared by cloneSuite too.
+ */
+export const cloneGeneration = async (sourceGenerationId: number, userId: string, userEmail?: string): Promise<SuiteGeneration> => {
+  try {
+    const source = await getGenerationByIdFromDb(sourceGenerationId);
+    if (!source) throw new HttpException(`Generation ${sourceGenerationId} not found`, HttpStatus.NOT_FOUND);
+    const nextNum = await getNextGenerationNumber(source.suite_id);
+    return await cloneGenerationDataInDb(sourceGenerationId, source.suite_id, nextNum, userId, userEmail);
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to clone generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

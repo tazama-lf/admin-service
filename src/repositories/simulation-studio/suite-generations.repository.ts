@@ -113,6 +113,187 @@ export const getGenerationsBySuiteId = async (suiteId: number): Promise<SuiteGen
   return result.rows.map(mapRowToGeneration);
 };
 
+export const getGenerationByIdFromDb = async (generationId: number): Promise<SuiteGeneration | null> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: 'SELECT * FROM trs_suite_generations WHERE id = $1', values: [generationId] } satisfies PgQueryConfig,
+    'simulation',
+  );
+  if (result.rows.length === 0) return null;
+  return mapRowToGeneration(result.rows[0]);
+};
+
+/**
+ * Clones a generation (and all its child data) into a new generation under targetSuiteId.
+ * Copies: context_txtp_configs + field_strategies, trigger_txtp_configs + field_overrides,
+ * enrichment_tables. Returns the new generation.
+ *
+ * Shared by both cloneGeneration and cloneSuite.
+ */
+export const cloneGenerationDataInDb = async (
+  sourceGenerationId: number,
+  targetSuiteId: number,
+  targetGenerationNumber: number,
+  userId: string,
+  userEmail?: string,
+): Promise<SuiteGeneration> => {
+  // 1. Clone the generation row
+  const newGenResult = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `
+        INSERT INTO trs_suite_generations (
+          suite_id, generation_number, status, simulation_type,
+          rule_repo, rule_version,
+          context_count, trigger_count, enrichment_table_count,
+          generated_context_count, generated_trigger_count, generated_enrichment_row_count,
+          context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
+          wizard_snapshot, generation_metadata, created_by, created_by_email, created_at, updated_at
+        )
+        SELECT
+          $1, $2, 'DRAFT', simulation_type,
+          rule_repo, rule_version,
+          context_count, trigger_count, enrichment_table_count,
+          0, 0, 0,
+          context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
+          wizard_snapshot, generation_metadata, $3, $4, NOW(), NOW()
+        FROM trs_suite_generations WHERE id = $5
+        RETURNING *
+      `,
+      values: [targetSuiteId, targetGenerationNumber, userId, userEmail ?? null, sourceGenerationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+  const newGen = mapRowToGeneration(newGenResult.rows[0]);
+
+  // 2. Clone context txtp configs and their field strategies
+  const ctxRows = await handlePostExecuteSqlStatement<{ old_id: number; new_id: number }>(
+    {
+      text: `
+        WITH inserted AS (
+          INSERT INTO trs_suite_context_txtp_configs (
+            generation_id, txtp, txtp_version, display_order, message_count,
+            schema_snapshot, sample_payload_snapshot, faker_seed, generator_profile, created_at
+          )
+          SELECT $1, txtp, txtp_version, display_order, message_count,
+                 schema_snapshot, sample_payload_snapshot, faker_seed, generator_profile, NOW()
+          FROM trs_suite_context_txtp_configs WHERE generation_id = $2
+          RETURNING id
+        ),
+        source AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY display_order ASC) AS rn
+          FROM trs_suite_context_txtp_configs WHERE generation_id = $2
+        ),
+        target AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
+        )
+        SELECT source.id AS old_id, target.id AS new_id
+        FROM source JOIN target ON source.rn = target.rn
+      `,
+      values: [newGen.id, sourceGenerationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (ctxRows.rows.length > 0) {
+    await Promise.all(
+      ctxRows.rows.map(async ({ old_id: oldId, new_id: newId }) => {
+        await handlePostExecuteSqlStatement<Record<string, unknown>>(
+          {
+            text: `
+              INSERT INTO trs_suite_context_field_strategies (
+                context_txtp_config_id, field_path, strategy_code,
+                static_value, range_min, range_max,
+                generator_type, generator_options, is_required_override, created_at
+              )
+              SELECT $1, field_path, strategy_code,
+                     static_value, range_min, range_max,
+                     generator_type, generator_options, is_required_override, NOW()
+              FROM trs_suite_context_field_strategies WHERE context_txtp_config_id = $2
+            `,
+            values: [newId, oldId],
+          } satisfies PgQueryConfig,
+          'simulation',
+        );
+      }),
+    );
+  }
+
+  // 3. Clone trigger txtp configs and their field overrides
+  const trigRows = await handlePostExecuteSqlStatement<{ old_id: number; new_id: number }>(
+    {
+      text: `
+        WITH inserted AS (
+          INSERT INTO trs_suite_trigger_txtp_configs (
+            generation_id, txtp, txtp_version, display_order, message_count,
+            payload_template_json, link_to_context_pairs,
+            expected_independent_variable, expected_result_band, notes,
+            faker_seed, generator_profile, created_at
+          )
+          SELECT $1, txtp, txtp_version, display_order, message_count,
+                 payload_template_json, link_to_context_pairs,
+                 expected_independent_variable, expected_result_band, notes,
+                 faker_seed, generator_profile, NOW()
+          FROM trs_suite_trigger_txtp_configs WHERE generation_id = $2
+          RETURNING id
+        ),
+        source AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY display_order ASC) AS rn
+          FROM trs_suite_trigger_txtp_configs WHERE generation_id = $2
+        ),
+        target AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
+        )
+        SELECT source.id AS old_id, target.id AS new_id
+        FROM source JOIN target ON source.rn = target.rn
+      `,
+      values: [newGen.id, sourceGenerationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (trigRows.rows.length > 0) {
+    await Promise.all(
+      trigRows.rows.map(async ({ old_id: oldId, new_id: newId }) => {
+        await handlePostExecuteSqlStatement<Record<string, unknown>>(
+          {
+            text: `
+              INSERT INTO trs_suite_trigger_field_overrides (
+                trigger_txtp_config_id, field_path, override_type,
+                static_value, range_min, range_max,
+                generator_type, generator_options, created_at
+              )
+              SELECT $1, field_path, override_type,
+                     static_value, range_min, range_max,
+                     generator_type, generator_options, NOW()
+              FROM trs_suite_trigger_field_overrides WHERE trigger_txtp_config_id = $2
+            `,
+            values: [newId, oldId],
+          } satisfies PgQueryConfig,
+          'simulation',
+        );
+      }),
+    );
+  }
+
+  // 4. Clone enrichment tables
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: `
+        INSERT INTO trs_suite_enrichment_tables (
+          generation_id, table_name, table_order, row_count,
+          payload_template_json, schema_template_json, faker_profile, created_at
+        )
+        SELECT $1, table_name, table_order, row_count,
+               payload_template_json, schema_template_json, faker_profile, NOW()
+        FROM trs_suite_enrichment_tables WHERE generation_id = $2
+      `,
+      values: [newGen.id, sourceGenerationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return newGen;
+};
+
 export const updateWizardProgressInDb = async (generationId: number, currentStep: number, completedSteps: number[]): Promise<void> => {
   await handlePostExecuteSqlStatement<Record<string, unknown>>(
     {

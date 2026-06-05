@@ -12,6 +12,8 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),
   updateGenerationStatusInDb: jest.fn(),
+  getGenerationByIdFromDb: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
@@ -259,17 +261,21 @@ describe('getLatestGenerationForSuite', () => {
   // ── resumeGeneration ────────────────────────────────────────────────────────
 
   describe('resumeGeneration', () => {
-    it('delegates to resumeGenerationInDb', async () => {
+    it('returns latest generation for suite', async () => {
       const resumed = { id: 1, suite_id: 42 } as any;
-      (generationsRepo.resumeGenerationInDb as jest.Mock).mockResolvedValue(resumed);
+      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(resumed as never);
 
       await expect(resumeGeneration(42)).resolves.toBe(resumed);
-      expect(generationsRepo.resumeGenerationInDb).toHaveBeenCalledWith(42);
+      expect(generationsRepo.getLatestGenerationBySuiteId).toHaveBeenCalledWith(42);
+    });
+
+    it('returns null when no generation exists', async () => {
+      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(null as never);
+      await expect(resumeGeneration(42)).resolves.toBeNull();
     });
 
     it('wraps repository errors in HttpException 500', async () => {
-      (generationsRepo.resumeGenerationInDb as jest.Mock).mockRejectedValue(new Error('db down'));
-
+      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockRejectedValue(new Error('db down') as never);
       await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
     });
 

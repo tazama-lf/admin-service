@@ -66,6 +66,7 @@ import {
   getSimulationSuiteById,
   createSimulationSuite,
   updateSimulationSuite,
+  cloneSuite,
 } from './services/simulation-suites.logic.service';
 import {
   getGenerationsForSuite,
@@ -80,6 +81,7 @@ import {
   deleteTriggerTxtpConfig,
   resumeGeneration,
   updateGenerationStatus,
+  cloneGeneration,
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
@@ -2399,6 +2401,53 @@ export const resumeGenerationHandler = async (req: FastifyRequest, reply: Fastif
   } catch (err) {
     loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to resume generation');
+  }
+};
+
+// ── Clone generation ──────────────────────────────────────────────────────────
+
+export const cloneGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Clone generation');
+    const authReq = req as AuthenticatedRequest;
+    const { id } = req.params as { id: string };
+    const generationId = parseInt(id, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const cloned = await cloneGeneration(generationId, userId, userEmail);
+    reply.status(201).send({ success: true, data: cloned });
+    loggerService.log('End - Clone generation');
+  } catch (err) {
+    loggerService.error(`Failed to clone generation. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to clone generation');
+  }
+};
+
+// ── Clone suite ───────────────────────────────────────────────────────────────
+
+export const cloneSuiteHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Clone suite');
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as { id: string };
+    const suiteId = parseInt(id, 10);
+    if (isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID' });
+      return;
+    }
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const cloned = await cloneSuite(suiteId, tenantId, userId, userEmail);
+    reply.status(201).send({ success: true, data: cloned });
+    loggerService.log('End - Clone suite');
+  } catch (err) {
+    loggerService.error(`Failed to clone suite. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to clone suite');
   }
 };
 

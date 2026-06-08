@@ -521,32 +521,3 @@ export const getRelatedTransactions = async (tenantId: string): Promise<string[]
 
   return result.rows.map((row) => row.related_transaction);
 };
-
-export interface MaskTuple {
-  tenant_id: string;
-  txtp: string;
-  txtp_version: string;
-  endpoint_path: string;
-}
-
-export const findActiveConfigsByTuples = async (tuples: MaskTuple[]): Promise<MaskTuple[]> => {
-  if (tuples.length === 0) return [];
-
-  const values: string[] = [];
-  const rowPlaceholders = tuples.map((t, i) => {
-    const base = i * 3;
-    values.push(t.tenant_id, t.txtp, t.txtp_version);
-    return `($${base + 1}, $${base + 2}, $${base + 3})`;
-  });
-
-  const query = `
-    SELECT DISTINCT tenant_id, transaction_type AS txtp, version AS txtp_version, endpoint_path
-    FROM tcs_config
-    WHERE publishing_status = 'active'
-      AND (tenant_id, transaction_type, version) IN (${rowPlaceholders.join(', ')})
-  `;
-
-  const result = await handlePostExecuteSqlStatement<MaskTuple>({ text: query, values } satisfies PgQueryConfig, 'configuration');
-
-  return result.rows;
-};

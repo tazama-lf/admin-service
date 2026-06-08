@@ -17,7 +17,6 @@ import {
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
 import { HttpException, HttpStatus } from '../utils/error';
-import { gettxtpAndVersionFromUrl } from '../utils/helper';
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -83,6 +82,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     notes: config.notes,
     related_txtp_config_id: config.related_txtp_config_id,
     field_overrides: fieldOverrides,
+    related_transaction: tcsRow.related_transaction ?? '',
   };
 };
 
@@ -121,30 +121,30 @@ export const createTriggerTxtpConfig = async (
       fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(primaryConfig.id, { field_path: path, override_type: 'null' })),
     );
 
-    const relatedTransactionPath = tcsRow.related_transaction ?? null;
-    if (relatedTransactionPath !== null) {
-      const { txtp: relatedTxtp, version: relatedVersion } = gettxtpAndVersionFromUrl(relatedTransactionPath);
-      const relatedtTcsRow = await getSchemaByTransactionType(relatedTxtp, relatedVersion, tenantId);
+    // const relatedTransactionPath = tcsRow.related_transaction ?? null;
+    // if (relatedTransactionPath !== null) {
+    //   const { txtp: relatedTxtp, version: relatedVersion } = gettxtpAndVersionFromUrl(relatedTransactionPath);
+    //   const relatedtTcsRow = await getSchemaByTransactionType(relatedTxtp, relatedVersion, tenantId);
 
-      const payloadTemplate = (
-        relatedtTcsRow.content_type === (ContentType.XML as string) ? relatedtTcsRow.payload_xml : relatedtTcsRow.payload_json
-      ) as Record<string, unknown> | undefined;
+    //   const payloadTemplate = (
+    //     relatedtTcsRow.content_type === (ContentType.XML as string) ? relatedtTcsRow.payload_xml : relatedtTcsRow.payload_json
+    //   ) as Record<string, unknown> | undefined;
 
-      const relatedConfig = await createTriggerTxtpConfigInDb({
-        generation_id: generationId,
-        txtp: relatedTxtp,
-        txtp_version: relatedVersion,
-        display_order: 2,
-        message_count: 1,
-        payload_template_json: payloadTemplate ?? {},
-        related_txtp_config_id: primaryConfig.id,
-      });
+    //   const relatedConfig = await createTriggerTxtpConfigInDb({
+    //     generation_id: generationId,
+    //     txtp: relatedTxtp,
+    //     txtp_version: relatedVersion,
+    //     display_order: 2,
+    //     message_count: 1,
+    //     payload_template_json: payloadTemplate ?? {},
+    //     related_txtp_config_id: primaryConfig.id,
+    //   });
 
-      const fieldPaths = flattenPayloadPaths(payloadTemplate);
-      await Promise.all(
-        fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(relatedConfig.id, { field_path: path, override_type: 'null' })),
-      );
-    }
+    //   const fieldPaths = flattenPayloadPaths(payloadTemplate);
+    //   await Promise.all(
+    //     fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(relatedConfig.id, { field_path: path, override_type: 'null' })),
+    //   );
+    // }
 
     return {
       trigger_txtp_config_id: primaryConfig.id,
@@ -158,6 +158,7 @@ export const createTriggerTxtpConfig = async (
       notes: primaryConfig.notes,
       related_txtp_config_id: null,
       field_overrides: fieldOverrides,
+      related_transaction: tcsRow.related_transaction ?? '',
     };
   } catch (error) {
     if (error instanceof HttpException) throw error;
@@ -200,9 +201,10 @@ export const addTriggerTxtpConfig = async (
 
 // ── Step 3: GET all ──────────────────────────────────────────────────────────
 
-export const getTriggerConfigsWithOverrides = async (generationId: number): Promise<TriggerTxtpConfigWithOverrides[]> => {
+export const getTriggerConfigsWithOverrides = async (generationId: number, tenantId: string): Promise<TriggerTxtpConfigWithOverrides[]> => {
   try {
     const configs = await getTriggerTxtpConfigsByGenerationId(generationId);
+    const tcsRow = await getSchemaByTransactionType(configs[0].txtp, configs[0].txtp_version, tenantId);
     return await Promise.all(
       configs.map(async (config) => {
         const fieldOverrides = await getTriggerFieldOverridesByConfigId(config.id);
@@ -218,6 +220,7 @@ export const getTriggerConfigsWithOverrides = async (generationId: number): Prom
           notes: config.notes,
           related_txtp_config_id: config.related_txtp_config_id ?? null,
           field_overrides: fieldOverrides,
+          related_transaction: tcsRow.related_transaction ?? '',
         };
       }),
     );
@@ -235,6 +238,7 @@ export const getTriggerConfigsWithOverrides = async (generationId: number): Prom
 export const bulkUpdateTriggerConfigs = async (
   generationId: number,
   items: BulkTriggerConfigItemDto[],
+  tenantId: string,
 ): Promise<TriggerTxtpConfigWithOverrides[]> => {
   try {
     await Promise.all(
@@ -248,7 +252,7 @@ export const bulkUpdateTriggerConfigs = async (
         }
       }),
     );
-    return await getTriggerConfigsWithOverrides(generationId);
+    return await getTriggerConfigsWithOverrides(generationId, tenantId);
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(

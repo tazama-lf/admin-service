@@ -2054,13 +2054,14 @@ export const getGenerationContextConfigsHandler = async (req: FastifyRequest, re
     loggerService.log('Start - Get generation context txtp configs');
     const { generationId } = req.params as { generationId: string };
     const genId = parseInt(generationId, 10);
+    const { tenantId } = req as ITenantRequest;
 
     if (!generationId || isNaN(genId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
       return;
     }
 
-    const configs = await getContextConfigsWithStrategies(genId);
+    const configs = await getContextConfigsWithStrategies(genId, tenantId);
 
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get generation context txtp configs');
@@ -2116,7 +2117,8 @@ export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply:
       return;
     }
 
-    const updated = await bulkUpdateContextConfigs(generationId, items);
+    const { tenantId } = req as ITenantRequest;
+    const updated = await bulkUpdateContextConfigs(generationId, items, tenantId);
     // void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
@@ -2134,13 +2136,14 @@ export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: Fasti
     loggerService.log('Start - Get trigger txtp configs');
     const { generationId: generationIdStr } = req.params as { generationId: string };
     const generationId = parseInt(generationIdStr, 10);
+    const { tenantId } = req as ITenantRequest;
 
     if (isNaN(generationId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
       return;
     }
 
-    const configs = await getTriggerConfigsWithOverrides(generationId);
+    const configs = await getTriggerConfigsWithOverrides(generationId, tenantId);
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get trigger txtp configs');
   } catch (err) {
@@ -2182,6 +2185,7 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
     loggerService.log('Start - Bulk update trigger txtp configs');
     const { generationId: generationIdStr } = req.params as { generationId: string };
     const generationId = parseInt(generationIdStr, 10);
+    const { tenantId } = req as ITenantRequest;
 
     if (isNaN(generationId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
@@ -2194,7 +2198,7 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
       return;
     }
 
-    const updated = await bulkUpdateTriggerConfigs(generationId, items);
+    const updated = await bulkUpdateTriggerConfigs(generationId, items, tenantId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update trigger txtp configs');

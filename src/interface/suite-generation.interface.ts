@@ -128,6 +128,7 @@ export interface ContextTxtpConfigWithStrategies {
   sample_payload_snapshot?: Record<string, unknown>;
   related_txtp_config_id?: number | null;
   field_strategies: ContextFieldStrategy[];
+  related_transaction?: string;
 }
 
 export interface BulkConfigItemDto {
@@ -229,6 +230,7 @@ export interface TriggerTxtpConfigWithOverrides {
   notes?: string;
   related_txtp_config_id?: number | null;
   field_overrides: TriggerFieldOverride[];
+  related_transaction?: string;
 }
 
 export interface BulkTriggerConfigItemDto {

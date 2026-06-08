@@ -104,6 +104,7 @@ import {
   saveEvaluationsInResultsTableHandler,
   saveRecordInTrsSimulationHandler,
   resumeGenerationHandler,
+  getFakerSemanticDataHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -208,6 +209,7 @@ const routePrivilege = {
   getSimulationResults: ['editor', 'approver'],
   saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
   resumeGeneration: ['editor', 'approver'],
+  getFakerSemanticData: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -621,6 +623,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/generation/resume', {
     ...SetOptionsBodyAndParams(resumeGenerationHandler, routePrivilege.resumeGeneration),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/faker-semantic-data', {
+    ...SetOptionsBodyAndParams(getFakerSemanticDataHandler, routePrivilege.getFakerSemanticData),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

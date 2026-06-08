@@ -140,6 +140,7 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
+import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -2445,6 +2446,18 @@ export const resumeGenerationHandler = async (req: FastifyRequest, reply: Fastif
   } catch (err) {
     loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to resume generation');
+  }
+};
+
+export const getFakerSemanticDataHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get faker semantic data');
+    const data = await getFakerSemanticData();
+    reply.status(200).send({ success: true, data });
+    loggerService.log('End - Get faker semantic data');
+  } catch (err) {
+    loggerService.error(`Failed to get faker semantic data. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get faker semantic data');
   }
 };
 

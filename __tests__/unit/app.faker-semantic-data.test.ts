@@ -2,6 +2,9 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { getFakerSemanticDataHandler } from '../../src/app.controller';
+import * as fakerSemanticService from '../../src/services/faker-semantic-data.logic.service';
+import { ErrorHandler } from '../../src/handlers/errorHandler';
 
 jest.mock('../../src/services/faker-semantic-data.logic.service', () => ({
   getFakerSemanticData: jest.fn(),
@@ -20,10 +23,6 @@ jest.mock('../../src', () => ({
     error: jest.fn(),
   },
 }));
-
-import { getFakerSemanticDataHandler } from '../../src/app.controller';
-import * as fakerSemanticService from '../../src/services/faker-semantic-data.logic.service';
-import { ErrorHandler } from '../../src/handlers/errorHandler';
 
 describe('Faker Semantic Data API Handler', () => {
   const buildReply = (): Partial<FastifyReply> => ({

@@ -166,6 +166,36 @@ describe('createTriggerConfigWithDefaultStrategies', () => {
     expect(result.field_overrides).toHaveLength(0);
   });
 
+  it('flattens nested payload objects recursively', async () => {
+    const nestedPayload = { transaction: { amount: 100, currency: 'USD' } };
+    const tcsNestedPayload = { ...tcsRowJson, payload_json: nestedPayload };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsNestedPayload);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue({
+      ...mockTriggerConfig,
+      payload_template_json: nestedPayload,
+    });
+    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
+
+    await createTriggerConfigWithDefaultStrategies({
+      generationId: 1,
+      txtp: 'pacs.008',
+      txtpVersion: '001.08',
+      messageCount: 1,
+      displayOrder: 1,
+      tenantId: 'tenant-001',
+    });
+
+    expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).toHaveBeenCalledTimes(2);
+    expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).toHaveBeenCalledWith(
+      20,
+      expect.objectContaining({ field_path: 'transaction.amount' }),
+    );
+    expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).toHaveBeenCalledWith(
+      20,
+      expect.objectContaining({ field_path: 'transaction.currency' }),
+    );
+  });
+
   it('throws when tcs_config row not found', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(new Error('Not found'));
     await expect(

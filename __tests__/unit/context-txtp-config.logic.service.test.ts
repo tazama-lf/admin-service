@@ -170,6 +170,58 @@ describe('createConfigWithDefaultStrategies', () => {
     expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledTimes(2);
   });
 
+  it('flattens nested payload objects recursively', async () => {
+    const nestedPayload = { transaction: { amount: 100, currency: 'USD' } };
+    const tcsNestedPayload = { ...tcsRowJson, payload_json: nestedPayload };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsNestedPayload);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createConfigWithDefaultStrategies({
+      generationId: 1,
+      txtp: 'pacs.008',
+      txtpVersion: '001.08',
+      messageCount: 100,
+      displayOrder: 1,
+      tenantId: 'tenant-001',
+    });
+
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledTimes(2);
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ field_path: 'transaction.amount' }),
+    );
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ field_path: 'transaction.currency' }),
+    );
+  });
+
+  it('returns no field strategies when schema is a non-object primitive', async () => {
+    const tcsStringSchema = {
+      schema: 'not-an-object',
+      content_type: 'application/json',
+      payload_json: null,
+      payload_xml: null,
+      related_transaction: null,
+    };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsStringSchema);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    const result = await createConfigWithDefaultStrategies({
+      generationId: 1,
+      txtp: 'pacs.008',
+      txtpVersion: '001.08',
+      messageCount: 100,
+      displayOrder: 1,
+      tenantId: 'tenant-001',
+    });
+
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).not.toHaveBeenCalled();
+    expect(result.field_strategies).toHaveLength(0);
+  });
+
   it('throws when tcs_config row not found', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(new Error('Not found'));
     await expect(

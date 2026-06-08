@@ -75,6 +75,11 @@ describe('Simulation Suites Logic Service', () => {
         'Failed to retrieve simulation suites: DB failure',
       );
     });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuitesFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow('Unknown error');
+    });
   });
 
   describe('getSimulationSuiteById', () => {
@@ -101,6 +106,11 @@ describe('Simulation Suites Logic Service', () => {
       await expect(simulationSuitesService.getSimulationSuiteById(1, mockTenantId)).rejects.toThrow(
         'Failed to retrieve simulation suite: DB crash',
       );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuiteById(1, mockTenantId)).rejects.toThrow('Unknown error');
     });
   });
 
@@ -158,6 +168,17 @@ describe('Simulation Suites Logic Service', () => {
         'Failed to create simulation suite: trigger DB fail',
       );
     });
+
+    it('skips txtp config creation when primary_txtp is absent', async () => {
+      const suiteWithoutTxtp = { ...mockSuite, primary_txtp: null, primary_txtp_version: null };
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(suiteWithoutTxtp);
+
+      const result = await simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId);
+
+      expect(trsGenService.createContextTxtpConfig).not.toHaveBeenCalled();
+      expect(triggerService.createTriggerTxtpConfig).not.toHaveBeenCalled();
+      expect(result).toEqual({ ...suiteWithoutTxtp, generation_id: 7 });
+    });
   });
 
   describe('updateSimulationSuite', () => {
@@ -207,6 +228,13 @@ describe('Simulation Suites Logic Service', () => {
 
       await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
         'Failed to update simulation suite: DB update failed',
+      );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.updateSimulationSuiteInDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
+        'Unknown error',
       );
     });
   });

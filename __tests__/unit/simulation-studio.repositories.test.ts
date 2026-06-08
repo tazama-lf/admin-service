@@ -334,6 +334,60 @@ describe('deleteContextTxtpConfigInDb', () => {
     mockDb.mockResolvedValue({ rows: [{ deleted_count: '0' }] } as never);
     expect(await deleteContextTxtpConfigInDb(999)).toBe(false);
   });
+
+  it('returns false when rows array is empty (deleted_count defaults to 0)', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteContextTxtpConfigInDb(10)).toBe(false);
+  });
+});
+
+describe('createContextTxtpConfigInDb — object-typed row fields', () => {
+  it('handles schema_snapshot, sample_payload_snapshot, and generator_profile already as objects', async () => {
+    const objectRow = {
+      ...contextConfigRow,
+      schema_snapshot: { type: 'object' },
+      sample_payload_snapshot: { test: 'payload' },
+      generator_profile: { mode: 'fast' },
+      related_txtp_config_id: 5,
+    };
+    mockDb.mockResolvedValue({ rows: [objectRow] });
+
+    const result = await createContextTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 100,
+      schema_snapshot: { type: 'object' },
+      sample_payload_snapshot: { test: 'payload' },
+    });
+
+    expect(result.schema_snapshot).toEqual({ type: 'object' });
+    expect(result.sample_payload_snapshot).toEqual({ test: 'payload' });
+    expect(result.generator_profile).toEqual({ mode: 'fast' });
+    expect(result.related_txtp_config_id).toBe(5);
+  });
+
+  it('handles null sample_payload_snapshot (maps to undefined)', async () => {
+    const noPayloadRow = {
+      ...contextConfigRow,
+      sample_payload_snapshot: null,
+      related_txtp_config_id: null,
+    };
+    mockDb.mockResolvedValue({ rows: [noPayloadRow] });
+
+    const result = await createContextTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 100,
+      schema_snapshot: {},
+    });
+
+    expect(result.sample_payload_snapshot).toBeUndefined();
+    expect(result.related_txtp_config_id).toBeNull();
+  });
 });
 
 describe('deleteTriggerTxtpConfigInDb', () => {

@@ -98,7 +98,7 @@ const fieldStrategyRow = {
   static_value: '999',
   range_min: null,
   range_max: null,
-  generator_type: null,
+  faker_semantic_type: null,
   generator_options: '{}',
   is_required_override: null,
   created_at: '2026-05-01T00:00:00.000Z',
@@ -391,7 +391,7 @@ describe('upsertFieldStrategyInDb', () => {
     const result = await upsertFieldStrategyInDb(1, {
       field_path: 'bic',
       strategy_code: 'generated',
-      generator_type: 'iso20022.bic',
+      faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 
@@ -465,7 +465,7 @@ const triggerOverrideRow = {
   static_value: null,
   range_min: null,
   range_max: null,
-  generator_type: null,
+  faker_semantic_type: null,
   generator_options: '{}',
   created_at: '2026-05-01T00:00:00.000Z',
 };
@@ -657,7 +657,7 @@ describe('upsertTriggerFieldOverrideInDb', () => {
     const result = await upsertTriggerFieldOverrideInDb(20, {
       field_path: 'bic',
       override_type: 'generated',
-      generator_type: 'iso20022.bic',
+      faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 

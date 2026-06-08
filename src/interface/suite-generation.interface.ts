@@ -101,7 +101,7 @@ export interface ContextFieldStrategy {
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
-  generator_type?: string;
+  faker_semantic_type?: string;
   generator_options: Record<string, unknown>;
   is_required_override?: boolean;
   created_at: Date;
@@ -113,7 +113,7 @@ export interface UpsertFieldStrategyDto {
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
-  generator_type?: string;
+  faker_semantic_type?: string;
   generator_options?: Record<string, unknown>;
   is_required_override?: boolean;
 }
@@ -202,7 +202,7 @@ export interface TriggerFieldOverride {
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
-  generator_type?: string;
+  faker_semantic_type?: string;
   generator_options: Record<string, unknown>;
   created_at: Date;
 }
@@ -213,7 +213,7 @@ export interface UpsertTriggerFieldOverrideDto {
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
-  generator_type?: string;
+  faker_semantic_type?: string;
   generator_options?: Record<string, unknown>;
 }
 

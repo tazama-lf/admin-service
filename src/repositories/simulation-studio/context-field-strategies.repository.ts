@@ -11,7 +11,7 @@ const mapRow = (row: Record<string, unknown>): ContextFieldStrategy => ({
   static_value: row.static_value ?? undefined,
   range_min: row.range_min as number | undefined,
   range_max: row.range_max as number | undefined,
-  generator_type: row.generator_type as string | undefined,
+  faker_semantic_type: row.faker_semantic_type as string | undefined,
   generator_options:
     typeof row.generator_options === 'string'
       ? (JSON.parse(row.generator_options) as Record<string, unknown>)
@@ -29,7 +29,7 @@ export const upsertFieldStrategyInDb = async (contextTxtpConfigId: number, dto: 
     INSERT INTO trs_suite_context_field_strategies (
       context_txtp_config_id, field_path, strategy_code,
       static_value, range_min, range_max,
-      generator_type, generator_options, is_required_override,
+      faker_semantic_type, generator_options, is_required_override,
       created_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
     ON CONFLICT (context_txtp_config_id, field_path)
@@ -38,7 +38,7 @@ export const upsertFieldStrategyInDb = async (contextTxtpConfigId: number, dto: 
       static_value         = EXCLUDED.static_value,
       range_min            = EXCLUDED.range_min,
       range_max            = EXCLUDED.range_max,
-      generator_type       = EXCLUDED.generator_type,
+      faker_semantic_type       = EXCLUDED.faker_semantic_type,
       generator_options    = EXCLUDED.generator_options,
       is_required_override = EXCLUDED.is_required_override
     RETURNING *
@@ -54,7 +54,7 @@ export const upsertFieldStrategyInDb = async (contextTxtpConfigId: number, dto: 
         dto.static_value !== undefined ? JSON.stringify(dto.static_value) : null,
         dto.range_min ?? null,
         dto.range_max ?? null,
-        dto.generator_type ?? null,
+        dto.faker_semantic_type ?? null,
         JSON.stringify(dto.generator_options ?? {}),
         dto.is_required_override ?? null,
       ],

@@ -320,33 +320,35 @@ describe('getContextTxtpConfigsByGenerationId', () => {
 });
 
 describe('deleteContextTxtpConfigInDb', () => {
-  it('returns true when row deleted', async () => {
-    mockDb.mockResolvedValue({ rows: [{ id: 10 }] } as never);
+  it('returns true when target and related rows are deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '2' }] } as never);
     expect(await deleteContextTxtpConfigInDb(10)).toBe(true);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_context_txtp_configs') }),
       'simulation',
     );
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('related_txtp_config_id') }), 'simulation');
   });
 
   it('returns false when row not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] } as never);
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '0' }] } as never);
     expect(await deleteContextTxtpConfigInDb(999)).toBe(false);
   });
 });
 
 describe('deleteTriggerTxtpConfigInDb', () => {
-  it('returns true when row deleted', async () => {
-    mockDb.mockResolvedValue({ rows: [{ id: 20 }] } as never);
+  it('returns true when target and related rows are deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '2' }] } as never);
     expect(await deleteTriggerTxtpConfigInDb(20)).toBe(true);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_trigger_txtp_configs') }),
       'simulation',
     );
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('related_txtp_config_id') }), 'simulation');
   });
 
   it('returns false when row not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] } as never);
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '0' }] } as never);
     expect(await deleteTriggerTxtpConfigInDb(999)).toBe(false);
   });
 });

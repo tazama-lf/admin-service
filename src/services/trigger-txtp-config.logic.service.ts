@@ -17,6 +17,7 @@ import {
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
 import { HttpException, HttpStatus } from '../utils/error';
+import { gettxtpAndVersionFromUrl } from '../utils/helper';
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -42,20 +43,15 @@ interface CreateTriggerConfigOptions {
   messageCount: number;
   displayOrder: number;
   tenantId: string;
+  relatedTxtpConfigId?: number | null;
 }
 
-/**
- * Creates a trigger txtp config row using sample payload from tcs_config as payload_template_json.
- * Seeds all payload field paths with override_type = 'null' (use payload as-is, no transformation).
- * Throws if tcs_config row not found.
- */
 export const createTriggerConfigWithDefaultStrategies = async (
   opts: CreateTriggerConfigOptions,
 ): Promise<TriggerTxtpConfigWithOverrides> => {
-  const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId } = opts;
+  const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId, relatedTxtpConfigId } = opts;
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
 
-  // const schema = tcsRow.schema as Record<string, unknown>;
   const payloadTemplate = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
     | Record<string, unknown>
     | undefined;
@@ -67,9 +63,9 @@ export const createTriggerConfigWithDefaultStrategies = async (
     display_order: displayOrder,
     message_count: messageCount,
     payload_template_json: payloadTemplate ?? {},
+    related_txtp_config_id: relatedTxtpConfigId ?? null,
   });
 
-  // Use payload for field paths;
   const fieldPaths = flattenPayloadPaths(payloadTemplate);
   const fieldOverrides = await Promise.all(
     fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(config.id, { field_path: path, override_type: 'null' })),
@@ -85,6 +81,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     link_to_context_pairs: config.link_to_context_pairs,
     expected_result_band: config.expected_result_band,
     notes: config.notes,
+    related_txtp_config_id: config.related_txtp_config_id,
     field_overrides: fieldOverrides,
   };
 };
@@ -92,7 +89,9 @@ export const createTriggerConfigWithDefaultStrategies = async (
 // ── Step 1 ───────────────────────────────────────────────────────────────────
 
 /**
- * Called during suite creation. Creates the primary trigger config. message_count = 1.
+ * Called during suite creation. Creates primary trigger config (display_order=1,
+ * message_count=1). If tcs_config has related_transaction, also creates a secondary
+ * trigger config (display_order=2) with related_txtp_config_id = primary id.
  */
 export const createTriggerTxtpConfig = async (
   generationId: number,
@@ -101,7 +100,65 @@ export const createTriggerTxtpConfig = async (
   tenantId: string,
 ): Promise<TriggerTxtpConfigWithOverrides> => {
   try {
-    return await createTriggerConfigWithDefaultStrategies({ generationId, txtp, txtpVersion, messageCount: 1, displayOrder: 1, tenantId });
+    const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
+
+    const payloadTemplate = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
+      | Record<string, unknown>
+      | undefined;
+
+    const primaryConfig = await createTriggerTxtpConfigInDb({
+      generation_id: generationId,
+      txtp,
+      txtp_version: txtpVersion,
+      display_order: 1,
+      message_count: 1,
+      payload_template_json: payloadTemplate ?? {},
+      related_txtp_config_id: null,
+    });
+
+    const fieldPaths = flattenPayloadPaths(payloadTemplate);
+    const fieldOverrides = await Promise.all(
+      fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(primaryConfig.id, { field_path: path, override_type: 'null' })),
+    );
+
+    const relatedTransactionPath = tcsRow.related_transaction ?? null;
+    if (relatedTransactionPath !== null) {
+      const { txtp: relatedTxtp, version: relatedVersion } = gettxtpAndVersionFromUrl(relatedTransactionPath);
+      const relatedtTcsRow = await getSchemaByTransactionType(relatedTxtp, relatedVersion, tenantId);
+
+      const payloadTemplate = (
+        relatedtTcsRow.content_type === (ContentType.XML as string) ? relatedtTcsRow.payload_xml : relatedtTcsRow.payload_json
+      ) as Record<string, unknown> | undefined;
+
+      const relatedConfig = await createTriggerTxtpConfigInDb({
+        generation_id: generationId,
+        txtp: relatedTxtp,
+        txtp_version: relatedVersion,
+        display_order: 2,
+        message_count: 1,
+        payload_template_json: payloadTemplate ?? {},
+        related_txtp_config_id: primaryConfig.id,
+      });
+
+      const fieldPaths = flattenPayloadPaths(payloadTemplate);
+      await Promise.all(
+        fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(relatedConfig.id, { field_path: path, override_type: 'null' })),
+      );
+    }
+
+    return {
+      trigger_txtp_config_id: primaryConfig.id,
+      txtp: primaryConfig.txtp,
+      txtp_version: primaryConfig.txtp_version,
+      message_count: primaryConfig.message_count,
+      display_order: primaryConfig.display_order,
+      payload_template_json: primaryConfig.payload_template_json,
+      link_to_context_pairs: primaryConfig.link_to_context_pairs,
+      expected_result_band: primaryConfig.expected_result_band,
+      notes: primaryConfig.notes,
+      related_txtp_config_id: null,
+      field_overrides: fieldOverrides,
+    };
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -159,6 +216,7 @@ export const getTriggerConfigsWithOverrides = async (generationId: number): Prom
           link_to_context_pairs: config.link_to_context_pairs,
           expected_result_band: config.expected_result_band,
           notes: config.notes,
+          related_txtp_config_id: config.related_txtp_config_id ?? null,
           field_overrides: fieldOverrides,
         };
       }),

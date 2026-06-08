@@ -16,6 +16,7 @@ jest.mock('../../src/repositories/simulation-studio/context-field-strategies.rep
 
 jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   getSchemaByTransactionType: jest.fn(),
+  getSchemaByEndpointPath: jest.fn(),
 }));
 
 jest.mock('@tazama-lf/tcs-lib', () => ({
@@ -68,6 +69,21 @@ const tcsRowJson = {
   content_type: 'application/json',
   payload_json: { amount: 100, currency: 'USD' },
   payload_xml: null,
+  related_transaction: null,
+};
+
+const tcsRowJsonWithRelated = {
+  ...tcsRowJson,
+  related_transaction: '/default/1.0.0/test/pacs.002.001.10',
+};
+
+const relatedTcsRow = {
+  schema: { type: 'object', properties: { id: {} } },
+  content_type: 'application/json',
+  payload_json: { id: 'abc' },
+  payload_xml: null,
+  transaction_type: 'pacs.002.001.10',
+  version: '001.10',
 };
 
 const tcsRowXml = {
@@ -75,6 +91,7 @@ const tcsRowXml = {
   content_type: 'application/xml',
   payload_xml: { amount: '<xml>' },
   payload_json: null,
+  related_transaction: null,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -212,6 +229,57 @@ describe('createContextTxtpConfig', () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(err);
     await expect(createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toBe(err);
   });
+
+  it('creates related context config when tcs_config has related_transaction', async () => {
+    const relatedMockConfig = { ...mockContextConfig, id: 11, txtp: 'pacs.002.001.10', display_order: 2, related_txtp_config_id: 10 };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
+    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(relatedTcsRow);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock)
+      .mockResolvedValueOnce(mockContextConfig) // primary
+      .mockResolvedValueOnce(relatedMockConfig); // related
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByTransactionType).toHaveBeenNthCalledWith(2, 'pacs.002.001.10', '1.0.0', 'tenant-001');
+    // createContextTxtpConfigInDb called twice: primary + related
+    expect(contextConfigRepo.createContextTxtpConfigInDb).toHaveBeenCalledTimes(2);
+    // Related config has related_txtp_config_id = primary.id
+    expect(contextConfigRepo.createContextTxtpConfigInDb).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        txtp: 'pacs.002.001.10',
+        txtp_version: '1.0.0',
+        display_order: 2,
+        related_txtp_config_id: 10,
+      }),
+    );
+  });
+
+  it('skips unrelated endpoint-path lookup and still creates related config', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
+    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(null);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock)
+      .mockResolvedValueOnce(mockContextConfig)
+      .mockResolvedValueOnce({ ...mockContextConfig, id: 11, related_txtp_config_id: 10 });
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
+    expect(contextConfigRepo.createContextTxtpConfigInDb).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips related config when related_transaction is null', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
+    expect(contextConfigRepo.createContextTxtpConfigInDb).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ── addContextTxtpConfig ─────────────────────────────────────────────────────
@@ -269,6 +337,7 @@ describe('getContextConfigsWithStrategies', () => {
     expect(result[0].context_txtp_config_id).toBe(10);
     expect(result[0].txtp).toBe('pacs.008');
     expect(result[0].field_strategies).toEqual([mockFieldStrategy]);
+    expect(result[0].related_txtp_config_id).toBeNull();
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(10);
   });
 
@@ -279,13 +348,14 @@ describe('getContextConfigsWithStrategies', () => {
   });
 
   it('handles multiple configs, fetches strategies for each', async () => {
-    const config2 = { ...mockContextConfig, id: 11, txtp: 'pacs.002' };
+    const config2 = { ...mockContextConfig, id: 11, txtp: 'pacs.002', related_txtp_config_id: 10 };
     (contextConfigRepo.getContextTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockContextConfig, config2]);
     (fieldStrategyRepo.getFieldStrategiesByContextConfigId as jest.Mock).mockResolvedValue([mockFieldStrategy]);
 
     const result = await getContextConfigsWithStrategies(1);
 
     expect(result).toHaveLength(2);
+    expect(result[1].related_txtp_config_id).toBe(10);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledTimes(2);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(10);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(11);

@@ -62,6 +62,7 @@ export interface SuiteContextTxtpConfig {
   sample_payload_snapshot?: Record<string, unknown>;
   faker_seed?: number;
   generator_profile: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
   created_at: Date;
 }
 
@@ -75,6 +76,7 @@ export interface CreateContextTxtpConfigDto {
   sample_payload_snapshot?: Record<string, unknown>;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
 }
 
 export interface UpdateContextTxtpConfigDto {
@@ -124,6 +126,7 @@ export interface ContextTxtpConfigWithStrategies {
   display_order: number;
   schema_snapshot: Record<string, unknown>;
   sample_payload_snapshot?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
   field_strategies: ContextFieldStrategy[];
 }
 
@@ -154,6 +157,7 @@ export interface SuiteTriggerTxtpConfig {
   notes?: string;
   faker_seed?: number;
   generator_profile: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
   created_at: Date;
 }
 
@@ -170,6 +174,7 @@ export interface CreateTriggerTxtpConfigDto {
   notes?: string;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
 }
 
 export interface UpdateTriggerTxtpConfigDto {
@@ -222,6 +227,7 @@ export interface TriggerTxtpConfigWithOverrides {
   link_to_context_pairs: boolean;
   expected_result_band?: TriggerExpectedBand;
   notes?: string;
+  related_txtp_config_id?: number | null;
   field_overrides: TriggerFieldOverride[];
 }
 

@@ -18,6 +18,7 @@ import {
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
 import { HttpException, HttpStatus } from '../utils/error';
+import { gettxtpAndVersionFromUrl } from '../utils/helper';
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -48,12 +49,12 @@ interface CreateConfigOptions {
   messageCount: number;
   displayOrder: number;
   tenantId: string;
+  relatedTxtpConfigId?: number | null;
 }
 
 export const createConfigWithDefaultStrategies = async (opts: CreateConfigOptions): Promise<ContextTxtpConfigWithStrategies> => {
-  const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId } = opts;
+  const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId, relatedTxtpConfigId } = opts;
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
-
   const schema = tcsRow.schema as Record<string, unknown>;
   const samplePayload = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
     | Record<string, unknown>
@@ -67,6 +68,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
     message_count: messageCount,
     schema_snapshot: schema,
     sample_payload_snapshot: samplePayload,
+    related_txtp_config_id: relatedTxtpConfigId ?? null,
   });
 
   const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
@@ -84,13 +86,20 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
     schema_snapshot: config.schema_snapshot,
     sample_payload_snapshot: config.sample_payload_snapshot,
     field_strategies: fieldStrategies,
+    related_txtp_config_id: relatedTxtpConfigId ?? null,
   };
 };
 
 // ── Step 1 ───────────────────────────────────────────────────────────────────
 
 /**
- * Called during suite creation. Creates the primary context txtp config with default strategies.
+ * Called during suite creation. Creates the primary context txtp config (display_order=1)
+ * with default keep_sample strategies. If the primary tcs_config has a related_transaction,
+ * also creates a secondary config (display_order=2) with related_txtp_config_id pointing
+ * back to the primary.
+ *
+ * Returns [primary, related?] — caller receives array but for suite creation only cares
+ * about side-effects. Related config is created silently; if lookup fails it is skipped.
  */
 export const createContextTxtpConfig = async (
   generationId: number,
@@ -99,7 +108,69 @@ export const createContextTxtpConfig = async (
   tenantId: string,
 ): Promise<ContextTxtpConfigWithStrategies> => {
   try {
-    return await createConfigWithDefaultStrategies({ generationId, txtp, txtpVersion, messageCount: 100, displayOrder: 1, tenantId });
+    const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
+
+    const schema = tcsRow.schema as Record<string, unknown>;
+    const samplePayload = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
+      | Record<string, unknown>
+      | undefined;
+
+    const primaryConfig = await createContextTxtpConfigInDb({
+      generation_id: generationId,
+      txtp,
+      txtp_version: txtpVersion,
+      display_order: 1,
+      message_count: 100,
+      schema_snapshot: schema,
+      sample_payload_snapshot: samplePayload,
+      related_txtp_config_id: null,
+    });
+
+    const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
+    const fieldPaths = flattenSchemaPaths(samplePayload ?? schemaFallback);
+    const fieldStrategies = await Promise.all(
+      fieldPaths.map(async (path) => await upsertFieldStrategyInDb(primaryConfig.id, { field_path: path, strategy_code: 'keep_sample' })),
+    );
+
+    // Create related config if tcs_config has related_transaction
+    const relatedTransactionPath = tcsRow.related_transaction ?? null;
+    if (relatedTransactionPath) {
+      const { txtp: relatedTxtp, version: relatedVersion } = gettxtpAndVersionFromUrl(relatedTransactionPath);
+      const relatedTcsRow = await getSchemaByTransactionType(relatedTxtp, relatedVersion, tenantId);
+
+      const schema = relatedTcsRow.schema as Record<string, unknown>;
+      const samplePayload = (
+        relatedTcsRow.content_type === (ContentType.XML as string) ? relatedTcsRow.payload_xml : relatedTcsRow.payload_json
+      ) as Record<string, unknown> | undefined;
+
+      const relatedConfig = await createContextTxtpConfigInDb({
+        generation_id: generationId,
+        txtp: relatedTxtp,
+        txtp_version: relatedVersion,
+        display_order: 2,
+        message_count: 100,
+        schema_snapshot: schema,
+        sample_payload_snapshot: samplePayload,
+        related_txtp_config_id: primaryConfig.id,
+      });
+
+      const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
+      const fieldPaths = flattenSchemaPaths(samplePayload ?? schemaFallback);
+      await Promise.all(
+        fieldPaths.map(async (path) => await upsertFieldStrategyInDb(relatedConfig.id, { field_path: path, strategy_code: 'keep_sample' })),
+      );
+    }
+    return {
+      context_txtp_config_id: primaryConfig.id,
+      txtp: primaryConfig.txtp,
+      txtp_version: primaryConfig.txtp_version,
+      message_count: primaryConfig.message_count,
+      display_order: primaryConfig.display_order,
+      schema_snapshot: primaryConfig.schema_snapshot,
+      sample_payload_snapshot: primaryConfig.sample_payload_snapshot,
+      related_txtp_config_id: null,
+      field_strategies: fieldStrategies,
+    };
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -158,6 +229,7 @@ export const getContextConfigsWithStrategies = async (generationId: number): Pro
           display_order: config.display_order,
           schema_snapshot: config.schema_snapshot,
           sample_payload_snapshot: config.sample_payload_snapshot,
+          related_txtp_config_id: config.related_txtp_config_id ?? null,
           field_strategies: fieldStrategies,
         };
       }),

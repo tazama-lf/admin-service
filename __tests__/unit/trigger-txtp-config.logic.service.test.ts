@@ -15,6 +15,7 @@ jest.mock('../../src/repositories/simulation-studio/trigger-field-strategies.rep
 
 jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   getSchemaByTransactionType: jest.fn(),
+  getSchemaByEndpointPath: jest.fn(),
 }));
 
 jest.mock('@tazama-lf/tcs-lib', () => ({
@@ -67,6 +68,21 @@ const tcsRowJson = {
   content_type: 'application/json',
   payload_json: { amount: 100, currency: 'USD' },
   payload_xml: null,
+  related_transaction: null,
+};
+
+const tcsRowJsonWithRelated = {
+  ...tcsRowJson,
+  related_transaction: '/default/1.0.0/test/pacs.002.001.10',
+};
+
+const relatedTcsTriggerRow = {
+  schema: { type: 'object', properties: { id: {} } },
+  content_type: 'application/json',
+  payload_json: { id: 'abc' },
+  payload_xml: null,
+  transaction_type: 'pacs.002.001.10',
+  version: '001.10',
 };
 
 const tcsRowXml = {
@@ -74,6 +90,7 @@ const tcsRowXml = {
   content_type: 'application/xml',
   payload_xml: { amount: '<xml>' },
   payload_json: null,
+  related_transaction: null,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -194,6 +211,55 @@ describe('createTriggerTxtpConfig', () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue('string error');
     await expect(createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
+
+  it('creates related trigger config when tcs_config has related_transaction', async () => {
+    const relatedMockConfig = { ...mockTriggerConfig, id: 21, txtp: 'pacs.002.001.10', display_order: 2, related_txtp_config_id: 20 };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
+    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(relatedTcsTriggerRow);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock)
+      .mockResolvedValueOnce(mockTriggerConfig) // primary
+      .mockResolvedValueOnce(relatedMockConfig); // related
+    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
+
+    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByTransactionType).toHaveBeenNthCalledWith(2, 'pacs.002.001.10', '1.0.0', 'tenant-001');
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledTimes(2);
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        txtp: 'pacs.002.001.10',
+        txtp_version: '1.0.0',
+        display_order: 2,
+        related_txtp_config_id: 20,
+      }),
+    );
+  });
+
+  it('skips unrelated endpoint-path lookup and still creates related trigger config', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
+    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(null);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock)
+      .mockResolvedValueOnce(mockTriggerConfig)
+      .mockResolvedValueOnce({ ...mockTriggerConfig, id: 21, related_txtp_config_id: 20 });
+    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
+
+    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips related trigger config when related_transaction is null', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
+    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
+
+    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ── addTriggerTxtpConfig ─────────────────────────────────────────────────────
@@ -249,6 +315,7 @@ describe('getTriggerConfigsWithOverrides', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].trigger_txtp_config_id).toBe(20);
+    expect(result[0].related_txtp_config_id).toBeNull();
     expect(result[0].field_overrides).toEqual([mockFieldOverride]);
     expect(triggerOverrideRepo.getTriggerFieldOverridesByConfigId).toHaveBeenCalledWith(20);
   });
@@ -259,13 +326,14 @@ describe('getTriggerConfigsWithOverrides', () => {
   });
 
   it('fetches overrides for each config independently', async () => {
-    const config2 = { ...mockTriggerConfig, id: 21, txtp: 'pacs.002' };
+    const config2 = { ...mockTriggerConfig, id: 21, txtp: 'pacs.002', related_txtp_config_id: 20 };
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockTriggerConfig, config2]);
     (triggerOverrideRepo.getTriggerFieldOverridesByConfigId as jest.Mock).mockResolvedValue([mockFieldOverride]);
 
     const result = await getTriggerConfigsWithOverrides(1);
 
     expect(result).toHaveLength(2);
+    expect(result[1].related_txtp_config_id).toBe(20);
     expect(triggerOverrideRepo.getTriggerFieldOverridesByConfigId).toHaveBeenCalledTimes(2);
     expect(triggerOverrideRepo.getTriggerFieldOverridesByConfigId).toHaveBeenCalledWith(20);
     expect(triggerOverrideRepo.getTriggerFieldOverridesByConfigId).toHaveBeenCalledWith(21);

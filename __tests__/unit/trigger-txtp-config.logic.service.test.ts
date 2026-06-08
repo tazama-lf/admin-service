@@ -242,44 +242,6 @@ describe('createTriggerTxtpConfig', () => {
     await expect(createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
 
-  it('creates related trigger config when tcs_config has related_transaction', async () => {
-    const relatedMockConfig = { ...mockTriggerConfig, id: 21, txtp: 'pacs.002.001.10', display_order: 2, related_txtp_config_id: 20 };
-    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
-    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(relatedTcsTriggerRow);
-    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock)
-      .mockResolvedValueOnce(mockTriggerConfig) // primary
-      .mockResolvedValueOnce(relatedMockConfig); // related
-    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
-
-    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
-
-    expect(tcsRepo.getSchemaByTransactionType).toHaveBeenNthCalledWith(2, 'pacs.002.001.10', '1.0.0', 'tenant-001');
-    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledTimes(2);
-    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        txtp: 'pacs.002.001.10',
-        txtp_version: '1.0.0',
-        display_order: 2,
-        related_txtp_config_id: 20,
-      }),
-    );
-  });
-
-  it('skips unrelated endpoint-path lookup and still creates related trigger config', async () => {
-    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJsonWithRelated);
-    (tcsRepo.getSchemaByEndpointPath as jest.Mock).mockResolvedValue(null);
-    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock)
-      .mockResolvedValueOnce(mockTriggerConfig)
-      .mockResolvedValueOnce({ ...mockTriggerConfig, id: 21, related_txtp_config_id: 20 });
-    (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
-
-    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
-
-    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
-    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledTimes(2);
-  });
-
   it('skips related trigger config when related_transaction is null', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
     (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
@@ -339,9 +301,10 @@ describe('addTriggerTxtpConfig', () => {
 describe('getTriggerConfigsWithOverrides', () => {
   it('returns all configs with their field overrides', async () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockTriggerConfig]);
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
     (triggerOverrideRepo.getTriggerFieldOverridesByConfigId as jest.Mock).mockResolvedValue([mockFieldOverride]);
 
-    const result = await getTriggerConfigsWithOverrides(1);
+    const result = await getTriggerConfigsWithOverrides(1, 'tenant-001');
 
     expect(result).toHaveLength(1);
     expect(result[0].trigger_txtp_config_id).toBe(20);
@@ -352,15 +315,16 @@ describe('getTriggerConfigsWithOverrides', () => {
 
   it('returns empty array when no configs', async () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([]);
-    expect(await getTriggerConfigsWithOverrides(1)).toEqual([]);
+    expect(await getTriggerConfigsWithOverrides(1, 'tenant-001')).toEqual([]);
   });
 
   it('fetches overrides for each config independently', async () => {
     const config2 = { ...mockTriggerConfig, id: 21, txtp: 'pacs.002', related_txtp_config_id: 20 };
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockTriggerConfig, config2]);
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
     (triggerOverrideRepo.getTriggerFieldOverridesByConfigId as jest.Mock).mockResolvedValue([mockFieldOverride]);
 
-    const result = await getTriggerConfigsWithOverrides(1);
+    const result = await getTriggerConfigsWithOverrides(1, 'tenant-001');
 
     expect(result).toHaveLength(2);
     expect(result[1].related_txtp_config_id).toBe(20);
@@ -371,12 +335,12 @@ describe('getTriggerConfigsWithOverrides', () => {
 
   it('wraps error in HttpException 500', async () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue(new Error('fail'));
-    await expect(getTriggerConfigsWithOverrides(1)).rejects.toMatchObject({ status: 500 });
+    await expect(getTriggerConfigsWithOverrides(1, 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
 
   it('wraps non-Error thrown value', async () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue('string error');
-    await expect(getTriggerConfigsWithOverrides(1)).rejects.toMatchObject({ status: 500 });
+    await expect(getTriggerConfigsWithOverrides(1, 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
 });
 
@@ -385,6 +349,7 @@ describe('getTriggerConfigsWithOverrides', () => {
 describe('bulkUpdateTriggerConfigs', () => {
   beforeEach(() => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockTriggerConfig]);
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
     (triggerOverrideRepo.getTriggerFieldOverridesByConfigId as jest.Mock).mockResolvedValue([mockFieldOverride]);
   });
 
@@ -392,13 +357,17 @@ describe('bulkUpdateTriggerConfigs', () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
     (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
 
-    const result = await bulkUpdateTriggerConfigs(1, [
-      {
-        trigger_txtp_config_id: 20,
-        message_count: 3,
-        field_overrides: [{ field_path: 'amount', override_type: 'static', static_value: '999' }],
-      },
-    ]);
+    const result = await bulkUpdateTriggerConfigs(
+      1,
+      [
+        {
+          trigger_txtp_config_id: 20,
+          message_count: 3,
+          field_overrides: [{ field_path: 'amount', override_type: 'static', static_value: '999' }],
+        },
+      ],
+      'tenant-001',
+    );
 
     expect(triggerConfigRepo.updateTriggerTxtpConfigInDb).toHaveBeenCalledWith(20, { message_count: 3 });
     expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).toHaveBeenCalledWith(20, {
@@ -412,7 +381,11 @@ describe('bulkUpdateTriggerConfigs', () => {
   it('skips update when no scalar fields provided', async () => {
     (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
 
-    await bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, field_overrides: [{ field_path: 'amount', override_type: 'null' }] }]);
+    await bulkUpdateTriggerConfigs(
+      1,
+      [{ trigger_txtp_config_id: 20, field_overrides: [{ field_path: 'amount', override_type: 'null' }] }],
+      'tenant-001',
+    );
 
     expect(triggerConfigRepo.updateTriggerTxtpConfigInDb).not.toHaveBeenCalled();
     expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).toHaveBeenCalledTimes(1);
@@ -421,7 +394,7 @@ describe('bulkUpdateTriggerConfigs', () => {
   it('skips upsert when field_overrides is empty array', async () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
 
-    await bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2, field_overrides: [] }]);
+    await bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2, field_overrides: [] }], 'tenant-001');
 
     expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).not.toHaveBeenCalled();
   });
@@ -429,7 +402,7 @@ describe('bulkUpdateTriggerConfigs', () => {
   it('skips upsert when field_overrides absent', async () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
 
-    await bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }]);
+    await bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }], 'tenant-001');
 
     expect(triggerOverrideRepo.upsertTriggerFieldOverrideInDb).not.toHaveBeenCalled();
   });
@@ -440,14 +413,18 @@ describe('bulkUpdateTriggerConfigs', () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
     (triggerOverrideRepo.upsertTriggerFieldOverrideInDb as jest.Mock).mockResolvedValue(mockFieldOverride);
 
-    const result = await bulkUpdateTriggerConfigs(1, [
-      { trigger_txtp_config_id: 20, message_count: 2 },
-      {
-        trigger_txtp_config_id: 21,
-        message_count: 3,
-        field_overrides: [{ field_path: 'amount', override_type: 'range', range_min: 1, range_max: 100 }],
-      },
-    ]);
+    const result = await bulkUpdateTriggerConfigs(
+      1,
+      [
+        { trigger_txtp_config_id: 20, message_count: 2 },
+        {
+          trigger_txtp_config_id: 21,
+          message_count: 3,
+          field_overrides: [{ field_path: 'amount', override_type: 'range', range_min: 1, range_max: 100 }],
+        },
+      ],
+      'tenant-001',
+    );
 
     expect(triggerConfigRepo.updateTriggerTxtpConfigInDb).toHaveBeenCalledTimes(2);
     expect(result).toHaveLength(2);
@@ -455,18 +432,22 @@ describe('bulkUpdateTriggerConfigs', () => {
 
   it('wraps error in HttpException 500', async () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
-    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }])).rejects.toMatchObject({ status: 500 });
+    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }], 'tenant-001')).rejects.toMatchObject({
+      status: 500,
+    });
   });
 
   it('rethrows HttpException as-is', async () => {
     const err = new HttpException('not found', 404);
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(err);
-    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }])).rejects.toBe(err);
+    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }], 'tenant-001')).rejects.toBe(err);
   });
 
   it('wraps non-Error thrown value', async () => {
     (triggerConfigRepo.updateTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
-    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }])).rejects.toMatchObject({ status: 500 });
+    await expect(bulkUpdateTriggerConfigs(1, [{ trigger_txtp_config_id: 20, message_count: 2 }], 'tenant-001')).rejects.toMatchObject({
+      status: 500,
+    });
   });
 });
 

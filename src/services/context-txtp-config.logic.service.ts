@@ -221,6 +221,7 @@ export const getContextConfigsWithStrategies = async (
 ): Promise<ContextTxtpConfigWithStrategies[]> => {
   try {
     const configs = await getContextTxtpConfigsByGenerationId(generationId);
+    if (configs.length === 0) return [];
     const tcsRow = await getSchemaByTransactionType(configs[0].txtp, configs[0].txtp_version, tenantId);
     return await Promise.all(
       configs.map(async (config) => {

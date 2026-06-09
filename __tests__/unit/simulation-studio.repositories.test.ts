@@ -137,7 +137,6 @@ describe('createSuiteGenerationInDb', () => {
 
     const result = await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, wizard_snapshot: {}, generation_metadata: {} },
-      1,
       'user-1',
       'user@test.com',
     );
@@ -154,7 +153,6 @@ describe('createSuiteGenerationInDb', () => {
 
     const result = await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, wizard_snapshot: {}, generation_metadata: {} },
-      1,
       'user-1',
     );
 
@@ -210,37 +208,36 @@ describe('getLatestGenerationBySuiteId', () => {
 describe('createSuiteGenerationInDb — optional fields', () => {
   it('uses SINGLE_RULE default when simulation_type absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('SINGLE_RULE');
+    expect(callValues[1]).toBe('SINGLE_RULE');
   });
 
   it('uses provided simulation_type when given', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('INTEGRATION_TESTING');
+    expect(callValues[1]).toBe('INTEGRATION_TESTING');
   });
 
   it('passes non-null rule_repo and rule_version when provided', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_repo: 'repo-a', rule_version: 'v1' },
-      1,
       'user-1',
     );
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[3]).toBe('repo-a');
-    expect(callValues[4]).toBe('v1');
+    expect(callValues[2]).toBe('repo-a');
+    expect(callValues[3]).toBe('v1');
   });
 
   it('passes null for optional rule_repo and rule_version when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[2]).toBeNull();
     expect(callValues[3]).toBeNull();
-    expect(callValues[4]).toBeNull();
-    expect(callValues[8]).toBeNull();
+    expect(callValues[7]).toBeNull();
   });
 });
 
@@ -497,7 +494,7 @@ describe('createSuiteGenerationInDb — optional fields', () => {
   it('uses SINGLE_RULE default when simulation_type absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
-    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 'user-1');
 
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(['SINGLE_RULE']) }), 'simulation');
   });
@@ -505,12 +502,12 @@ describe('createSuiteGenerationInDb — optional fields', () => {
   it('passes null for optional rule_repo, rule_version, userEmail when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
 
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[3]).toBeNull(); // rule_repo
-    expect(callValues[4]).toBeNull(); // rule_version
-    expect(callValues[8]).toBeNull(); // userEmail
+    expect(callValues[2]).toBeNull(); // rule_repo
+    expect(callValues[3]).toBeNull(); // rule_version
+    expect(callValues[7]).toBeNull(); // userEmail
   });
 });
 

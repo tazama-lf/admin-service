@@ -235,6 +235,11 @@ describe('createTriggerTxtpConfig', () => {
     await expect(createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
 
+  it('maps missing tcs_config to HttpException 404', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(new Error('Configuration not found'));
+    await expect(createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 404 });
+  });
+
   it('rethrows HttpException as-is', async () => {
     const err = new HttpException('bad', 404);
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(err);

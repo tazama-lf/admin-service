@@ -36,11 +36,18 @@ const mapRowToGeneration = (row: Record<string, unknown>): SuiteGeneration => ({
 
 export const createSuiteGenerationInDb = async (
   dto: CreateSuiteGenerationDto,
-  generationNumber: number,
   userId: string,
   userEmail?: string,
 ): Promise<SuiteGeneration> => {
   const query = `
+    WITH lock_row AS (
+      SELECT pg_advisory_xact_lock($1::bigint)
+    ),
+    next_num AS (
+      SELECT COALESCE(MAX(generation_number), 0) + 1 AS generation_number
+      FROM trs_suite_generations
+      WHERE suite_id = $1
+    )
     INSERT INTO trs_suite_generations (
       suite_id, generation_number, status, simulation_type,
       rule_repo, rule_version,
@@ -49,15 +56,16 @@ export const createSuiteGenerationInDb = async (
       context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
       wizard_snapshot, generation_metadata,
       created_by, created_by_email, created_at, updated_at
-    ) VALUES (
-      $1, $2, 'DRAFT', $3,
-      $4, $5,
-      0, 0, 0,
-      0, 0, 0,
-      0, 0, 0,
-      $6, $7,
-      $8, $9, NOW(), NOW()
     )
+    SELECT
+      $1, next_num.generation_number, 'DRAFT', $2,
+      $3, $4,
+      0, 0, 0,
+      0, 0, 0,
+      0, 0, 0,
+      $5, $6,
+      $7, $8, NOW(), NOW()
+    FROM next_num, lock_row
     RETURNING *
   `;
 
@@ -66,7 +74,6 @@ export const createSuiteGenerationInDb = async (
       text: query,
       values: [
         dto.suite_id,
-        generationNumber,
         dto.simulation_type ?? 'SINGLE_RULE',
         dto.rule_repo ?? null,
         dto.rule_version ?? null,

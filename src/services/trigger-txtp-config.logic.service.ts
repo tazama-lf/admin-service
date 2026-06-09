@@ -32,6 +32,14 @@ interface CreateTriggerConfigOptions {
   relatedTxtpConfigId?: number | null;
 }
 
+const isMissingTcsConfigError = (error: unknown): boolean =>
+  error instanceof Error && error.message.toLowerCase().includes('configuration not found');
+
+/**
+ * Creates a trigger txtp config row using sample payload from tcs_config as payload_template_json.
+ * Seeds all payload field paths with override_type = 'null' (use payload as-is, no transformation).
+ * Throws if tcs_config row not found.
+ */
 export const createTriggerConfigWithDefaultStrategies = async (
   opts: CreateTriggerConfigOptions,
 ): Promise<TriggerTxtpConfigWithStrategies> => {
@@ -154,6 +162,9 @@ export const createTriggerTxtpConfig = async (
     };
   } catch (error) {
     if (error instanceof HttpException) throw error;
+    if (isMissingTcsConfigError(error)) {
+      throw new HttpException(`Configuration not found for ${txtp} ${txtpVersion}`, HttpStatus.NOT_FOUND);
+    }
     throw new HttpException(
       `Failed to create trigger txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
@@ -194,6 +205,9 @@ export const addTriggerTxtpConfig = async (
     return newConfig;
   } catch (error) {
     if (error instanceof HttpException) throw error;
+    if (isMissingTcsConfigError(error)) {
+      throw new HttpException(`Configuration not found for ${dto.txtp} ${dto.txtp_version}`, HttpStatus.NOT_FOUND);
+    }
     throw new HttpException(
       `Failed to add trigger txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,

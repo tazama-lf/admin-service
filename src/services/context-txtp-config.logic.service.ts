@@ -39,6 +39,9 @@ interface CreateConfigOptions {
   relatedTxtpConfigId?: number | null;
 }
 
+const isMissingTcsConfigError = (error: unknown): boolean =>
+  error instanceof Error && error.message.toLowerCase().includes('configuration not found');
+
 export const createConfigWithDefaultStrategies = async (opts: CreateConfigOptions): Promise<ContextTxtpConfigWithStrategies> => {
   const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId, relatedTxtpConfigId } = opts;
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
@@ -137,6 +140,9 @@ export const createContextTxtpConfig = async (
     };
   } catch (error) {
     if (error instanceof HttpException) throw error;
+    if (isMissingTcsConfigError(error)) {
+      throw new HttpException(`Configuration not found for ${txtp} ${txtpVersion}`, HttpStatus.NOT_FOUND);
+    }
     throw new HttpException(
       `Failed to create context txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
@@ -173,6 +179,9 @@ export const addContextTxtpConfig = async (
     return config;
   } catch (error) {
     if (error instanceof HttpException) throw error;
+    if (isMissingTcsConfigError(error)) {
+      throw new HttpException(`Configuration not found for ${dto.txtp} ${dto.txtp_version}`, HttpStatus.NOT_FOUND);
+    }
     throw new HttpException(
       `Failed to add context txtp config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,

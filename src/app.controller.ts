@@ -2584,6 +2584,53 @@ export const getFakerSemanticDataHandler = async (req: FastifyRequest, reply: Fa
   }
 };
 
+// ── Generate sample context messages ──────────────────────────────────────────
+
+export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample context messages');
+    const { generationId } = req.params as { generationId: string };
+    const { tenantId } = req as ITenantRequest;
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategies } = await import('./utils/strategy-resolver.js');
+
+    const configs = await getContextConfigsWithStrategies(genId, tenantId);
+    if (!configs.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const sorted = [...configs].sort((a, b) => a.display_order - b.display_order);
+
+    const result = sorted.map((cfg) => {
+      const count = cfg.message_count > 0 ? cfg.message_count : 1;
+      const payloads: Array<Record<string, unknown>> = [];
+      for (let i = 1; i <= count; i++) {
+        payloads.push(applyStrategies(cfg.sample_payload_snapshot, cfg.field_strategies ?? []));
+      }
+      return {
+        context_txtp_config_id: cfg.context_txtp_config_id,
+        txtp: cfg.txtp,
+        txtp_version: cfg.txtp_version,
+        display_order: cfg.display_order,
+        message_count: count,
+        payloads,
+      };
+    });
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample context messages');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample messages. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample messages');
+  }
+};
+
 // ==================== SIMULATION OPERATIONS ====================
 
 export const createTrsSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {

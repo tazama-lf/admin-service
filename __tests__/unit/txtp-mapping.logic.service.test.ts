@@ -10,7 +10,7 @@ jest.mock('../../src/repositories/simulation-studio/txtp-mapping.repository', ()
 
 import { HttpException } from '../../src/utils/error';
 import * as mappingRepo from '../../src/repositories/simulation-studio/txtp-mapping.repository';
-import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from '../../src/services/txtp-mapping.logic.service';
+import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping, upsertTxtpMapping } from '../../src/services/txtp-mapping.logic.service';
 
 describe('txtp-mapping.logic.service', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -56,6 +56,16 @@ describe('txtp-mapping.logic.service', () => {
     ).rejects.toBeInstanceOf(HttpException);
   });
 
+  it('throws 400 when a mapping item has invalid shape', async () => {
+    await expect(
+      createTxtpMapping({
+        primary_txtp_id: 123,
+        related_txtp_id: 456,
+        mapping: [{ primary: 'valid', related: 42 as unknown as string }],
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
   it('gets all mappings by ids', async () => {
     (mappingRepo.getTxtpMappingByIdsInDb as jest.Mock).mockResolvedValue([
       {
@@ -87,5 +97,35 @@ describe('txtp-mapping.logic.service', () => {
 
     expect(mappingRepo.deleteTxtpMappingByIdsInDb).toHaveBeenCalledWith(111, 222);
     expect(result).toBe(true);
+  });
+
+  it('upsertTxtpMapping aliases createTxtpMapping behavior', async () => {
+    (mappingRepo.insertTxtpMappingInDb as jest.Mock).mockResolvedValue({
+      id: 9,
+      primary_tx_id: 123,
+      related_tx_id: 456,
+      mapping: [{ primary: 'p', related: 'r' }],
+    });
+
+    const result = await upsertTxtpMapping({
+      primary_txtp_id: 123,
+      related_txtp_id: 456,
+      mapping: [{ primary: 'p', related: 'r' }],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(9);
+  });
+
+  it('wraps non-HttpException errors from getTxtpMappings as 500 HttpException', async () => {
+    (mappingRepo.getTxtpMappingByIdsInDb as jest.Mock).mockRejectedValue(new Error('db read failed'));
+
+    await expect(getTxtpMappings(111, 222)).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('wraps non-HttpException errors from deleteTxtpMapping as 500 HttpException', async () => {
+    (mappingRepo.deleteTxtpMappingByIdsInDb as jest.Mock).mockRejectedValue(new Error('db delete failed'));
+
+    await expect(deleteTxtpMapping(111, 222)).rejects.toBeInstanceOf(HttpException);
   });
 });

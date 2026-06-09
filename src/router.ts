@@ -86,6 +86,12 @@ import {
   getTriggerConfigsHandler,
   addTriggerTxtpConfigHandler,
   bulkUpdateTriggerConfigsHandler,
+  upsertContextMappingHandler,
+  getContextMappingHandler,
+  deleteContextMappingHandler,
+  upsertTriggerMappingHandler,
+  getTriggerMappingHandler,
+  deleteTriggerMappingHandler,
   createEnrichmentTableHandler,
   getEnrichmentTablesHandler,
   bulkUpdateEnrichmentTablesHandler,
@@ -195,6 +201,12 @@ const routePrivilege = {
   getTriggerConfigs: ['editor', 'approver'],
   addTriggerTxtpConfig: ['editor', 'approver'],
   bulkUpdateTriggerConfigs: ['editor', 'approver'],
+  upsertContextMapping: ['editor', 'approver'],
+  getContextMapping: ['editor', 'approver'],
+  deleteContextMapping: ['editor', 'approver'],
+  upsertTriggerMapping: ['editor', 'approver'],
+  getTriggerMapping: ['editor', 'approver'],
+  deleteTriggerMapping: ['editor', 'approver'],
   getEnrichmentTables: ['editor', 'approver'],
   createEnrichmentTable: ['editor', 'approver'],
   bulkUpdateEnrichmentTables: ['editor', 'approver'],
@@ -587,6 +599,30 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
     ...SetOptionsBodyAndParams(bulkUpdateTriggerConfigsHandler, routePrivilege.bulkUpdateTriggerConfigs),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/context-mappings', {
+    ...SetOptionsBodyAndParams(upsertContextMappingHandler, routePrivilege.upsertContextMapping),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/context-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(getContextMappingHandler, routePrivilege.getContextMapping),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/context-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(deleteContextMappingHandler, routePrivilege.deleteContextMapping),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/trigger-mappings', {
+    ...SetOptionsBodyAndParams(upsertTriggerMappingHandler, routePrivilege.upsertTriggerMapping),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/trigger-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(getTriggerMappingHandler, routePrivilege.getTriggerMapping),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/trigger-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(deleteTriggerMappingHandler, routePrivilege.deleteTriggerMapping),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables', {

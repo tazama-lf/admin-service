@@ -253,6 +253,31 @@ export interface BulkTriggerConfigItemDto {
   field_overrides?: UpsertTriggerFieldOverrideDto[];
 }
 
+// ── Context/Trigger Mapping ──────────────────────────────────────────────────
+
+export interface MappingPair {
+  primary: string;
+  related: string;
+}
+
+export interface TxtpMapping {
+  id: number;
+  primary_tx_id: number;
+  related_tx_id: number;
+  mapping: MappingPair[];
+}
+
+export interface UpsertTxtpMappingDto {
+  primary_txtp_id: number;
+  related_txtp_id: number;
+  mapping: MappingPair[];
+}
+
+export interface TxtpMappingParamsDto {
+  primaryTxtpId: string;
+  relatedTxtpId: string;
+}
+
 // ── Enrichment Tables ────────────────────────────────────────────────────────
 
 export type EnrichmentFieldStrategyCode = 'static' | 'range' | 'generated' | 'null' | 'copy';

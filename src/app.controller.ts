@@ -110,12 +110,15 @@ import {
   deleteEnrichmentTable,
   getEnrichmentTables,
 } from './services/enrichment-table.logic.service';
+import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from './services/txtp-mapping.logic.service';
 import type {
   AddContextTxtpConfigDto,
   BulkConfigItemDto,
   AddTriggerTxtpConfigDto,
   BulkTriggerConfigItemDto,
   BulkEnrichmentUpdateItemDto,
+  UpsertTxtpMappingDto,
+  TxtpMappingParamsDto,
 } from './interface/simulation-studio/suite-generation.interface';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
@@ -2430,6 +2433,108 @@ export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply:
   } catch (err) {
     loggerService.error(`Failed to delete trigger txtp config. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to delete trigger txtp config');
+  }
+};
+
+export const upsertContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create context mapping');
+    const dto = req.body as UpsertTxtpMappingDto;
+    const mapping = await createTxtpMapping(dto);
+    reply.status(201).send({ success: true, data: mapping });
+    loggerService.log('End - Create context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to create context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create context mapping');
+  }
+};
+
+export const getContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get context mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (mappings.length === 0) {
+      reply.status(404).send({ success: false, message: 'Context mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: mappings });
+    loggerService.log('End - Get context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to get context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get context mapping');
+  }
+};
+
+export const deleteContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete context mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const deleted = await deleteTxtpMapping(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (!deleted) {
+      reply.status(404).send({ success: false, message: 'Context mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, message: 'Context mapping deleted' });
+    loggerService.log('End - Delete context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to delete context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete context mapping');
+  }
+};
+
+export const upsertTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create trigger mapping');
+    const dto = req.body as UpsertTxtpMappingDto;
+    const mapping = await createTxtpMapping(dto);
+    reply.status(201).send({ success: true, data: mapping });
+    loggerService.log('End - Create trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to create trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create trigger mapping');
+  }
+};
+
+export const getTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (mappings.length === 0) {
+      reply.status(404).send({ success: false, message: 'Trigger mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: mappings });
+    loggerService.log('End - Get trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to get trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get trigger mapping');
+  }
+};
+
+export const deleteTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete trigger mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const deleted = await deleteTxtpMapping(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (!deleted) {
+      reply.status(404).send({ success: false, message: 'Trigger mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, message: 'Trigger mapping deleted' });
+    loggerService.log('End - Delete trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to delete trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete trigger mapping');
   }
 };
 

@@ -3,7 +3,6 @@ import type { SuiteGeneration } from '../interface/suite-generation.interface';
 import type { SimulationSuite } from '../interface/simulation-suites.interface';
 import {
   createSuiteGenerationInDb,
-  getNextGenerationNumber,
   getGenerationsBySuiteId,
   getLatestGenerationBySuiteId,
   updateGenerationCountsInDb,
@@ -123,7 +122,6 @@ export const getGenerationSummary = async (generationId: number): Promise<Genera
 
 export const createSuiteGeneration = async (suite: SimulationSuite, userId: string, userEmail?: string): Promise<SuiteGeneration> => {
   try {
-    const generationNumber = await getNextGenerationNumber(suite.id);
     return await createSuiteGenerationInDb(
       {
         suite_id: suite.id,
@@ -133,7 +131,6 @@ export const createSuiteGeneration = async (suite: SimulationSuite, userId: stri
         wizard_snapshot: suite.wizard_progress,
         generation_metadata: {},
       },
-      generationNumber,
       userId,
       userEmail,
     );

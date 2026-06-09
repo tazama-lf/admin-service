@@ -4,7 +4,6 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 jest.mock('../../src/repositories/simulation-studio/suite-generations.repository', () => ({
   createSuiteGenerationInDb: jest.fn(),
-  getNextGenerationNumber: jest.fn(),
   getGenerationsBySuiteId: jest.fn(),
   getLatestGenerationBySuiteId: jest.fn(),
   resumeGenerationInDb: jest.fn(),
@@ -82,34 +81,29 @@ beforeEach(() => jest.clearAllMocks());
 // ── createSuiteGeneration ────────────────────────────────────────────────────
 
 describe('createSuiteGeneration', () => {
-  it('fetches next generation number and inserts row', async () => {
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(1);
+  it('creates generation row using atomic repository insert', async () => {
     (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockResolvedValue(mockGeneration);
 
     const result = await createSuiteGeneration(mockSuite, 'user-1', 'user@test.com');
 
     expect(result).toEqual(mockGeneration);
-    expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(42);
     expect(generationsRepo.createSuiteGenerationInDb).toHaveBeenCalledWith(
       expect.objectContaining({ suite_id: 42, simulation_type: 'SINGLE_RULE' }),
-      1,
       'user-1',
       'user@test.com',
     );
   });
 
   it('works without userEmail', async () => {
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
     (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockResolvedValue({ ...mockGeneration, generation_number: 2 });
 
     const result = await createSuiteGeneration(mockSuite, 'user-1');
 
     expect(result.generation_number).toBe(2);
-    expect(generationsRepo.createSuiteGenerationInDb).toHaveBeenCalledWith(expect.anything(), 2, 'user-1', undefined);
+    expect(generationsRepo.createSuiteGenerationInDb).toHaveBeenCalledWith(expect.anything(), 'user-1', undefined);
   });
 
   it('passes wizard_progress as wizard_snapshot', async () => {
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(1);
     (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockResolvedValue(mockGeneration);
     const suiteWithProgress = { ...mockSuite, wizard_progress: { currentStep: 1, completedSteps: [1] } };
 
@@ -117,7 +111,6 @@ describe('createSuiteGeneration', () => {
 
     expect(generationsRepo.createSuiteGenerationInDb).toHaveBeenCalledWith(
       expect.objectContaining({ wizard_snapshot: { currentStep: 1, completedSteps: [1] } }),
-      expect.any(Number),
       expect.any(String),
       undefined,
     );
@@ -125,17 +118,17 @@ describe('createSuiteGeneration', () => {
 
   it('rethrows HttpException as-is', async () => {
     const httpErr = new HttpException('conflict', 409);
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockRejectedValue(httpErr);
+    (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockRejectedValue(httpErr);
     await expect(createSuiteGeneration(mockSuite, 'user-1')).rejects.toBe(httpErr);
   });
 
   it('wraps unknown Error in HttpException 500', async () => {
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockRejectedValue(new Error('DB down'));
+    (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockRejectedValue(new Error('DB down'));
     await expect(createSuiteGeneration(mockSuite, 'user-1')).rejects.toMatchObject({ status: 500 });
   });
 
   it('wraps non-Error thrown value in HttpException 500', async () => {
-    (generationsRepo.getNextGenerationNumber as jest.Mock).mockRejectedValue('string error');
+    (generationsRepo.createSuiteGenerationInDb as jest.Mock).mockRejectedValue('string error');
     await expect(createSuiteGeneration(mockSuite, 'user-1')).rejects.toMatchObject({ status: 500 });
   });
 });

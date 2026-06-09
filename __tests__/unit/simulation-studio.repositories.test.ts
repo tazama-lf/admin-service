@@ -45,6 +45,7 @@ import {
 } from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
 import {
   createEnrichmentTableInDb,
+  getNextEnrichmentTableOrderInDb,
   updateEnrichmentTableInDb,
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
@@ -100,7 +101,7 @@ const fieldStrategyRow = {
   static_value: '999',
   range_min: null,
   range_max: null,
-  generator_type: null,
+  faker_semantic_type: null,
   generator_options: '{}',
   is_required_override: null,
   created_at: '2026-05-01T00:00:00.000Z',
@@ -117,7 +118,6 @@ describe('createSuiteGenerationInDb', () => {
 
     const result = await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, wizard_snapshot: {}, generation_metadata: {} },
-      1,
       'user-1',
       'user@test.com',
     );
@@ -134,7 +134,6 @@ describe('createSuiteGenerationInDb', () => {
 
     const result = await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, wizard_snapshot: {}, generation_metadata: {} },
-      1,
       'user-1',
     );
 
@@ -190,37 +189,36 @@ describe('getLatestGenerationBySuiteId', () => {
 describe('createSuiteGenerationInDb — optional fields', () => {
   it('uses SINGLE_RULE default when simulation_type absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('SINGLE_RULE');
+    expect(callValues[1]).toBe('SINGLE_RULE');
   });
 
   it('uses provided simulation_type when given', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('INTEGRATION_TESTING');
+    expect(callValues[1]).toBe('INTEGRATION_TESTING');
   });
 
   it('passes non-null rule_repo and rule_version when provided', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb(
       { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_repo: 'repo-a', rule_version: 'v1' },
-      1,
       'user-1',
     );
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[3]).toBe('repo-a');
-    expect(callValues[4]).toBe('v1');
+    expect(callValues[2]).toBe('repo-a');
+    expect(callValues[3]).toBe('v1');
   });
 
   it('passes null for optional rule_repo and rule_version when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(callValues[2]).toBeNull();
     expect(callValues[3]).toBeNull();
-    expect(callValues[4]).toBeNull();
-    expect(callValues[8]).toBeNull();
+    expect(callValues[7]).toBeNull();
   });
 });
 
@@ -391,7 +389,7 @@ describe('upsertFieldStrategyInDb', () => {
     const result = await upsertFieldStrategyInDb(1, {
       field_path: 'bic',
       strategy_code: 'generated',
-      generator_type: 'iso20022.bic',
+      faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 
@@ -421,7 +419,7 @@ describe('createSuiteGenerationInDb — optional fields', () => {
   it('uses SINGLE_RULE default when simulation_type absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
-    await createSuiteGenerationInDb({ suite_id: 42 } as any, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42 } as any, 'user-1');
 
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(['SINGLE_RULE']) }), 'simulation');
   });
@@ -429,12 +427,12 @@ describe('createSuiteGenerationInDb — optional fields', () => {
   it('passes null for optional rule_repo, rule_version, userEmail when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
-    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 1, 'user-1');
+    await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
 
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[3]).toBeNull(); // rule_repo
-    expect(callValues[4]).toBeNull(); // rule_version
-    expect(callValues[8]).toBeNull(); // userEmail
+    expect(callValues[2]).toBeNull(); // rule_repo
+    expect(callValues[3]).toBeNull(); // rule_version
+    expect(callValues[7]).toBeNull(); // userEmail
   });
 });
 
@@ -465,7 +463,7 @@ const triggerOverrideRow = {
   static_value: null,
   range_min: null,
   range_max: null,
-  generator_type: null,
+  faker_semantic_type: null,
   generator_options: '{}',
   created_at: '2026-05-01T00:00:00.000Z',
 };
@@ -657,7 +655,7 @@ describe('upsertTriggerFieldOverrideInDb', () => {
     const result = await upsertTriggerFieldOverrideInDb(20, {
       field_path: 'bic',
       override_type: 'generated',
-      generator_type: 'iso20022.bic',
+      faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 
@@ -763,7 +761,7 @@ describe('createEnrichmentTableInDb', () => {
 describe('updateEnrichmentTableInDb', () => {
   it('updates row_count and returns mapped row', async () => {
     mockDb.mockResolvedValue({ rows: [{ ...enrichmentTableRow, row_count: 5 }] });
-    const result = await updateEnrichmentTableInDb(30, { row_count: 5 });
+    const result = await updateEnrichmentTableInDb(30, 1, { row_count: 5 });
     expect(result!.row_count).toBe(5);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('UPDATE trs_suite_enrichment_tables') }),
@@ -773,40 +771,52 @@ describe('updateEnrichmentTableInDb', () => {
 
   it('updates payload_template_json', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { payload_template_json: { city: 'Karachi' } });
+    await updateEnrichmentTableInDb(30, 1, { payload_template_json: { city: 'Karachi' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ city: 'Karachi' }));
   });
 
   it('updates schema_template_json', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { schema_template_json: { col: 'VARCHAR' } });
+    await updateEnrichmentTableInDb(30, 1, { schema_template_json: { col: 'VARCHAR' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ col: 'VARCHAR' }));
   });
 
   it('updates faker_profile', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { faker_profile: { locale: 'ur' } });
+    await updateEnrichmentTableInDb(30, 1, { faker_profile: { locale: 'ur' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ locale: 'ur' }));
   });
 
   it('fetches existing row when no fields to update', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    const result = await updateEnrichmentTableInDb(30, {});
+    const result = await updateEnrichmentTableInDb(30, 1, {});
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('SELECT') }), 'simulation');
     expect(result).not.toBeNull();
   });
 
   it('returns null when no fields and row not found', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await updateEnrichmentTableInDb(99, {})).toBeNull();
+    expect(await updateEnrichmentTableInDb(99, 1, {})).toBeNull();
   });
 
   it('returns null when UPDATE finds no row', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await updateEnrichmentTableInDb(99, { row_count: 5 })).toBeNull();
+    expect(await updateEnrichmentTableInDb(99, 1, { row_count: 5 })).toBeNull();
+  });
+});
+
+describe('getNextEnrichmentTableOrderInDb', () => {
+  it('returns next table order for a generation', async () => {
+    mockDb.mockResolvedValue({ rows: [{ next_order: '4' }] });
+    await expect(getNextEnrichmentTableOrderInDb(1)).resolves.toBe(4);
+  });
+
+  it('defaults to 1 when query has no row', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await expect(getNextEnrichmentTableOrderInDb(1)).resolves.toBe(1);
   });
 });
 

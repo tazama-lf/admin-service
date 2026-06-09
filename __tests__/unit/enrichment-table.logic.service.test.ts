@@ -4,6 +4,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 jest.mock('../../src/repositories/simulation-studio/enrichment-tables.repository', () => ({
   createEnrichmentTableInDb: jest.fn(),
+  getNextEnrichmentTableOrderInDb: jest.fn(),
   updateEnrichmentTableInDb: jest.fn(),
   getEnrichmentTablesByGenerationId: jest.fn(),
   deleteEnrichmentTableInDb: jest.fn(),
@@ -41,6 +42,7 @@ beforeEach(() => jest.clearAllMocks());
 
 describe('createEnrichmentTable', () => {
   it('inserts table and returns SuiteEnrichmentTable', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockResolvedValue(mockTable);
 
     const result = await createEnrichmentTable(1, 'account_enrichment', 13, { name: 'feeba', country: 'Pak' });
@@ -49,6 +51,7 @@ describe('createEnrichmentTable', () => {
       expect.objectContaining({
         generation_id: 1,
         table_name: 'account_enrichment',
+        table_order: 1,
         row_count: 13,
         payload_template_json: { name: 'feeba', country: 'Pak' },
       }),
@@ -59,6 +62,7 @@ describe('createEnrichmentTable', () => {
   });
 
   it('passes schema_template_json to createEnrichmentTableInDb', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockResolvedValue(mockTable);
 
     await createEnrichmentTable(1, 'cnic', 5, { id: '123' }, { col: 'VARCHAR' });
@@ -69,6 +73,7 @@ describe('createEnrichmentTable', () => {
   });
 
   it('omits optional fields when not provided', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockResolvedValue(mockTable);
 
     await createEnrichmentTable(1, 'bare', 1);
@@ -79,17 +84,20 @@ describe('createEnrichmentTable', () => {
   });
 
   it('wraps error in HttpException 500', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
     await expect(createEnrichmentTable(1, 'cnic', 1)).rejects.toMatchObject({ status: 500 });
   });
 
   it('rethrows HttpException as-is', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     const err = new HttpException('conflict', 409);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockRejectedValue(err);
     await expect(createEnrichmentTable(1, 'cnic', 1)).rejects.toBe(err);
   });
 
   it('wraps non-Error thrown value', async () => {
+    (enrichmentTableRepo.getNextEnrichmentTableOrderInDb as jest.Mock).mockResolvedValue(1);
     (enrichmentTableRepo.createEnrichmentTableInDb as jest.Mock).mockRejectedValue('string error');
     await expect(createEnrichmentTable(1, 'cnic', 1)).rejects.toMatchObject({ status: 500 });
   });
@@ -148,7 +156,7 @@ describe('bulkUpdateEnrichmentTables', () => {
 
     const result = await bulkUpdateEnrichmentTables(1, [{ id: 30, row_count: 5 }]);
 
-    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(30, { row_count: 5 });
+    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(30, 1, { row_count: 5 });
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(30);
   });
@@ -169,8 +177,13 @@ describe('bulkUpdateEnrichmentTables', () => {
     ]);
 
     expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledTimes(2);
-    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(30, { row_count: 5 });
-    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(31, { row_count: 10 });
+    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(30, 1, { row_count: 5 });
+    expect(enrichmentTableRepo.updateEnrichmentTableInDb).toHaveBeenCalledWith(31, 1, { row_count: 10 });
+  });
+
+  it('throws 404 when an update target is outside the generation', async () => {
+    (enrichmentTableRepo.updateEnrichmentTableInDb as jest.Mock).mockResolvedValue(null);
+    await expect(bulkUpdateEnrichmentTables(1, [{ id: 30, row_count: 5 }])).rejects.toMatchObject({ status: 404 });
   });
 
   it('wraps error in HttpException 500', async () => {

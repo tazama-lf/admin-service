@@ -80,6 +80,7 @@ import {
   getSimulationByIdHandler,
   getSimulationsHandler,
   getSuiteGenerationsHandler,
+  getLatestSuiteGenerationHandler,
   getGenerationContextConfigsHandler,
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
@@ -106,6 +107,7 @@ import {
   saveEvaluationsInResultsTableHandler,
   saveRecordInTrsSimulationHandler,
   resumeGenerationHandler,
+  getFakerSemanticDataHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -568,6 +570,10 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getSuiteGenerationsHandler, routePrivilege.getSuiteGenerations),
   });
 
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations/latest', {
+    ...SetOptionsBodyAndParams(getLatestSuiteGenerationHandler, routePrivilege.getSuiteGenerations),
+  });
+
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs', {
     ...SetOptionsBodyAndParams(getGenerationContextConfigsHandler, routePrivilege.getGenerationContextConfigs),
   });
@@ -634,6 +640,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/generation/resume', {
     ...SetOptionsBodyAndParams(resumeGenerationHandler, routePrivilege.resumeGeneration),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/faker-semantic-data', {
+    ...SetOptionsBodyAndParams(getFakerSemanticDataHandler, routePrivilege.getFakerSemanticData),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

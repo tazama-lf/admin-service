@@ -131,7 +131,7 @@ export const cloneSuite = async (sourceSuiteId: number, tenantId: string, userId
 
     const newSuite = await createSimulationSuiteInDb(
       {
-        name: `${source.name} (Copy)`,
+        name: source.name,
         description: source.description,
         simulation_type: source.simulation_type,
         rule_repo: source.rule_repo ?? '',

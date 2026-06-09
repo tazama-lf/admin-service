@@ -2,6 +2,7 @@
 import type { SuiteEnrichmentTable, BulkEnrichmentUpdateItemDto } from '../interface/suite-generation.interface';
 import {
   createEnrichmentTableInDb,
+  getNextEnrichmentTableOrderInDb,
   updateEnrichmentTableInDb,
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
@@ -21,9 +22,12 @@ export const createEnrichmentTable = async (
   schemaTemplateJson?: Record<string, unknown>,
 ): Promise<SuiteEnrichmentTable> => {
   try {
+    // Keep ordering stable by assigning the next server-side order for the generation.
+    const tableOrder = await getNextEnrichmentTableOrderInDb(generationId);
     const table = await createEnrichmentTableInDb({
       generation_id: generationId,
       table_name: tableName,
+      table_order: tableOrder,
       row_count: rowCount,
       payload_template_json: payloadTemplateJson,
       schema_template_json: schemaTemplateJson,
@@ -64,8 +68,12 @@ export const bulkUpdateEnrichmentTables = async (
     await Promise.all(
       items.map(async (item) => {
         const { id: tableId, ...updateFields } = item;
+        if (!Number.isInteger(tableId) || tableId <= 0) return;
         if (Object.keys(updateFields).length > 0) {
-          await updateEnrichmentTableInDb(tableId, updateFields);
+          const updated = await updateEnrichmentTableInDb(tableId, generationId, updateFields);
+          if (!updated) {
+            throw new HttpException(`Enrichment table ${tableId} not found for generation ${generationId}`, HttpStatus.NOT_FOUND);
+          }
         }
       }),
     );

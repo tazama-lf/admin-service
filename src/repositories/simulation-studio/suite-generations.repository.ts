@@ -122,7 +122,7 @@ export const updateWizardProgressInDb = async (generationId: number, currentStep
               jsonb_set(
                 wizard_snapshot,
                 '{currentStep}',
-                $1::jsonb
+                to_jsonb($1::int)
               ),
               '{completedSteps}',
               $2::jsonb

@@ -80,6 +80,7 @@ import {
   getSimulationByIdHandler,
   getSimulationsHandler,
   getSuiteGenerationsHandler,
+  getLatestSuiteGenerationHandler,
   getGenerationContextConfigsHandler,
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
@@ -563,6 +564,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations', {
     ...SetOptionsBodyAndParams(getSuiteGenerationsHandler, routePrivilege.getSuiteGenerations),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations/latest', {
+    ...SetOptionsBodyAndParams(getLatestSuiteGenerationHandler, routePrivilege.getSuiteGenerations),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs', {

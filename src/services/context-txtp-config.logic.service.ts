@@ -186,6 +186,8 @@ export const bulkUpdateContextConfigs = async (
     await Promise.all(
       items.map(async (item) => {
         const { context_txtp_config_id: contextTxtpConfigId, field_strategies: fieldStrategies, ...updateFields } = item;
+        // Skip malformed entries instead of issuing DB writes with an undefined id.
+        if (!Number.isInteger(contextTxtpConfigId) || contextTxtpConfigId <= 0) return;
         if (Object.keys(updateFields).length > 0) {
           await updateContextTxtpConfigInDb(contextTxtpConfigId, updateFields);
         }

@@ -29,6 +29,7 @@ const mapRowToContextConfig = (row: Record<string, unknown>): SuiteContextTxtpCo
       ? (JSON.parse(row.generator_profile) as Record<string, unknown>)
       : (row.generator_profile as Record<string, unknown>),
   related_txtp_config_id: row.related_txtp_config_id != null ? (row.related_txtp_config_id as number) : null,
+  related_transaction: row.related_transaction != null ? (row.related_transaction as string) : null,
   created_at: new Date(row.created_at as string),
 });
 
@@ -37,11 +38,11 @@ export const createContextTxtpConfigInDb = async (dto: CreateContextTxtpConfigDt
     INSERT INTO trs_suite_context_txtp_configs (
       generation_id, txtp, txtp_version, display_order, message_count,
       schema_snapshot, sample_payload_snapshot, faker_seed, generator_profile,
-      related_txtp_config_id, created_at
+      related_txtp_config_id, related_transaction, created_at
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9,
-      $10, NOW()
+      $10, $11, NOW()
     )
     RETURNING *
   `;
@@ -60,6 +61,7 @@ export const createContextTxtpConfigInDb = async (dto: CreateContextTxtpConfigDt
         dto.faker_seed ?? null,
         JSON.stringify(dto.generator_profile ?? {}),
         dto.related_txtp_config_id ?? null,
+        dto.related_transaction ?? null,
       ],
     } satisfies PgQueryConfig,
     'simulation',
@@ -84,6 +86,10 @@ export const updateContextTxtpConfigInDb = async (id: number, dto: UpdateContext
   if (dto.generator_profile !== undefined) {
     updates.push(`generator_profile = $${idx++}`);
     values.push(JSON.stringify(dto.generator_profile));
+  }
+  if (dto.related_txtp_config_id !== undefined) {
+    updates.push(`related_txtp_config_id = $${idx++}`);
+    values.push(dto.related_txtp_config_id);
   }
 
   if (updates.length === 0) {
@@ -156,4 +162,19 @@ export const getContextTxtpConfigsByGenerationId = async (generationId: number):
   );
 
   return result.rows.map(mapRowToContextConfig);
+};
+
+export const getContextTxtpConfigById = async (id: number): Promise<SuiteContextTxtpConfig | null> => {
+  const query = `
+    SELECT *
+    FROM trs_suite_context_txtp_configs
+    WHERE id = $1
+  `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: query, values: [id] } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return result.rows.length ? mapRowToContextConfig(result.rows[0]) : null;
 };

@@ -4,12 +4,14 @@ import type {
   AddContextTxtpConfigDto,
   BulkConfigItemDto,
   ContextTxtpConfigWithStrategies,
+  SuiteContextTxtpConfig,
 } from '../interface/suite-generation.interface';
 import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
   deleteContextTxtpConfigInDb,
+  getContextTxtpConfigById,
 } from '../repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -68,6 +70,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
     schema_snapshot: schema,
     sample_payload_snapshot: samplePayload,
     related_txtp_config_id: relatedTxtpConfigId ?? null,
+    related_transaction: tcsRow.related_transaction ?? null,
   });
 
   const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
@@ -86,7 +89,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
     sample_payload_snapshot: config.sample_payload_snapshot,
     field_strategies: fieldStrategies,
     related_txtp_config_id: relatedTxtpConfigId ?? null,
-    related_transaction: tcsRow.related_transaction ?? '',
+    related_transaction: config.related_transaction ?? null,
   };
 };
 
@@ -124,6 +127,7 @@ export const createContextTxtpConfig = async (
       schema_snapshot: schema,
       sample_payload_snapshot: samplePayload,
       related_txtp_config_id: null,
+      related_transaction: tcsRow.related_transaction ?? null,
     });
 
     const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
@@ -133,33 +137,6 @@ export const createContextTxtpConfig = async (
     );
 
     // Create related config if tcs_config has related_transaction
-    // const relatedTransactionPath = tcsRow.related_transaction ?? null;
-    // if (relatedTransactionPath) {
-    //   const { txtp: relatedTxtp, version: relatedVersion } = gettxtpAndVersionFromUrl(relatedTransactionPath);
-    //   const relatedTcsRow = await getSchemaByTransactionType(relatedTxtp, relatedVersion, tenantId);
-
-    //   const schema = relatedTcsRow.schema as Record<string, unknown>;
-    //   const samplePayload = (
-    //     relatedTcsRow.content_type === (ContentType.XML as string) ? relatedTcsRow.payload_xml : relatedTcsRow.payload_json
-    //   ) as Record<string, unknown> | undefined;
-
-    //   const relatedConfig = await createContextTxtpConfigInDb({
-    //     generation_id: generationId,
-    //     txtp: relatedTxtp,
-    //     txtp_version: relatedVersion,
-    //     display_order: 2,
-    //     message_count: 100,
-    //     schema_snapshot: schema,
-    //     sample_payload_snapshot: samplePayload,
-    //     related_txtp_config_id: primaryConfig.id,
-    //   });
-
-    //   const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
-    //   const fieldPaths = flattenSchemaPaths(samplePayload ?? schemaFallback);
-    //   await Promise.all(
-    //     fieldPaths.map(async (path) => await upsertFieldStrategyInDb(relatedConfig.id, { field_path: path, strategy_code: 'keep_sample' })),
-    //   );
-    // }
     return {
       context_txtp_config_id: primaryConfig.id,
       txtp: primaryConfig.txtp,
@@ -169,6 +146,7 @@ export const createContextTxtpConfig = async (
       schema_snapshot: primaryConfig.schema_snapshot,
       sample_payload_snapshot: primaryConfig.sample_payload_snapshot,
       related_txtp_config_id: null,
+      related_transaction: primaryConfig.related_transaction ?? null,
       field_strategies: fieldStrategies,
     };
   } catch (error) {
@@ -193,7 +171,8 @@ export const addContextTxtpConfig = async (
   try {
     const existing = await getContextTxtpConfigsByGenerationId(generationId);
     const displayOrder = existing.length + 1;
-    return await createConfigWithDefaultStrategies({
+
+    const config = await createConfigWithDefaultStrategies({
       generationId,
       txtp: dto.txtp,
       txtpVersion: dto.txtp_version,
@@ -201,6 +180,11 @@ export const addContextTxtpConfig = async (
       displayOrder,
       tenantId,
     });
+
+    if (dto.related_context_txtp_id) {
+      await getContextTxtpAnsAddRelatedConfig(dto.related_context_txtp_id, config.context_txtp_config_id);
+    }
+    return config;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -210,6 +194,18 @@ export const addContextTxtpConfig = async (
   }
 };
 
+export const getContextTxtpAnsAddRelatedConfig = async (
+  configId: number,
+  relatedConfigId: number,
+): Promise<SuiteContextTxtpConfig | null> => {
+  const existingContextTxtp = await getContextTxtpConfigById(configId);
+  if (!existingContextTxtp) {
+    throw new HttpException(`Context txtp config with id ${configId} not found`, HttpStatus.NOT_FOUND);
+  }
+
+  const updatedContextTxtp = await updateContextTxtpConfigInDb(configId, { related_txtp_config_id: relatedConfigId });
+  return updatedContextTxtp;
+};
 // ── Step 2: GET all ──────────────────────────────────────────────────────────
 
 /**
@@ -217,12 +213,10 @@ export const addContextTxtpConfig = async (
  */
 export const getContextConfigsWithStrategies = async (
   generationId: number,
-  tenantId: string,
+  _tenantId?: string,
 ): Promise<ContextTxtpConfigWithStrategies[]> => {
   try {
     const configs = await getContextTxtpConfigsByGenerationId(generationId);
-    if (configs.length === 0) return [];
-    const tcsRow = await getSchemaByTransactionType(configs[0].txtp, configs[0].txtp_version, tenantId);
     return await Promise.all(
       configs.map(async (config) => {
         const fieldStrategies = await getFieldStrategiesByContextConfigId(config.id);
@@ -235,8 +229,8 @@ export const getContextConfigsWithStrategies = async (
           schema_snapshot: config.schema_snapshot,
           sample_payload_snapshot: config.sample_payload_snapshot,
           related_txtp_config_id: config.related_txtp_config_id ?? null,
+          related_transaction: config.related_transaction ?? null,
           field_strategies: fieldStrategies,
-          related_transaction: tcsRow.related_transaction ?? '',
         };
       }),
     );

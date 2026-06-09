@@ -63,6 +63,7 @@ export interface SuiteContextTxtpConfig {
   faker_seed?: number;
   generator_profile: Record<string, unknown>;
   related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
   created_at: Date;
 }
 
@@ -77,18 +78,21 @@ export interface CreateContextTxtpConfigDto {
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
   related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
 }
 
 export interface UpdateContextTxtpConfigDto {
   message_count?: number;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
 }
 
 export interface AddContextTxtpConfigDto {
   txtp: string;
   txtp_version: string;
   message_count?: number;
+  related_context_txtp_id?: number;
 }
 
 // ── Context Field Strategies ─────────────────────────────────────────────────
@@ -127,8 +131,8 @@ export interface ContextTxtpConfigWithStrategies {
   schema_snapshot: Record<string, unknown>;
   sample_payload_snapshot?: Record<string, unknown>;
   related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
   field_strategies: ContextFieldStrategy[];
-  related_transaction?: string;
 }
 
 export interface BulkConfigItemDto {

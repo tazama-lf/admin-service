@@ -5,7 +5,7 @@ import type {
   BulkConfigItemDto,
   ContextTxtpConfigWithStrategies,
   SuiteContextTxtpConfig,
-} from '../interface/suite-generation.interface';
+} from '../interface/simulation-studio/suite-generation.interface';
 import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,

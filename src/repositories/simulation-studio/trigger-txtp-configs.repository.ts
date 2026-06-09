@@ -5,7 +5,7 @@ import type {
   SuiteTriggerTxtpConfig,
   CreateTriggerTxtpConfigDto,
   UpdateTriggerTxtpConfigDto,
-} from '../../interface/suite-generation.interface';
+} from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRow = (row: Record<string, unknown>): SuiteTriggerTxtpConfig => ({
   id: row.id as number,
@@ -28,6 +28,7 @@ const mapRow = (row: Record<string, unknown>): SuiteTriggerTxtpConfig => ({
       ? (JSON.parse(row.generator_profile) as Record<string, unknown>)
       : (row.generator_profile as Record<string, unknown>),
   related_txtp_config_id: row.related_txtp_config_id != null ? (row.related_txtp_config_id as number) : null,
+  related_transaction: row.related_transaction != null ? (row.related_transaction as string) : null,
   created_at: new Date(row.created_at as string),
 });
 
@@ -37,12 +38,12 @@ export const createTriggerTxtpConfigInDb = async (dto: CreateTriggerTxtpConfigDt
       generation_id, txtp, txtp_version, display_order, message_count,
       payload_template_json, link_to_context_pairs,
       expected_independent_variable, expected_result_band, notes,
-      faker_seed, generator_profile, related_txtp_config_id, created_at
+      faker_seed, generator_profile, related_txtp_config_id, related_transaction, created_at
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7,
       $8, $9, $10,
-      $11, $12, $13, NOW()
+      $11, $12, $13, $14, NOW()
     )
     RETURNING *
   `;
@@ -64,6 +65,7 @@ export const createTriggerTxtpConfigInDb = async (dto: CreateTriggerTxtpConfigDt
         dto.faker_seed ?? null,
         JSON.stringify(dto.generator_profile ?? {}),
         dto.related_txtp_config_id ?? null,
+        dto.related_transaction ?? null,
       ],
     } satisfies PgQueryConfig,
     'simulation',
@@ -108,6 +110,10 @@ export const updateTriggerTxtpConfigInDb = async (id: number, dto: UpdateTrigger
   if (dto.generator_profile !== undefined) {
     updates.push(`generator_profile = $${idx++}`);
     values.push(JSON.stringify(dto.generator_profile));
+  }
+  if (dto.related_txtp_config_id !== undefined) {
+    updates.push(`related_txtp_config_id = $${idx++}`);
+    values.push(dto.related_txtp_config_id);
   }
 
   if (updates.length === 0) {

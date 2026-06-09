@@ -5,7 +5,7 @@ import type {
   SuiteContextTxtpConfig,
   CreateContextTxtpConfigDto,
   UpdateContextTxtpConfigDto,
-} from '../../interface/suite-generation.interface';
+} from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRowToContextConfig = (row: Record<string, unknown>): SuiteContextTxtpConfig => ({
   id: row.id as number,

@@ -5,7 +5,7 @@ import type {
   UpdateSimulationSuiteDto,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
-} from '../interface/simulation-suites.interface';
+} from '../interface/simulation-studio/simulation-suites.interface';
 import {
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,

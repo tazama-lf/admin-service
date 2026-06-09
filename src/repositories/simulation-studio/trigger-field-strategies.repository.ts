@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { TriggerFieldOverride, UpsertTriggerFieldOverrideDto } from '../../interface/suite-generation.interface';
+import type { TriggerFieldOverride, UpsertTriggerFieldOverrideDto } from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRow = (row: Record<string, unknown>): TriggerFieldOverride => ({
   id: row.id as number,

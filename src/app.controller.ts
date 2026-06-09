@@ -116,7 +116,7 @@ import type {
   AddTriggerTxtpConfigDto,
   BulkTriggerConfigItemDto,
   BulkEnrichmentUpdateItemDto,
-} from './interface/suite-generation.interface';
+} from './interface/simulation-studio/suite-generation.interface';
 import type { EvaluationRow } from './repositories/configuration/evaluation.repository';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -125,7 +125,7 @@ import type {
   CreateSimulationSuiteDto,
   UpdateSimulationSuiteDto,
   SimulationSuiteIdParamsDto,
-} from './interface/simulation-suites.interface';
+} from './interface/simulation-studio/simulation-suites.interface';
 import {
   handleCreatePushJob,
   handleGetAllJobs,
@@ -2136,14 +2136,13 @@ export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: Fasti
     loggerService.log('Start - Get trigger txtp configs');
     const { generationId: generationIdStr } = req.params as { generationId: string };
     const generationId = parseInt(generationIdStr, 10);
-    const { tenantId } = req as ITenantRequest;
 
     if (isNaN(generationId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
       return;
     }
 
-    const configs = await getTriggerConfigsWithOverrides(generationId, tenantId);
+    const configs = await getTriggerConfigsWithOverrides(generationId);
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get trigger txtp configs');
   } catch (err) {
@@ -2185,7 +2184,6 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
     loggerService.log('Start - Bulk update trigger txtp configs');
     const { generationId: generationIdStr } = req.params as { generationId: string };
     const generationId = parseInt(generationIdStr, 10);
-    const { tenantId } = req as ITenantRequest;
 
     if (isNaN(generationId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
@@ -2198,7 +2196,7 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
       return;
     }
 
-    const updated = await bulkUpdateTriggerConfigs(generationId, items, tenantId);
+    const updated = await bulkUpdateTriggerConfigs(generationId, items);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update trigger txtp configs');

@@ -4,7 +4,7 @@ import type {
   AddTriggerTxtpConfigDto,
   BulkTriggerConfigItemDto,
   TriggerTxtpConfigWithOverrides,
-} from '../interface/suite-generation.interface';
+} from '../interface/simulation-studio/suite-generation.interface';
 import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
@@ -63,6 +63,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     message_count: messageCount,
     payload_template_json: payloadTemplate ?? {},
     related_txtp_config_id: relatedTxtpConfigId ?? null,
+    related_transaction: tcsRow.related_transaction ?? null,
   });
 
   const fieldPaths = flattenPayloadPaths(payloadTemplate);
@@ -82,7 +83,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     notes: config.notes,
     related_txtp_config_id: config.related_txtp_config_id,
     field_overrides: fieldOverrides,
-    related_transaction: tcsRow.related_transaction ?? '',
+    related_transaction: config.related_transaction ?? '',
   };
 };
 
@@ -114,6 +115,7 @@ export const createTriggerTxtpConfig = async (
       message_count: 1,
       payload_template_json: payloadTemplate ?? {},
       related_txtp_config_id: null,
+      related_transaction: tcsRow.related_transaction ?? null,
     });
 
     const fieldPaths = flattenPayloadPaths(payloadTemplate);
@@ -158,7 +160,7 @@ export const createTriggerTxtpConfig = async (
       notes: primaryConfig.notes,
       related_txtp_config_id: null,
       field_overrides: fieldOverrides,
-      related_transaction: tcsRow.related_transaction ?? '',
+      related_transaction: primaryConfig.related_transaction ?? '',
     };
   } catch (error) {
     if (error instanceof HttpException) throw error;
@@ -173,6 +175,8 @@ export const createTriggerTxtpConfig = async (
 
 /**
  * Called when user clicks "Add TXTP" in Step 3. display_order = existing count + 1.
+ * If dto.related_trigger_txtp_id is provided, updates that config's related_txtp_config_id
+ * to point to the newly created config.
  */
 export const addTriggerTxtpConfig = async (
   generationId: number,
@@ -182,7 +186,7 @@ export const addTriggerTxtpConfig = async (
   try {
     const existing = await getTriggerTxtpConfigsByGenerationId(generationId);
     const displayOrder = existing.length + 1;
-    return await createTriggerConfigWithDefaultStrategies({
+    const newConfig = await createTriggerConfigWithDefaultStrategies({
       generationId,
       txtp: dto.txtp,
       txtpVersion: dto.txtp_version,
@@ -190,6 +194,14 @@ export const addTriggerTxtpConfig = async (
       displayOrder,
       tenantId,
     });
+
+    if (dto.related_trigger_txtp_id) {
+      await updateTriggerTxtpConfigInDb(dto.related_trigger_txtp_id, {
+        related_txtp_config_id: newConfig.trigger_txtp_config_id,
+      });
+    }
+
+    return newConfig;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -201,11 +213,10 @@ export const addTriggerTxtpConfig = async (
 
 // ── Step 3: GET all ──────────────────────────────────────────────────────────
 
-export const getTriggerConfigsWithOverrides = async (generationId: number, tenantId: string): Promise<TriggerTxtpConfigWithOverrides[]> => {
+export const getTriggerConfigsWithOverrides = async (generationId: number): Promise<TriggerTxtpConfigWithOverrides[]> => {
   try {
     const configs = await getTriggerTxtpConfigsByGenerationId(generationId);
     if (configs.length === 0) return [];
-    const tcsRow = await getSchemaByTransactionType(configs[0].txtp, configs[0].txtp_version, tenantId);
     return await Promise.all(
       configs.map(async (config) => {
         const fieldOverrides = await getTriggerFieldOverridesByConfigId(config.id);
@@ -221,7 +232,7 @@ export const getTriggerConfigsWithOverrides = async (generationId: number, tenan
           notes: config.notes,
           related_txtp_config_id: config.related_txtp_config_id ?? null,
           field_overrides: fieldOverrides,
-          related_transaction: tcsRow.related_transaction ?? '',
+          related_transaction: config.related_transaction ?? '',
         };
       }),
     );
@@ -239,7 +250,6 @@ export const getTriggerConfigsWithOverrides = async (generationId: number, tenan
 export const bulkUpdateTriggerConfigs = async (
   generationId: number,
   items: BulkTriggerConfigItemDto[],
-  tenantId: string,
 ): Promise<TriggerTxtpConfigWithOverrides[]> => {
   try {
     await Promise.all(
@@ -253,7 +263,7 @@ export const bulkUpdateTriggerConfigs = async (
         }
       }),
     );
-    return await getTriggerConfigsWithOverrides(generationId, tenantId);
+    return await getTriggerConfigsWithOverrides(generationId);
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(

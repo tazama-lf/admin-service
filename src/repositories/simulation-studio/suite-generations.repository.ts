@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { SuiteGeneration, CreateSuiteGenerationDto } from '../../interface/suite-generation.interface';
+import type { SuiteGeneration, CreateSuiteGenerationDto } from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRowToGeneration = (row: Record<string, unknown>): SuiteGeneration => ({
   id: row.id as number,

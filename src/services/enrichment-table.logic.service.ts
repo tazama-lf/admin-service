@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SuiteEnrichmentTable, BulkEnrichmentUpdateItemDto } from '../interface/suite-generation.interface';
+import type { SuiteEnrichmentTable, BulkEnrichmentUpdateItemDto } from '../interface/simulation-studio/suite-generation.interface';
 import {
   createEnrichmentTableInDb,
   updateEnrichmentTableInDb,

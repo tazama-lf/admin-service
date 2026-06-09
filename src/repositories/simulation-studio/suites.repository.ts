@@ -7,7 +7,7 @@ import type {
   SimulationSuitesListResponse,
   CreateSimulationSuiteDto,
   UpdateSimulationSuiteDto,
-} from '../../interface/simulation-suites.interface';
+} from '../../interface/simulation-studio/simulation-suites.interface';
 
 export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOptions): Promise<SimulationSuitesListResponse> => {
   const { tenantId, search, status, ruleName, txtp, updatedFrom, updatedTo, limit = 20, offset = 0 } = options;

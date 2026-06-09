@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SuiteGeneration } from '../interface/suite-generation.interface';
-import type { SimulationSuite } from '../interface/simulation-suites.interface';
+import type { SuiteGeneration } from '../interface/simulation-studio/suite-generation.interface';
+import type { SimulationSuite } from '../interface/simulation-studio/simulation-suites.interface';
 import {
   createSuiteGenerationInDb,
   getNextGenerationNumber,

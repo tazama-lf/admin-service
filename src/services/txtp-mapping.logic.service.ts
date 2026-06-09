@@ -17,7 +17,7 @@ const validateIds = (primaryTxtpId: number, relatedTxtpId: number): void => {
   }
 };
 
-export const createTxtpMapping = async (dto: UpsertTxtpMappingDto): Promise<TxtpMapping> => {
+export const createTxtpMapping = async (dto: UpsertTxtpMappingDto): Promise<TxtpMapping[]> => {
   try {
     const { primary_txtp_id: primaryTxtpId, related_txtp_id: relatedTxtpId, mapping } = dto;
     validateIds(primaryTxtpId, relatedTxtpId);
@@ -26,7 +26,17 @@ export const createTxtpMapping = async (dto: UpsertTxtpMappingDto): Promise<Txtp
       throw new HttpException('mapping must be an array', HttpStatus.BAD_REQUEST);
     }
 
-    return await insertTxtpMappingInDb(primaryTxtpId, relatedTxtpId, mapping);
+    const insertedRows = await Promise.all(
+      mapping.map(async (pair) => {
+        if (typeof pair?.primary !== 'string' || typeof pair?.related !== 'string') {
+          throw new HttpException('each mapping item must include string primary and related values', HttpStatus.BAD_REQUEST);
+        }
+
+        return await insertTxtpMappingInDb(primaryTxtpId, relatedTxtpId, [pair]);
+      }),
+    );
+
+    return insertedRows;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -49,7 +59,7 @@ export const getTxtpMappings = async (primaryTxtpId: number, relatedTxtpId: numb
   }
 };
 
-export const upsertTxtpMapping = async (dto: UpsertTxtpMappingDto): Promise<TxtpMapping> => await createTxtpMapping(dto);
+export const upsertTxtpMapping = async (dto: UpsertTxtpMappingDto): Promise<TxtpMapping[]> => await createTxtpMapping(dto);
 
 export const deleteTxtpMapping = async (primaryTxtpId: number, relatedTxtpId: number): Promise<boolean> => {
   try {

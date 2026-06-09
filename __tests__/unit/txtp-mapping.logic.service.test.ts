@@ -15,22 +15,35 @@ import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from '../../src
 describe('txtp-mapping.logic.service', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('inserts mapping for valid ids', async () => {
-    (mappingRepo.insertTxtpMappingInDb as jest.Mock).mockResolvedValue({
-      id: 1,
-      primary_tx_id: 123,
-      related_tx_id: 456,
-      mapping: [{ primary: 'FITOFI.amount', related: 'msgId' }],
-    });
+  it('inserts one row per mapping item for valid ids', async () => {
+    (mappingRepo.insertTxtpMappingInDb as jest.Mock)
+      .mockResolvedValueOnce({
+        id: 1,
+        primary_tx_id: 123,
+        related_tx_id: 456,
+        mapping: [{ primary: 'FITOFI.amount', related: 'msgId' }],
+      })
+      .mockResolvedValueOnce({
+        id: 2,
+        primary_tx_id: 123,
+        related_tx_id: 456,
+        mapping: [{ primary: 'FITOFI.currency', related: 'ccy' }],
+      });
 
     const result = await createTxtpMapping({
       primary_txtp_id: 123,
       related_txtp_id: 456,
-      mapping: [{ primary: 'FITOFI.amount', related: 'msgId' }],
+      mapping: [
+        { primary: 'FITOFI.amount', related: 'msgId' },
+        { primary: 'FITOFI.currency', related: 'ccy' },
+      ],
     });
 
-    expect(mappingRepo.insertTxtpMappingInDb).toHaveBeenCalledWith(123, 456, [{ primary: 'FITOFI.amount', related: 'msgId' }]);
-    expect(result.id).toBe(1);
+    expect(mappingRepo.insertTxtpMappingInDb).toHaveBeenNthCalledWith(1, 123, 456, [{ primary: 'FITOFI.amount', related: 'msgId' }]);
+    expect(mappingRepo.insertTxtpMappingInDb).toHaveBeenNthCalledWith(2, 123, 456, [{ primary: 'FITOFI.currency', related: 'ccy' }]);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe(1);
+    expect(result[1].id).toBe(2);
   });
 
   it('throws 400 for invalid ids while inserting', async () => {

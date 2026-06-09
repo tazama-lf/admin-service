@@ -128,3 +128,10 @@ export interface SimulationSuitesListResponse {
   limit?: number;
   offset?: number;
 }
+
+export interface SimulationSuitesCountsResponse {
+  total_suites: number;
+  total_draft_suites: number;
+  total_completed_suites: number;
+  latest_run_at: Date | null;
+}

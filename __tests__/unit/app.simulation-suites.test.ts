@@ -6,6 +6,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 jest.mock('../../src/services/simulation-suites.logic.service', () => ({
   createSimulationSuite: jest.fn(),
   getSimulationSuites: jest.fn(),
+  getSimulationSuitesCounts: jest.fn(),
   getSimulationSuiteById: jest.fn(),
   updateSimulationSuite: jest.fn(),
 }));
@@ -31,6 +32,7 @@ jest.mock('../../src', () => ({
 import {
   createSimulationHandler,
   getSimulationsHandler,
+  getSimulationSuitesCountsHandler,
   getSimulationByIdHandler,
   updateSimulationHandler,
   resumeGenerationHandler,
@@ -164,6 +166,43 @@ describe('Simulation Suites API Handlers', () => {
           total: 1,
         }),
       );
+    });
+  });
+
+  describe('getSimulationSuitesCountsHandler', () => {
+    it('should return simulation suites counts with 200', async () => {
+      const counts = {
+        total_suites: 10,
+        total_draft_suites: 4,
+        total_completed_suites: 3,
+        latest_run_at: new Date('2026-06-01T00:00:00.000Z'),
+      };
+      (simulationSuitesService.getSimulationSuitesCounts as jest.Mock).mockResolvedValue(counts);
+
+      const req = {
+        tenantId: mockTenantId,
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await getSimulationSuitesCountsHandler(req, reply as FastifyReply);
+
+      expect(simulationSuitesService.getSimulationSuitesCounts).toHaveBeenCalledWith(mockTenantId);
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith({ success: true, data: counts });
+    });
+
+    it('should delegate count errors to ErrorHandler', async () => {
+      const error = new Error('Counts failed');
+      (simulationSuitesService.getSimulationSuitesCounts as jest.Mock).mockRejectedValue(error);
+
+      const req = {
+        tenantId: mockTenantId,
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await getSimulationSuitesCountsHandler(req, reply as FastifyReply);
+
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to retrieve simulation suites counts');
     });
   });
 

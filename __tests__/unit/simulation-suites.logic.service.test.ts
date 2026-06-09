@@ -9,6 +9,7 @@ import * as trsGenService from '../../src/services/trs-suite-generation.logic.se
 import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
 jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
+  getSimulationSuitesCountsFromDb: jest.fn(),
   getSimulationSuitesFromDb: jest.fn(),
   getSimulationSuiteByIdFromDb: jest.fn(),
   createSimulationSuiteInDb: jest.fn(),
@@ -79,6 +80,31 @@ describe('Simulation Suites Logic Service', () => {
     it('wraps non-Error thrown value with Unknown error', async () => {
       (simulationSuitesRepository.getSimulationSuitesFromDb as jest.Mock).mockRejectedValue('string failure');
       await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow('Unknown error');
+    });
+  });
+
+  describe('getSimulationSuitesCounts', () => {
+    it('should return suites counts', async () => {
+      const response = {
+        total_suites: 10,
+        total_draft_suites: 4,
+        total_completed_suites: 3,
+        latest_run_at: new Date('2026-06-01T00:00:00.000Z'),
+      };
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockResolvedValue(response);
+
+      const result = await simulationSuitesService.getSimulationSuitesCounts(mockTenantId);
+
+      expect(result).toEqual(response);
+      expect(simulationSuitesRepository.getSimulationSuitesCountsFromDb).toHaveBeenCalledWith(mockTenantId);
+    });
+
+    it('should wrap repository errors for counts', async () => {
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockRejectedValue(new Error('DB failure'));
+
+      await expect(simulationSuitesService.getSimulationSuitesCounts(mockTenantId)).rejects.toThrow(
+        'Failed to retrieve simulation suites counts: DB failure',
+      );
     });
   });
 

@@ -7,6 +7,7 @@ jest.mock('../../../src/services/database.logic.service', () => ({
 }));
 
 import {
+  getSimulationSuitesCountsFromDb,
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,
   createSimulationSuiteInDb,
@@ -57,6 +58,43 @@ describe('Suites Repository', () => {
     expect(countQuery.text).toContain('COUNT(*)');
     const dataQuery = mockHandlePostExecuteSqlStatement.mock.calls[1][0] as { text: string };
     expect(dataQuery.text).toContain('ORDER BY updated_at DESC');
+  });
+
+  it('getSimulationSuitesCountsFromDb should return parsed counts and latest run date', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          total_suites: '12',
+          total_draft_suites: '5',
+          total_completed_suites: '4',
+          latest_run_at: '2026-06-08T10:15:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getSimulationSuitesCountsFromDb('tenant-a');
+
+    expect(result.total_suites).toBe(12);
+    expect(result.total_draft_suites).toBe(5);
+    expect(result.total_completed_suites).toBe(4);
+    expect(result.latest_run_at).toBeInstanceOf(Date);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('COUNT(*) AS total_suites'), values: ['tenant-a'] }),
+      'simulation',
+    );
+  });
+
+  it('getSimulationSuitesCountsFromDb should fallback to zeros when row missing', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [] });
+
+    const result = await getSimulationSuitesCountsFromDb('tenant-a');
+
+    expect(result).toEqual({
+      total_suites: 0,
+      total_draft_suites: 0,
+      total_completed_suites: 0,
+      latest_run_at: null,
+    });
   });
 
   it('getSimulationSuiteByIdFromDb should return null when missing', async () => {

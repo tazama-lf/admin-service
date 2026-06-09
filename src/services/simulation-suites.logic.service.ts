@@ -5,8 +5,10 @@ import type {
   UpdateSimulationSuiteDto,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
+  SimulationSuitesCountsResponse,
 } from '../interface/simulation-studio/simulation-suites.interface';
 import {
+  getSimulationSuitesCountsFromDb,
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,
   createSimulationSuiteInDb,
@@ -23,6 +25,17 @@ export const getSimulationSuites = async (options: SimulationSuitesQueryOptions)
   } catch (error) {
     throw new HttpException(
       `Failed to retrieve simulation suites: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const getSimulationSuitesCounts = async (tenantId: string): Promise<SimulationSuitesCountsResponse> => {
+  try {
+    return await getSimulationSuitesCountsFromDb(tenantId);
+  } catch (error) {
+    throw new HttpException(
+      `Failed to retrieve simulation suites counts: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

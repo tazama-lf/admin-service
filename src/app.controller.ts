@@ -82,6 +82,7 @@ import {
 } from './services/simulation-logs.logic.service';
 import {
   getSimulationSuites,
+  getSimulationSuitesCounts,
   getSimulationSuiteById,
   createSimulationSuite,
   updateSimulationSuite,
@@ -1906,6 +1907,21 @@ export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyR
     const failMessage = `Failed to retrieve simulation suites. \n${util.inspect(err)}`;
     loggerService.error(failMessage);
     ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites');
+  }
+};
+
+export const getSimulationSuitesCountsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suites counts');
+    const { tenantId } = req as ITenantRequest;
+    const counts = await getSimulationSuitesCounts(tenantId);
+
+    reply.status(200).send({ success: true, data: counts });
+    loggerService.log('End - Get simulation suites counts');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suites counts. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites counts');
   }
 };
 

@@ -77,6 +77,7 @@ import {
   reviewMaskHandler,
   updateSimulationHandler,
   createSimulationHandler,
+  getSimulationSuitesCountsHandler,
   getSimulationByIdHandler,
   getSimulationsHandler,
   getSuiteGenerationsHandler,
@@ -192,6 +193,7 @@ const routePrivilege = {
   reviewMask: 'trs_data_engineer_approver',
   createSimulationSuites: ['editor', 'approver'],
   getSimulationSuites: ['editor', 'approver'],
+  getSimulationSuitesCounts: ['editor', 'approver'],
   getSimulationSuiteById: ['editor', 'approver'],
   updateSimulationSuite: ['editor', 'approver'],
   getSuiteGenerations: ['editor', 'approver'],
@@ -563,6 +565,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites', {
     ...SetOptionsBodyAndParams(getSimulationsHandler, routePrivilege.getSimulationSuites),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/counts', {
+    ...SetOptionsBodyAndParams(getSimulationSuitesCountsHandler, routePrivilege.getSimulationSuitesCounts),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:id', {

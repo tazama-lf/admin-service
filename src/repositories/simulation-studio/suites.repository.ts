@@ -5,9 +5,47 @@ import type {
   SimulationSuite,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
+  SimulationSuitesCountsResponse,
   CreateSimulationSuiteDto,
   UpdateSimulationSuiteDto,
 } from '../../interface/simulation-studio/simulation-suites.interface';
+
+export const getSimulationSuitesCountsFromDb = async (tenantId: string): Promise<SimulationSuitesCountsResponse> => {
+  const result = await handlePostExecuteSqlStatement<{
+    total_suites: string | number;
+    total_draft_suites: string | number;
+    total_completed_suites: string | number;
+    latest_run_at: string | null;
+  }>(
+    {
+      text: `
+        SELECT
+          COUNT(*) AS total_suites,
+          COUNT(*) FILTER (WHERE status = 'DRAFT') AS total_draft_suites,
+          COUNT(*) FILTER (WHERE status = 'COMPLETED') AS total_completed_suites,
+          MAX(last_run_at) AS latest_run_at
+        FROM trs_simulation_suites
+        WHERE tenant_id = $1
+      `,
+      values: [tenantId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const row = result.rows[0] ?? {
+    total_suites: '0',
+    total_draft_suites: '0',
+    total_completed_suites: '0',
+    latest_run_at: null,
+  };
+
+  return {
+    total_suites: parseInt(String(row.total_suites ?? '0'), 10),
+    total_draft_suites: parseInt(String(row.total_draft_suites ?? '0'), 10),
+    total_completed_suites: parseInt(String(row.total_completed_suites ?? '0'), 10),
+    latest_run_at: row.latest_run_at ? new Date(row.latest_run_at) : null,
+  };
+};
 
 export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOptions): Promise<SimulationSuitesListResponse> => {
   const { tenantId, search, status, ruleName, txtp, updatedFrom, updatedTo, limit = 20, offset = 0 } = options;

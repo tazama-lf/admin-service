@@ -55,7 +55,27 @@ export const createEnrichmentTableInDb = async (dto: CreateEnrichmentTableDto): 
   return mapRow(result.rows[0]);
 };
 
-export const updateEnrichmentTableInDb = async (id: number, dto: UpdateEnrichmentTableDto): Promise<SuiteEnrichmentTable | null> => {
+export const getNextEnrichmentTableOrderInDb = async (generationId: number): Promise<number> => {
+  const result = await handlePostExecuteSqlStatement<{ next_order: string | number }>(
+    {
+      text: `
+        SELECT COALESCE(MAX(table_order), 0) + 1 AS next_order
+        FROM trs_suite_enrichment_tables
+        WHERE generation_id = $1
+      `,
+      values: [generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return parseInt(String(result.rows[0]?.next_order ?? '1'), 10);
+};
+
+export const updateEnrichmentTableInDb = async (
+  id: number,
+  generationId: number,
+  dto: UpdateEnrichmentTableDto,
+): Promise<SuiteEnrichmentTable | null> => {
   const updates: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -79,14 +99,17 @@ export const updateEnrichmentTableInDb = async (id: number, dto: UpdateEnrichmen
 
   if (updates.length === 0) {
     const existing = await handlePostExecuteSqlStatement<Record<string, unknown>>(
-      { text: 'SELECT * FROM trs_suite_enrichment_tables WHERE id = $1', values: [id] } satisfies PgQueryConfig,
+      {
+        text: 'SELECT * FROM trs_suite_enrichment_tables WHERE id = $1 AND generation_id = $2',
+        values: [id, generationId],
+      } satisfies PgQueryConfig,
       'simulation',
     );
     return existing.rows.length ? mapRow(existing.rows[0]) : null;
   }
 
-  values.push(id);
-  const query = `UPDATE trs_suite_enrichment_tables SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+  values.push(id, generationId);
+  const query = `UPDATE trs_suite_enrichment_tables SET ${updates.join(', ')} WHERE id = $${idx} AND generation_id = $${idx + 1} RETURNING *`;
 
   const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
     { text: query, values } satisfies PgQueryConfig,

@@ -49,6 +49,7 @@ import {
 } from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
 import {
   createEnrichmentTableInDb,
+  getNextEnrichmentTableOrderInDb,
   updateEnrichmentTableInDb,
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
@@ -838,7 +839,7 @@ describe('createEnrichmentTableInDb', () => {
 describe('updateEnrichmentTableInDb', () => {
   it('updates row_count and returns mapped row', async () => {
     mockDb.mockResolvedValue({ rows: [{ ...enrichmentTableRow, row_count: 5 }] });
-    const result = await updateEnrichmentTableInDb(30, { row_count: 5 });
+    const result = await updateEnrichmentTableInDb(30, 1, { row_count: 5 });
     expect(result!.row_count).toBe(5);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('UPDATE trs_suite_enrichment_tables') }),
@@ -848,40 +849,52 @@ describe('updateEnrichmentTableInDb', () => {
 
   it('updates payload_template_json', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { payload_template_json: { city: 'Karachi' } });
+    await updateEnrichmentTableInDb(30, 1, { payload_template_json: { city: 'Karachi' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ city: 'Karachi' }));
   });
 
   it('updates schema_template_json', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { schema_template_json: { col: 'VARCHAR' } });
+    await updateEnrichmentTableInDb(30, 1, { schema_template_json: { col: 'VARCHAR' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ col: 'VARCHAR' }));
   });
 
   it('updates faker_profile', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    await updateEnrichmentTableInDb(30, { faker_profile: { locale: 'ur' } });
+    await updateEnrichmentTableInDb(30, 1, { faker_profile: { locale: 'ur' } });
     const callArg = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
     expect(callArg).toContain(JSON.stringify({ locale: 'ur' }));
   });
 
   it('fetches existing row when no fields to update', async () => {
     mockDb.mockResolvedValue({ rows: [enrichmentTableRow] });
-    const result = await updateEnrichmentTableInDb(30, {});
+    const result = await updateEnrichmentTableInDb(30, 1, {});
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('SELECT') }), 'simulation');
     expect(result).not.toBeNull();
   });
 
   it('returns null when no fields and row not found', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await updateEnrichmentTableInDb(99, {})).toBeNull();
+    expect(await updateEnrichmentTableInDb(99, 1, {})).toBeNull();
   });
 
   it('returns null when UPDATE finds no row', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await updateEnrichmentTableInDb(99, { row_count: 5 })).toBeNull();
+    expect(await updateEnrichmentTableInDb(99, 1, { row_count: 5 })).toBeNull();
+  });
+});
+
+describe('getNextEnrichmentTableOrderInDb', () => {
+  it('returns next table order for a generation', async () => {
+    mockDb.mockResolvedValue({ rows: [{ next_order: '4' }] });
+    await expect(getNextEnrichmentTableOrderInDb(1)).resolves.toBe(4);
+  });
+
+  it('defaults to 1 when query has no row', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    await expect(getNextEnrichmentTableOrderInDb(1)).resolves.toBe(1);
   });
 });
 

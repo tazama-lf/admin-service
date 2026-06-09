@@ -129,6 +129,13 @@ import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interf
 import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
 import { getSuiteResult, saveRunResult } from './services/simulation-run-results.logic.service';
 
+const scheduleRecalculateGenerationCounts = (generationId: number): void => {
+  // Prevent unhandled promise rejections while keeping count updates async/non-blocking.
+  void recalculateGenerationCounts(generationId).catch((error: unknown) => {
+    loggerService.error(`Failed to recalculate generation counts for generation ${generationId}. \n${util.inspect(error)}`);
+  });
+};
+
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
   try {
@@ -1910,7 +1917,7 @@ export const addContextTxtpConfigHandler = async (req: FastifyRequest, reply: Fa
 
     const dto = req.body as AddContextTxtpConfigDto;
     const created = await addContextTxtpConfig(generationId, dto, tenantId);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
 
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Add context txtp config');
@@ -1989,7 +1996,7 @@ export const addTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: Fa
 
     const dto = req.body as AddTriggerTxtpConfigDto;
     const created = await addTriggerTxtpConfig(generationId, dto, tenantId);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
 
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Add trigger txtp config');
@@ -2088,7 +2095,7 @@ export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     const created = await createEnrichmentTable(generationId, tableName, rowCount ?? 1, payloadTemplateJson, schemaTemplateJson);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
     reply.status(201).send({ success: true, data: created });
     loggerService.log('End - Create enrichment table');
   } catch (err) {
@@ -2163,7 +2170,7 @@ export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: F
     }
 
     await deleteEnrichmentTable(tableId);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Enrichment table deleted' });
     loggerService.log('End - Delete enrichment table');
   } catch (err) {
@@ -2249,7 +2256,7 @@ export const deleteContextTxtpConfigHandler = async (req: FastifyRequest, reply:
       return;
     }
     await deleteContextTxtpConfig(configId);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Context txtp config deleted' });
     loggerService.log('End - Delete context txtp config');
   } catch (err) {
@@ -2275,7 +2282,7 @@ export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply:
       return;
     }
     await deleteTriggerTxtpConfig(configId);
-    void recalculateGenerationCounts(generationId);
+    scheduleRecalculateGenerationCounts(generationId);
     reply.status(200).send({ success: true, message: 'Trigger txtp config deleted' });
     loggerService.log('End - Delete trigger txtp config');
   } catch (err) {

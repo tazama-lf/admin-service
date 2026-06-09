@@ -245,6 +245,8 @@ export const bulkUpdateTriggerConfigs = async (
     await Promise.all(
       items.map(async (item) => {
         const { trigger_txtp_config_id: configId, field_strategies: fieldStrategies, ...updateFields } = item;
+        // Skip malformed entries instead of issuing DB writes with an undefined id.
+        if (!Number.isInteger(configId) || configId <= 0) return;
         if (Object.keys(updateFields).length > 0) {
           await updateTriggerTxtpConfigInDb(configId, updateFields);
         }

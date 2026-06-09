@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Type, type Static } from '@sinclair/typebox';
 
-const ExpressionMathJSON = Type.String();
+// Mirrors @tazama-lf/frms-coe-lib's TypologyConfig.expression:
+//   type ExpressionMathJSON = Array<string | number | ExpressionMathJSON>
+const ExpressionMathJSON = Type.Recursive((Self) => Type.Array(Type.Union([Type.String(), Type.Number(), Self])));
 
 const Weight = Type.Object({
   ref: Type.String(),
@@ -28,7 +30,7 @@ export const TypologySchema = Type.Object(
     cfg: Type.String(),
     desc: Type.Optional(Type.String()),
     rules: Type.Array(RuleValue),
-    expression: Type.Array(ExpressionMathJSON),
+    expression: ExpressionMathJSON,
     workflow: WorkFlow,
     creDtTm: Type.Optional(Type.String({ format: 'date-time' })),
     updDtTm: Type.Optional(Type.String({ format: 'date-time' })),

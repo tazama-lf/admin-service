@@ -113,6 +113,8 @@ import {
   resumeGenerationHandler,
   getFakerSemanticDataHandler,
   generateSampleMessagesHandler,
+  generateSampleTriggerMessagesHandler,
+  generateSampleEnrichmentRowsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -226,6 +228,8 @@ const routePrivilege = {
   resumeGeneration: ['editor', 'approver'],
   getFakerSemanticData: ['editor', 'approver'],
   generateSampleMessages: ['editor', 'approver'],
+  generateSampleTriggerMessages: ['editor', 'approver'],
+  generateSampleEnrichmentRows: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -675,6 +679,14 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-messages', {
     ...SetOptionsBodyAndParams(generateSampleMessagesHandler, routePrivilege.generateSampleMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-trigger-messages', {
+    ...SetOptionsBodyAndParams(generateSampleTriggerMessagesHandler, routePrivilege.generateSampleTriggerMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-enrichment-rows', {
+    ...SetOptionsBodyAndParams(generateSampleEnrichmentRowsHandler, routePrivilege.generateSampleEnrichmentRows),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

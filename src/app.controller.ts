@@ -102,7 +102,7 @@ import {
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
-  getTriggerConfigsWithOverrides,
+  getTriggerConfigsWithStrategies,
   bulkUpdateTriggerConfigs,
 } from './services/trigger-txtp-config.logic.service';
 import {
@@ -110,6 +110,7 @@ import {
   bulkUpdateEnrichmentTables,
   deleteEnrichmentTable,
   getEnrichmentTables,
+  getEnrichmentTablesWithStrategies,
 } from './services/enrichment-table.logic.service';
 import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from './services/txtp-mapping.logic.service';
 import type {
@@ -2161,7 +2162,7 @@ export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: Fasti
       return;
     }
 
-    const configs = await getTriggerConfigsWithOverrides(generationId);
+    const configs = await getTriggerConfigsWithStrategies(generationId);
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get trigger txtp configs');
   } catch (err) {
@@ -2597,7 +2598,7 @@ export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: 
       return;
     }
 
-    const { applyStrategies } = await import('./utils/strategy-resolver.js');
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
 
     const configs = await getContextConfigsWithStrategies(genId, tenantId);
     if (!configs.length) {
@@ -2611,7 +2612,7 @@ export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: 
       const count = cfg.message_count > 0 ? cfg.message_count : 1;
       const payloads: Array<Record<string, unknown>> = [];
       for (let i = 1; i <= count; i++) {
-        payloads.push(applyStrategies(cfg.sample_payload_snapshot, cfg.field_strategies ?? []));
+        payloads.push(applyStrategy(cfg.sample_payload_snapshot, cfg.field_strategies ?? []));
       }
       return {
         context_txtp_config_id: cfg.context_txtp_config_id,
@@ -2628,6 +2629,103 @@ export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: 
   } catch (err) {
     loggerService.error(`Failed to generate sample messages. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to generate sample messages');
+  }
+};
+
+// ── Generate sample trigger messages ─────────────────────────────────────────
+
+export const generateSampleTriggerMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample trigger messages');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
+
+    const configs = await getTriggerConfigsWithStrategies(genId);
+    if (!configs.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const sorted = [...configs].sort((a, b) => a.display_order - b.display_order);
+
+    // Primary is always the first config. Related is included only when related_transaction exists.
+    const [primary] = sorted;
+    const hasRelated = !!primary.related_transaction && primary.related_transaction !== '';
+    const toGenerate = hasRelated ? sorted : [primary];
+
+    const result = toGenerate.map((cfg) => ({
+      trigger_txtp_config_id: cfg.trigger_txtp_config_id,
+      txtp: cfg.txtp,
+      txtp_version: cfg.txtp_version,
+      display_order: cfg.display_order,
+      related_transaction: cfg.related_transaction ?? null,
+      related_txtp_config_id: cfg.related_txtp_config_id ?? null,
+      payload: applyStrategy(cfg.payload_template_json, cfg.field_strategies),
+    }));
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample trigger messages');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample trigger messages. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample trigger messages');
+  }
+};
+
+// ── Generate sample enrichment rows ──────────────────────────────────────────
+
+export const generateSampleEnrichmentRowsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample enrichment rows');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
+
+    const tables = await getEnrichmentTablesWithStrategies(genId);
+    if (!tables.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const result = tables.map((table) => {
+      const count = table.row_count > 0 ? table.row_count : 1;
+      const rows: Array<Record<string, unknown>> = [];
+      // Map enrichment field strategies to the unified FieldStrategyInput shape.
+      const strategies = table.field_strategies.map((s) => ({
+        field_path: s.column_name,
+        strategy_code: s.strategy_code,
+        static_value: s.static_value,
+        range_min: s.range_min,
+        range_max: s.range_max,
+        faker_semantic_type: s.generator_type,
+      }));
+      for (let i = 0; i < count; i++) {
+        rows.push(applyStrategy(table.payload_template_json, strategies));
+      }
+      return {
+        enrichment_table_id: table.id,
+        table_name: table.table_name,
+        table_order: table.table_order,
+        row_count: count,
+        rows,
+      };
+    });
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample enrichment rows');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample enrichment rows. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample enrichment rows');
   }
 };
 

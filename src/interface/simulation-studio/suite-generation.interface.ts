@@ -13,7 +13,8 @@ export enum SimulationType {
   INTEGRATION_TESTING = 'INTEGRATION_TESTING',
 }
 
-export type ContextFieldStrategyCode = 'keep_sample' | 'static' | 'range' | 'generated' | 'null' | 'skip';
+/** @deprecated Use FieldStrategyCode instead */
+export type ContextFieldStrategyCode = FieldStrategyCode;
 
 export interface SuiteGeneration {
   id: number;
@@ -101,7 +102,7 @@ export interface ContextFieldStrategy {
   id: number;
   context_txtp_config_id: number;
   field_path: string;
-  strategy_code: ContextFieldStrategyCode;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -113,7 +114,7 @@ export interface ContextFieldStrategy {
 
 export interface UpsertFieldStrategyDto {
   field_path: string;
-  strategy_code: ContextFieldStrategyCode;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -143,9 +144,13 @@ export interface BulkConfigItemDto {
   field_strategies?: UpsertFieldStrategyDto[];
 }
 
+// ── Shared field strategy code ───────────────────────────────────────────────
+
+/** Unified strategy code used across context, trigger, and enrichment field strategy tables. */
+export type FieldStrategyCode = 'keep_sample' | 'static' | 'range' | 'generated' | 'null' | 'skip' | 'copy';
+
 // ── Trigger TXTP Config ──────────────────────────────────────────────────────
 
-export type TriggerOverrideType = 'static' | 'range' | 'generated' | 'remove' | 'null';
 export type TriggerExpectedBand = 'good' | 'neutral' | 'bad' | 'error';
 
 export interface SuiteTriggerTxtpConfig {
@@ -203,11 +208,11 @@ export interface AddTriggerTxtpConfigDto {
   related_trigger_txtp_id?: number;
 }
 
-export interface TriggerFieldOverride {
+export interface TriggerFieldStrategy {
   id: number;
   trigger_txtp_config_id: number;
   field_path: string;
-  override_type: TriggerOverrideType;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -216,9 +221,9 @@ export interface TriggerFieldOverride {
   created_at: Date;
 }
 
-export interface UpsertTriggerFieldOverrideDto {
+export interface UpsertTriggerFieldStrategyDto {
   field_path: string;
-  override_type: TriggerOverrideType;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -226,7 +231,7 @@ export interface UpsertTriggerFieldOverrideDto {
   generator_options?: Record<string, unknown>;
 }
 
-export interface TriggerTxtpConfigWithOverrides {
+export interface TriggerTxtpConfigWithStrategies {
   trigger_txtp_config_id: number;
   txtp: string;
   txtp_version: string;
@@ -237,7 +242,7 @@ export interface TriggerTxtpConfigWithOverrides {
   expected_result_band?: TriggerExpectedBand;
   notes?: string;
   related_txtp_config_id?: number | null;
-  field_overrides: TriggerFieldOverride[];
+  field_strategies: TriggerFieldStrategy[];
   related_transaction?: string;
 }
 
@@ -250,7 +255,7 @@ export interface BulkTriggerConfigItemDto {
   notes?: string;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
-  field_overrides?: UpsertTriggerFieldOverrideDto[];
+  field_strategies?: UpsertTriggerFieldStrategyDto[];
 }
 
 // ── Context/Trigger Mapping ──────────────────────────────────────────────────
@@ -279,8 +284,6 @@ export interface TxtpMappingParamsDto {
 }
 
 // ── Enrichment Tables ────────────────────────────────────────────────────────
-
-export type EnrichmentFieldStrategyCode = 'static' | 'range' | 'generated' | 'null' | 'copy';
 
 export interface SuiteEnrichmentTable {
   id: number;
@@ -317,4 +320,33 @@ export interface BulkEnrichmentUpdateItemDto {
   payload_template_json?: Record<string, unknown>;
   schema_template_json?: Record<string, unknown>;
   faker_profile?: Record<string, unknown>;
+}
+
+export interface EnrichmentFieldStrategy {
+  id: number;
+  enrichment_table_id: number;
+  column_name: string;
+  column_type: string;
+  strategy_code: FieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface UpsertEnrichmentFieldStrategyDto {
+  column_name: string;
+  column_type?: string;
+  strategy_code: FieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options?: Record<string, unknown>;
+}
+
+export interface SuiteEnrichmentTableWithStrategies extends SuiteEnrichmentTable {
+  field_strategies: EnrichmentFieldStrategy[];
 }

@@ -1,11 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Simple strategy resolver for admin-service.
- * Given a sample payload and a list of field strategies, returns one generated payload.
+ * Unified strategy resolver for admin-service.
+ * Applies field strategies (context, trigger, or enrichment) to a payload template.
  */
 
 import { randomUUID } from 'node:crypto';
-import type { ContextFieldStrategy } from '../interface/simulation-studio/suite-generation.interface';
+
+// ── Shared input type ─────────────────────────────────────────────────────────
+
+/**
+ * Normalised field strategy input accepted by applyStrategy.
+ * Context, trigger, and enrichment strategies all map to this shape.
+ */
+export interface FieldStrategyInput {
+  /** Dot-path in the payload (field_path for context/trigger, column_name for enrichment). */
+  field_path: string;
+  strategy_code: string;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  /** Semantic generator key (faker_semantic_type for context/trigger, generator_type for enrichment). */
+  faker_semantic_type?: string;
+}
 
 // ── Dot-path helpers ──────────────────────────────────────────────────────────
 
@@ -96,52 +112,63 @@ const SEMANTIC_GENERATORS: Partial<Record<string, () => unknown>> = {
   status: () => pick(['ACCP', 'RJCT', 'PDNG', 'ACSC', 'ACWC']),
 };
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Unified applyStrategy ─────────────────────────────────────────────────────
 
 /**
- * Applies field strategies to a sample payload and returns one generated payload.
- * Does NOT mutate the input sample.
+ * Applies a list of field strategies to a payload template and returns one generated payload.
+ * Works for context, trigger, and enrichment strategies — they all share the same strategy_code values.
+ *
+ * strategy_code semantics:
+ *   keep_sample — leave the template value unchanged
+ *   static      — set field to static_value
+ *   range       — pick a random number in [range_min, range_max]
+ *   generated   — use faker_semantic_type to generate a value
+ *   null        — set field to null
+ *   skip/remove — remove the field from the payload entirely
+ *   copy        — keep the template value unchanged (alias for keep_sample used by enrichment)
+ *
+ * Does NOT mutate the input template.
  */
-export const applyStrategies = (
-  samplePayload: Record<string, unknown> | undefined,
-  strategies: ContextFieldStrategy[],
-): Record<string, unknown> => {
-  const base = JSON.parse(JSON.stringify(samplePayload ?? {})) as Record<string, unknown>;
-  const skipPaths = new Set<string>();
+export const applyStrategy = (template: Record<string, unknown> | undefined, strategies: FieldStrategyInput[]): Record<string, unknown> => {
+  const base = JSON.parse(JSON.stringify(template ?? {})) as Record<string, unknown>;
+  const removePaths = new Set<string>();
 
-  for (const strategy of strategies) {
-    switch (strategy.strategy_code) {
+  for (const s of strategies) {
+    switch (s.strategy_code) {
       case 'keep_sample':
+      case 'copy':
+        // keep template value as-is
         break;
 
       case 'static':
-        setNestedValue(base, strategy.field_path, strategy.static_value ?? null);
+        setNestedValue(base, s.field_path, s.static_value ?? null);
         break;
 
       case 'range': {
-        const min = strategy.range_min ?? 0;
-        const max = strategy.range_max ?? 1;
-        setNestedValue(base, strategy.field_path, parseFloat(rand(min, max).toFixed(2)));
+        const min = s.range_min ?? 0;
+        const max = s.range_max ?? 1;
+        setNestedValue(base, s.field_path, parseFloat(rand(min, max).toFixed(2)));
         break;
       }
 
       case 'generated': {
-        const generator = SEMANTIC_GENERATORS[strategy.faker_semantic_type?.toLowerCase() ?? ''];
-        setNestedValue(base, strategy.field_path, generator?.() ?? randomUUID());
+        const generator = SEMANTIC_GENERATORS[s.faker_semantic_type?.toLowerCase() ?? ''];
+        setNestedValue(base, s.field_path, generator?.() ?? randomUUID());
         break;
       }
 
       case 'null':
-        setNestedValue(base, strategy.field_path, null);
+        setNestedValue(base, s.field_path, null);
         break;
 
       case 'skip':
-        skipPaths.add(strategy.field_path);
+      case 'remove':
+        removePaths.add(s.field_path);
         break;
     }
   }
 
-  for (const path of skipPaths) {
+  for (const path of removePaths) {
     removeNestedValue(base, path);
   }
 

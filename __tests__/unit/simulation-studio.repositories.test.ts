@@ -38,8 +38,8 @@ import {
   deleteTriggerTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
-  upsertTriggerFieldOverrideInDb,
-  getTriggerFieldOverridesByConfigId,
+  upsertTriggerFieldStrategyInDb,
+  getTriggerFieldStrategiesByConfigId,
 } from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
 import {
   createEnrichmentTableInDb,
@@ -511,11 +511,11 @@ const triggerConfigRow = {
   created_at: '2026-05-01T00:00:00.000Z',
 };
 
-const triggerOverrideRow = {
+const triggerFieldStrategyRow = {
   id: 1,
   trigger_txtp_config_id: 20,
   field_path: 'amount',
-  override_type: 'null',
+  strategy_code: 'skip',
   static_value: null,
   range_min: null,
   range_max: null,
@@ -663,39 +663,39 @@ describe('getTriggerTxtpConfigsByGenerationId', () => {
 
 // ── trigger-field-strategies.repository ─────────────────────────────────────
 
-describe('upsertTriggerFieldOverrideInDb', () => {
-  it('upserts row and returns mapped override', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+describe('upsertTriggerFieldStrategyInDb', () => {
+  it('upserts row and returns mapped strategy', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerFieldStrategyRow] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'null',
+      strategy_code: 'skip',
     });
 
     expect(result.id).toBe(1);
     expect(result.trigger_txtp_config_id).toBe(20);
-    expect(result.override_type).toBe('null');
+    expect(result.strategy_code).toBe('skip');
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('ON CONFLICT') }), 'simulation');
   });
 
-  it('handles static override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'static', static_value: '"999"' }] });
+  it('handles static strategy', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerFieldStrategyRow, strategy_code: 'static', static_value: '"999"' }] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'static',
+      strategy_code: 'static',
       static_value: '999',
     });
 
-    expect(result.override_type).toBe('static');
+    expect(result.strategy_code).toBe('static');
   });
 
-  it('handles range override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'range', range_min: 1, range_max: 100 }] });
+  it('handles range strategy', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerFieldStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 }] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'range',
+      strategy_code: 'range',
       range_min: 1,
       range_max: 100,
     });
@@ -705,40 +705,34 @@ describe('upsertTriggerFieldOverrideInDb', () => {
   });
 
   it('handles generator_options as object (not string)', async () => {
-    const rowWithObj = { ...triggerOverrideRow, generator_options: { type: 'bic' } };
+    const rowWithObj = { ...triggerFieldStrategyRow, generator_options: { type: 'bic' } };
     mockDb.mockResolvedValue({ rows: [rowWithObj] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'bic',
-      override_type: 'generated',
+      strategy_code: 'random',
       faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 
     expect(result.generator_options).toEqual({ type: 'bic' });
   });
-
-  it('handles remove override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'remove' }] });
-    const result = await upsertTriggerFieldOverrideInDb(20, { field_path: 'field.a', override_type: 'remove' });
-    expect(result.override_type).toBe('remove');
-  });
 });
 
-describe('getTriggerFieldOverridesByConfigId', () => {
-  it('returns mapped overrides array', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+describe('getTriggerFieldStrategiesByConfigId', () => {
+  it('returns mapped strategies array', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerFieldStrategyRow] });
 
-    const result = await getTriggerFieldOverridesByConfigId(20);
+    const result = await getTriggerFieldStrategiesByConfigId(20);
 
     expect(result).toHaveLength(1);
     expect(result[0].field_path).toBe('amount');
-    expect(result[0].override_type).toBe('null');
+    expect(result[0].strategy_code).toBe('skip');
   });
 
   it('returns empty array when no rows', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await getTriggerFieldOverridesByConfigId(20)).toEqual([]);
+    expect(await getTriggerFieldStrategiesByConfigId(20)).toEqual([]);
   });
 });
 

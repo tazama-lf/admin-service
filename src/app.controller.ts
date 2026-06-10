@@ -102,7 +102,7 @@ import {
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
-  getTriggerConfigsWithOverrides,
+  getTriggerConfigsWithStrategies,
   bulkUpdateTriggerConfigs,
 } from './services/trigger-txtp-config.logic.service';
 import {
@@ -113,10 +113,6 @@ import {
 } from './services/enrichment-table.logic.service';
 import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from './services/txtp-mapping.logic.service';
 import type {
-  AddContextTxtpConfigDto,
-  BulkConfigItemDto,
-  AddTriggerTxtpConfigDto,
-  BulkTriggerConfigItemDto,
   BulkEnrichmentUpdateItemDto,
   UpsertTxtpMappingDto,
   TxtpMappingParamsDto,
@@ -145,6 +141,8 @@ import {
   handleValidateActive,
 } from './services/job.logic.service';
 import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
+import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interface/simulation-studio/trigger-txtp.interface';
+import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -2161,7 +2159,7 @@ export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: Fasti
       return;
     }
 
-    const configs = await getTriggerConfigsWithOverrides(generationId);
+    const configs = await getTriggerConfigsWithStrategies(generationId);
     reply.status(200).send({ success: true, data: configs });
     loggerService.log('End - Get trigger txtp configs');
   } catch (err) {

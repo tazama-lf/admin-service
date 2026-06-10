@@ -5,7 +5,7 @@ import type {
   SuiteTriggerTxtpConfig,
   CreateTriggerTxtpConfigDto,
   UpdateTriggerTxtpConfigDto,
-} from '../../interface/simulation-studio/suite-generation.interface';
+} from '../../interface/simulation-studio/trigger-txtp.interface';
 
 const mapRow = (row: Record<string, unknown>): SuiteTriggerTxtpConfig => ({
   id: row.id as number,

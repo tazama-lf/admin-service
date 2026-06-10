@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { ContextFieldStrategy, UpsertFieldStrategyDto } from '../../interface/simulation-studio/suite-generation.interface';
+import type { ContextFieldStrategy, UpsertFieldStrategyDto } from '../../interface/simulation-studio/context-txtp.interface';
 
 const mapRow = (row: Record<string, unknown>): ContextFieldStrategy => ({
   id: row.id as number,

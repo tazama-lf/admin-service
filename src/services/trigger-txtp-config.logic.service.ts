@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 import type {
-  TriggerFieldOverride,
   AddTriggerTxtpConfigDto,
   BulkTriggerConfigItemDto,
-  TriggerTxtpConfigWithOverrides,
-} from '../interface/simulation-studio/suite-generation.interface';
+  TriggerFieldStrategy,
+  TriggerTxtpConfigWithStrategies,
+} from '../interface/simulation-studio/trigger-txtp.interface';
 import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
 } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
-  upsertTriggerFieldOverrideInDb,
-  getTriggerFieldOverridesByConfigId,
+  upsertTriggerFieldStrategyInDb,
+  getTriggerFieldStrategiesByConfigId,
 } from '../repositories/simulation-studio/trigger-field-strategies.repository';
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
@@ -47,8 +47,9 @@ interface CreateTriggerConfigOptions {
 
 export const createTriggerConfigWithDefaultStrategies = async (
   opts: CreateTriggerConfigOptions,
-): Promise<TriggerTxtpConfigWithOverrides> => {
+): Promise<TriggerTxtpConfigWithStrategies> => {
   const { generationId, txtp, txtpVersion, messageCount, displayOrder, tenantId, relatedTxtpConfigId } = opts;
+
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
 
   const payloadTemplate = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
@@ -68,7 +69,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
 
   const fieldPaths = flattenPayloadPaths(payloadTemplate);
   const fieldOverrides = await Promise.all(
-    fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(config.id, { field_path: path, override_type: 'null' })),
+    fieldPaths.map(async (path) => await upsertTriggerFieldStrategyInDb(config.id, { field_path: path, strategy_code: 'keep_sample' })),
   );
 
   return {
@@ -82,7 +83,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     expected_result_band: config.expected_result_band,
     notes: config.notes,
     related_txtp_config_id: config.related_txtp_config_id,
-    field_overrides: fieldOverrides,
+    field_strategies: fieldOverrides,
     related_transaction: config.related_transaction ?? '',
   };
 };
@@ -99,7 +100,7 @@ export const createTriggerTxtpConfig = async (
   txtp: string,
   txtpVersion: string,
   tenantId: string,
-): Promise<TriggerTxtpConfigWithOverrides> => {
+): Promise<TriggerTxtpConfigWithStrategies> => {
   try {
     const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
 
@@ -119,8 +120,10 @@ export const createTriggerTxtpConfig = async (
     });
 
     const fieldPaths = flattenPayloadPaths(payloadTemplate);
-    const fieldOverrides = await Promise.all(
-      fieldPaths.map(async (path) => await upsertTriggerFieldOverrideInDb(primaryConfig.id, { field_path: path, override_type: 'null' })),
+    const fieldStrategies = await Promise.all(
+      fieldPaths.map(
+        async (path) => await upsertTriggerFieldStrategyInDb(primaryConfig.id, { field_path: path, strategy_code: 'keep_sample' }),
+      ),
     );
 
     // const relatedTransactionPath = tcsRow.related_transaction ?? null;
@@ -159,7 +162,7 @@ export const createTriggerTxtpConfig = async (
       expected_result_band: primaryConfig.expected_result_band,
       notes: primaryConfig.notes,
       related_txtp_config_id: null,
-      field_overrides: fieldOverrides,
+      field_strategies: fieldStrategies,
       related_transaction: primaryConfig.related_transaction ?? '',
     };
   } catch (error) {
@@ -182,7 +185,7 @@ export const addTriggerTxtpConfig = async (
   generationId: number,
   dto: AddTriggerTxtpConfigDto,
   tenantId: string,
-): Promise<TriggerTxtpConfigWithOverrides> => {
+): Promise<TriggerTxtpConfigWithStrategies> => {
   try {
     const existing = await getTriggerTxtpConfigsByGenerationId(generationId);
     const displayOrder = existing.length + 1;
@@ -213,13 +216,13 @@ export const addTriggerTxtpConfig = async (
 
 // ── Step 3: GET all ──────────────────────────────────────────────────────────
 
-export const getTriggerConfigsWithOverrides = async (generationId: number): Promise<TriggerTxtpConfigWithOverrides[]> => {
+export const getTriggerConfigsWithStrategies = async (generationId: number): Promise<TriggerTxtpConfigWithStrategies[]> => {
   try {
     const configs = await getTriggerTxtpConfigsByGenerationId(generationId);
     if (configs.length === 0) return [];
     return await Promise.all(
       configs.map(async (config) => {
-        const fieldOverrides = await getTriggerFieldOverridesByConfigId(config.id);
+        const fieldStrategies = await getTriggerFieldStrategiesByConfigId(config.id);
         return {
           trigger_txtp_config_id: config.id,
           txtp: config.txtp,
@@ -231,7 +234,7 @@ export const getTriggerConfigsWithOverrides = async (generationId: number): Prom
           expected_result_band: config.expected_result_band,
           notes: config.notes,
           related_txtp_config_id: config.related_txtp_config_id ?? null,
-          field_overrides: fieldOverrides,
+          field_strategies: fieldStrategies,
           related_transaction: config.related_transaction ?? '',
         };
       }),
@@ -250,20 +253,20 @@ export const getTriggerConfigsWithOverrides = async (generationId: number): Prom
 export const bulkUpdateTriggerConfigs = async (
   generationId: number,
   items: BulkTriggerConfigItemDto[],
-): Promise<TriggerTxtpConfigWithOverrides[]> => {
+): Promise<TriggerTxtpConfigWithStrategies[]> => {
   try {
     await Promise.all(
       items.map(async (item) => {
-        const { trigger_txtp_config_id: configId, field_overrides: fieldOverrides, ...updateFields } = item;
+        const { trigger_txtp_config_id: configId, field_strategies: fieldStrategies, ...updateFields } = item;
         if (Object.keys(updateFields).length > 0) {
           await updateTriggerTxtpConfigInDb(configId, updateFields);
         }
-        if (Array.isArray(fieldOverrides) && fieldOverrides.length > 0) {
-          await Promise.all(fieldOverrides.map(async (o) => await upsertTriggerFieldOverrideInDb(configId, o)));
+        if (Array.isArray(fieldStrategies) && fieldStrategies.length > 0) {
+          await Promise.all(fieldStrategies.map(async (o) => await upsertTriggerFieldStrategyInDb(configId, o)));
         }
       }),
     );
-    return await getTriggerConfigsWithOverrides(generationId);
+    return await getTriggerConfigsWithStrategies(generationId);
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -275,12 +278,12 @@ export const bulkUpdateTriggerConfigs = async (
 
 // ── Read helper ──────────────────────────────────────────────────────────────
 
-export const getTriggerFieldOverridesForConfig = async (triggerTxtpConfigId: number): Promise<TriggerFieldOverride[]> => {
+export const getTriggerFieldStrategiesForConfig = async (triggerTxtpConfigId: number): Promise<TriggerFieldStrategy[]> => {
   try {
-    return await getTriggerFieldOverridesByConfigId(triggerTxtpConfigId);
+    return await getTriggerFieldStrategiesByConfigId(triggerTxtpConfigId);
   } catch (error) {
     throw new HttpException(
-      `Failed to retrieve trigger field overrides: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      `Failed to retrieve trigger field strategies: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

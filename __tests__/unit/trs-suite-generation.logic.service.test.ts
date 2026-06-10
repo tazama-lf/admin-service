@@ -7,6 +7,7 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   getGenerationsBySuiteId: jest.fn(),
   getLatestGenerationBySuiteId: jest.fn(),
   resumeGenerationInDb: jest.fn(),
+  getNextGenerationNumber: jest.fn(),
   updateWizardProgressInDb: jest.fn(),
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),

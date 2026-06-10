@@ -221,7 +221,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
   const creditorByEdgeE = creditorByEdge as unknown as Edge[];
-  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = debtorByEdge as unknown as Edge[];
 
   if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
     return { code: 404, message: 'Entity does not exist in the database.' };
@@ -298,7 +298,7 @@ export const handlePostConditionAccount = async (
       await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId, updDtTm: nowDateTime });
     }
 
-    await saveConditionEdges(condition.prsptv, condId, accountIdentifier, condition as ConditionEdge, 'account', tenantId);
+    await saveConditionEdges(condition.prsptv, condId, accountIdentifier, condition, 'account', tenantId);
 
     const report = await databaseManager.getAccountConditionsByGraph(condAccountId, condSchemeProprietary, tenantId, condMemberid);
 
@@ -470,7 +470,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
   const creditorByEdgeE = creditorByEdge as unknown as Edge[];
-  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = debtorByEdge as unknown as Edge[];
 
   if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
     return { code: 404, message: 'Account does not exist in the database.' };

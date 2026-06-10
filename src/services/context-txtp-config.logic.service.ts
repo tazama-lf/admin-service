@@ -20,21 +20,7 @@ import {
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
 import { HttpException, HttpStatus } from '../utils/error';
-
-// ── Internal helpers ─────────────────────────────────────────────────────────
-
-const flattenSchemaPaths = (obj: unknown, prefix = ''): string[] => {
-  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
-    return prefix ? [prefix] : [];
-  }
-  return Object.entries(obj as Record<string, unknown>).flatMap(([key, val]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (typeof val === 'object' && val !== null && !Array.isArray(val) && Object.keys(val).length > 0) {
-      return flattenSchemaPaths(val, path);
-    }
-    return [path];
-  });
-};
+import { flattenPayloadPaths } from '../utils/helper';
 
 // ── Shared factory ───────────────────────────────────────────────────────────
 
@@ -74,7 +60,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
   });
 
   const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
-  const fieldPaths = flattenSchemaPaths(samplePayload ?? schemaFallback);
+  const fieldPaths = flattenPayloadPaths(samplePayload ?? schemaFallback);
   const fieldStrategies = await Promise.all(
     fieldPaths.map(async (path) => await upsertFieldStrategyInDb(config.id, { field_path: path, strategy_code: 'keep_sample' })),
   );
@@ -131,7 +117,7 @@ export const createContextTxtpConfig = async (
     });
 
     const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
-    const fieldPaths = flattenSchemaPaths(samplePayload ?? schemaFallback);
+    const fieldPaths = flattenPayloadPaths(samplePayload ?? schemaFallback);
     const fieldStrategies = await Promise.all(
       fieldPaths.map(async (path) => await upsertFieldStrategyInDb(primaryConfig.id, { field_path: path, strategy_code: 'keep_sample' })),
     );

@@ -17,21 +17,7 @@ import {
 import { getSchemaByTransactionType } from '../repositories/configuration/tcs.config.repository';
 import { ContentType } from '@tazama-lf/tcs-lib';
 import { HttpException, HttpStatus } from '../utils/error';
-
-// ── Internal helpers ─────────────────────────────────────────────────────────
-
-const flattenPayloadPaths = (obj: unknown, prefix = ''): string[] => {
-  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
-    return prefix ? [prefix] : [];
-  }
-  return Object.entries(obj as Record<string, unknown>).flatMap(([key, val]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (typeof val === 'object' && val !== null && !Array.isArray(val) && Object.keys(val).length > 0) {
-      return flattenPayloadPaths(val, path);
-    }
-    return [path];
-  });
-};
+import { flattenPayloadPaths } from '../utils/helper';
 
 // ── Shared factory ───────────────────────────────────────────────────────────
 

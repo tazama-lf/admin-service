@@ -26,6 +26,7 @@ import {
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
   deleteContextTxtpConfigInDb,
+  getContextTxtpConfigById,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -36,6 +37,7 @@ import {
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
   deleteTriggerTxtpConfigInDb,
+  getTriggerTxtpConfigByIdInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
   upsertTriggerFieldStrategyInDb,
@@ -305,6 +307,36 @@ describe('updateContextTxtpConfigInDb', () => {
   it('returns null when UPDATE finds no row', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await updateContextTxtpConfigInDb(99, { message_count: 5 })).toBeNull();
+  });
+
+  it('updates related_txtp_config_id', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...contextConfigRow, related_txtp_config_id: 7 }] });
+    const result = await updateContextTxtpConfigInDb(1, { related_txtp_config_id: 7 });
+    expect(result).not.toBeNull();
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('related_txtp_config_id');
+    expect(callArg.values).toContain(7);
+  });
+});
+
+describe('getContextTxtpConfigById', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [contextConfigRow] });
+
+    const result = await getContextTxtpConfigById(1);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(result!.txtp).toBe('pacs.008');
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('WHERE id = $1'), values: [1] }),
+      'simulation',
+    );
+  });
+
+  it('returns null when not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getContextTxtpConfigById(99)).toBeNull();
   });
 });
 
@@ -644,6 +676,45 @@ describe('updateTriggerTxtpConfigInDb', () => {
   it('returns null when UPDATE finds no row', async () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await updateTriggerTxtpConfigInDb(99, { message_count: 5 })).toBeNull();
+  });
+
+  it('updates expected_independent_variable', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, expected_independent_variable: 42 }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { expected_independent_variable: 42 });
+    expect(result).not.toBeNull();
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('expected_independent_variable');
+    expect(callArg.values).toContain(42);
+  });
+
+  it('updates related_txtp_config_id', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, related_txtp_config_id: 5 }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { related_txtp_config_id: 5 });
+    expect(result).not.toBeNull();
+    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(callArg.text).toContain('related_txtp_config_id');
+    expect(callArg.values).toContain(5);
+  });
+});
+
+describe('getTriggerTxtpConfigByIdInDb', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+
+    const result = await getTriggerTxtpConfigByIdInDb(20);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(20);
+    expect(result!.txtp).toBe('pacs.008');
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('WHERE id = $1'), values: [20] }),
+      'simulation',
+    );
+  });
+
+  it('returns null when not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+    expect(await getTriggerTxtpConfigByIdInDb(99)).toBeNull();
   });
 });
 

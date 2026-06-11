@@ -24,7 +24,7 @@ export interface RunResultEntry {
   id: number;
   outcome: string | null;
   independent_variable: string | null;
-  result_band: string;
+  sub_rule_ref: string;
   rule_result: unknown;
   trigger: TriggerConfig | null;
 }
@@ -56,7 +56,7 @@ interface ResultJoinRow {
   run_id: number;
   outcome: string | null;
   independent_variable: string | null;
-  result_band: string;
+  sub_rule_ref: string;
   rule_result: unknown;
   // joined trigger config columns (prefixed)
   tc_id: number | null;
@@ -127,7 +127,7 @@ export const getSuiteResultFromDb = async (suiteId: number): Promise<SuiteResult
         rr.run_id,
         rr.outcome,
         rr.independent_variable,
-        rr.result_band,
+        rr.sub_rule_ref,
         rr.rule_result,
         tc.id                           AS tc_id,
         tc.generation_id                AS tc_generation_id,
@@ -170,7 +170,7 @@ export const getSuiteResultFromDb = async (suiteId: number): Promise<SuiteResult
       id: r.id,
       outcome: r.outcome,
       independent_variable: r.independent_variable,
-      result_band: r.result_band,
+      sub_rule_ref: r.sub_rule_ref,
       rule_result: r.rule_result,
       trigger: mapTriggerConfig(r),
     })),

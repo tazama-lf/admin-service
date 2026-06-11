@@ -27,7 +27,7 @@ const makeResultJoinRow = (overrides: Record<string, unknown> = {}) => ({
   run_id: 1,
   outcome: 'PASS',
   independent_variable: '500',
-  result_band: 'good',
+  sub_rule_ref: '.x02',
   rule_result: { score: 0.5 },
   tc_id: 1,
   tc_generation_id: 10,

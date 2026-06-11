@@ -56,7 +56,7 @@ export const getSuiteResultFromDb = async (suiteId: number): Promise<SuiteResult
 
   const runsResult = await handlePostExecuteSqlStatement<RunRow>(runsQuery, 'simulation');
 
-  if (runsResult.rowCount === 0) return null;
+  if (!runsResult.rowCount) return null;
 
   const runIds = runsResult.rows.map((r) => r.id);
 

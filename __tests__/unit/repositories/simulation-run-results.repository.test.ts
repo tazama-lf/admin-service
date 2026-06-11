@@ -86,6 +86,7 @@ describe('getSuiteResultFromDb', () => {
 
     const trigger = result!.results[0].triggers[0];
     expect(trigger.id).toBe(10);
+    expect(trigger.trigger_id).toBe(1);
     expect(trigger.rule_result).toEqual({ score: 0.5 });
     expect(trigger.independent_variable).toBe('500');
     expect(trigger.sub_rule_ref).toBe('.02');

@@ -55,7 +55,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
   });
 
   const fieldPaths = flattenPayloadPaths(payloadTemplate);
-  const fieldOverrides = await Promise.all(
+  const fieldStrategies = await Promise.all(
     fieldPaths.map(async (path) => await upsertTriggerFieldStrategyInDb(config.id, { field_path: path, strategy_code: 'keep_sample' })),
   );
 
@@ -70,7 +70,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
     expected_result_band: config.expected_result_band,
     notes: config.notes,
     related_txtp_config_id: config.related_txtp_config_id,
-    field_strategies: fieldOverrides,
+    field_strategies: fieldStrategies,
     related_transaction: config.related_transaction ?? '',
   };
 };
@@ -249,7 +249,7 @@ export const bulkUpdateTriggerConfigs = async (
           await updateTriggerTxtpConfigInDb(configId, updateFields);
         }
         if (Array.isArray(fieldStrategies) && fieldStrategies.length > 0) {
-          await Promise.all(fieldStrategies.map(async (o) => await upsertTriggerFieldStrategyInDb(configId, o)));
+          await Promise.all(fieldStrategies.map(async (s) => await upsertTriggerFieldStrategyInDb(configId, s)));
         }
       }),
     );

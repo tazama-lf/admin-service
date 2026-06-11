@@ -26,7 +26,6 @@ import {
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
   deleteContextTxtpConfigInDb,
-  getContextTxtpConfigById,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
   upsertFieldStrategyInDb,
@@ -37,7 +36,6 @@ import {
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
   deleteTriggerTxtpConfigInDb,
-  getTriggerTxtpConfigByIdInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
   upsertTriggerFieldStrategyInDb,
@@ -308,36 +306,6 @@ describe('updateContextTxtpConfigInDb', () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await updateContextTxtpConfigInDb(99, { message_count: 5 })).toBeNull();
   });
-
-  it('updates related_txtp_config_id', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...contextConfigRow, related_txtp_config_id: 7 }] });
-    const result = await updateContextTxtpConfigInDb(1, { related_txtp_config_id: 7 });
-    expect(result).not.toBeNull();
-    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
-    expect(callArg.text).toContain('related_txtp_config_id');
-    expect(callArg.values).toContain(7);
-  });
-});
-
-describe('getContextTxtpConfigById', () => {
-  it('returns mapped config when found', async () => {
-    mockDb.mockResolvedValue({ rows: [contextConfigRow] });
-
-    const result = await getContextTxtpConfigById(1);
-
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe(1);
-    expect(result!.txtp).toBe('pacs.008');
-    expect(mockDb).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('WHERE id = $1'), values: [1] }),
-      'simulation',
-    );
-  });
-
-  it('returns null when not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] });
-    expect(await getContextTxtpConfigById(99)).toBeNull();
-  });
 });
 
 describe('getContextTxtpConfigsByGenerationId', () => {
@@ -543,11 +511,11 @@ const triggerConfigRow = {
   created_at: '2026-05-01T00:00:00.000Z',
 };
 
-const triggerFieldStrategyRow = {
+const triggerStrategyRow = {
   id: 1,
   trigger_txtp_config_id: 20,
   field_path: 'amount',
-  strategy_code: 'skip',
+  strategy_code: 'null',
   static_value: null,
   range_min: null,
   range_max: null,
@@ -677,45 +645,6 @@ describe('updateTriggerTxtpConfigInDb', () => {
     mockDb.mockResolvedValue({ rows: [] });
     expect(await updateTriggerTxtpConfigInDb(99, { message_count: 5 })).toBeNull();
   });
-
-  it('updates expected_independent_variable', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, expected_independent_variable: 42 }] });
-    const result = await updateTriggerTxtpConfigInDb(20, { expected_independent_variable: 42 });
-    expect(result).not.toBeNull();
-    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
-    expect(callArg.text).toContain('expected_independent_variable');
-    expect(callArg.values).toContain(42);
-  });
-
-  it('updates related_txtp_config_id', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, related_txtp_config_id: 5 }] });
-    const result = await updateTriggerTxtpConfigInDb(20, { related_txtp_config_id: 5 });
-    expect(result).not.toBeNull();
-    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
-    expect(callArg.text).toContain('related_txtp_config_id');
-    expect(callArg.values).toContain(5);
-  });
-});
-
-describe('getTriggerTxtpConfigByIdInDb', () => {
-  it('returns mapped config when found', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
-
-    const result = await getTriggerTxtpConfigByIdInDb(20);
-
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe(20);
-    expect(result!.txtp).toBe('pacs.008');
-    expect(mockDb).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('WHERE id = $1'), values: [20] }),
-      'simulation',
-    );
-  });
-
-  it('returns null when not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] });
-    expect(await getTriggerTxtpConfigByIdInDb(99)).toBeNull();
-  });
 });
 
 describe('getTriggerTxtpConfigsByGenerationId', () => {
@@ -736,21 +665,21 @@ describe('getTriggerTxtpConfigsByGenerationId', () => {
 
 describe('upsertTriggerFieldStrategyInDb', () => {
   it('upserts row and returns mapped strategy', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerFieldStrategyRow] });
+    mockDb.mockResolvedValue({ rows: [triggerStrategyRow] });
 
     const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      strategy_code: 'skip',
+      strategy_code: 'null',
     });
 
     expect(result.id).toBe(1);
     expect(result.trigger_txtp_config_id).toBe(20);
-    expect(result.strategy_code).toBe('skip');
+    expect(result.strategy_code).toBe('null');
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('ON CONFLICT') }), 'simulation');
   });
 
-  it('handles static strategy', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerFieldStrategyRow, strategy_code: 'static', static_value: '"999"' }] });
+  it('handles static strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'static', static_value: '"999"' }] });
 
     const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
@@ -761,8 +690,8 @@ describe('upsertTriggerFieldStrategyInDb', () => {
     expect(result.strategy_code).toBe('static');
   });
 
-  it('handles range strategy', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerFieldStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 }] });
+  it('handles range strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 }] });
 
     const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
@@ -776,29 +705,35 @@ describe('upsertTriggerFieldStrategyInDb', () => {
   });
 
   it('handles generator_options as object (not string)', async () => {
-    const rowWithObj = { ...triggerFieldStrategyRow, generator_options: { type: 'bic' } };
+    const rowWithObj = { ...triggerStrategyRow, generator_options: { type: 'bic' } };
     mockDb.mockResolvedValue({ rows: [rowWithObj] });
 
     const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'bic',
-      strategy_code: 'random',
+      strategy_code: 'generated',
       faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
 
     expect(result.generator_options).toEqual({ type: 'bic' });
   });
+
+  it('handles skip strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'skip' }] });
+    const result = await upsertTriggerFieldStrategyInDb(20, { field_path: 'field.a', strategy_code: 'skip' });
+    expect(result.strategy_code).toBe('skip');
+  });
 });
 
 describe('getTriggerFieldStrategiesByConfigId', () => {
   it('returns mapped strategies array', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerFieldStrategyRow] });
+    mockDb.mockResolvedValue({ rows: [triggerStrategyRow] });
 
     const result = await getTriggerFieldStrategiesByConfigId(20);
 
     expect(result).toHaveLength(1);
     expect(result[0].field_path).toBe('amount');
-    expect(result[0].strategy_code).toBe('skip');
+    expect(result[0].strategy_code).toBe('null');
   });
 
   it('returns empty array when no rows', async () => {

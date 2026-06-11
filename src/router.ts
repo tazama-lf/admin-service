@@ -115,6 +115,9 @@ import {
   getFakerSemanticDataHandler,
   getSuiteResultHandler,
   saveRunResultHandler,
+  generateSampleMessagesHandler,
+  generateSampleTriggerMessagesHandler,
+  generateSampleEnrichmentRowsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -230,6 +233,9 @@ const routePrivilege = {
   getFakerSemanticData: ['editor', 'approver'],
   getSuiteResult: ['editor', 'approver'],
   saveRunResult: ['editor', 'approver'],
+  generateSampleMessages: ['editor', 'approver'],
+  generateSampleTriggerMessages: ['editor', 'approver'],
+  generateSampleEnrichmentRows: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -687,6 +693,18 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.post('/v1/admin/trs/simulation-studio/runs/result', {
     ...SetOptionsBodyAndParams(saveRunResultHandler, routePrivilege.saveRunResult),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-messages', {
+    ...SetOptionsBodyAndParams(generateSampleMessagesHandler, routePrivilege.generateSampleMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-trigger-messages', {
+    ...SetOptionsBodyAndParams(generateSampleTriggerMessagesHandler, routePrivilege.generateSampleTriggerMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-enrichment-rows', {
+    ...SetOptionsBodyAndParams(generateSampleEnrichmentRowsHandler, routePrivilege.generateSampleEnrichmentRows),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

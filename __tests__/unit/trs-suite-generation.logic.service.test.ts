@@ -8,6 +8,17 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   getGenerationsBySuiteId: jest.fn(),
   getLatestGenerationBySuiteId: jest.fn(),
   resumeGenerationInDb: jest.fn(),
+  updateWizardProgressInDb: jest.fn(),
+  updateGenerationCountsInDb: jest.fn(),
+  getGenerationSummaryFromDb: jest.fn(),
+}));
+
+jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
+  deleteTriggerTxtpConfigInDb: jest.fn(),
+}));
+
+jest.mock('../../src/services/database.logic.service', () => ({
+  handlePostExecuteSqlStatement: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/context-txtp-configs.repository', () => ({
@@ -36,11 +47,17 @@ jest.mock('../../src', () => ({
 
 import { HttpException } from '../../src/utils/error';
 import * as generationsRepo from '../../src/repositories/simulation-studio/suite-generations.repository';
+import * as triggerRepo from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
+import * as dbService from '../../src/services/database.logic.service';
 import {
   createSuiteGeneration,
   getGenerationsForSuite,
   getLatestGenerationForSuite,
   resumeGeneration,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
 } from '../../src/services/trs-suite-generation.logic.service';
 import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
 import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
@@ -205,5 +222,171 @@ describe('getLatestGenerationForSuite', () => {
 
       await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
     });
+
+    it('wraps non-Error thrown value in HttpException 500', async () => {
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockRejectedValue('string error');
+
+      await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
+    });
+  });
+});
+
+// ── updateWizardProgress ─────────────────────────────────────────────────────
+
+describe('updateWizardProgress', () => {
+  it('delegates to updateWizardProgressInDb', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await expect(updateWizardProgress(1, 2, [1, 2])).resolves.toBeUndefined();
+    expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(1, 2, [1, 2]);
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const httpErr = new HttpException('not found', 404);
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(updateWizardProgress(1, 2, [1])).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+
+    await expect(updateWizardProgress(1, 2, [1])).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(updateWizardProgress(1, 2, [])).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── deleteTriggerTxtpConfig ──────────────────────────────────────────────────
+
+describe('deleteTriggerTxtpConfig', () => {
+  it('calls deleteTriggerTxtpConfigInDb and resolves when deleted', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+
+    await expect(deleteTriggerTxtpConfig(5)).resolves.toBeUndefined();
+    expect(triggerRepo.deleteTriggerTxtpConfigInDb).toHaveBeenCalledWith(5);
+  });
+
+  it('throws 404 when config not found', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
+
+    await expect(deleteTriggerTxtpConfig(99)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const httpErr = new HttpException('conflict', 409);
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(deleteTriggerTxtpConfig(5)).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+
+    await expect(deleteTriggerTxtpConfig(5)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(deleteTriggerTxtpConfig(5)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── recalculateGenerationCounts ──────────────────────────────────────────────
+
+describe('recalculateGenerationCounts', () => {
+  it('queries all three tables and calls updateGenerationCountsInDb', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ total: '300' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: '150' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: '50' }], rowCount: 1 });
+    (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await expect(recalculateGenerationCounts(7)).resolves.toBeUndefined();
+    expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(7, {
+      context_count: 300,
+      trigger_count: 150,
+      enrichment_table_count: 50,
+    });
+  });
+
+  it('parses totals as integers', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 });
+    (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await recalculateGenerationCounts(7);
+
+    expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(7, {
+      context_count: 0,
+      trigger_count: 0,
+      enrichment_table_count: 0,
+    });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const httpErr = new HttpException('forbidden', 403);
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(recalculateGenerationCounts(7)).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(new Error('timeout'));
+
+    await expect(recalculateGenerationCounts(7)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue('string error');
+
+    await expect(recalculateGenerationCounts(7)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── getGenerationSummary ─────────────────────────────────────────────────────
+
+describe('getGenerationSummary', () => {
+  const mockSummary = { generationId: 1, contextCount: 2, triggerCount: 3 } as any;
+
+  it('returns summary from repo', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(mockSummary);
+
+    const result = await getGenerationSummary(1);
+
+    expect(result).toBe(mockSummary);
+    expect(generationsRepo.getGenerationSummaryFromDb).toHaveBeenCalledWith(1);
+  });
+
+  it('returns null when no summary exists', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(null);
+
+    expect(await getGenerationSummary(1)).toBeNull();
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const httpErr = new HttpException('not found', 404);
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(getGenerationSummary(1)).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+
+    await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
   });
 });

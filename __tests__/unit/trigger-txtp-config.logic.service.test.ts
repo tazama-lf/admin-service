@@ -124,7 +124,10 @@ describe('createTriggerConfigWithDefaultStrategies', () => {
     );
     // payload has 2 leaf fields: amount, currency
     expect(triggerStrategyRepo.upsertTriggerFieldStrategyInDb).toHaveBeenCalledTimes(2);
-    expect(triggerStrategyRepo.upsertTriggerFieldStrategyInDb).toHaveBeenCalledWith(20, expect.objectContaining({ strategy_code: 'null' }));
+    expect(triggerStrategyRepo.upsertTriggerFieldStrategyInDb).toHaveBeenCalledWith(
+      20,
+      expect.objectContaining({ strategy_code: 'keep_sample' }),
+    );
     expect(result.trigger_txtp_config_id).toBe(20);
     expect(result.field_strategies).toHaveLength(2);
   });
@@ -243,6 +246,29 @@ describe('createTriggerTxtpConfig', () => {
     await expect(createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toMatchObject({ status: 500 });
   });
 
+  it('uses payload_xml when content_type is XML', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowXml);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
+    (triggerStrategyRepo.upsertTriggerFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledWith(
+      expect.objectContaining({ payload_template_json: tcsRowXml.payload_xml }),
+    );
+  });
+
+  it('falls back to empty object when payloadTemplate is null', async () => {
+    const tcsNoPayload = { ...tcsRowJson, payload_json: null, content_type: 'application/json' };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsNoPayload);
+    (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
+    (triggerStrategyRepo.upsertTriggerFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createTriggerTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(triggerConfigRepo.createTriggerTxtpConfigInDb).toHaveBeenCalledWith(expect.objectContaining({ payload_template_json: {} }));
+  });
+
   it('skips related trigger config when related_transaction is null', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
     (triggerConfigRepo.createTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
@@ -308,6 +334,11 @@ describe('addTriggerTxtpConfig', () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue(err);
     await expect(addTriggerTxtpConfig(1, { txtp: 'x', txtp_version: '1' }, 'tenant')).rejects.toBe(err);
   });
+
+  it('wraps non-Error thrown value', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue('string error');
+    await expect(addTriggerTxtpConfig(1, { txtp: 'x', txtp_version: '1' }, 'tenant')).rejects.toMatchObject({ status: 500 });
+  });
 });
 
 // ── getTriggerConfigsWithStrategies ──────────────────────────────────────────
@@ -348,6 +379,12 @@ describe('getTriggerConfigsWithStrategies', () => {
   it('wraps error in HttpException 500', async () => {
     (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue(new Error('fail'));
     await expect(getTriggerConfigsWithStrategies(1)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('forbidden', 403);
+    (triggerConfigRepo.getTriggerTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue(err);
+    await expect(getTriggerConfigsWithStrategies(1)).rejects.toBe(err);
   });
 
   it('wraps non-Error thrown value', async () => {

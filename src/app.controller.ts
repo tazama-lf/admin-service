@@ -143,6 +143,7 @@ import {
 import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
 import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interface/simulation-studio/trigger-txtp.interface';
 import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
+import { getSuiteResult } from './services/simulation-run-results.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -2793,5 +2794,23 @@ export const saveRecordInTrsSimulationHandler = async (req: FastifyRequest, repl
     reply.code(200).send();
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to save record in TRS simulation');
+  }
+};
+
+export const getSuiteResultHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get suite result');
+    const { suiteId } = req.params as { suiteId: string };
+    const result = await getSuiteResult(Number(suiteId));
+    reply.status(200).send({
+      success: true,
+      message: 'Suite result retrieved successfully',
+      data: result,
+    });
+    loggerService.log('End - Get suite result');
+  } catch (err) {
+    const failMessage = `Failed to get suite result. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to get suite result');
   }
 };

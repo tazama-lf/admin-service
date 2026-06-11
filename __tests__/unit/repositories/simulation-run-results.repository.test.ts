@@ -2,7 +2,8 @@
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
-const mockHandlePostExecuteSqlStatement = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockHandlePostExecuteSqlStatement: any = jest.fn();
 
 jest.mock('../../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: (...args: any[]) => mockHandlePostExecuteSqlStatement(...args),
@@ -17,38 +18,26 @@ import { getSuiteResultFromDb } from '../../../src/repositories/simulation-studi
 
 const mockRunRow = {
   id: 1,
-  outcome: 'PASS',
-  rule_version: 'v10',
-  rule_name: 'rule021',
-  trigger_count: 2,
+  generation_id: 13,
+  outcome: 'success',
+  rule_version: 'v1.0.1',
+  rule_name: 'rule01',
+  trigger_count: 12,
 };
 
-const makeResultJoinRow = (overrides: Record<string, unknown> = {}) => ({
+const makeResultRow = (overrides: Record<string, unknown> = {}) => ({
   id: 10,
   run_id: 1,
-  outcome: 'PASS',
-  independent_variable: '500',
-  sub_rule_ref: '.x02',
+  trigger_id: 1,
   rule_result: { score: 0.5 },
-  tc_id: 1,
-  tc_generation_id: 10,
-  tc_txtp: 'pacs.002.001.12',
-  tc_txtp_version: '001.12',
-  tc_display_order: 1,
-  tc_message_count: 100,
-  tc_link_to_context_pairs: false,
-  tc_payload_template_json: { TxTp: 'pacs.002' },
-  tc_expected_independent_variable: 500,
-  tc_expected_result_band: 'good',
-  tc_notes: null,
-  tc_faker_seed: null,
-  tc_generator_profile: {},
-  tc_related_txtp_config_id: null,
-  tc_related_transaction: null,
+  independent_variable: '500',
+  sub_rule_ref: '.02',
   ...overrides,
 });
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe('getSuiteResultFromDb', () => {
   it('returns null when no runs found', async () => {
@@ -60,70 +49,46 @@ describe('getSuiteResultFromDb', () => {
     expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(1);
   });
 
-  it('returns suite result with trigger config joined', async () => {
+  it('returns suite result with correct shape', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [makeResultJoinRow()], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [makeResultRow()], rowCount: 1 });
 
-    const result = await getSuiteResultFromDb(3);
+    const result = await getSuiteResultFromDb(1);
 
     expect(result).not.toBeNull();
-    expect(result!.suite_id).toBe(3);
-    expect(result!.total_runs).toBe(1);
+    expect(result!.suite_id).toBe(1);
     expect(result!.results).toHaveLength(1);
-    expect(result!.results[0].rule_name).toBe('rule021');
-    expect(result!.results[0].rule_version).toBe('v10');
-    expect(result!.results[0].triggers).toHaveLength(1);
-    expect(result!.results[0].triggers[0].trigger?.txtp).toBe('pacs.002.001.12');
   });
 
-  it('returns null trigger when tc_id is null (LEFT JOIN miss)', async () => {
+  it('maps run fields correctly', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_id: null })], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const result = await getSuiteResultFromDb(3);
+    const result = await getSuiteResultFromDb(1);
 
-    expect(result!.results[0].triggers[0].trigger).toBeNull();
+    const run = result!.results[0];
+    expect(run.run_id).toBe(1);
+    expect(run.generation_id).toBe(13);
+    expect(run.rule_name).toBe('rule01');
+    expect(run.rule_version).toBe('v1.0.1');
+    expect(run.trigger_count).toBe(12);
+    expect(run.outcome).toBe('success');
   });
 
-  it('parses tc_payload_template_json string to object', async () => {
+  it('maps trigger entries correctly', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_payload_template_json: '{"TxTp":"pacs.002"}' })], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [makeResultRow()], rowCount: 1 });
 
-    const result = await getSuiteResultFromDb(3);
+    const result = await getSuiteResultFromDb(1);
 
-    expect(result!.results[0].triggers[0].trigger?.payload_template_json).toEqual({ TxTp: 'pacs.002' });
-  });
-
-  it('parses tc_generator_profile string to object', async () => {
-    mockHandlePostExecuteSqlStatement
-      .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_generator_profile: '{"mode":"faker"}' })], rowCount: 1 });
-
-    const result = await getSuiteResultFromDb(3);
-
-    expect(result!.results[0].triggers[0].trigger?.generator_profile).toEqual({ mode: 'faker' });
-  });
-
-  it('groups multiple result rows under correct run', async () => {
-    const run1 = { ...mockRunRow, id: 1 };
-    const run2 = { ...mockRunRow, id: 2, rule_name: 'rule022' };
-    const resultRow1 = makeResultJoinRow({ id: 10, run_id: 1 });
-    const resultRow2 = makeResultJoinRow({ id: 11, run_id: 1 });
-    const resultRow3 = makeResultJoinRow({ id: 20, run_id: 2 });
-
-    mockHandlePostExecuteSqlStatement
-      .mockResolvedValueOnce({ rows: [run1, run2], rowCount: 2 })
-      .mockResolvedValueOnce({ rows: [resultRow1, resultRow2, resultRow3], rowCount: 3 });
-
-    const result = await getSuiteResultFromDb(3);
-
-    expect(result!.total_runs).toBe(2);
-    expect(result!.results[0].triggers).toHaveLength(2);
-    expect(result!.results[1].triggers).toHaveLength(1);
-    expect(result!.results[1].rule_name).toBe('rule022');
+    const trigger = result!.results[0].triggers[0];
+    expect(trigger.id).toBe(10);
+    expect(trigger.rule_result).toEqual({ score: 0.5 });
+    expect(trigger.independent_variable).toBe('500');
+    expect(trigger.sub_rule_ref).toBe('.02');
   });
 
   it('returns empty triggers array when run has no result rows', async () => {
@@ -131,19 +96,28 @@ describe('getSuiteResultFromDb', () => {
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const result = await getSuiteResultFromDb(3);
+    const result = await getSuiteResultFromDb(1);
 
     expect(result!.results[0].triggers).toHaveLength(0);
   });
 
-  it('uses rowCount ?? 0 when rowCount is null', async () => {
+  it('groups multiple result rows under correct run', async () => {
+    const run1 = { ...mockRunRow, id: 1 };
+    const run2 = { ...mockRunRow, id: 2, rule_name: 'rule02' };
+    const r1 = makeResultRow({ id: 10, run_id: 1 });
+    const r2 = makeResultRow({ id: 11, run_id: 1 });
+    const r3 = makeResultRow({ id: 20, run_id: 2 });
+
     mockHandlePostExecuteSqlStatement
-      .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: null })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      .mockResolvedValueOnce({ rows: [run1, run2], rowCount: 2 })
+      .mockResolvedValueOnce({ rows: [r1, r2, r3], rowCount: 3 });
 
     const result = await getSuiteResultFromDb(3);
 
-    expect(result!.total_runs).toBe(0);
+    expect(result!.results).toHaveLength(2);
+    expect(result!.results[0].triggers).toHaveLength(2);
+    expect(result!.results[1].triggers).toHaveLength(1);
+    expect(result!.results[1].rule_name).toBe('rule02');
   });
 
   it('passes suiteId to runs query', async () => {
@@ -166,5 +140,13 @@ describe('getSuiteResultFromDb', () => {
 
     const secondCall = mockHandlePostExecuteSqlStatement.mock.calls[1];
     expect((secondCall[0] as { values: unknown[] }).values[0]).toContain(7);
+  });
+
+  it('uses rowCount null check — returns null when rowCount is null and no rows', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValueOnce({ rows: [], rowCount: null });
+
+    const result = await getSuiteResultFromDb(3);
+
+    expect(result).toBeNull();
   });
 });

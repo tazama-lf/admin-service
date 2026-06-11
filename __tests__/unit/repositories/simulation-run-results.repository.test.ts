@@ -2,8 +2,10 @@
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+const mockHandlePostExecuteSqlStatement = jest.fn();
+
 jest.mock('../../../src/services/database.logic.service', () => ({
-  handlePostExecuteSqlStatement: jest.fn(),
+  handlePostExecuteSqlStatement: (...args: any[]) => mockHandlePostExecuteSqlStatement(...args),
 }));
 
 jest.mock('../../../src', () => ({
@@ -11,7 +13,6 @@ jest.mock('../../../src', () => ({
   configuration: {},
 }));
 
-import * as db from '../../../src/services/database.logic.service';
 import { getSuiteResultFromDb } from '../../../src/repositories/simulation-studio/simulation-run-results.repository';
 
 const mockRunRow = {
@@ -51,16 +52,16 @@ beforeEach(() => jest.clearAllMocks());
 
 describe('getSuiteResultFromDb', () => {
   it('returns null when no runs found', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    mockHandlePostExecuteSqlStatement.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     const result = await getSuiteResultFromDb(99);
 
     expect(result).toBeNull();
-    expect(db.handlePostExecuteSqlStatement).toHaveBeenCalledTimes(1);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(1);
   });
 
   it('returns suite result with trigger config joined', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [makeResultJoinRow()], rowCount: 1 });
 
@@ -77,7 +78,7 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('returns null trigger when tc_id is null (LEFT JOIN miss)', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_id: null })], rowCount: 1 });
 
@@ -87,10 +88,9 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('parses tc_payload_template_json string to object', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock).mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 }).mockResolvedValueOnce({
-      rows: [makeResultJoinRow({ tc_payload_template_json: '{"TxTp":"pacs.002"}' })],
-      rowCount: 1,
-    });
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_payload_template_json: '{"TxTp":"pacs.002"}' })], rowCount: 1 });
 
     const result = await getSuiteResultFromDb(3);
 
@@ -98,10 +98,9 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('parses tc_generator_profile string to object', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock).mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 }).mockResolvedValueOnce({
-      rows: [makeResultJoinRow({ tc_generator_profile: '{"mode":"faker"}' })],
-      rowCount: 1,
-    });
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [makeResultJoinRow({ tc_generator_profile: '{"mode":"faker"}' })], rowCount: 1 });
 
     const result = await getSuiteResultFromDb(3);
 
@@ -115,7 +114,7 @@ describe('getSuiteResultFromDb', () => {
     const resultRow2 = makeResultJoinRow({ id: 11, run_id: 1 });
     const resultRow3 = makeResultJoinRow({ id: 20, run_id: 2 });
 
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [run1, run2], rowCount: 2 })
       .mockResolvedValueOnce({ rows: [resultRow1, resultRow2, resultRow3], rowCount: 3 });
 
@@ -128,7 +127,7 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('returns empty triggers array when run has no result rows', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
@@ -138,7 +137,7 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('uses rowCount ?? 0 when rowCount is null', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: null })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
@@ -148,24 +147,24 @@ describe('getSuiteResultFromDb', () => {
   });
 
   it('passes suiteId to runs query', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockRunRow], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     await getSuiteResultFromDb(42);
 
-    const firstCall = (db.handlePostExecuteSqlStatement as jest.Mock).mock.calls[0];
+    const firstCall = mockHandlePostExecuteSqlStatement.mock.calls[0];
     expect((firstCall[0] as { values: unknown[] }).values).toContain(42);
   });
 
   it('passes run ids to results query', async () => {
-    (db.handlePostExecuteSqlStatement as jest.Mock)
+    mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [{ ...mockRunRow, id: 7 }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     await getSuiteResultFromDb(3);
 
-    const secondCall = (db.handlePostExecuteSqlStatement as jest.Mock).mock.calls[1];
+    const secondCall = mockHandlePostExecuteSqlStatement.mock.calls[1];
     expect((secondCall[0] as { values: unknown[] }).values[0]).toContain(7);
   });
 });

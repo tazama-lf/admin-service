@@ -9,6 +9,7 @@ import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
+  getTriggerTxtpConfigByIdInDb,
 } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
   upsertTriggerFieldStrategyInDb,
@@ -257,6 +258,36 @@ export const bulkUpdateTriggerConfigs = async (
     if (error instanceof HttpException) throw error;
     throw new HttpException(
       `Failed to bulk update trigger configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+// ── GET by ID ────────────────────────────────────────────────────────────────
+
+export const getTriggerConfigById = async (configId: number): Promise<TriggerTxtpConfigWithStrategies | null> => {
+  try {
+    const config = await getTriggerTxtpConfigByIdInDb(configId);
+    if (!config) return null;
+    const fieldStrategies = await getTriggerFieldStrategiesByConfigId(config.id);
+    return {
+      trigger_txtp_config_id: config.id,
+      txtp: config.txtp,
+      txtp_version: config.txtp_version,
+      message_count: config.message_count,
+      display_order: config.display_order,
+      payload_template_json: config.payload_template_json,
+      link_to_context_pairs: config.link_to_context_pairs,
+      expected_result_band: config.expected_result_band,
+      notes: config.notes,
+      related_txtp_config_id: config.related_txtp_config_id ?? null,
+      field_strategies: fieldStrategies,
+      related_transaction: config.related_transaction ?? '',
+    };
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to retrieve trigger config: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

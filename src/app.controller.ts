@@ -104,6 +104,7 @@ import {
   addTriggerTxtpConfig,
   getTriggerConfigsWithStrategies,
   bulkUpdateTriggerConfigs,
+  getTriggerConfigById,
 } from './services/trigger-txtp-config.logic.service';
 import {
   createEnrichmentTable,
@@ -143,7 +144,7 @@ import {
 import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
 import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interface/simulation-studio/trigger-txtp.interface';
 import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
-import { getSuiteResult } from './services/simulation-run-results.logic.service';
+import { getSuiteResult, saveRunResult } from './services/simulation-run-results.logic.service';
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -2224,6 +2225,34 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
   }
 };
 
+// ── Step 3: GET trigger config by ID ─────────────────────────────────────────
+
+export const getTriggerConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger txtp config by ID');
+    const { configId: configIdStr } = req.params as { configId: string };
+    const configId = parseInt(configIdStr, 10);
+
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+
+    const config = await getTriggerConfigById(configId);
+
+    if (!config) {
+      reply.status(404).send({ success: false, message: `Trigger config with id ${configId} not found` });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: config });
+    loggerService.log('End - Get trigger txtp config by ID');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve trigger txtp config');
+  }
+};
+
 // ── Step 4: POST create enrichment table ─────────────────────────────────────
 
 export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -2812,5 +2841,39 @@ export const getSuiteResultHandler = async (req: FastifyRequest, reply: FastifyR
     const failMessage = `Failed to get suite result. \n${util.inspect(err)}`;
     loggerService.error(failMessage);
     ErrorHandler.sendError(reply, err, 'Failed to get suite result');
+  }
+};
+
+export const saveRunResultHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Save run result');
+    const body = req.body as {
+      gen_id: number;
+      trigger_id: number | null;
+      rule_result: Record<string, unknown>;
+      outcome?: string;
+    };
+
+    if (!body.gen_id || !body.rule_result) {
+      reply.status(400).send({ success: false, message: 'gen_id and rule_result are required' });
+      return;
+    }
+
+    const result = await saveRunResult({
+      gen_id: body.gen_id,
+      trigger_id: body.trigger_id ?? null,
+      rule_result: body.rule_result,
+    });
+
+    reply.status(201).send({
+      success: true,
+      message: 'Run result saved successfully',
+      data: result,
+    });
+    loggerService.log('End - Save run result');
+  } catch (err) {
+    const failMessage = `Failed to save run result. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to save run result');
   }
 };

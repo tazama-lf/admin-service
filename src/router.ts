@@ -85,6 +85,7 @@ import {
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
   getTriggerConfigsHandler,
+  getTriggerConfigByIdHandler,
   addTriggerTxtpConfigHandler,
   bulkUpdateTriggerConfigsHandler,
   upsertContextMappingHandler,
@@ -113,6 +114,7 @@ import {
   resumeGenerationHandler,
   getFakerSemanticDataHandler,
   getSuiteResultHandler,
+  saveRunResultHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -202,6 +204,7 @@ const routePrivilege = {
   addContextTxtpConfig: ['editor', 'approver'],
   updateContextTxtpConfig: ['editor', 'approver'],
   getTriggerConfigs: ['editor', 'approver'],
+  getTriggerConfigById: ['editor', 'approver'],
   addTriggerTxtpConfig: ['editor', 'approver'],
   bulkUpdateTriggerConfigs: ['editor', 'approver'],
   upsertContextMapping: ['editor', 'approver'],
@@ -226,6 +229,7 @@ const routePrivilege = {
   resumeGeneration: ['editor', 'approver'],
   getFakerSemanticData: ['editor', 'approver'],
   getSuiteResult: ['editor', 'approver'],
+  saveRunResult: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -601,6 +605,10 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getTriggerConfigsHandler, routePrivilege.getTriggerConfigs),
   });
 
+  fastify.get('/v1/admin/trs/simulation-studio/trigger-configs/:configId', {
+    ...SetOptionsBodyAndParams(getTriggerConfigByIdHandler, routePrivilege.getTriggerConfigById),
+  });
+
   fastify.post('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
     ...SetOptionsBodyAndParams(addTriggerTxtpConfigHandler, routePrivilege.addTriggerTxtpConfig),
   });
@@ -675,6 +683,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/result', {
     ...SetOptionsBodyAndParams(getSuiteResultHandler, routePrivilege.getSuiteResult),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/runs/result', {
+    ...SetOptionsBodyAndParams(saveRunResultHandler, routePrivilege.saveRunResult),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

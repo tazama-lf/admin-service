@@ -6,6 +6,7 @@ jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.reposit
   createTriggerTxtpConfigInDb: jest.fn(),
   updateTriggerTxtpConfigInDb: jest.fn(),
   getTriggerTxtpConfigsByGenerationId: jest.fn(),
+  getTriggerTxtpConfigByIdInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/trigger-field-strategies.repository', () => ({
@@ -38,6 +39,7 @@ import {
   getTriggerConfigsWithStrategies,
   bulkUpdateTriggerConfigs,
   getTriggerFieldStrategiesForConfig,
+  getTriggerConfigById,
 } from '../../src/services/trigger-txtp-config.logic.service';
 import type { SuiteTriggerTxtpConfig, TriggerFieldStrategy } from '../../src/interface/simulation-studio/trigger-txtp.interface';
 
@@ -479,5 +481,70 @@ describe('getTriggerFieldStrategiesForConfig', () => {
   it('wraps non-Error thrown value', async () => {
     (triggerOverrideRepo.getTriggerFieldStrategiesByConfigId as jest.Mock).mockRejectedValue('string error');
     await expect(getTriggerFieldStrategiesForConfig(20)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── getTriggerConfigById ─────────────────────────────────────────────────────
+
+describe('getTriggerConfigById', () => {
+  it('returns config with field strategies when found', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
+    (triggerOverrideRepo.getTriggerFieldStrategiesByConfigId as jest.Mock).mockResolvedValue([mockFieldStrategy]);
+
+    const result = await getTriggerConfigById(20);
+
+    expect(result).not.toBeNull();
+    expect(result!.trigger_txtp_config_id).toBe(20);
+    expect(result!.txtp).toBe('pacs.008');
+    expect(result!.field_strategies).toEqual([mockFieldStrategy]);
+    expect(triggerConfigRepo.getTriggerTxtpConfigByIdInDb).toHaveBeenCalledWith(20);
+    expect(triggerOverrideRepo.getTriggerFieldStrategiesByConfigId).toHaveBeenCalledWith(20);
+  });
+
+  it('returns null when config not found', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockResolvedValue(null);
+
+    const result = await getTriggerConfigById(99);
+
+    expect(result).toBeNull();
+    expect(triggerOverrideRepo.getTriggerFieldStrategiesByConfigId).not.toHaveBeenCalled();
+  });
+
+  it('maps all config fields correctly', async () => {
+    const configWithRelated = { ...mockTriggerConfig, related_txtp_config_id: 5, related_transaction: '/default/1.0.0/test/pacs.002' };
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockResolvedValue(configWithRelated);
+    (triggerOverrideRepo.getTriggerFieldStrategiesByConfigId as jest.Mock).mockResolvedValue([]);
+
+    const result = await getTriggerConfigById(20);
+
+    expect(result!.related_txtp_config_id).toBe(5);
+    expect(result!.related_transaction).toBe('/default/1.0.0/test/pacs.002');
+    expect(result!.message_count).toBe(mockTriggerConfig.message_count);
+    expect(result!.display_order).toBe(mockTriggerConfig.display_order);
+  });
+
+  it('returns empty field_strategies array when none exist', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockResolvedValue(mockTriggerConfig);
+    (triggerOverrideRepo.getTriggerFieldStrategiesByConfigId as jest.Mock).mockResolvedValue([]);
+
+    const result = await getTriggerConfigById(20);
+
+    expect(result!.field_strategies).toHaveLength(0);
+  });
+
+  it('wraps error in HttpException 500', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(getTriggerConfigById(20)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('not found', 404);
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockRejectedValue(err);
+    await expect(getTriggerConfigById(20)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value', async () => {
+    (triggerConfigRepo.getTriggerTxtpConfigByIdInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(getTriggerConfigById(20)).rejects.toMatchObject({ status: 500 });
   });
 });

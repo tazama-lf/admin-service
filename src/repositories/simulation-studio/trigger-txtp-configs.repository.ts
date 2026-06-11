@@ -187,3 +187,12 @@ export const getTriggerTxtpConfigsByGenerationId = async (generationId: number):
 
   return result.rows.map(mapRow);
 };
+
+export const getTriggerTxtpConfigByIdInDb = async (id: number): Promise<SuiteTriggerTxtpConfig | null> => {
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: 'SELECT * FROM trs_suite_trigger_txtp_configs WHERE id = $1', values: [id] } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return result.rows.length ? mapRow(result.rows[0]) : null;
+};

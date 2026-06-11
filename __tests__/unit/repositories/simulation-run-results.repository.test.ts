@@ -14,7 +14,7 @@ jest.mock('../../../src', () => ({
   configuration: {},
 }));
 
-import { getSuiteResultFromDb } from '../../../src/repositories/simulation-studio/simulation-run-results.repository';
+import { getSuiteResultFromDb, saveRunResultInDb } from '../../../src/repositories/simulation-studio/simulation-run-results.repository';
 
 const mockRunRow = {
   id: 1,
@@ -149,5 +149,110 @@ describe('getSuiteResultFromDb', () => {
     const result = await getSuiteResultFromDb(3);
 
     expect(result).toBeNull();
+  });
+});
+
+const mockGenRow = {
+  suite_id: 1,
+  rule_version: 'v1.0.1',
+  trigger_count: 12,
+  rule_name: 'rule01',
+};
+
+const mockDto = {
+  gen_id: 13,
+  trigger_id: 5,
+  rule_result: { subRuleRef: '.02', indpdntVarbl: 500, id: 'rule01@1.0.0', cfg: 'none', wght: 0, prcgTm: 1000, tenantId: 'cbe' },
+};
+
+describe('saveRunResultInDb', () => {
+  it('creates new run when none exists and inserts result', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 });
+
+    const result = await saveRunResultInDb(mockDto);
+
+    expect(result.run_id).toBe(10);
+    expect(result.result_id).toBe(100);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(4);
+  });
+
+  it('reuses existing run when found for gen_id', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 });
+
+    const result = await saveRunResultInDb(mockDto);
+
+    expect(result.run_id).toBe(7);
+    expect(result.result_id).toBe(200);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws when generation not found', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await expect(saveRunResultInDb(mockDto)).rejects.toThrow('Generation not found for gen_id: 13');
+  });
+
+  it('extracts subRuleRef and indpdntVarbl from rule_result', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 });
+
+    await saveRunResultInDb(mockDto);
+
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[3];
+    const values = (insertResultCall[0] as { values: unknown[] }).values;
+    expect(values[3]).toBe('.02');
+    expect(values[4]).toBe(500);
+    expect(values[5]).toBe('SUCCESS');
+  });
+
+  it('sets outcome to FAILED when subRuleRef contains err', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 });
+
+    await saveRunResultInDb({ ...mockDto, rule_result: { ...mockDto.rule_result, subRuleRef: '.err' } });
+
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[2];
+    const values = (insertResultCall[0] as { values: unknown[] }).values;
+    expect(values[5]).toBe('FAILED');
+  });
+
+  it('defaults subRuleRef to "none" when missing from rule_result', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 });
+
+    await saveRunResultInDb({ ...mockDto, rule_result: { id: 'rule01@1.0.0', cfg: 'none', wght: 0, prcgTm: 1000, tenantId: 'cbe' } });
+
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[3];
+    const values = (insertResultCall[0] as { values: unknown[] }).values;
+    expect(values[3]).toBe('none');
+    expect(values[4]).toBeNull();
+  });
+
+  it('passes trigger_id to result insert', async () => {
+    mockHandlePostExecuteSqlStatement
+      .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 });
+
+    await saveRunResultInDb({ ...mockDto, trigger_id: 42 });
+
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[2];
+    const values = (insertResultCall[0] as { values: unknown[] }).values;
+    expect(values[1]).toBe(42);
   });
 });

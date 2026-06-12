@@ -11,6 +11,7 @@ import {
   updateWizardProgressInDb,
   type GenerationSummary,
   resumeGenerationInDb,
+  updateGenerationStatusInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
@@ -174,6 +175,28 @@ export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration
   } catch (error) {
     throw new HttpException(
       `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const updateGenerationStatus = async (generationId: number, status: string): Promise<SuiteGeneration> => {
+  try {
+    // Validate status against enum values
+    const validStatuses = ['DRAFT', 'READY', 'RUNNING', 'COMPLETED', 'FAILED'];
+    if (!validStatuses.includes(status)) {
+      throw new HttpException(`Invalid generation status: ${status}. Allowed values: ${validStatuses.join(', ')}`, HttpStatus.BAD_REQUEST);
+    }
+
+    const updated = await updateGenerationStatusInDb(generationId, status);
+    if (!updated) {
+      throw new HttpException(`Generation with id ${generationId} not found`, HttpStatus.NOT_FOUND);
+    }
+    return updated;
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to update generation status: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

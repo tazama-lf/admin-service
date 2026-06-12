@@ -99,6 +99,7 @@ import {
   updateWizardProgress,
   deleteTriggerTxtpConfig,
   resumeGeneration,
+  updateGenerationStatus,
 } from './services/trs-suite-generation.logic.service';
 import {
   addTriggerTxtpConfig,
@@ -2598,6 +2599,32 @@ export const resumeGenerationHandler = async (req: FastifyRequest, reply: Fastif
   } catch (err) {
     loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
     ErrorHandler.sendError(reply, err, 'Failed to resume generation');
+  }
+};
+
+export const updateGenerationStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update generation status');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const { status } = req.body as { status: string };
+
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    if (!status) {
+      reply.status(400).send({ success: false, message: 'Status is required' });
+      return;
+    }
+
+    const updated = await updateGenerationStatus(generationId, status);
+    reply.status(200).send({ success: true, message: 'Generation status updated', data: updated });
+    loggerService.log('End - Update generation status');
+  } catch (err) {
+    loggerService.error(`Failed to update generation status. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to update generation status');
   }
 };
 

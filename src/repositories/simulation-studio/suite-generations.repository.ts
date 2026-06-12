@@ -277,3 +277,23 @@ export const resumeGenerationInDb = async (suiteId: number): Promise<SuiteGenera
   if (result.rows.length === 0) return null;
   return mapRowToGeneration(result.rows[0]);
 };
+
+export const updateGenerationStatusInDb = async (generationId: number, status: string): Promise<SuiteGeneration | null> => {
+  const query = `
+    UPDATE trs_suite_generations
+    SET status = $1, updated_at = NOW()
+    WHERE id = $2
+    RETURNING *
+  `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: query,
+      values: [status, generationId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (result.rows.length === 0) return null;
+  return mapRowToGeneration(result.rows[0]);
+};

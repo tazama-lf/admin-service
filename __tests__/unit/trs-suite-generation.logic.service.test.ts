@@ -11,6 +11,7 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   updateWizardProgressInDb: jest.fn(),
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),
+  updateGenerationStatusInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
@@ -67,7 +68,6 @@ const mockSuite: SimulationSuite = {
   tenant_id: 'tenant-001',
   name: 'Test Suite',
   simulation_type: 'SINGLE_RULE' as any,
-  status: 'DRAFT' as any,
   rule_repo: 'repo-a',
   rule_version: 'v1.0',
   primary_txtp: 'pacs.008',

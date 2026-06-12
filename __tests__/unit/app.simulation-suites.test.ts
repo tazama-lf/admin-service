@@ -13,6 +13,7 @@ jest.mock('../../src/services/simulation-suites.logic.service', () => ({
 
 jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   resumeGeneration: jest.fn(),
+  updateGenerationStatus: jest.fn(),
 }));
 
 jest.mock('../../src/handlers/errorHandler', () => ({
@@ -36,6 +37,7 @@ import {
   getSimulationByIdHandler,
   updateSimulationHandler,
   resumeGenerationHandler,
+  updateGenerationStatusHandler,
 } from '../../src/app.controller';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as trsSuiteGenerationService from '../../src/services/trs-suite-generation.logic.service';
@@ -48,7 +50,6 @@ describe('Simulation Suites API Handlers', () => {
     id: 101,
     tenant_id: mockTenantId,
     name: 'Q3 Edge Cases',
-    status: 'DRAFT',
     wizard_progress: { currentStep: 1, completedSteps: [1] },
     created_at: new Date('2026-05-01T00:00:00.000Z'),
     updated_at: new Date('2026-05-01T00:00:00.000Z'),
@@ -352,6 +353,92 @@ describe('Simulation Suites API Handlers', () => {
       await resumeGenerationHandler(req, reply as FastifyReply);
 
       expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to resume generation');
+    });
+  });
+
+  describe('updateGenerationStatusHandler', () => {
+    it('should return 400 for invalid generationId', async () => {
+      const req = {
+        params: { generationId: 'abc' },
+        body: { status: 'COMPLETED' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await updateGenerationStatusHandler(req, reply as FastifyReply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Invalid generation ID' });
+      expect(trsSuiteGenerationService.updateGenerationStatus).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if status is missing', async () => {
+      const req = {
+        params: { generationId: '1' },
+        body: {},
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await updateGenerationStatusHandler(req, reply as FastifyReply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({ success: false, message: 'Status is required' });
+      expect(trsSuiteGenerationService.updateGenerationStatus).not.toHaveBeenCalled();
+    });
+
+    it('should update generation status and return 200', async () => {
+      const updated = {
+        id: 1,
+        suite_id: 101,
+        generation_number: 1,
+        status: 'COMPLETED',
+        simulation_type: 'SINGLE_RULE',
+        context_count: 5,
+        trigger_count: 3,
+        enrichment_table_count: 2,
+        generated_context_count: 0,
+        generated_trigger_count: 0,
+        generated_enrichment_row_count: 0,
+        context_field_config_count: 0,
+        trigger_field_config_count: 0,
+        enrichment_field_config_count: 0,
+        wizard_snapshot: {},
+        generation_metadata: {},
+        created_by: 'user-1',
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      (trsSuiteGenerationService.updateGenerationStatus as jest.Mock).mockResolvedValue(updated);
+
+      const req = {
+        params: { generationId: '1' },
+        body: { status: 'COMPLETED' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await updateGenerationStatusHandler(req, reply as FastifyReply);
+
+      expect(trsSuiteGenerationService.updateGenerationStatus).toHaveBeenCalledWith(1, 'COMPLETED');
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith({
+        success: true,
+        message: 'Generation status updated',
+        data: updated,
+      });
+    });
+
+    it('should delegate errors to ErrorHandler', async () => {
+      const error = new Error('Update failed');
+      (trsSuiteGenerationService.updateGenerationStatus as jest.Mock).mockRejectedValue(error);
+
+      const req = {
+        params: { generationId: '1' },
+        body: { status: 'FAILED' },
+      } as unknown as FastifyRequest;
+      const reply = buildReply();
+
+      await updateGenerationStatusHandler(req, reply as FastifyReply);
+
+      expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to update generation status');
     });
   });
 });

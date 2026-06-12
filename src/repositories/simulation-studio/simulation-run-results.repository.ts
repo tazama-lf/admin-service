@@ -66,7 +66,7 @@ interface RunInsertRow {
   id: number;
 }
 
-export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id: number; result_id: number }> => {
+export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id: number; result_id: number; outcome: string }> => {
   const genQuery: PgQueryConfig = {
     text: `
       SELECT g.suite_id, g.rule_version, g.trigger_count, s.rule_name
@@ -125,7 +125,7 @@ export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id
 
   const insertResultResult = await handlePostExecuteSqlStatement<RunInsertRow>(insertResultQuery, 'simulation');
 
-  return { run_id: runId, result_id: insertResultResult.rows[0].id };
+  return { run_id: runId, result_id: insertResultResult.rows[0].id, outcome: runResultOutcome };
 };
 
 export const getSuiteResultFromDb = async (suiteId: number): Promise<SuiteResultRow | null> => {

@@ -112,6 +112,7 @@ import {
   saveEvaluationsInResultsTableHandler,
   saveRecordInTrsSimulationHandler,
   resumeGenerationHandler,
+  updateGenerationStatusHandler,
   getFakerSemanticDataHandler,
   getSuiteResultHandler,
   saveRunResultHandler,
@@ -230,6 +231,7 @@ const routePrivilege = {
   getSimulationResults: ['editor', 'approver'],
   saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
   resumeGeneration: ['editor', 'approver'],
+  updateGenerationStatus: ['editor', 'approver'],
   getFakerSemanticData: ['editor', 'approver'],
   getSuiteResult: ['editor', 'approver'],
   saveRunResult: ['editor', 'approver'],
@@ -681,6 +683,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/generation/resume', {
     ...SetOptionsBodyAndParams(resumeGenerationHandler, routePrivilege.resumeGeneration),
+  });
+
+  fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/status', {
+    ...SetOptionsBodyAndParams(updateGenerationStatusHandler, routePrivilege.updateGenerationStatus),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/faker-semantic-data', {

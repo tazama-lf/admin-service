@@ -11,6 +11,7 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   updateWizardProgressInDb: jest.fn(),
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),
+  updateGenerationStatusInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
@@ -59,7 +60,57 @@ import {
   recalculateGenerationCounts,
   getGenerationSummary,
 } from '../../src/services/trs-suite-generation.logic.service';
+import { updateGenerationStatus } from '../../src/services/trs-suite-generation.logic.service';
+import {
+  createSuiteGeneration,
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  resumeGeneration,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateGenerationStatus,
+} from '../../src/services/trs-suite-generation.logic.service';
 import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
+import {
+  createSuiteGeneration,
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  resumeGeneration,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateGenerationStatus,
+} from '../../src/services/trs-suite-generation.logic.service';
+import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
+import {
+  createSuiteGeneration,
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  resumeGeneration,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateGenerationStatus,
+} from '../../src/services/trs-suite-generation.logic.service';
+import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
+import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
+import {
+  createSuiteGeneration,
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  resumeGeneration,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateGenerationStatus,
+} from '../../src/services/trs-suite-generation.logic.service';
+import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
+import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
 import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
 
 const mockSuite: SimulationSuite = {
@@ -67,7 +118,6 @@ const mockSuite: SimulationSuite = {
   tenant_id: 'tenant-001',
   name: 'Test Suite',
   simulation_type: 'SINGLE_RULE' as any,
-  status: 'DRAFT' as any,
   rule_repo: 'repo-a',
   rule_version: 'v1.0',
   primary_txtp: 'pacs.008',
@@ -388,5 +438,83 @@ describe('getGenerationSummary', () => {
     (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('string error');
 
     await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── updateGenerationStatus ───────────────────────────────────────────────────
+
+describe('updateGenerationStatus', () => {
+  it('updates generation status to COMPLETED', async () => {
+    const updatedGen = { ...mockGeneration, status: 'COMPLETED' as any };
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockResolvedValue(updatedGen);
+
+    const result = await updateGenerationStatus(1, 'COMPLETED');
+
+    expect(result).toEqual(updatedGen);
+    expect(generationsRepo.updateGenerationStatusInDb).toHaveBeenCalledWith(1, 'COMPLETED');
+  });
+
+  it('updates generation status to FAILED', async () => {
+    const updatedGen = { ...mockGeneration, status: 'FAILED' as any };
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockResolvedValue(updatedGen);
+
+    const result = await updateGenerationStatus(1, 'FAILED');
+
+    expect(result).toEqual(updatedGen);
+    expect(generationsRepo.updateGenerationStatusInDb).toHaveBeenCalledWith(1, 'FAILED');
+  });
+
+  it('updates generation status to RUNNING', async () => {
+    const updatedGen = { ...mockGeneration, status: 'RUNNING' as any };
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockResolvedValue(updatedGen);
+
+    const result = await updateGenerationStatus(1, 'RUNNING');
+
+    expect(result).toEqual(updatedGen);
+  });
+
+  it('updates generation status to READY', async () => {
+    const updatedGen = { ...mockGeneration, status: 'READY' as any };
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockResolvedValue(updatedGen);
+
+    const result = await updateGenerationStatus(1, 'READY');
+
+    expect(result).toEqual(updatedGen);
+  });
+
+  it('throws 400 BAD_REQUEST for invalid status', async () => {
+    await expect(updateGenerationStatus(1, 'INVALID_STATUS')).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('Invalid generation status'),
+    });
+    expect(generationsRepo.updateGenerationStatusInDb).not.toHaveBeenCalled();
+  });
+
+  it('throws 404 NOT_FOUND when generation does not exist', async () => {
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockResolvedValue(null);
+
+    await expect(updateGenerationStatus(99, 'COMPLETED')).rejects.toMatchObject({
+      status: 404,
+      message: expect.stringContaining('not found'),
+    });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const httpErr = new HttpException('conflict', 409);
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(updateGenerationStatus(1, 'COMPLETED')).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+
+    await expect(updateGenerationStatus(1, 'COMPLETED')).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.updateGenerationStatusInDb as jest.Mock).mockRejectedValue('string error');
+
+    await expect(updateGenerationStatus(1, 'COMPLETED')).rejects.toMatchObject({ status: 500 });
   });
 });

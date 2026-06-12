@@ -5,11 +5,20 @@ import {
   type SaveRunResultDto,
   type SuiteResultRow,
 } from '../repositories/simulation-studio/simulation-run-results.repository';
+import { updateGenerationStatus } from './trs-suite-generation.logic.service';
 import { HttpException, HttpStatus } from '../utils/error';
 
 export const saveRunResult = async (dto: SaveRunResultDto): Promise<{ run_id: number; result_id: number }> => {
   try {
-    return await saveRunResultInDb(dto);
+    const result = await saveRunResultInDb(dto);
+
+    // Update generation status based on result outcome
+    // If the result outcome is SUCCESS, mark generation as COMPLETED
+    // If the result outcome is FAILED, mark generation as FAILED
+    const newStatus = result.outcome === 'SUCCESS' ? 'COMPLETED' : 'FAILED';
+    await updateGenerationStatus(dto.gen_id, newStatus);
+
+    return { run_id: result.run_id, result_id: result.result_id };
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(`Failed to save run result: ${(error as Error).message}`, HttpStatus.INTERNAL_SERVER_ERROR);

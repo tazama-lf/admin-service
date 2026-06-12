@@ -17,6 +17,8 @@ import {
   getNextGenerationNumber,
   getGenerationsBySuiteId,
   getLatestGenerationBySuiteId,
+  resumeGenerationInDb,
+  updateGenerationStatusInDb,
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
   updateWizardProgressInDb,
@@ -25,6 +27,7 @@ import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
+  getContextTxtpConfigById,
   deleteContextTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
@@ -35,6 +38,7 @@ import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
+  getTriggerTxtpConfigByIdInDb,
   deleteTriggerTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
@@ -47,6 +51,7 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../../src/repositories/simulation-studio/enrichment-tables.repository';
+import { getEnrichmentFieldStrategiesByTableId } from '../../src/repositories/simulation-studio/enrichment-field-strategies.repository';
 
 const mockDb = db.handlePostExecuteSqlStatement as jest.Mock;
 
@@ -103,6 +108,20 @@ const fieldStrategyRow = {
   is_required_override: null,
   created_at: '2026-05-01T00:00:00.000Z',
   updated_at: '2026-05-01T00:00:00.000Z',
+};
+
+const enrichmentFieldStrategyRow = {
+  id: 1,
+  enrichment_table_id: 30,
+  column_name: 'amount',
+  column_type: null,
+  strategy_code: 'range',
+  static_value: null,
+  range_min: 1,
+  range_max: 99,
+  generator_type: null,
+  generator_options: '{"min":1,"max":99}',
+  created_at: '2026-05-01T00:00:00.000Z',
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -1062,5 +1081,97 @@ describe('updateWizardProgressInDb', () => {
     await updateWizardProgressInDb(7, 2, [1, 2]);
     const callArg = mockDb.mock.calls[0][0] as { text: string };
     expect(callArg.text).toContain('updated_at = NOW()');
+  });
+});
+
+describe('resumeGenerationInDb', () => {
+  it('returns latest DRAFT generation when found', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] });
+
+    const result = await resumeGenerationInDb(42);
+
+    expect(result).not.toBeNull();
+    expect(result!.suite_id).toBe(42);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [42] }), 'simulation');
+  });
+
+  it('returns null when no DRAFT generation exists', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await resumeGenerationInDb(42)).toBeNull();
+  });
+});
+
+describe('updateGenerationStatusInDb', () => {
+  it('updates status and returns mapped generation', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...generationRow, status: 'READY' }] });
+
+    const result = await updateGenerationStatusInDb(1, 'READY');
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('READY');
+    const callArg = mockDb.mock.calls[0][0] as { values: unknown[] };
+    expect(callArg.values).toEqual(['READY', 1]);
+  });
+
+  it('returns null when generation is not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await updateGenerationStatusInDb(999, 'COMPLETED')).toBeNull();
+  });
+});
+
+describe('getContextTxtpConfigById', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [contextConfigRow] });
+
+    const result = await getContextTxtpConfigById(1);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [1] }), 'simulation');
+  });
+
+  it('returns null when config does not exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getContextTxtpConfigById(999)).toBeNull();
+  });
+});
+
+describe('getTriggerTxtpConfigByIdInDb', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+
+    const result = await getTriggerTxtpConfigByIdInDb(20);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(20);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [20] }), 'simulation');
+  });
+
+  it('returns null when config does not exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getTriggerTxtpConfigByIdInDb(999)).toBeNull();
+  });
+});
+
+describe('getEnrichmentFieldStrategiesByTableId', () => {
+  it('returns mapped strategies and defaults null column_type to text', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentFieldStrategyRow] });
+
+    const result = await getEnrichmentFieldStrategiesByTableId(30);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].enrichment_table_id).toBe(30);
+    expect(result[0].column_type).toBe('text');
+    expect(result[0].generator_options).toEqual({ min: 1, max: 99 });
+  });
+
+  it('returns empty array when no strategies exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getEnrichmentFieldStrategiesByTableId(30)).toEqual([]);
   });
 });

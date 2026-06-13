@@ -179,6 +179,25 @@ describe('NetworkMapRepository', () => {
         'configuration',
       );
     });
+
+    it('keeps the ::boolean filter but omits OFFSET and LIMIT when limit is "all" (#422)', async () => {
+      const map = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '1' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: map }], rowCount: 1 });
+
+      await NetworkMapRepo.list({ filters: { active: 'true' }, limit: 'all', order: 'ASC', tenantId: mockTenantId });
+
+      // The active predicate (cast ::boolean) is preserved; no OFFSET/LIMIT is appended.
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM network_map WHERE tenantid = $1 AND active = $2::boolean ORDER BY cfg ASC;',
+          values: [mockTenantId, 'true'],
+        },
+        'configuration',
+      );
+    });
   });
 
   describe('get', () => {

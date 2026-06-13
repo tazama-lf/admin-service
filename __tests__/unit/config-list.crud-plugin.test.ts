@@ -142,4 +142,50 @@ describe('configuration list - schema-boundary behaviour (#418)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().meta).toEqual({ total: 99, limit: 20, offset: 0 });
   });
+
+  // --- limit=all (#422): bounded default stays, explicit opt-in for the full set ---
+
+  it('accepts limit=all and forwards it to repo.list (#422)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?limit=all' });
+    expect(res.statusCode).toBe(200);
+    expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ limit: 'all' }));
+  });
+
+  it('reports meta.limit = total and meta.offset = 0 for limit=all (#422)', async () => {
+    mockRuleList.mockResolvedValueOnce({ data: [], total: 99 });
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?limit=all' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().meta).toEqual({ total: 99, limit: 99, offset: 0 });
+  });
+
+  it('allows limit=all with an explicit offset=0 (#422)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?limit=all&offset=0' });
+    expect(res.statusCode).toBe(200);
+    expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ limit: 'all' }));
+  });
+
+  it('rejects limit=all combined with a non-zero offset with 400 (mutually exclusive, #422)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?limit=all&offset=10' });
+    expect(res.statusCode).toBe(400);
+    // Must be the handler-level cross-field guard, not the schema rejecting the literal 'all'.
+    expect(res.json().message).toMatch(/offset/i);
+    expect(mockRuleList).not.toHaveBeenCalled();
+  });
+
+  it('forwards the bounded default limit:20 and offset:0 when no paging params are supplied (#422)', async () => {
+    await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule' });
+    expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 0 }));
+  });
+
+  it('forwards a bare offset with the bounded default limit:20 (#422)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?offset=10' });
+    expect(res.statusCode).toBe(200);
+    expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ offset: 10, limit: 20 }));
+  });
+
+  it('still rejects an over-cap numeric limit with 400 (#422)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?limit=500' });
+    expect(res.statusCode).toBe(400);
+    expect(mockRuleList).not.toHaveBeenCalled();
+  });
 });

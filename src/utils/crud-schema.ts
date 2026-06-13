@@ -34,6 +34,13 @@ const DefaultQuery = Type.Object({
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
+// Shared error body for every CRUD route, so the documented 400/404 shapes stay consistent in one
+// place and surface a description in the generated OpenAPI spec.
+const ErrorResponse = Type.Object(
+  { message: Type.String({ description: 'Human-readable description of why the request failed.' }) },
+  { description: 'Standard error response returned for validation (400) and not-found (404) errors.' },
+);
+
 const makeIdSchema = (
   cfg?: { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] },
 ): TObject => {
@@ -81,9 +88,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
     const ListResponse = Type.Object({
       data: Type.Array(Entity),
       meta: Type.Object({
-        total: Type.Integer(),
-        limit: Type.Integer(),
-        offset: Type.Integer(),
+        total: Type.Integer({
+          description: 'Total number of rows matching the query (a real COUNT(*), not the size of the returned page).',
+        }),
+        limit: Type.Integer({ description: 'Page size applied to this response. Equals total on the limit=all path.' }),
+        offset: Type.Integer({ description: 'Row offset applied to this response. Always 0 on the limit=all path.' }),
       }),
     });
     // --- LIST --- AUTH:EXAMPLE(LIST_V1_ADMIN_RAW_HISTORY_PACS002)
@@ -93,7 +102,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           querystring: QuerySchema,
-          response: { 200: ListResponse, 400: Type.Object({ message: Type.String() }) },
+          response: { 200: ListResponse, 400: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -141,7 +150,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -185,7 +194,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           tags: [prefix],
           params: IdParam,
           body: Update,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -208,7 +217,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Type.Object({ success: Type.Boolean() }) },
+          response: {
+            200: Type.Object({ success: Type.Boolean({ description: 'Always true when a row was deleted.' }) }),
+            404: ErrorResponse,
+          },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -219,7 +231,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const { tenantId } = req as ITenantRequest;
 
         const ok = await repo.remove(makeRepositoryId(p, tenantId));
-        return { success: ok };
+        // Parity with GET/PUT: a missing row is a 404, not a 200 { success: false } (#420).
+        if (!ok) return await reply.code(404).send({ message: 'Not found' });
+        return { success: true };
       },
     );
 

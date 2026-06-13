@@ -7,7 +7,18 @@ import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { configuration } from '..';
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import qs from 'qs';
+
+// Single source of truth for the documented API version: read it from package.json at startup so
+// the OpenAPI `info.version` cannot drift from the published package version. A missing package.json
+// is left to throw loudly (it signals a broken build); a missing/invalid `version` field falls back
+// to a neutral value so the generated spec always carries a valid version string.
+const parsedPkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8')) as {
+  version?: unknown;
+};
+const apiVersion = typeof parsedPkg.version === 'string' && parsedPkg.version.length > 0 ? parsedPkg.version : '0.0.0';
 
 const fastify = Fastify({
   routerOptions: {
@@ -26,6 +37,18 @@ addFormats(ajv); // <-- add this line
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
   await fastify.register(fastifySwagger, {
     prefix: '/swagger',
+    openapi: {
+      info: {
+        title: 'Tazama Admin Service API',
+        description: 'Administrative API for managing Tazama configuration (network maps, rules and typologies) and related operations.',
+        version: apiVersion,
+      },
+      tags: [
+        { name: '/v1/admin/configuration/network_map', description: 'CRUD operations for network map configurations.' },
+        { name: '/v1/admin/configuration/rule', description: 'CRUD operations for rule configurations.' },
+        { name: '/v1/admin/configuration/typology', description: 'CRUD operations for typology configurations.' },
+      ],
+    },
   });
 
   await fastify.register(fastifySwaggerUi, {

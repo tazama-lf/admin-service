@@ -575,10 +575,47 @@ Each repository implementation follows a standardized interface, ensuring consis
 | 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
 | 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
 
-For all GET queries:
- * You can either do a pure GET, which will list all items; 
- * You can do a GET with a query parameter to find, for example, only Active networkmaps: /v1/admin/configuration/network_map?filters[active]=true;
- * Right now, if you specify more than one query param, only the first one will take afffect. 
+### Configuration LIST query contract
+
+The three configuration LIST endpoints (`network_map`, `rule`, `typology`) share a common query
+contract, implemented by a single parameterised helper. A bare `GET` is **safe by default**: it
+returns the first page only, not the whole table.
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer `1-100`, or `all` | `20` | Page size. Use `all` to return the full tenant-scoped set in one response. `all` is mutually exclusive with a non-zero `offset` (returns `400`). Values above `100` return `400`. |
+| `offset` | integer `>= 0` | `0` | Rows to skip for pagination. Cannot be combined with `limit=all`. |
+| `sort` | per-entity allowlist | `id` (rule/typology), `cfg` (network_map) | Lead ordering column. The remaining unique-key column is always appended so paging is deterministic. A value outside the allowlist returns `400`. |
+| `order` | `ASC` or `DESC` | `ASC` | Sort direction. |
+| `filters[<field>]` | string | - | Exact-match filters. **All** supplied filters are ANDed (not just the first). Each `<field>` is allowlisted per entity; unknown keys are ignored. |
+| `keys` | array of `{ id, cfg }` | - | Targeted batch fetch (rule/typology only): return exactly the listed composite `(id, cfg)` pairs in one query. Maximum 200 pairs (`400` past the cap). Supplied as `keys[0][id]=..&keys[0][cfg]=..`. |
+
+Per-entity allowlists: `rule`/`typology` accept `sort`/`filters` of `id` and `cfg`; `network_map`
+accepts `cfg` and `active` (`true`/`false`).
+
+#### Response shape
+
+```json
+{
+  "data": [ /* entity objects */ ],
+  "meta": { "total": 128, "limit": 20, "offset": 0 }
+}
+```
+
+`meta.total` is the real `COUNT(*)` of all matching rows (not the size of the returned page), so a
+client can compute the number of pages. On the `limit=all` path, `meta.limit` equals `total` and
+`meta.offset` is `0`.
+
+#### Examples
+
+```http
+GET /v1/admin/configuration/network_map?filters[active]=true HTTP/1.1
+GET /v1/admin/configuration/rule?limit=50&offset=50&sort=id&order=DESC HTTP/1.1
+GET /v1/admin/configuration/typology?limit=all HTTP/1.1
+GET /v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&keys[1][id]=R1&keys[1][cfg]=1.0.0&limit=all HTTP/1.1
+```
 
 
 ---
@@ -587,13 +624,13 @@ For all GET queries:
 
 ### List Operation
 
-When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain.
+When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain. Every supplied filter is applied (ANDed), and ordering is deterministic: the chosen `sort` column followed by the remaining unique-key columns.
 
-The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin.
+The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin, where `total` is a separate `COUNT(*)` of all matching rows (not the size of the returned page). The CRUD plugin then shapes the HTTP response as `{ data, meta }`.
 
 ### Get Operation
 
-The `get` method retrieves a single entity record based on the combination of `cfg` and tenantId. If the record exists, it returns the parsed configuration object.
+The `get` method retrieves a single entity record based on its unique key and `tenantId` — `(id, cfg)` for rule and typology, and `(cfg)` for network_map. If the record exists, it returns the parsed configuration object; otherwise the endpoint responds `404`.
 
 ### Create Operation
 
@@ -605,7 +642,7 @@ The update process replaces an existing configuration record that matches `cfg` 
 
 ### Delete Operation
 
-The deletion process removes the record from the table matching the same `cfg` and `tenantId` identifiers. It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
+The deletion process removes the record from the table matching its unique key and `tenantId`. When a row is deleted it returns `200` with `{ "success": true }`. When no matching row exists it returns `404` (parity with GET and PUT), rather than `200 { "success": false }`.
 
 ---
 

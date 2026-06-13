@@ -35,4 +35,8 @@ export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   update: (id: TId, payload: TEntity) => Promise<TEntity | null>;
   remove: (id: TId) => Promise<boolean>;
   getNodeByName?: (nodeName: string, tenantId: string) => Promise<TEntity[] | null>;
+  // Optional lifecycle actions. Only entities with a single-active invariant (network_map)
+  // implement these; the CRUD factory registers the activate/deactivate routes only when present.
+  activate?: (id: TId) => Promise<TEntity | null>;
+  deactivate?: (id: TId) => Promise<TEntity | null>;
 }

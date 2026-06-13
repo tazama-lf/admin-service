@@ -81,9 +81,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
     const ListResponse = Type.Object({
       data: Type.Array(Entity),
       meta: Type.Object({
-        total: Type.Integer(),
-        limit: Type.Integer(),
-        offset: Type.Integer(),
+        total: Type.Integer({
+          description: 'Total number of rows matching the query (a real COUNT(*), not the size of the returned page).',
+        }),
+        limit: Type.Integer({ description: 'Page size applied to this response. Equals total on the limit=all path.' }),
+        offset: Type.Integer({ description: 'Row offset applied to this response. Always 0 on the limit=all path.' }),
       }),
     });
     // --- LIST --- AUTH:EXAMPLE(LIST_V1_ADMIN_RAW_HISTORY_PACS002)

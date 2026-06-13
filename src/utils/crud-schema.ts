@@ -34,6 +34,13 @@ const DefaultQuery = Type.Object({
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
+// Shared error body for every CRUD route, so the documented 400/404 shapes stay consistent in one
+// place and surface a description in the generated OpenAPI spec.
+const ErrorResponse = Type.Object(
+  { message: Type.String({ description: 'Human-readable description of why the request failed.' }) },
+  { description: 'Standard error response returned for validation (400) and not-found (404) errors.' },
+);
+
 const makeIdSchema = (
   cfg?: { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] },
 ): TObject => {
@@ -95,7 +102,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           querystring: QuerySchema,
-          response: { 200: ListResponse, 400: Type.Object({ message: Type.String() }) },
+          response: { 200: ListResponse, 400: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -143,7 +150,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -187,7 +194,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           tags: [prefix],
           params: IdParam,
           body: Update,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -210,7 +217,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Type.Object({ success: Type.Boolean() }), 404: Type.Object({ message: Type.String() }) },
+          response: {
+            200: Type.Object({ success: Type.Boolean({ description: 'Always true when a row was deleted.' }) }),
+            404: ErrorResponse,
+          },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]

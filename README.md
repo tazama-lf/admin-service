@@ -571,7 +571,7 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
-| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL |
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate` and `POST {cfg}/deactivate` |
 | 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
 | 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
 
@@ -643,6 +643,21 @@ The update process replaces an existing configuration record that matches `cfg` 
 ### Delete Operation
 
 The deletion process removes the record from the table matching its unique key and `tenantId`. When a row is deleted it returns `200` with `{ "success": true }`. When no matching row exists it returns `404` (parity with GET and PUT), rather than `200 { "success": false }`.
+
+### Activate / Deactivate Operation (network_map only)
+
+Network maps carry a single-active-per-tenant invariant, enforced at the database level by the partial unique index `idx_networkmap_active_tenant on network_map (tenantId) where active = true`. Two dedicated actions switch which map is active without a full `PUT` replace:
+
+```http
+POST /v1/admin/configuration/network_map/{cfg}/activate HTTP/1.1
+POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
+```
+
+**Activate** promotes the target map and demotes the currently-active map (if any) in a single atomic swap, returning the activated map. Because `active` (and `cfg`) are generated `STORED` columns derived from the `configuration` JSONB, the flag is flipped by rewriting the JSON with `jsonb_set` rather than a direct `UPDATE`. The partial unique index is non-deferrable and checked per row, so the swap runs inside one transaction and demotes the current map **before** promoting the target - at no instant are two rows active, regardless of physical row order (a single multi-row `UPDATE` would otherwise risk a `23505` unique-violation). The target's existence is checked first and outside the transaction: a missing map returns `404` with no writes (no rollback needed). `updDtTm` is bumped on both the demoted and promoted records.
+
+**Deactivate** sets a single map inactive in one atomic statement (zero active maps is a legal state, so no transaction is required), bumps `updDtTm`, and returns the deactivated map, or `404` when the target does not exist.
+
+> Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
 
 ---
 

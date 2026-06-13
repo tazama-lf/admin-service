@@ -88,14 +88,13 @@ describe('TypologyConfigRepository', () => {
   });
 
   describe('list', () => {
-    it('should list typology configurations with default sort and no filters', async () => {
+    it('counts all matching rows and pages deterministically on the generated key (no filters)', async () => {
       const firstConfig = createMockTypologyConfig();
       const secondConfig = { ...createMockTypologyConfig(), id: 'typology-002', cfg: '2.0.0' };
 
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ configuration: firstConfig }, { configuration: secondConfig }],
-        rowCount: 2,
-      });
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: firstConfig }, { configuration: secondConfig }], rowCount: 2 });
 
       const result = await TypologyConfigRepo.list({
         offset: 5,
@@ -105,20 +104,29 @@ describe('TypologyConfigRepository', () => {
       });
 
       expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 DESC OFFSET $3 LIMIT $4;",
-          values: ['typologyid', '', 5, 10, 'cfg', mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM typology WHERE tenantid = $1;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM typology WHERE tenantid = $1 ORDER BY typologycfg DESC, typologyid DESC OFFSET $2 LIMIT $3;',
+          values: [mockTenantId, 5, 10],
         },
         'configuration',
       );
     });
 
-    it('should list with the first provided filter and custom sort', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-      });
+    it('applies every supplied filter (ANDed) on the generated columns and sorts by the chosen key', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await TypologyConfigRepo.list({
         filters: { id: 'typology-002', cfg: '2.0.0' },
@@ -130,10 +138,55 @@ describe('TypologyConfigRepository', () => {
       });
 
       expect(result).toEqual({ data: [], total: 0 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 ASC OFFSET $3 LIMIT $4;",
-          values: ['id', 'typology-002', 0, 25, 'id', mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM typology WHERE tenantid = $1 AND typologyid = $2 AND typologycfg = $3;',
+          values: [mockTenantId, 'typology-002', '2.0.0'],
+        },
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM typology WHERE tenantid = $1 AND typologyid = $2 AND typologycfg = $3 ORDER BY typologyid ASC, typologycfg ASC OFFSET $4 LIMIT $5;',
+          values: [mockTenantId, 'typology-002', '2.0.0', 0, 25],
+        },
+        'configuration',
+      );
+    });
+
+    it('takes total from COUNT (not the page length) and never returns null', async () => {
+      const cfg = createMockTypologyConfig();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '42' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: cfg }], rowCount: null });
+
+      const result = await TypologyConfigRepo.list({ offset: 0, limit: 20, order: 'ASC', tenantId: mockTenantId });
+
+      expect(result.total).toBe(42);
+      expect(result.data).toEqual([cfg]);
+    });
+
+    it('ignores filter fields that are not in the allowlist', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await TypologyConfigRepo.list({
+        filters: { nope: 'x', id: 'typology-1' },
+        offset: 0,
+        limit: 20,
+        order: 'ASC',
+        tenantId: mockTenantId,
+      });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        {
+          text: 'SELECT COUNT(*) AS total FROM typology WHERE tenantid = $1 AND typologyid = $2;',
+          values: [mockTenantId, 'typology-1'],
         },
         'configuration',
       );

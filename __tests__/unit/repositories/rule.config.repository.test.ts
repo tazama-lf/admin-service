@@ -80,14 +80,14 @@ describe('RuleConfigRepository', () => {
   });
 
   describe('list', () => {
-    it('should list rule configurations with default sort and no filters', async () => {
+    it('counts all matching rows and pages deterministically on the generated key (no filters)', async () => {
       const firstConfig = createMockRuleConfig();
       const secondConfig = { ...createMockRuleConfig(), id: 'rule-002', cfg: '2.0.0' };
 
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ configuration: firstConfig }, { configuration: secondConfig }],
-        rowCount: 2,
-      });
+      // The shared list issues COUNT(*) first, then the page query.
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: firstConfig }, { configuration: secondConfig }], rowCount: 2 });
 
       const result = await RuleConfigRepo.list({
         offset: 5,
@@ -97,20 +97,31 @@ describe('RuleConfigRepository', () => {
       });
 
       expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      // total comes from a real COUNT(*) over the same predicates
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 DESC OFFSET $4 LIMIT $5;",
-          values: ['ruleid', '', 'cfg', 5, 10, mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM rule WHERE tenantid = $1;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+      // ordering is on the generated unique-key columns (rulecfg, ruleid), not configuration->>...
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM rule WHERE tenantid = $1 ORDER BY rulecfg DESC, ruleid DESC OFFSET $2 LIMIT $3;',
+          values: [mockTenantId, 5, 10],
         },
         'configuration',
       );
     });
 
-    it('should list with the first provided filter and custom sort', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-      });
+    it('applies every supplied filter (ANDed) on the generated columns and sorts by the chosen key', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await RuleConfigRepo.list({
         filters: { id: 'rule-002', cfg: '2.0.0' },
@@ -122,13 +133,82 @@ describe('RuleConfigRepository', () => {
       });
 
       expect(result).toEqual({ data: [], total: 0 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      // BOTH filters become separate ANDed, parameterised predicates (single-filter bug fixed)
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;",
-          values: ['id', 'rule-002', 'id', 0, 25, mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM rule WHERE tenantid = $1 AND ruleid = $2 AND rulecfg = $3;',
+          values: [mockTenantId, 'rule-002', '2.0.0'],
         },
         'configuration',
       );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM rule WHERE tenantid = $1 AND ruleid = $2 AND rulecfg = $3 ORDER BY ruleid ASC, rulecfg ASC OFFSET $4 LIMIT $5;',
+          values: [mockTenantId, 'rule-002', '2.0.0', 0, 25],
+        },
+        'configuration',
+      );
+    });
+
+    it('takes total from COUNT (not the page length) and never returns null', async () => {
+      const cfg = createMockRuleConfig();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '42' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: cfg }], rowCount: null });
+
+      const result = await RuleConfigRepo.list({ offset: 0, limit: 20, order: 'ASC', tenantId: mockTenantId });
+
+      expect(result.total).toBe(42);
+      expect(result.data).toEqual([cfg]);
+    });
+
+    it('ignores filter fields that are not in the allowlist', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await RuleConfigRepo.list({
+        filters: { nope: 'x', id: 'rule-1' },
+        offset: 0,
+        limit: 20,
+        order: 'ASC',
+        tenantId: mockTenantId,
+      });
+
+      // only the recognised `id` filter becomes a predicate; `nope` is dropped
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        {
+          text: 'SELECT COUNT(*) AS total FROM rule WHERE tenantid = $1 AND ruleid = $2;',
+          values: [mockTenantId, 'rule-1'],
+        },
+        'configuration',
+      );
+    });
+
+    it('reports the real total on an over-paged (empty) page (separate COUNT, not COUNT(*) OVER())', async () => {
+      // offset past the end => the page query returns zero rows, but COUNT still answers 42.
+      // A COUNT(*) OVER() implementation would read no window row here and wrongly report 0.
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '42' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const result = await RuleConfigRepo.list({ offset: 1000, limit: 20, order: 'ASC', tenantId: mockTenantId });
+
+      expect(result).toEqual({ data: [], total: 42 });
+    });
+
+    it('coerces a missing/null COUNT result to total 0 (never null/NaN)', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: null }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const result = await RuleConfigRepo.list({ offset: 0, limit: 20, order: 'ASC', tenantId: mockTenantId });
+
+      expect(result).toEqual({ data: [], total: 0 });
     });
   });
 

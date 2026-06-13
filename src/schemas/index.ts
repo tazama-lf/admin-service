@@ -11,6 +11,7 @@ import { QueryAccountConditionSchema } from './queryAccountConditionSchema';
 import { QueryEntityConditionSchema } from './queryEntityConditionSchema';
 import { RuleSchema } from './ruleSchema';
 import { TypologySchema } from './typologySchema';
+import { NetworkMapListQuery, RuleListQuery, TypologyListQuery } from './configListQuerySchema';
 export {
   AccountConditionSchema,
   EntityConditionSchema,
@@ -23,4 +24,7 @@ export {
   QueryEntityConditionSchema,
   RuleSchema,
   TypologySchema,
+  NetworkMapListQuery,
+  RuleListQuery,
+  TypologyListQuery,
 };

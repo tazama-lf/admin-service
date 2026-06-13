@@ -14,7 +14,7 @@ export interface CrudSchemas {
   Create: TSchema;
   Update: TSchema;
   Id?: TSchema;
-  Query?: typeof DefaultQuery;
+  Query?: TObject;
 }
 
 type IdParamConfig = { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] };
@@ -100,7 +100,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           : [validateTenantMiddleware],
       },
       async (req, reply) => {
-        const queryParams = req.query as Static<typeof QuerySchema>;
+        const queryParams = req.query as Static<typeof DefaultQuery>;
         const { tenantId } = req as ITenantRequest;
         const { limit = 20, offset = 0, sort, order = 'ASC', filters } = queryParams;
 

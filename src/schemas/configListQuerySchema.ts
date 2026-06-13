@@ -9,7 +9,9 @@ import { Type } from '@sinclair/typebox';
 // (D1) while an out-of-range `sort`/`order` value is rejected with 400.
 
 const Order = Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')]));
-const Limit = Type.Optional(Type.Integer({ minimum: 1, maximum: 100 }));
+// `all` returns the full tenant-scoped set in one response (#422); it is mutually exclusive
+// with a non-zero `offset`, which the list handler enforces as a 400 cross-field guard.
+const Limit = Type.Optional(Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.Literal('all')]));
 const Offset = Type.Optional(Type.Integer({ minimum: 0 }));
 
 export const RuleListQuery = Type.Object({

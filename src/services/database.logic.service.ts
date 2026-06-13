@@ -51,7 +51,17 @@ export const withConfigurationTransaction = async <T>(work: (client: PoolClient)
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    // Roll back, but never let a rollback failure (typically a dead connection, which Postgres
+    // has already aborted server-side) mask the original cause: log the secondary error and
+    // rethrow the original transaction error.
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      loggerService.log(
+        `Failed to roll back configuration transaction: ${(rollbackError as { message: string }).message}`,
+        'withConfigurationTransaction()',
+      );
+    }
     throw error;
   } finally {
     client.release();

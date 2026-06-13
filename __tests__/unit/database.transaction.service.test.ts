@@ -22,6 +22,7 @@ jest.mock('../../src', () => ({
 }));
 
 import * as dbLogic from '../../src/services/database.logic.service';
+import { loggerService } from '../../src';
 
 type TransactionClient = { query: (text: string, values?: unknown[]) => Promise<unknown>; release: () => void };
 const withConfigurationTransaction = (
@@ -79,6 +80,29 @@ describe('withConfigurationTransaction (#434)', () => {
     expect(queryCalls).toContain('BEGIN');
     expect(queryCalls).toContain('ROLLBACK');
     expect(queryCalls).not.toContain('COMMIT');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the original work error (and logs the secondary failure) when ROLLBACK itself also fails', async () => {
+    const release = jest.fn();
+    const client: TransactionClient = {
+      query: jest.fn(async (text: string) => {
+        if (text === 'ROLLBACK') throw new Error('connection terminated');
+        return { rows: [], rowCount: 0 };
+      }),
+      release,
+    };
+    mockConnect.mockResolvedValue(client as never);
+
+    // The original transaction failure must propagate, not the rollback's own error.
+    await expect(
+      withConfigurationTransaction(async () => {
+        throw new Error('swap failed');
+      }),
+    ).rejects.toThrow('swap failed');
+
+    // The secondary rollback failure is logged rather than swallowed or masking the cause.
+    expect(jest.mocked(loggerService.log)).toHaveBeenCalledWith(expect.stringContaining('connection terminated'), expect.any(String));
     expect(release).toHaveBeenCalledTimes(1);
   });
 });

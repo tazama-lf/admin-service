@@ -71,12 +71,15 @@ export const listConfiguration = async <TEntity>(
   const orderColumns = [sortColumn, ...descriptor.uniqueKeyOrder.filter((column) => column !== sortColumn)];
   const orderByClause = orderColumns.map((column) => `${column} ${direction}`).join(', ');
 
-  const offsetParam = filterValues.length + 2;
-  const limitParam = filterValues.length + 3;
+  // `limit === 'all'` returns the full tenant-scoped set: omit OFFSET/LIMIT entirely and bind
+  // neither param (#422). The handler guarantees offset is 0 on this path (mutually exclusive).
+  const isUnbounded = limit === 'all';
+  const pageClause = isUnbounded ? '' : ` OFFSET $${filterValues.length + 2} LIMIT $${filterValues.length + 3}`;
+  const pageValues = isUnbounded ? [tenantId, ...filterValues] : [tenantId, ...filterValues, offset, limit];
   const pageRes = await handlePostExecuteSqlStatement<{ configuration: TEntity }>(
     {
-      text: `SELECT configuration FROM ${descriptor.table} WHERE ${whereClause} ORDER BY ${orderByClause} OFFSET $${offsetParam} LIMIT $${limitParam};`,
-      values: [tenantId, ...filterValues, offset, limit],
+      text: `SELECT configuration FROM ${descriptor.table} WHERE ${whereClause} ORDER BY ${orderByClause}${pageClause};`,
+      values: pageValues,
     } satisfies PgQueryConfig,
     'configuration',
   );

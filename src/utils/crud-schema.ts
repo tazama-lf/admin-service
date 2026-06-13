@@ -27,7 +27,7 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
 }
 
 const DefaultQuery = Type.Object({
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  limit: Type.Optional(Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.Literal('all')])),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
@@ -93,7 +93,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           querystring: QuerySchema,
-          response: { 200: ListResponse },
+          response: { 200: ListResponse, 400: Type.Object({ message: Type.String() }) },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -103,6 +103,12 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const queryParams = req.query as Static<typeof DefaultQuery>;
         const { tenantId } = req as ITenantRequest;
         const { limit = 20, offset = 0, sort, order = 'ASC', filters } = queryParams;
+
+        // `limit=all` and a non-zero `offset` are mutually exclusive: an unbounded fetch has no
+        // page to skip into, so combining them is a client error rather than a silent no-op (#422).
+        if (limit === 'all' && offset !== 0) {
+          return await reply.code(400).send({ message: 'offset cannot be combined with limit=all' });
+        }
 
         type SortField = Extract<keyof TEntity, string>;
 
@@ -116,7 +122,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         };
 
         const { data, total } = await repo.list(params);
-        return await reply.send({ data, meta: { total, limit, offset } });
+        // For the unbounded path report the truthful window: the whole set was returned from offset 0.
+        const meta = limit === 'all' ? { total, limit: total, offset: 0 } : { total, limit, offset };
+        return await reply.send({ data, meta });
       },
     );
 

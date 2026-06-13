@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 type StringKeys<T> = Extract<keyof T, string>;
 export interface ListQuery<TSort extends string = string> {
-  limit?: number; // default 20
+  limit?: number | 'all'; // default 20; 'all' returns the full tenant-scoped set (#422)
   tenantId?: string; // tenant id is (optional) default "DEFAULT"
   offset?: number; // default 0
   sort?: TSort; // field name

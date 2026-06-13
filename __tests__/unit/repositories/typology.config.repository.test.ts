@@ -191,6 +191,25 @@ describe('TypologyConfigRepository', () => {
         'configuration',
       );
     });
+
+    it('omits OFFSET and LIMIT when limit is "all" (unbounded full-set retrieval, #422)', async () => {
+      const cfg = createMockTypologyConfig();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: cfg }], rowCount: 1 });
+
+      await TypologyConfigRepo.list({ limit: 'all', order: 'ASC', tenantId: mockTenantId });
+
+      // COUNT(*) is unchanged; the page query carries no OFFSET/LIMIT and binds only the tenant.
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM typology WHERE tenantid = $1 ORDER BY typologycfg ASC, typologyid ASC;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+    });
   });
 
   describe('get', () => {

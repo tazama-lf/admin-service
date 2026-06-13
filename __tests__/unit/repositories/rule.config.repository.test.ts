@@ -210,6 +210,56 @@ describe('RuleConfigRepository', () => {
 
       expect(result).toEqual({ data: [], total: 0 });
     });
+
+    it('omits OFFSET and LIMIT when limit is "all" (unbounded full-set retrieval, #422)', async () => {
+      const firstConfig = createMockRuleConfig();
+      const secondConfig = { ...createMockRuleConfig(), id: 'rule-002', cfg: '2.0.0' };
+
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: firstConfig }, { configuration: secondConfig }], rowCount: 2 });
+
+      const result = await RuleConfigRepo.list({ limit: 'all', order: 'ASC', tenantId: mockTenantId });
+
+      expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
+
+      // COUNT(*) is unchanged - the real total is still reported.
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        {
+          text: 'SELECT COUNT(*) AS total FROM rule WHERE tenantid = $1;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+      // The page query carries NEITHER OFFSET NOR LIMIT and binds only the tenant (+ any filters).
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM rule WHERE tenantid = $1 ORDER BY rulecfg ASC, ruleid ASC;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('applies filters but still omits OFFSET and LIMIT when limit is "all" (#422)', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '1' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await RuleConfigRepo.list({ filters: { id: 'rule-002' }, limit: 'all', order: 'ASC', tenantId: mockTenantId });
+
+      // The recognised filter is still ANDed and parameterised; no OFFSET/LIMIT is appended.
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM rule WHERE tenantid = $1 AND ruleid = $2 ORDER BY rulecfg ASC, ruleid ASC;',
+          values: [mockTenantId, 'rule-002'],
+        },
+        'configuration',
+      );
+    });
   });
 
   describe('get', () => {

@@ -208,7 +208,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Type.Object({ success: Type.Boolean() }) },
+          response: { 200: Type.Object({ success: Type.Boolean() }), 404: Type.Object({ message: Type.String() }) },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -219,7 +219,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const { tenantId } = req as ITenantRequest;
 
         const ok = await repo.remove(makeRepositoryId(p, tenantId));
-        return { success: ok };
+        // Parity with GET/PUT: a missing row is a 404, not a 200 { success: false } (#420).
+        if (!ok) return await reply.code(404).send({ message: 'Not found' });
+        return { success: true };
       },
     );
 

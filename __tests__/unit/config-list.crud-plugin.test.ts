@@ -188,4 +188,50 @@ describe('configuration list - schema-boundary behaviour (#418)', () => {
     expect(res.statusCode).toBe(400);
     expect(mockRuleList).not.toHaveBeenCalled();
   });
+
+  // --- targeted batch fetch by (id, cfg) set (#423) ---
+
+  it('forwards a parsed (id, cfg) set to repo.list as an array of {id, cfg} (#423)', async () => {
+    const url = '/v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&keys[1][id]=Foo@1.0.0&keys[1][cfg]=1.0.0';
+    const res = await app.inject({ method: 'GET', url });
+    expect(res.statusCode).toBe(200);
+    expect(mockRuleList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keys: [
+          { id: 'EFRuP@1.0.0', cfg: '1.0.0' },
+          { id: 'Foo@1.0.0', cfg: '1.0.0' },
+        ],
+      }),
+    );
+  });
+
+  it('accepts the (id, cfg) set together with limit=all (the canonical client call, #423)', async () => {
+    const url = '/v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&limit=all';
+    const res = await app.inject({ method: 'GET', url });
+    expect(res.statusCode).toBe(200);
+    expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ keys: [{ id: 'EFRuP@1.0.0', cfg: '1.0.0' }], limit: 'all' }));
+  });
+
+  it('rejects a malformed set entry (a pair missing cfg) with 400 (#423)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0' });
+    expect(res.statusCode).toBe(400);
+    expect(mockRuleList).not.toHaveBeenCalled();
+  });
+
+  it('rejects a set larger than the maxItems cap with 400 (#423)', async () => {
+    const pairs = Array.from({ length: 201 }, (_, i) => `keys[${i}][id]=r${i}&keys[${i}][cfg]=1.0.0`).join('&');
+    const res = await app.inject({ method: 'GET', url: `/v1/admin/configuration/rule?${pairs}` });
+    expect(res.statusCode).toBe(400);
+    expect(mockRuleList).not.toHaveBeenCalled();
+  });
+
+  it('does not expose the (id, cfg) set on network_map - the param is stripped, not forwarded (#423 scope)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/configuration/network_map?keys[0][id]=x&keys[0][cfg]=1.0.0',
+    });
+    expect(res.statusCode).toBe(200);
+    const forwarded = mockNetworkMapList.mock.calls[0][0] as { keys?: unknown };
+    expect(forwarded).not.toHaveProperty('keys');
+  });
 });

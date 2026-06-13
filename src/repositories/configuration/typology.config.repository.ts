@@ -14,6 +14,7 @@ const typologyListDescriptor: ConfigListDescriptor = {
     { key: 'id', column: 'typologyid' },
     { key: 'cfg', column: 'typologycfg' },
   ],
+  keySetColumns: ['typologyid', 'typologycfg'],
 };
 
 export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {

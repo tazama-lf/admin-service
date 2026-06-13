@@ -7,6 +7,7 @@ export interface ListQuery<TSort extends string = string> {
   sort?: TSort; // field name
   order?: 'ASC' | 'DESC';
   filters?: Record<string, string>; // exact-match filters
+  keys?: Array<{ id: string; cfg: string }>; // targeted batch fetch by composite (id, cfg) set (#423)
 }
 
 export interface Node {

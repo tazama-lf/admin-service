@@ -100,9 +100,12 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           : [validateTenantMiddleware],
       },
       async (req, reply) => {
-        const queryParams = req.query as Static<typeof DefaultQuery>;
+        // The batch-fetch set (#423) is validated/bounded only by the per-entity Query schema
+        // (rule + typology, maxItems 200); entities without it have `keys` stripped by Ajv. It is
+        // typed here so the handler can forward it without widening the generic fallback schema.
+        const queryParams = req.query as Static<typeof DefaultQuery> & { keys?: Array<{ id: string; cfg: string }> };
         const { tenantId } = req as ITenantRequest;
-        const { limit = 20, offset = 0, sort, order = 'ASC', filters } = queryParams;
+        const { limit = 20, offset = 0, sort, order = 'ASC', filters, keys } = queryParams;
 
         // `limit=all` and a non-zero `offset` are mutually exclusive: an unbounded fetch has no
         // page to skip into, so combining them is a client error rather than a silent no-op (#422).
@@ -119,6 +122,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           sort: sort as SortField | undefined,
           order,
           filters,
+          // Only forward the batch-fetch set when the per-entity schema kept it; entities out of
+          // scope (e.g. network_map) have `keys` stripped to undefined and must not receive it.
+          ...(keys ? { keys } : {}),
         };
 
         const { data, total } = await repo.list(params);

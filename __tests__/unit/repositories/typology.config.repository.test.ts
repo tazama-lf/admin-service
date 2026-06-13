@@ -210,6 +210,44 @@ describe('TypologyConfigRepository', () => {
         'configuration',
       );
     });
+
+    it('matches a set of (id, cfg) pairs with a parameterised row-value IN on the typology key columns (#423)', async () => {
+      const firstConfig = createMockTypologyConfig();
+      const secondConfig = { ...createMockTypologyConfig(), id: 'typology-002', cfg: '2.0.0' };
+
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: firstConfig }, { configuration: secondConfig }], rowCount: 2 });
+
+      const result = await TypologyConfigRepo.list({
+        keys: [
+          { id: 'typology-001', cfg: '1.0.0' },
+          { id: 'typology-002', cfg: '2.0.0' },
+        ],
+        limit: 'all',
+        order: 'ASC',
+        tenantId: mockTenantId,
+      });
+
+      expect(result).toEqual({ data: [firstConfig, secondConfig], total: 2 });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        {
+          text: 'SELECT COUNT(*) AS total FROM typology WHERE tenantid = $1 AND (typologyid, typologycfg) IN (($2, $3), ($4, $5));',
+          values: [mockTenantId, 'typology-001', '1.0.0', 'typology-002', '2.0.0'],
+        },
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM typology WHERE tenantid = $1 AND (typologyid, typologycfg) IN (($2, $3), ($4, $5)) ORDER BY typologycfg ASC, typologyid ASC;',
+          values: [mockTenantId, 'typology-001', '1.0.0', 'typology-002', '2.0.0'],
+        },
+        'configuration',
+      );
+    });
   });
 
   describe('get', () => {

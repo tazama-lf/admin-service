@@ -66,7 +66,12 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
       },
     },
     staticCSP: true,
-    transformStaticCSP: (header) => header,
+    // Drop `upgrade-insecure-requests` from the generated CSP. Swagger UI references its assets via
+    // same-origin, path-absolute URLs, so they already inherit the document's scheme (HTTP or HTTPS).
+    // The directive only ever rewrites explicit http:// subresources to https://, of which there are
+    // none here; leaving it in forces asset requests to https on a plain-HTTP deployment, which fails
+    // with ERR_SSL_PROTOCOL_ERROR and renders a blank UI. Removal is a no-op when served over HTTPS.
+    transformStaticCSP: (header) => header.replace(/\s*upgrade-insecure-requests;?/i, ''),
     transformSpecification: (swaggerObject, request, reply) => swaggerObject,
     transformSpecificationClone: true,
   });

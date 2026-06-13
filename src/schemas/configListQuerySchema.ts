@@ -14,6 +14,15 @@ const Order = Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC'
 const Limit = Type.Optional(Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.Literal('all')]));
 const Offset = Type.Optional(Type.Integer({ minimum: 0 }));
 
+// Targeted batch fetch (#423): an optional set of (id, cfg) pairs matched in one query against the
+// generated composite-key columns. A top-level param (not part of scalar `filters`); bounded by
+// `maxItems` so an oversized request is rejected with 400 at the schema boundary. Supplied via the
+// qs nested-array form `keys[0][id]=..&keys[0][cfg]=..`. Scoped to rule + typology (composite key);
+// network_map (single (cfg) key) deliberately omits it, so the param is stripped (removeAdditional).
+const Keys = Type.Optional(
+  Type.Array(Type.Object({ id: Type.String(), cfg: Type.String() }, { additionalProperties: false }), { maxItems: 200 }),
+);
+
 export const RuleListQuery = Type.Object({
   limit: Limit,
   offset: Offset,
@@ -28,6 +37,7 @@ export const RuleListQuery = Type.Object({
       { additionalProperties: false },
     ),
   ),
+  keys: Keys,
 });
 
 export const TypologyListQuery = Type.Object({
@@ -44,6 +54,7 @@ export const TypologyListQuery = Type.Object({
       { additionalProperties: false },
     ),
   ),
+  keys: Keys,
 });
 
 export const NetworkMapListQuery = Type.Object({

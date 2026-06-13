@@ -14,6 +14,7 @@ const ruleListDescriptor: ConfigListDescriptor = {
     { key: 'id', column: 'ruleid' },
     { key: 'cfg', column: 'rulecfg' },
   ],
+  keySetColumns: ['ruleid', 'rulecfg'],
 };
 
 export const RuleConfigRepo: CrudRepository<RuleConfig> = {

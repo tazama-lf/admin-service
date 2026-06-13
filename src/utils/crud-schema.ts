@@ -237,6 +237,59 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       },
     );
 
+    // --- ACTIVATE / DEACTIVATE --- only for entities that expose the lifecycle actions
+    // (network_map). The activate swap is atomic in the repository; the route just maps a
+    // null result (missing target) to 404, mirroring GET/PUT/DELETE. AUTH:EXAMPLE(POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_ACTIVATE)
+    const activateFn = repo.activate;
+    if (activateFn) {
+      app.post(
+        `${prefix}${idPath}/activate`,
+        {
+          schema: {
+            tags: [prefix],
+            params: IdParam,
+            response: { 200: Entity, 404: ErrorResponse },
+          },
+          preHandler: configuration.AUTHENTICATED
+            ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_ACTIVATE`)]
+            : [validateTenantMiddleware],
+        },
+        async (req, reply) => {
+          const p = req.params as Record<string, string>;
+          const { tenantId } = req as ITenantRequest;
+
+          const activated = await activateFn(makeRepositoryId(p, tenantId));
+          if (!activated) return await reply.code(404).send({ message: 'Not found' });
+          return activated;
+        },
+      );
+    }
+
+    const deactivateFn = repo.deactivate;
+    if (deactivateFn) {
+      app.post(
+        `${prefix}${idPath}/deactivate`,
+        {
+          schema: {
+            tags: [prefix],
+            params: IdParam,
+            response: { 200: Entity, 404: ErrorResponse },
+          },
+          preHandler: configuration.AUTHENTICATED
+            ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_DEACTIVATE`)]
+            : [validateTenantMiddleware],
+        },
+        async (req, reply) => {
+          const p = req.params as Record<string, string>;
+          const { tenantId } = req as ITenantRequest;
+
+          const deactivated = await deactivateFn(makeRepositoryId(p, tenantId));
+          if (!deactivated) return await reply.code(404).send({ message: 'Not found' });
+          return deactivated;
+        },
+      );
+    }
+
     await Promise.resolve(true);
   };
 

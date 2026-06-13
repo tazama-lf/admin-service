@@ -3,12 +3,13 @@ import { describe, it, expect, jest, beforeAll, afterAll, beforeEach } from '@je
 import Fastify, { type FastifyInstance } from 'fastify';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import qs from 'qs';
+import { parseQueryString } from '../../src/clients/querystringParser';
 
 // Issue #418 - schema-boundary behaviour of the configuration `list` endpoints.
 //
 // This test mirrors production validation exactly (src/clients/fastify.ts):
-//   - querystringParser: qs.parse  (so `filters[active]=true` -> { active: 'true' })
+//   - querystringParser: parseQueryString (shared qs parser, arrayLimit aligned with the keys
+//     maxItems so >20 (id, cfg) pairs parse as an array, #432)
 //   - Ajv with removeAdditional: 'all', coerceTypes: 'array', useDefaults: true
 // and registers the CRUD plugin with the per-entity `Query` override the router will
 // pass in production. It asserts:
@@ -61,7 +62,7 @@ describe('configuration list - schema-boundary behaviour (#418)', () => {
   beforeAll(async () => {
     // Mirror production (src/clients/fastify.ts): the qs parser is nested under
     // routerOptions in Fastify v5, so `filters[active]=true` becomes { filters: { active: 'true' } }.
-    app = Fastify({ routerOptions: { querystringParser: (str) => qs.parse(str) } });
+    app = Fastify({ routerOptions: { querystringParser: (str) => parseQueryString(str) } });
 
     const ajv = new Ajv({ removeAdditional: 'all', useDefaults: true, coerceTypes: 'array', strictTuples: false });
     addFormats(ajv);
@@ -210,6 +211,20 @@ describe('configuration list - schema-boundary behaviour (#418)', () => {
     const res = await app.inject({ method: 'GET', url });
     expect(res.statusCode).toBe(200);
     expect(mockRuleList).toHaveBeenCalledWith(expect.objectContaining({ keys: [{ id: 'EFRuP@1.0.0', cfg: '1.0.0' }], limit: 'all' }));
+  });
+
+  it('parses a set larger than the qs default arrayLimit (25 pairs) as an array, not an object (#432)', async () => {
+    // qs defaults arrayLimit to 20: beyond index 20 it degrades the array into an object with
+    // numeric keys, which the Ajv array schema then rejects with 400. The parser must build the
+    // array up to the schema maxItems so realistic network maps (30+ rules) batch in one call.
+    const count = 25;
+    const pairs = Array.from({ length: count }, (_, i) => `keys[${i}][id]=r${i}@1.0.0&keys[${i}][cfg]=1.0.0`).join('&');
+    const res = await app.inject({ method: 'GET', url: `/v1/admin/configuration/rule?${pairs}&limit=all` });
+    expect(res.statusCode).toBe(200);
+    const forwarded = mockRuleList.mock.calls[0][0] as { keys?: Array<{ id: string; cfg: string }> };
+    expect(Array.isArray(forwarded.keys)).toBe(true);
+    expect(forwarded.keys).toHaveLength(count);
+    expect(forwarded.keys?.[24]).toEqual({ id: 'r24@1.0.0', cfg: '1.0.0' });
   });
 
   it('rejects a malformed set entry (a pair missing cfg) with 400 (#423)', async () => {

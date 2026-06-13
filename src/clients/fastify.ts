@@ -9,7 +9,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { configuration } from '..';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import qs from 'qs';
+import { parseQueryString } from './querystringParser';
 
 // Single source of truth for the documented API version: read it from package.json at startup so
 // the OpenAPI `info.version` cannot drift from the published package version. A missing package.json
@@ -22,7 +22,7 @@ const apiVersion = typeof parsedPkg.version === 'string' && parsedPkg.version.le
 
 const fastify = Fastify({
   routerOptions: {
-    querystringParser: (str) => qs.parse(str),
+    querystringParser: (str) => parseQueryString(str),
   },
 });
 

@@ -78,6 +78,9 @@ import {
   QueryEntityConditionSchema,
   RuleSchema,
   TypologySchema,
+  NetworkMapListQuery,
+  RuleListQuery,
+  TypologyListQuery,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
@@ -147,7 +150,7 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/network_map',
       repo: NetworkMapRepo,
-      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
+      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema, Query: NetworkMapListQuery },
       idParam: { kind: 'cfg' },
     }),
   );
@@ -156,7 +159,7 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/rule',
       repo: RuleConfigRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema, Query: RuleListQuery },
       idParam: { kind: 'single', name: 'id' },
     }),
   );
@@ -165,7 +168,7 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/typology',
       repo: TypologyConfigRepo,
-      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
+      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema, Query: TypologyListQuery },
       idParam: { kind: 'single', name: 'id' },
     }),
   );

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Type, type Static, type TObject, type TSchema } from '@sinclair/typebox';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
 import type { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fastify';
 import fp from 'fastify-plugin';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { PoolClient } from 'pg';
 import { configuration } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
@@ -17,6 +20,19 @@ export interface CrudSchemas {
   Query?: TObject;
 }
 
+// Opt-in atomic batch (array) submission for the POST route (#436). Supplied only by the
+// configuration entities that want it (rule, typology); when absent the POST route accepts a
+// single object exactly as before. `runInTransaction` is injected per call site (so the generic
+// factory never hard-codes a pool-specific helper) and pins one client for the whole batch.
+export interface BatchCreateOptions {
+  runInTransaction: <T>(work: (client: PoolClient) => Promise<T>) => Promise<T>;
+  maxItems?: number;
+}
+
+// Default upper bound on a single batch, matching the existing list `keys` batch-fetch cap (#423):
+// bounds the transaction size and the request payload.
+const DEFAULT_BATCH_MAX_ITEMS = 200;
+
 type IdParamConfig = { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] };
 
 interface BuildCrudOptions<TEntity, TId extends AllowedId> {
@@ -24,6 +40,7 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
   repo: CrudRepository<TEntity, TId>;
   schemas: CrudSchemas;
   idParam?: IdParamConfig;
+  batch?: BatchCreateOptions;
 }
 
 const DefaultQuery = Type.Object({
@@ -60,8 +77,41 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
   opts: BuildCrudOptions<TEntity, TId>,
 ): FastifyPluginAsync => {
   const plugin: FastifyPluginAsync = async (app: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse>) => {
-    const { prefix, repo, schemas, idParam } = opts;
+    const { prefix, repo, schemas, idParam, batch } = opts;
     const { Entity, Create, Update } = schemas;
+    const batchMaxItems = batch?.maxItems ?? DEFAULT_BATCH_MAX_ITEMS;
+
+    // When batch submission is enabled the POST body accepts BOTH a single object and an array.
+    // The array branch's items use an unconstrained schema (Type.Unknown) so the app-wide
+    // `removeAdditional: 'all'` does NOT strip their fields and malformed ITEMS reach the handler,
+    // where per-item validation reports the offending index (item[i]); the union's single-object
+    // branch still enforces the full Create schema, preserving today's single-object behaviour.
+    const BatchItem = Type.Unknown({ description: 'A configuration object following the entity Create schema.' });
+    const CreateBody = batch
+      ? Type.Union([Create, Type.Array(BatchItem, { minItems: 1, maxItems: batchMaxItems })], {
+          description:
+            'A single configuration object, or a non-empty array (atomic batch insert) of configuration objects following the same schema.',
+        })
+      : Create;
+    // Response serialization: a single object keeps the strict Entity schema. For batch routes the
+    // 201 body may be an object OR an array; we intentionally omit a response schema for that case
+    // because a Union([Entity, Array(Entity)]) breaks fast-json-stringify when Entity is recursive
+    // (e.g. TypologySchema.expression). Default JSON serialization handles both shapes. The accepted
+    // request shapes remain fully documented via CreateBody (the #436 OpenAPI acceptance criterion).
+    const CreateResponseSchema = batch ? { 400: ErrorResponse } : { 201: Entity };
+
+    // Batch runtime: the transaction runner and a standalone per-item validator are bundled together
+    // so they share a single existence fact (`batch` enabled <=> both present). This lets the handler
+    // narrow once and treat `validateItem` as non-optional, guaranteeing validation is never skipped.
+    // The validator mirrors the app-wide Ajv config (see src/clients/fastify.ts) and is compiled from
+    // the full Create schema so it can surface an item[i] message for the offending array element.
+    const batchRuntime = batch
+      ? (() => {
+          const itemAjv = new Ajv({ removeAdditional: 'all', useDefaults: true, coerceTypes: 'array', strictTuples: false });
+          addFormats(itemAjv);
+          return { runInTransaction: batch.runInTransaction, validateItem: itemAjv.compile(Create) };
+        })()
+      : undefined;
 
     // --- Build path and param schema based on idParam ---
     const singleName: string = idParam?.kind === 'single' ? (idParam.name ?? 'id') : 'id';
@@ -172,8 +222,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       {
         schema: {
           tags: [prefix],
-          body: Create,
-          response: { 201: Entity },
+          body: CreateBody,
+          response: CreateResponseSchema,
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -181,6 +231,33 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       },
       async (req, reply) => {
         const { tenantId } = req as ITenantRequest;
+
+        // Batch path: an array body is inserted all-or-nothing inside one injected transaction,
+        // with the pinned client threaded into every create so the rows share one BEGIN/COMMIT.
+        if (batchRuntime && Array.isArray(req.body)) {
+          const items = req.body as TEntity[];
+
+          // Validate each item up-front (before opening a transaction) so a malformed batch never
+          // partially inserts and the client gets an error that names the offending index.
+          for (let i = 0; i < items.length; i++) {
+            if (!batchRuntime.validateItem(items[i])) {
+              const firstError = batchRuntime.validateItem.errors?.[0];
+              const detail = firstError ? `${firstError.instancePath || '/'} ${firstError.message}`.trim() : 'invalid item';
+              return await reply.code(400).send({ message: `item[${i}]: ${detail}` });
+            }
+          }
+
+          const created = await batchRuntime.runInTransaction(async (client) => {
+            const results: TEntity[] = [];
+            // Inserts run serially: a single pinned PoolClient cannot execute concurrent queries.
+            for (const item of items) {
+              results.push(await repo.create(item, tenantId, client));
+            }
+            return results;
+          });
+          return await reply.code(201).send(created);
+        }
+
         const created = await repo.create(req.body as TEntity, tenantId);
         return await reply.code(201).send(created);
       },

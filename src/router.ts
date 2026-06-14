@@ -84,6 +84,7 @@ import {
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import { withConfigurationTransaction } from './services/database.logic.service';
 
 // Privilege mapping for each route, for easier maintenance and claim management
 const routePrivilege = {
@@ -161,6 +162,7 @@ function Routes(fastify: FastifyInstance): void {
       repo: RuleConfigRepo,
       schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema, Query: RuleListQuery },
       idParam: { kind: 'single', name: 'id' },
+      batch: { runInTransaction: withConfigurationTransaction },
     }),
   );
 
@@ -170,6 +172,7 @@ function Routes(fastify: FastifyInstance): void {
       repo: TypologyConfigRepo,
       schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema, Query: TypologyListQuery },
       idParam: { kind: 'single', name: 'id' },
+      batch: { runInTransaction: withConfigurationTransaction },
     }),
   );
 

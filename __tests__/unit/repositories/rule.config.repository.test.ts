@@ -470,6 +470,7 @@ describe('RuleConfigRepository', () => {
           values: [inputPayload],
         },
         'configuration',
+        undefined,
       );
 
       expect(result).toEqual(mockCreateResponse.rows[0].configuration);

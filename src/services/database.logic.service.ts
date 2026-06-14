@@ -6,9 +6,17 @@ import { databaseManager, loggerService } from '..';
 export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
   queryConfig: PgQueryConfig,
   databaseName: string,
+  client?: PoolClient,
 ): Promise<QueryResult<T>> => {
   try {
     loggerService.log('Started handling execution of the sql statement');
+
+    // When a pinned transaction client is supplied (batch insert, #436), run the
+    // statement on THAT client so it joins the open BEGIN/COMMIT rather than borrowing
+    // a separate pooled connection - otherwise the batch would not be atomic.
+    if (client) {
+      return await client.query<T>(queryConfig.text, queryConfig.values);
+    }
 
     switch (databaseName) {
       case 'configuration':

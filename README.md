@@ -572,8 +572,8 @@ Each repository implementation follows a standardized interface, ensuring consis
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
 | 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate` and `POST {cfg}/deactivate` |
-| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
-| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
+| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST (single or batch),PUT,DEL |
+| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST (single or batch),PUT,DEL |
 
 ### Configuration LIST query contract
 
@@ -617,6 +617,94 @@ GET /v1/admin/configuration/typology?limit=all HTTP/1.1
 GET /v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&keys[1][id]=R1&keys[1][cfg]=1.0.0&limit=all HTTP/1.1
 ```
 
+### Configuration POST contract (single or batch)
+
+The `rule` and `typology` POST endpoints accept **either** a single configuration object **or** an
+array of configuration objects in one request. `network_map` is intentionally excluded (its
+single-active-per-tenant invariant and `activate`/`deactivate` swap make atomic bulk insert
+semantics ambiguous), so its POST accepts a single object only.
+
+#### Accepted body shapes
+
+A single object (unchanged, backwards compatible):
+
+```json
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } }
+```
+
+An array of objects (batch). A common shape is one entity identity (`id` is slow-changing) submitted
+with several config versions (`cfg` is the high-churn part of the key) in a single atomic insert:
+
+```json
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { /* ... */ } }
+]
+```
+
+Each array element must follow the same Create schema as the single-object body. Unknown
+top-level fields are stripped before insert on both paths (no mass-assignment via the array form).
+
+#### Semantics
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Array bounds | `minItems` 1, `maxItems` 200 by default. An empty array or one over the cap returns `400`. |
+| Validation | Every item is validated **before** any insert. The first invalid item returns `400` with a body message of the form `item[<index>]: <path> <reason>`, identifying which element failed. |
+| Atomicity | All items in a batch are inserted inside a single configuration-pool transaction. If any insert fails the whole batch is rolled back - it is all-or-nothing, never a partial write. |
+| Tenant scoping | Every item is stamped with the `tenantId` from the auth token, exactly as the single-object path. |
+| Success status | `201 Created` for both the single-object and the array form. |
+
+#### Response body note
+
+For the **single-object** path the `201` response body is the created entity, serialized against the
+entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
+
+For the **array** path the success body (the array of created entities) is returned with the
+per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
+compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
+the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
+response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
+remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
+per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
+a single uniform code path over a bespoke per-entity serializer for the batch array case only.
+
+#### Examples
+
+A single rule (the single-object form):
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } }
+```
+
+A batch of rule config versions - one `id`, several `cfg` values, inserted atomically:
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { } }
+]
+```
+
+A batch of typology config versions (note typology's required `rules`, `expression`, `workflow`
+fields - there is no `config` field on a typology):
+
+```http
+POST /v1/admin/configuration/typology HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.0", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } },
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.1", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } }
+]
+```
+
 
 ---
 
@@ -634,7 +722,7 @@ The `get` method retrieves a single entity record based on its unique key and `t
 
 ### Create Operation
 
-The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation.
+The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation. The `create` method also accepts an optional transaction `client`; when supplied (by the batch POST path) the insert runs on that pinned client so a multi-item batch commits or rolls back atomically. See **Configuration POST contract (single or batch)** above for the `rule`/`typology` array form.
 
 ### Update Operation
 

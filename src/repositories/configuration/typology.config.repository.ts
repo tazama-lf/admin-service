@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
+import type { PoolClient } from 'pg';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
 import { listConfiguration, type ConfigListDescriptor } from './config-list.shared';
@@ -34,7 +35,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: TypologyConfig, tenantId: string): Promise<TypologyConfig> {
+  create: async function (payload: TypologyConfig, tenantId: string, client?: PoolClient): Promise<TypologyConfig> {
     payload.tenantId = tenantId;
 
     const dtTme = new Date().toISOString();
@@ -47,6 +48,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         values: [payload],
       } satisfies PgQueryConfig,
       'configuration',
+      client,
     );
     return queryRes.rows[0].configuration;
   },

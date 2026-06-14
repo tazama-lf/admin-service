@@ -93,12 +93,12 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
             'A single configuration object, or a non-empty array (atomic batch insert) of configuration objects following the same schema.',
         })
       : Create;
-    // Response serialization: a single object keeps the strict Entity schema. For batch routes the
-    // 201 body may be an object OR an array; we intentionally omit a response schema for that case
-    // because a Union([Entity, Array(Entity)]) breaks fast-json-stringify when Entity is recursive
-    // (e.g. TypologySchema.expression). Default JSON serialization handles both shapes. The accepted
-    // request shapes remain fully documented via CreateBody (the #436 OpenAPI acceptance criterion).
-    const CreateResponseSchema = batch ? { 400: ErrorResponse } : { 201: Entity };
+    // Response serialization: the single-object 201 always keeps the strict Entity schema (and its
+    // OpenAPI 201), on batch routes too. Only the batch ARRAY reply skips the schema serializer (see
+    // the POST handler), because a Union([Entity, Array(Entity)]) breaks fast-json-stringify when
+    // Entity is recursive (e.g. TypologySchema.expression). The accepted request shapes remain fully
+    // documented via CreateBody (the #436 OpenAPI acceptance criterion).
+    const CreateResponseSchema = batch ? { 201: Entity, 400: ErrorResponse } : { 201: Entity };
 
     // Batch runtime: the transaction runner and a standalone per-item validator are bundled together
     // so they share a single existence fact (`batch` enabled <=> both present). This lets the handler
@@ -255,6 +255,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
             }
             return results;
           });
+          // The route's 201 schema is the single Entity (object); an array can't be serialized
+          // against it, and a Union serializer breaks on recursive schemas (typology.expression).
+          // Bypass the schema serializer for this array reply only - the single-object path below
+          // keeps the Entity serializer (and its OpenAPI 201).
+          reply.serializer((payload) => JSON.stringify(payload));
           return await reply.code(201).send(created);
         }
 

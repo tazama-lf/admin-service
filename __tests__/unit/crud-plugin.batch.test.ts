@@ -3,6 +3,7 @@ import { describe, it, expect, jest, beforeAll, afterAll, beforeEach } from '@je
 import Fastify, { type FastifyInstance } from 'fastify';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { Type } from '@sinclair/typebox';
 
 // RED tests (#436): buildCrudPlugin must allow batch (array) submission on the
 // generic POST route for the `rule` and `typology` configuration entities.
@@ -373,6 +374,73 @@ describe('POST batch (array) submission on buildCrudPlugin (#436)', () => {
 
       expect(response.statusCode).toBe(400);
       expect(mockNetworkMapCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  // Response serialization on batch-enabled routes (CodeRabbit, PR #437): the single-object 201 must
+  // keep its strict Entity serializer (and OpenAPI 201), while ONLY the array reply bypasses it. A
+  // Union([Entity, Array(Entity)]) serializer breaks fast-json-stringify on recursive schemas, so the
+  // array path overrides reply.serializer to emit raw JSON. These tests use a deliberately strict
+  // Entity (no additionalProperties) so fast-json-stringify drops anything outside the schema - the
+  // observable signal that the schema serializer ran on the single-object reply but not the array.
+  describe('response serialization on batch routes (#436, PR #437)', () => {
+    let app: FastifyInstance;
+    const StrictEntity = Type.Object({ id: Type.String(), cfg: Type.String() });
+
+    beforeAll(async () => {
+      app = Fastify();
+      app.setValidatorCompiler(({ schema }) => makeAjv().compile(schema));
+      const { runInTransaction } = makeTxRecorder();
+
+      await app.register(
+        registerCrud({
+          prefix: '/v1/admin/configuration/rule',
+          repo: RuleConfigRepo,
+          // Entity (response) is strict; Create (request) stays the real RuleSchema.
+          schemas: { Entity: StrictEntity, Create: RuleSchema, Update: RuleSchema },
+          idParam: { kind: 'single', name: 'id' },
+          batch: { runInTransaction, maxItems: BATCH_MAX },
+        }),
+      );
+      await app.ready();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      mockRuleCreate.mockReset();
+      // The repo returns a field that is NOT in the strict Entity response schema.
+      mockRuleCreate.mockImplementation((payload: Record<string, unknown>) =>
+        Promise.resolve({ id: payload.id, cfg: payload.cfg, serverOnly: 'secret' }),
+      );
+    });
+
+    it('serializes the single-object 201 against Entity, dropping fields outside the schema', async () => {
+      const response = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: validRule('r1') });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as Record<string, unknown>;
+      // The Entity serializer ran: only the declared id/cfg survive; serverOnly is dropped.
+      expect(body).toEqual({ id: 'r1', cfg: '1.0.0' });
+      expect(body).not.toHaveProperty('serverOnly');
+    });
+
+    it('returns the array 201 with the serializer bypassed (stays an array, keeps off-schema fields)', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/admin/configuration/rule',
+        payload: [validRule('r1'), validRule('r2')],
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as Array<Record<string, unknown>>;
+      // Not coerced through the single-object Entity serializer: it stays an array of length 2 and
+      // retains fields outside the Entity schema (proof the array reply skips schema serialization).
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(2);
+      expect(body[0]).toMatchObject({ id: 'r1', cfg: '1.0.0', serverOnly: 'secret' });
     });
   });
 });

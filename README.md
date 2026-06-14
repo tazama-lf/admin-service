@@ -632,12 +632,13 @@ A single object (unchanged, backwards compatible):
 { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } }
 ```
 
-An array of objects (batch):
+An array of objects (batch). A common shape is one entity identity (`id` is slow-changing) submitted
+with several config versions (`cfg` is the high-churn part of the key) in a single atomic insert:
 
 ```json
 [
   { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } },
-  { "id": "EFRuP@1.0.1", "cfg": "1.0.0", "config": { /* ... */ } }
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { /* ... */ } }
 ]
 ```
 
@@ -656,19 +657,21 @@ top-level fields are stripped before insert on both paths (no mass-assignment vi
 
 #### Response body note
 
-For the **single-object** path the `201` response body is the created entity (unchanged).
+For the **single-object** path the `201` response body is the created entity, serialized against the
+entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
 
-For the **array** path the success body is returned but **not** re-serialized through the per-entity
-response schema. The shared CRUD response serializer is built from a `Type.Union` of the single
-entity and an array of items; the typology entity schema is recursive (`expression`), which the
-underlying `fast-json-stringify` serializer cannot compile inside that union. To keep one generic,
-auto-derived plugin for all entities (maintainability through automation) rather than hand-written
-per-entity batch serializers, the batch success path skips response serialization. A direct
-consequence is that, in the generated OpenAPI, the array request items appear as a generic object
-(`{}`); the per-item shape is the entity Create schema documented above. This is a deliberate
-trade-off favouring a single uniform code path over bespoke per-entity detail.
+For the **array** path the success body (the array of created entities) is returned with the
+per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
+compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
+the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
+response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
+remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
+per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
+a single uniform code path over a bespoke per-entity serializer for the batch array case only.
 
 #### Examples
+
+A single rule (the single-object form):
 
 ```http
 POST /v1/admin/configuration/rule HTTP/1.1
@@ -677,13 +680,28 @@ Content-Type: application/json
 { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } }
 ```
 
+A batch of rule config versions - one `id`, several `cfg` values, inserted atomically:
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { } }
+]
+```
+
+A batch of typology config versions (note typology's required `rules`, `expression`, `workflow`
+fields - there is no `config` field on a typology):
+
 ```http
 POST /v1/admin/configuration/typology HTTP/1.1
 Content-Type: application/json
 
 [
-  { "id": "typology-processor@1.0.0", "cfg": "1.0.0", "config": { } },
-  { "id": "typology-processor@1.0.1", "cfg": "1.0.0", "config": { } }
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.0", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } },
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.1", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } }
 ]
 ```
 

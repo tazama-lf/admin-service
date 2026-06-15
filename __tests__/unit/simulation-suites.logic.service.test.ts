@@ -19,6 +19,7 @@ jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
 jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   createSuiteGeneration: jest.fn(),
   createContextTxtpConfig: jest.fn(),
+  recalculateGenerationCounts: jest.fn(),
 }));
 
 jest.mock('../../src/services/trigger-txtp-config.logic.service', () => ({
@@ -55,6 +56,7 @@ describe('Simulation Suites Logic Service', () => {
     (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 7, suite_id: 1 });
     (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
     (triggerService.createTriggerTxtpConfig as jest.Mock).mockResolvedValue({ trigger_txtp_config_id: 1, field_overrides: [] });
+    (trsGenService.recalculateGenerationCounts as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('getSimulationSuites', () => {
@@ -159,6 +161,7 @@ describe('Simulation Suites Logic Service', () => {
         mockUserId,
         mockUserEmail,
       );
+      expect(trsGenService.recalculateGenerationCounts).toHaveBeenCalledWith(7);
     });
 
     it('should validate empty name', async () => {
@@ -203,6 +206,7 @@ describe('Simulation Suites Logic Service', () => {
 
       expect(trsGenService.createContextTxtpConfig).not.toHaveBeenCalled();
       expect(triggerService.createTriggerTxtpConfig).not.toHaveBeenCalled();
+      expect(trsGenService.recalculateGenerationCounts).not.toHaveBeenCalled();
       expect(result).toEqual({ ...suiteWithoutTxtp, generation_id: 7 });
     });
   });

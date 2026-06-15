@@ -77,6 +77,7 @@ import {
   reviewMaskHandler,
   updateSimulationHandler,
   createSimulationHandler,
+  getSimulationSuitesCountsHandler,
   getSimulationByIdHandler,
   getSimulationsHandler,
   getSuiteGenerationsHandler,
@@ -85,8 +86,15 @@ import {
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
   getTriggerConfigsHandler,
+  getTriggerConfigByIdHandler,
   addTriggerTxtpConfigHandler,
   bulkUpdateTriggerConfigsHandler,
+  upsertContextMappingHandler,
+  getContextMappingHandler,
+  deleteContextMappingHandler,
+  upsertTriggerMappingHandler,
+  getTriggerMappingHandler,
+  deleteTriggerMappingHandler,
   createEnrichmentTableHandler,
   getEnrichmentTablesHandler,
   bulkUpdateEnrichmentTablesHandler,
@@ -107,7 +115,13 @@ import {
   saveEvaluationsInResultsTableHandler,
   saveRecordInTrsSimulationHandler,
   resumeGenerationHandler,
+  updateGenerationStatusHandler,
   getFakerSemanticDataHandler,
+  getSuiteResultHandler,
+  saveRunResultHandler,
+  generateSampleMessagesHandler,
+  generateSampleTriggerMessagesHandler,
+  generateSampleEnrichmentRowsHandler,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -189,6 +203,7 @@ const routePrivilege = {
   reviewMask: 'trs_data_engineer_approver',
   createSimulationSuites: ['editor', 'approver'],
   getSimulationSuites: ['editor', 'approver'],
+  getSimulationSuitesCounts: ['editor', 'approver'],
   getSimulationSuiteById: ['editor', 'approver'],
   updateSimulationSuite: ['editor', 'approver'],
   getSuiteGenerations: ['editor', 'approver'],
@@ -196,8 +211,15 @@ const routePrivilege = {
   addContextTxtpConfig: ['editor', 'approver'],
   updateContextTxtpConfig: ['editor', 'approver'],
   getTriggerConfigs: ['editor', 'approver'],
+  getTriggerConfigById: ['editor', 'approver'],
   addTriggerTxtpConfig: ['editor', 'approver'],
   bulkUpdateTriggerConfigs: ['editor', 'approver'],
+  upsertContextMapping: ['editor', 'approver'],
+  getContextMapping: ['editor', 'approver'],
+  deleteContextMapping: ['editor', 'approver'],
+  upsertTriggerMapping: ['editor', 'approver'],
+  getTriggerMapping: ['editor', 'approver'],
+  deleteTriggerMapping: ['editor', 'approver'],
   getEnrichmentTables: ['editor', 'approver'],
   createEnrichmentTable: ['editor', 'approver'],
   bulkUpdateEnrichmentTables: ['editor', 'approver'],
@@ -214,7 +236,13 @@ const routePrivilege = {
   getSimulationResults: ['editor', 'approver'],
   saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
   resumeGeneration: ['editor', 'approver'],
+  updateGenerationStatus: ['editor', 'approver'],
   getFakerSemanticData: ['editor', 'approver'],
+  getSuiteResult: ['editor', 'approver'],
+  saveRunResult: ['editor', 'approver'],
+  generateSampleMessages: ['editor', 'approver'],
+  generateSampleTriggerMessages: ['editor', 'approver'],
+  generateSampleEnrichmentRows: ['editor', 'approver'],
 };
 
 function Routes(fastify: FastifyInstance): void {
@@ -558,6 +586,10 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getSimulationsHandler, routePrivilege.getSimulationSuites),
   });
 
+  fastify.get('/v1/admin/trs/simulation-studio/suites/counts', {
+    ...SetOptionsBodyAndParams(getSimulationSuitesCountsHandler, routePrivilege.getSimulationSuitesCounts),
+  });
+
   fastify.get('/v1/admin/trs/simulation-studio/suites/:id', {
     ...SetOptionsBodyAndParams(getSimulationByIdHandler, routePrivilege.getSimulationSuiteById),
   });
@@ -590,12 +622,40 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(getTriggerConfigsHandler, routePrivilege.getTriggerConfigs),
   });
 
+  fastify.get('/v1/admin/trs/simulation-studio/trigger-configs/:configId', {
+    ...SetOptionsBodyAndParams(getTriggerConfigByIdHandler, routePrivilege.getTriggerConfigById),
+  });
+
   fastify.post('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
     ...SetOptionsBodyAndParams(addTriggerTxtpConfigHandler, routePrivilege.addTriggerTxtpConfig),
   });
 
   fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/trigger-configs', {
     ...SetOptionsBodyAndParams(bulkUpdateTriggerConfigsHandler, routePrivilege.bulkUpdateTriggerConfigs),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/context-mappings', {
+    ...SetOptionsBodyAndParams(upsertContextMappingHandler, routePrivilege.upsertContextMapping),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/context-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(getContextMappingHandler, routePrivilege.getContextMapping),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/context-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(deleteContextMappingHandler, routePrivilege.deleteContextMapping),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/trigger-mappings', {
+    ...SetOptionsBodyAndParams(upsertTriggerMappingHandler, routePrivilege.upsertTriggerMapping),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/trigger-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(getTriggerMappingHandler, routePrivilege.getTriggerMapping),
+  });
+
+  fastify.delete('/v1/admin/trs/simulation-studio/trigger-mappings/:primaryTxtpId/:relatedTxtpId', {
+    ...SetOptionsBodyAndParams(deleteTriggerMappingHandler, routePrivilege.deleteTriggerMapping),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/enrichment-tables', {
@@ -642,8 +702,32 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(resumeGenerationHandler, routePrivilege.resumeGeneration),
   });
 
+  fastify.patch('/v1/admin/trs/simulation-studio/generations/:generationId/status', {
+    ...SetOptionsBodyAndParams(updateGenerationStatusHandler, routePrivilege.updateGenerationStatus),
+  });
+
   fastify.get('/v1/admin/trs/simulation-studio/faker-semantic-data', {
     ...SetOptionsBodyAndParams(getFakerSemanticDataHandler, routePrivilege.getFakerSemanticData),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/result', {
+    ...SetOptionsBodyAndParams(getSuiteResultHandler, routePrivilege.getSuiteResult),
+  });
+
+  fastify.post('/v1/admin/trs/simulation-studio/runs/result', {
+    ...SetOptionsBodyAndParams(saveRunResultHandler, routePrivilege.saveRunResult),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-messages', {
+    ...SetOptionsBodyAndParams(generateSampleMessagesHandler, routePrivilege.generateSampleMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-trigger-messages', {
+    ...SetOptionsBodyAndParams(generateSampleTriggerMessagesHandler, routePrivilege.generateSampleTriggerMessages),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/sample-enrichment-rows', {
+    ...SetOptionsBodyAndParams(generateSampleEnrichmentRowsHandler, routePrivilege.generateSampleEnrichmentRows),
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------

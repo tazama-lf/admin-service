@@ -413,18 +413,26 @@ export const getSchemaByTransactionType = async (
   transactionType: string,
   version: string,
   tenantId: string,
-): Promise<{ schema: unknown; mapping: unknown; content_type: string; payload_xml: string | null; payload_json: unknown }> => {
+): Promise<{
+  schema: unknown;
+  mapping: unknown;
+  content_type: string;
+  payload_xml: string | null;
+  payload_json: unknown;
+  related_transaction: string | null;
+}> => {
   if (!transactionType || !version || !tenantId) {
     throw new Error('Transaction type, version, and tenant ID are required');
   }
 
   const query = `
-    SELECT 
-      schema, 
-      mapping, 
+    SELECT
+      schema,
+      mapping,
       content_type,
       payload_xml,
-      payload_json
+      payload_json,
+      related_transaction
     FROM tcs_config
     WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
   `;
@@ -435,6 +443,7 @@ export const getSchemaByTransactionType = async (
     content_type: string;
     payload_xml: string | null;
     payload_json: unknown;
+    related_transaction: string | null;
   }>({ text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
@@ -447,6 +456,7 @@ export const getSchemaByTransactionType = async (
     content_type: result.rows[0].content_type,
     payload_xml: result.rows[0].payload_xml,
     payload_json: result.rows[0].payload_json,
+    related_transaction: result.rows[0].related_transaction ?? null,
   };
 };
 

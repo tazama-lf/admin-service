@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { SuiteEnrichmentTable, CreateEnrichmentTableDto, UpdateEnrichmentTableDto } from '../../interface/suite-generation.interface';
+import type {
+  SuiteEnrichmentTable,
+  CreateEnrichmentTableDto,
+  UpdateEnrichmentTableDto,
+} from '../../interface/simulation-studio/suite-generation.interface';
 
 const parseJsonCol = (val: unknown): Record<string, unknown> | undefined =>
   val ? (typeof val === 'string' ? (JSON.parse(val) as Record<string, unknown>) : (val as Record<string, unknown>)) : undefined;

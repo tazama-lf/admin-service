@@ -106,6 +106,11 @@ describe('recalculateGenerationCounts', () => {
     await expect(recalculateGenerationCounts(7)).rejects.toBe(err);
   });
 
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue('string error');
+    await expect(recalculateGenerationCounts(7)).rejects.toMatchObject({ status: 500 });
+  });
+
   it('queries all 3 config tables with correct SQL patterns', async () => {
     (dbService.handlePostExecuteSqlStatement as jest.Mock)
       .mockResolvedValueOnce({ rows: [{ total: '0' }] })
@@ -148,6 +153,11 @@ describe('getGenerationSummary', () => {
     const err = new HttpException('not found', 404);
     (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(err);
     await expect(getGenerationSummary(7)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('string error');
+    await expect(getGenerationSummary(7)).rejects.toMatchObject({ status: 500 });
   });
 });
 

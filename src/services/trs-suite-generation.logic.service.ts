@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SuiteGeneration } from '../interface/suite-generation.interface';
-import type { SimulationSuite } from '../interface/simulation-suites.interface';
+import type { SuiteGeneration } from '../interface/simulation-studio/suite-generation.interface';
+import type { SimulationSuite } from '../interface/simulation-studio/simulation-suites.interface';
 import {
   createSuiteGenerationInDb,
   getGenerationsBySuiteId,
@@ -12,6 +12,8 @@ import {
   getNextGenerationNumber,
   cloneGenerationDataInDb,
   type GenerationSummary,
+  resumeGenerationInDb,
+  updateGenerationStatusInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
@@ -169,7 +171,7 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
 
 export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
   try {
-    return await getLatestGenerationBySuiteId(suiteId);
+    return await resumeGenerationInDb(suiteId);
   } catch (error) {
     throw new HttpException(
       `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -195,6 +197,28 @@ export const cloneGeneration = async (sourceGenerationId: number, userId: string
     if (error instanceof HttpException) throw error;
     throw new HttpException(
       `Failed to clone generation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const updateGenerationStatus = async (generationId: number, status: string): Promise<SuiteGeneration> => {
+  try {
+    // Validate status against enum values
+    const validStatuses = ['DRAFT', 'READY', 'RUNNING', 'COMPLETED', 'FAILED'];
+    if (!validStatuses.includes(status)) {
+      throw new HttpException(`Invalid generation status: ${status}. Allowed values: ${validStatuses.join(', ')}`, HttpStatus.BAD_REQUEST);
+    }
+
+    const updated = await updateGenerationStatusInDb(generationId, status);
+    if (!updated) {
+      throw new HttpException(`Generation with id ${generationId} not found`, HttpStatus.NOT_FOUND);
+    }
+    return updated;
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to update generation status: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }

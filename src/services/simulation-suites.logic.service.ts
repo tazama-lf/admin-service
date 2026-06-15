@@ -5,14 +5,16 @@ import type {
   UpdateSimulationSuiteDto,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
-} from '../interface/simulation-suites.interface';
+  SimulationSuitesCountsResponse,
+} from '../interface/simulation-studio/simulation-suites.interface';
 import {
+  getSimulationSuitesCountsFromDb,
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,
   createSimulationSuiteInDb,
   updateSimulationSuiteInDb,
 } from '../repositories/simulation-studio/suites.repository';
-import { createSuiteGeneration, createContextTxtpConfig } from './trs-suite-generation.logic.service';
+import { createSuiteGeneration, createContextTxtpConfig, recalculateGenerationCounts } from './trs-suite-generation.logic.service';
 import { createTriggerTxtpConfig } from './trigger-txtp-config.logic.service';
 import {
   getNextGenerationNumber,
@@ -28,6 +30,17 @@ export const getSimulationSuites = async (options: SimulationSuitesQueryOptions)
   } catch (error) {
     throw new HttpException(
       `Failed to retrieve simulation suites: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
+
+export const getSimulationSuitesCounts = async (tenantId: string): Promise<SimulationSuitesCountsResponse> => {
+  try {
+    return await getSimulationSuitesCountsFromDb(tenantId);
+  } catch (error) {
+    throw new HttpException(
+      `Failed to retrieve simulation suites counts: ${error instanceof Error ? error.message : 'Unknown error'}`,
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }
@@ -78,6 +91,8 @@ export const createSimulationSuite = async (
         createContextTxtpConfig(generation.id, suite.primary_txtp, suite.primary_txtp_version, tenantId),
         createTriggerTxtpConfig(generation.id, suite.primary_txtp, suite.primary_txtp_version, tenantId),
       ]);
+      // Recalculate and save generation counts after creating initial configs
+      await recalculateGenerationCounts(generation.id);
     }
 
     return { ...suite, generation_id: generation.id };

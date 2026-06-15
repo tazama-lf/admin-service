@@ -9,6 +9,7 @@ import * as trsGenService from '../../src/services/trs-suite-generation.logic.se
 import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
 jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
+  getSimulationSuitesCountsFromDb: jest.fn(),
   getSimulationSuitesFromDb: jest.fn(),
   getSimulationSuiteByIdFromDb: jest.fn(),
   createSimulationSuiteInDb: jest.fn(),
@@ -22,6 +23,7 @@ jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   getLatestGenerationBySuiteId: jest.fn(),
   getNextGenerationNumber: jest.fn(),
   cloneGenerationDataInDb: jest.fn(),
+  recalculateGenerationCounts: jest.fn(),
 }));
 
 jest.mock('../../src/services/trigger-txtp-config.logic.service', () => ({
@@ -58,6 +60,7 @@ describe('Simulation Suites Logic Service', () => {
     (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 7, suite_id: 1 });
     (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
     (triggerService.createTriggerTxtpConfig as jest.Mock).mockResolvedValue({ trigger_txtp_config_id: 1, field_overrides: [] });
+    (trsGenService.recalculateGenerationCounts as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('getSimulationSuites', () => {
@@ -77,6 +80,36 @@ describe('Simulation Suites Logic Service', () => {
 
       await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow(
         'Failed to retrieve simulation suites: DB failure',
+      );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuitesFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow('Unknown error');
+    });
+  });
+
+  describe('getSimulationSuitesCounts', () => {
+    it('should return suites counts', async () => {
+      const response = {
+        total_suites: 10,
+        total_draft_suites: 4,
+        total_completed_suites: 3,
+        latest_run_at: new Date('2026-06-01T00:00:00.000Z'),
+      };
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockResolvedValue(response);
+
+      const result = await simulationSuitesService.getSimulationSuitesCounts(mockTenantId);
+
+      expect(result).toEqual(response);
+      expect(simulationSuitesRepository.getSimulationSuitesCountsFromDb).toHaveBeenCalledWith(mockTenantId);
+    });
+
+    it('should wrap repository errors for counts', async () => {
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockRejectedValue(new Error('DB failure'));
+
+      await expect(simulationSuitesService.getSimulationSuitesCounts(mockTenantId)).rejects.toThrow(
+        'Failed to retrieve simulation suites counts: DB failure',
       );
     });
   });
@@ -106,6 +139,11 @@ describe('Simulation Suites Logic Service', () => {
         'Failed to retrieve simulation suite: DB crash',
       );
     });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuiteById(1, mockTenantId)).rejects.toThrow('Unknown error');
+    });
   });
 
   describe('createSimulationSuite', () => {
@@ -127,6 +165,7 @@ describe('Simulation Suites Logic Service', () => {
         mockUserId,
         mockUserEmail,
       );
+      expect(trsGenService.recalculateGenerationCounts).toHaveBeenCalledWith(7);
     });
 
     it('should validate empty name', async () => {
@@ -161,6 +200,18 @@ describe('Simulation Suites Logic Service', () => {
       await expect(simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId)).rejects.toThrow(
         'Failed to create simulation suite: trigger DB fail',
       );
+    });
+
+    it('skips txtp config creation when primary_txtp is absent', async () => {
+      const suiteWithoutTxtp = { ...mockSuite, primary_txtp: null, primary_txtp_version: null };
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(suiteWithoutTxtp);
+
+      const result = await simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId);
+
+      expect(trsGenService.createContextTxtpConfig).not.toHaveBeenCalled();
+      expect(triggerService.createTriggerTxtpConfig).not.toHaveBeenCalled();
+      expect(trsGenService.recalculateGenerationCounts).not.toHaveBeenCalled();
+      expect(result).toEqual({ ...suiteWithoutTxtp, generation_id: 7 });
     });
   });
 
@@ -211,6 +262,13 @@ describe('Simulation Suites Logic Service', () => {
 
       await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
         'Failed to update simulation suite: DB update failed',
+      );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.updateSimulationSuiteInDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
+        'Unknown error',
       );
     });
   });

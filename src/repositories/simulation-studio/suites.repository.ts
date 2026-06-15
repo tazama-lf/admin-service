@@ -5,9 +5,44 @@ import type {
   SimulationSuite,
   SimulationSuitesQueryOptions,
   SimulationSuitesListResponse,
+  SimulationSuitesCountsResponse,
   CreateSimulationSuiteDto,
   UpdateSimulationSuiteDto,
-} from '../../interface/simulation-suites.interface';
+} from '../../interface/simulation-studio/simulation-suites.interface';
+
+export const getSimulationSuitesCountsFromDb = async (tenantId: string): Promise<SimulationSuitesCountsResponse> => {
+  const result = await handlePostExecuteSqlStatement<{
+    total_suites: string | number;
+    total_run: string | number;
+    latest_run_at: string | null;
+  }>(
+    {
+      text: `
+        SELECT
+          COUNT(DISTINCT s.id) AS total_suites,
+          COUNT(r.id) AS total_run,
+          MAX(r.created_at) AS latest_run_at
+        FROM trs_simulation_suites s
+        LEFT JOIN trs_simulation_runs r ON r.suite_id = s.id
+        WHERE s.tenant_id = $1
+      `,
+      values: [tenantId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  const row = result.rows[0] ?? {
+    total_suites: '0',
+    total_run: '0',
+    latest_run_at: null,
+  };
+
+  return {
+    total_suites: parseInt(String(row.total_suites ?? '0'), 10),
+    total_run: parseInt(String(row.total_run ?? '0'), 10),
+    latest_run_at: row.latest_run_at ? new Date(row.latest_run_at) : null,
+  };
+};
 
 export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOptions): Promise<SimulationSuitesListResponse> => {
   const { tenantId, search, status, ruleName, txtp, updatedFrom, updatedTo, limit = 20, offset = 0 } = options;
@@ -24,7 +59,7 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
   }
 
   if (status) {
-    whereClause += ` AND status = $${paramIndex++}`;
+    whereClause += ` AND (SELECT status FROM trs_suite_generations WHERE suite_id = trs_simulation_suites.id ORDER BY generation_number DESC LIMIT 1) = $${paramIndex++}`;
     params.push(status);
   }
 
@@ -63,7 +98,7 @@ export const getSimulationSuitesFromDb = async (options: SimulationSuitesQueryOp
   // Get paginated results
   let query = `
     SELECT 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
+      id, tenant_id, name, description, simulation_type, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     FROM trs_simulation_suites
@@ -118,7 +153,7 @@ const normalizeWizardProgress = (raw: unknown): Record<string, unknown> => {
 export const getSimulationSuiteByIdFromDb = async (id: number, tenantId: string): Promise<SimulationSuite | null> => {
   const query = `
     SELECT 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
+      id, tenant_id, name, description, simulation_type, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     FROM trs_simulation_suites
@@ -161,14 +196,14 @@ export const createSimulationSuiteInDb = async (
 ): Promise<SimulationSuite> => {
   const query = `
     INSERT INTO trs_simulation_suites (
-      tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
+      tenant_id, name, description, simulation_type, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW()
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW()
     )
     RETURNING 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
+      id, tenant_id, name, description, simulation_type, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
   `;
@@ -187,7 +222,6 @@ export const createSimulationSuiteInDb = async (
         payload.name,
         payload.description ?? null,
         payload.simulation_type ?? 'SINGLE_RULE',
-        'DRAFT',
         payload.rule_repo ?? null,
         payload.rule_name ?? null,
         payload.rule_version ?? null,
@@ -243,7 +277,6 @@ export const updateSimulationSuiteInDb = async (
     { key: 'name', column: 'name' },
     { key: 'description', column: 'description', transform: nullableValue },
     { key: 'simulation_type', column: 'simulation_type' },
-    { key: 'status', column: 'status' },
     { key: 'rule_repo', column: 'rule_repo', transform: nullableValue },
     { key: 'rule_name', column: 'rule_name', transform: nullableValue },
     { key: 'rule_version', column: 'rule_version', transform: nullableValue },
@@ -277,7 +310,7 @@ export const updateSimulationSuiteInDb = async (
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex++} AND tenant_id = $${paramIndex++}
     RETURNING 
-      id, tenant_id, name, description, simulation_type, status, rule_repo, rule_name, rule_version, rule_config,
+      id, tenant_id, name, description, simulation_type, rule_repo, rule_name, rule_version, rule_config,
       primary_txtp, primary_txtp_version, clone_source_suite_id, iteration_count, run_count,
       last_run_at, wizard_progress, metadata, created_by, created_by_email, created_at, updated_at
   `;

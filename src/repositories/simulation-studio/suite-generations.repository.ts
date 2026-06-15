@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { SuiteGeneration, CreateSuiteGenerationDto } from '../../interface/suite-generation.interface';
+import type { SuiteGeneration, CreateSuiteGenerationDto } from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRowToGeneration = (row: Record<string, unknown>): SuiteGeneration => ({
   id: row.id as number,
@@ -458,6 +458,26 @@ export const resumeGenerationInDb = async (suiteId: number): Promise<SuiteGenera
     {
       text: "Select * FROM trs_suite_generations WHERE suite_id = $1 AND status IN ('DRAFT') ORDER BY generation_number DESC LIMIT 1",
       values: [suiteId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  if (result.rows.length === 0) return null;
+  return mapRowToGeneration(result.rows[0]);
+};
+
+export const updateGenerationStatusInDb = async (generationId: number, status: string): Promise<SuiteGeneration | null> => {
+  const query = `
+    UPDATE trs_suite_generations
+    SET status = $1, updated_at = NOW()
+    WHERE id = $2
+    RETURNING *
+  `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: query,
+      values: [status, generationId],
     } satisfies PgQueryConfig,
     'simulation',
   );

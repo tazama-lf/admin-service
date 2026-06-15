@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SuiteEnrichmentTable, BulkEnrichmentUpdateItemDto } from '../interface/suite-generation.interface';
+import type {
+  SuiteEnrichmentTable,
+  SuiteEnrichmentTableWithStrategies,
+  BulkEnrichmentUpdateItemDto,
+} from '../interface/simulation-studio/suite-generation.interface';
 import {
   createEnrichmentTableInDb,
   getNextEnrichmentTableOrderInDb,
@@ -7,13 +11,9 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../repositories/simulation-studio/enrichment-tables.repository';
+import { getEnrichmentFieldStrategiesByTableId } from '../repositories/simulation-studio/enrichment-field-strategies.repository';
 import { HttpException, HttpStatus } from '../utils/error';
 
-// ── Step 4: Create enrichment table ──────────────────────────────────────────
-
-/**
- * POST — creates enrichment table row + seeds all payload column names with strategy_code = 'null'.
- */
 export const createEnrichmentTable = async (
   generationId: number,
   tableName: string,
@@ -24,7 +24,7 @@ export const createEnrichmentTable = async (
   try {
     // Keep ordering stable by assigning the next server-side order for the generation.
     const tableOrder = await getNextEnrichmentTableOrderInDb(generationId);
-    const table = await createEnrichmentTableInDb({
+    return await createEnrichmentTableInDb({
       generation_id: generationId,
       table_name: tableName,
       table_order: tableOrder,
@@ -32,8 +32,6 @@ export const createEnrichmentTable = async (
       payload_template_json: payloadTemplateJson,
       schema_template_json: schemaTemplateJson,
     });
-
-    return table;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -43,12 +41,9 @@ export const createEnrichmentTable = async (
   }
 };
 
-// ── Step 4: GET all ───────────────────────────────────────────────────────────
-
 export const getEnrichmentTables = async (generationId: number): Promise<SuiteEnrichmentTable[]> => {
   try {
-    const tables = await getEnrichmentTablesByGenerationId(generationId);
-    return tables;
+    return await getEnrichmentTablesByGenerationId(generationId);
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -58,7 +53,23 @@ export const getEnrichmentTables = async (generationId: number): Promise<SuiteEn
   }
 };
 
-// ── Step 4: Bulk update ───────────────────────────────────────────────────────
+export const getEnrichmentTablesWithStrategies = async (generationId: number): Promise<SuiteEnrichmentTableWithStrategies[]> => {
+  try {
+    const tables = await getEnrichmentTablesByGenerationId(generationId);
+    return await Promise.all(
+      tables.map(async (table) => ({
+        ...table,
+        field_strategies: await getEnrichmentFieldStrategiesByTableId(table.id),
+      })),
+    );
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to retrieve enrichment tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
 
 export const bulkUpdateEnrichmentTables = async (
   generationId: number,
@@ -86,8 +97,6 @@ export const bulkUpdateEnrichmentTables = async (
     );
   }
 };
-
-// ── Step 4: Delete ────────────────────────────────────────────────────────────
 
 export const deleteEnrichmentTable = async (tableId: number): Promise<void> => {
   try {

@@ -3,7 +3,13 @@ import { Type, type Static } from '@sinclair/typebox';
 
 // Mirrors @tazama-lf/frms-coe-lib's TypologyConfig.expression:
 //   type ExpressionMathJSON = Array<string | number | ExpressionMathJSON>
-const ExpressionMathJSON = Type.Recursive((Self) => Type.Array(Type.Union([Type.String(), Type.Number(), Self])));
+// Modelled as a non-recursive array of unconstrained items rather than Type.Recursive. A recursive
+// TypeBox schema makes @fastify/swagger emit a self-$ref (`#/components/schemas/def-0`) that it does
+// not hoist into components/schemas, leaving a dangling pointer that breaks the Swagger UI for every
+// typology endpoint. An unconstrained item schema serialises and validates the nested
+// string/number/array shape correctly (fast-json-stringify and Ajv treat `{}` items as pass-through)
+// while emitting no $ref, so the generated OpenAPI document resolves cleanly.
+const ExpressionMathJSON = Type.Array(Type.Unknown());
 
 const Weight = Type.Object({
   ref: Type.String(),
@@ -23,7 +29,7 @@ const WorkFlow = Type.Object({
   flowProcessor: Type.Optional(Type.String()),
 });
 
-// Final top-level schema — fully inline except for the recursive array
+// Final top-level schema - fully inline
 export const TypologySchema = Type.Object(
   {
     id: Type.String(),

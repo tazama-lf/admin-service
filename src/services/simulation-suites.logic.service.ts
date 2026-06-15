@@ -14,7 +14,7 @@ import {
   createSimulationSuiteInDb,
   updateSimulationSuiteInDb,
 } from '../repositories/simulation-studio/suites.repository';
-import { createSuiteGeneration, createContextTxtpConfig } from './trs-suite-generation.logic.service';
+import { createSuiteGeneration, createContextTxtpConfig, recalculateGenerationCounts } from './trs-suite-generation.logic.service';
 import { createTriggerTxtpConfig } from './trigger-txtp-config.logic.service';
 import { HttpException, HttpStatus } from '../utils/error';
 import { validateSimulationSuiteLengthConstraints } from '../utils/simulation-suite-validation';
@@ -86,6 +86,8 @@ export const createSimulationSuite = async (
         createContextTxtpConfig(generation.id, suite.primary_txtp, suite.primary_txtp_version, tenantId),
         createTriggerTxtpConfig(generation.id, suite.primary_txtp, suite.primary_txtp_version, tenantId),
       ]);
+      // Recalculate and save generation counts after creating initial configs
+      await recalculateGenerationCounts(generation.id);
     }
 
     return { ...suite, generation_id: generation.id };

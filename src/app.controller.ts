@@ -2140,7 +2140,7 @@ export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply:
 
     const { tenantId } = req as ITenantRequest;
     const updated = await bulkUpdateContextConfigs(generationId, items, tenantId);
-    // void recalculateGenerationCounts(generationId);
+    void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update context txtp configs');
@@ -2218,6 +2218,7 @@ export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply
     }
 
     const updated = await bulkUpdateTriggerConfigs(generationId, items);
+    void recalculateGenerationCounts(generationId);
 
     reply.status(200).send({ success: true, data: updated });
     loggerService.log('End - Bulk update trigger txtp configs');

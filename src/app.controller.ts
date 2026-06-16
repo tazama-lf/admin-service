@@ -32,6 +32,7 @@ import {
   handleGetPayloadByTransactionType,
   handleGetConfigByTransactionType,
   handleGetRelatedTransactions,
+  handleGetConfigByTransactionTypew3,
 } from './services/tcs-config.logic.service';
 import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
 import {
@@ -1604,6 +1605,37 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
     }
 
     const config = await handleGetConfigByTransactionType(transactionType, version, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      config,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get config by transaction type');
+  } finally {
+    loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
+export const getConfigByTransactionTypeHandlerw3 = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+    loggerService.log('request params are ====================: \n', JSON.stringify(req.params));
+
+    const { transactionType, version } = req.params as { transactionType: string; version: string };
+
+    if (!transactionType || !version) {
+      reply.status(400).send({
+        success: false,
+        message: `Transaction type and version are required. Received: transactionType=${transactionType}, version=${version}`,
+      });
+      return;
+    }
+
+    const config = await handleGetConfigByTransactionTypew3(transactionType, version, tenantId);
 
     reply.status(200).send({
       success: true,

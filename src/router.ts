@@ -119,6 +119,7 @@ import {
   generateSampleMessagesHandler,
   generateSampleTriggerMessagesHandler,
   generateSampleEnrichmentRowsHandler,
+  getConfigByTransactionTypeHandlerw3,
 } from './app.controller';
 import { NetworkMapRepo, RuleConfigRepo, TypologyConfigRepo } from './repositories';
 import {
@@ -358,6 +359,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/config/:transactionType/:version', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
+  });
+
+  fastify.get('/v1/admin/config/w3/:transactionType/:version', {
+    ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandlerw3, routePrivilege.getTcsConfig),
   });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {

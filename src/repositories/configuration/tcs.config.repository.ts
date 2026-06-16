@@ -460,6 +460,45 @@ export const getSchemaByTransactionType = async (
   };
 };
 
+export const getSchemaByTransactionTypew3 = async (
+  transactionType: string,
+  version: string,
+  tenantId: string,
+): Promise<{
+  schema: unknown;
+  mapping: unknown;
+  functions: unknown;
+}> => {
+  if (!transactionType || !version || !tenantId) {
+    throw new Error('Transaction type, version, and tenant ID are required');
+  }
+
+  const query = `
+    SELECT
+      schema,
+      mapping,
+      functions
+    FROM tcs_config
+    WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{
+    schema: unknown;
+    mapping: unknown;
+    functions: unknown;
+  }>({ text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig, 'configuration');
+
+  if (result.rows.length === 0) {
+    throw new Error('Configuration not found');
+  }
+
+  return {
+    schema: result.rows[0].schema,
+    mapping: result.rows[0].mapping,
+    functions: result.rows[0].functions,
+  };
+};
+
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
   const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);

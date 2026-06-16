@@ -256,7 +256,7 @@ describe('getLatestGenerationForSuite', () => {
 
     it('returns null when no generation exists', async () => {
       (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(null as never);
-      await expect(resumeGeneration(42)).resolves.toBeNull();
+      await expect(resumeGeneration(42, 10)).resolves.toBeNull();
     });
 
     it('wraps repository errors in HttpException 500', async () => {

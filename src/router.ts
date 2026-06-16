@@ -619,7 +619,7 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(deleteTriggerTxtpConfigHandler, routePrivilege.deleteTriggerTxtpConfig),
   });
 
-  fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/generation/resume', {
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:suiteId/generations/:generationId/resume', {
     ...SetOptionsBodyAndParams(resumeGenerationHandler, routePrivilege.resumeGeneration),
   });
 

@@ -13,6 +13,7 @@ import {
   cloneGenerationDataInDb,
   type GenerationSummary,
   updateGenerationStatusInDb,
+  resumeGenerationInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
@@ -168,9 +169,9 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
   }
 };
 
-export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
+export const resumeGeneration = async (suiteId: number, generationId: number): Promise<SuiteGeneration | null> => {
   try {
-    return await getLatestGenerationBySuiteId(suiteId);
+    return await resumeGenerationInDb(suiteId, generationId);
   } catch (error) {
     throw new HttpException(
       `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,

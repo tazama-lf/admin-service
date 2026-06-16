@@ -27,8 +27,6 @@ import {
   cloneRuleHandler,
   updateRuleStatusHandler,
   getSimulationLogsHandler,
-  getSimulationMessagesHandler,
-  fetchSimulationItemsHandler,
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
@@ -66,21 +64,13 @@ import {
   getRuleConfigurationHandler,
   getRuleFlowHandler,
   updateRuleHandler,
-  getAllMasksHandler,
-  createMaskHandler,
-  updateMaskHandler,
-  getMaskByIdHandler,
-  stageSimulationItemsHandler,
-  fetchCountApiFlow,
-  findActiveMaskConfigsHandler,
-  getExcludedTypesHandler,
-  reviewMaskHandler,
   updateSimulationHandler,
   createSimulationHandler,
   getSimulationSuitesCountsHandler,
   getSimulationByIdHandler,
   getSimulationsHandler,
   getSuiteGenerationsHandler,
+  getLatestSuiteGenerationHandler,
   getGenerationContextConfigsHandler,
   addContextTxtpConfigHandler,
   updateContextTxtpConfigHandler,
@@ -102,15 +92,6 @@ import {
   updateWizardProgressHandler,
   deleteContextTxtpConfigHandler,
   deleteTriggerTxtpConfigHandler,
-  getAllSimulationsHandler,
-  createTrsSimulationHandler,
-  getSimulationStatsHandler,
-  getSimulationResultsHandler,
-  fetchCountDlhHandler,
-  getAllEvaluationsHandler,
-  truncateEvaluationResultsHandler,
-  saveEvaluationsInResultsTableHandler,
-  saveRecordInTrsSimulationHandler,
   resumeGenerationHandler,
   updateGenerationStatusHandler,
   getFakerSemanticDataHandler,
@@ -133,9 +114,13 @@ import {
   QueryEntityConditionSchema,
   RuleSchema,
   TypologySchema,
+  NetworkMapListQuery,
+  RuleListQuery,
+  TypologyListQuery,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
+import { withConfigurationTransaction } from './services/database.logic.service';
 
 // Privilege mapping for each route, for easier maintenance and claim management
 const routePrivilege = {
@@ -149,12 +134,11 @@ const routePrivilege = {
   getReport: 'GET_V1_GETREPORTBYMSGID',
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
-  getAllEvaluations: ['editor', 'approver', 'exporter', 'publisher'],
   getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
-  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getTcsConfigByTransaction: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'], // data engineer roles were given because this API is consumed on simulation sandbox as well (data scientist role uses it)
   putTcsConfigWrite: ['editor', 'approver', 'exporter', 'publisher'],
   postTcsConfigMapping: 'editor',
   deleteTcsConfigMapping: 'editor',
@@ -180,10 +164,7 @@ const routePrivilege = {
   postTcsDataModelTable: ['editor', 'approver', 'publisher'],
   getTrsRules: ['editor', 'approver', 'exporter', 'publisher'],
   postTrsRule: 'editor',
-  putTrsRule: ['editor', 'aaprover', 'trs_approver'],
-  getTrsMasks: ['trs_data_engineer_editor', 'trs_data_engineer_approver'],
-  getExcludedTypes: 'editor',
-  getActiveNetworkMap: ['editor', 'approver', 'exporter', 'publisher'],
+  putTrsRule: ['editor', 'approver', 'trs_approver'],
   getNodes: ['editor', 'approver', 'exporter', 'publisher'],
   postNodes: 'editor',
   deleteNodes: 'editor',
@@ -191,13 +172,8 @@ const routePrivilege = {
   executeQueryNode: 'editor',
   postSimulationLogs: ['editor', 'approver'],
   getSimulationLogs: ['editor', 'approver'],
-  getSimulationMessages: ['editor', 'approver', 'exporter', 'publisher'],
-  fetchFromDlh: ['editor', 'approver', 'exporter', 'publisher'],
   getDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
   putDataModelJson: ['editor', 'approver', 'exporter', 'publisher'],
-  createMask: 'trs_data_engineer_editor',
-  updateMask: 'trs_data_engineer_editor',
-  reviewMask: 'trs_data_engineer_approver',
   createSimulationSuites: ['editor', 'approver'],
   getSimulationSuites: ['editor', 'approver'],
   getSimulationSuitesCounts: ['editor', 'approver'],
@@ -226,10 +202,6 @@ const routePrivilege = {
   deleteContextTxtpConfig: ['editor', 'approver'],
   deleteTriggerTxtpConfig: ['editor', 'approver'],
   getSimulations: ['editor', 'approver'],
-  createSimulation: ['editor', 'approver'],
-  getSimulationStats: ['editor', 'approver'],
-  getSimulationResults: ['editor', 'approver'],
-  saveRecordInTrsSimulation: ['editor', 'approver', 'exporter', 'publisher'],
   resumeGeneration: ['editor', 'approver'],
   updateGenerationStatus: ['editor', 'approver'],
   getFakerSemanticData: ['editor', 'approver'],
@@ -249,7 +221,7 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/network_map',
       repo: NetworkMapRepo,
-      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema },
+      schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema, Query: NetworkMapListQuery },
       idParam: { kind: 'cfg' },
     }),
   );
@@ -258,8 +230,9 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/rule',
       repo: RuleConfigRepo,
-      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+      schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema, Query: RuleListQuery },
       idParam: { kind: 'single', name: 'id' },
+      batch: { runInTransaction: withConfigurationTransaction },
     }),
   );
 
@@ -267,8 +240,9 @@ function Routes(fastify: FastifyInstance): void {
     buildCrudPlugin({
       prefix: '/v1/admin/configuration/typology',
       repo: TypologyConfigRepo,
-      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema },
+      schemas: { Entity: TypologySchema, Create: TypologySchema, Update: TypologySchema, Query: TypologyListQuery },
       idParam: { kind: 'single', name: 'id' },
+      batch: { runInTransaction: withConfigurationTransaction },
     }),
   );
 
@@ -460,58 +434,9 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateRuleFlowHandler, routePrivilege.putTrsRule),
   });
 
-  // ====================  MASKING OPERATIONS ====================
-
-  fastify.post('/v1/admin/trs/masking/all/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getAllMasksHandler, routePrivilege.getTrsMasks),
-  });
-
-  fastify.post('/v1/admin/trs/masking/create', {
-    ...SetOptionsBodyAndParams(createMaskHandler, routePrivilege.createMask),
-  });
-
-  fastify.put('/v1/admin/trs/masking/:id', {
-    ...SetOptionsBodyAndParams(updateMaskHandler, routePrivilege.updateMask),
-  });
-
-  fastify.get('/v1/admin/trs/masking/:id', {
-    ...SetOptionsBodyAndParams(getMaskByIdHandler, routePrivilege.getTrsMasks),
-  });
-
-  // ====================  SIMULATION OPERATIONS ====================
-
-  fastify.post('/v1/admin/trs/simulation/create', {
-    ...SetOptionsBodyAndParams(createTrsSimulationHandler, routePrivilege.createSimulation),
-  });
-
-  fastify.get('/v1/admin/trs/simulation/all/:offset/:limit', {
-    ...SetOptionsBodyAndParams(getAllSimulationsHandler, routePrivilege.getSimulations),
-  });
-
-  fastify.get('/v1/admin/trs/simulation/get_simulation_stats', {
-    ...SetOptionsBodyAndParams(getSimulationStatsHandler, routePrivilege.getSimulationStats),
-  });
-
-  fastify.get('/v1/admin/trs/simulation/get_simulation_results', {
-    ...SetOptionsBodyAndParams(getSimulationResultsHandler, routePrivilege.getSimulationResults),
-  });
-
-  // ====================  RULE SIMULATION OPERATIONS ====================
-
-  fastify.get('/v1/admin/trs/excluded/types', {
-    ...SetOptionsBodyAndParams(getExcludedTypesHandler, routePrivilege.getExcludedTypes),
-  });
-
-  fastify.patch('/v1/admin/trs/masking/:id/review', {
-    ...SetOptionsBodyAndParams(reviewMaskHandler, routePrivilege.reviewMask),
-  });
-
   // ====================  ADMIN SERVICE OPERATIONS ====================
   fastify.get('/v1/admin/reports/getreportbymsgid', {
     ...SetOptionsBodyAndParams(reportRequestHandler, routePrivilege.getReport, undefined, GetReportSchema),
-  });
-  fastify.delete('/v1/dlh/truncate-evaluations', {
-    ...SetOptionsBodyAndParams(truncateEvaluationResultsHandler, routePrivilege.fetchFromDlh),
   });
   fastify.get('/v1/admin/event-flow-control/entity', {
     ...SetOptionsBodyAndParams(getEntityConditionHandler, routePrivilege.getEntity, undefined, QueryEntityConditionSchema),
@@ -524,9 +449,6 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.post('/v1/admin/event-flow-control/account', {
     ...SetOptionsBodyAndParams(postConditionHandlerAccount, routePrivilege.postAccount, AccountConditionSchema),
-  });
-  fastify.get('/v1/admin/reports/evaluations', {
-    ...SetOptionsBodyAndParams(getAllEvaluationsHandler, routePrivilege.getAllEvaluations),
   });
   fastify.put('/v1/admin/event-flow-control/entity', {
     ...SetOptionsBodyAndParams(
@@ -595,6 +517,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations', {
     ...SetOptionsBodyAndParams(getSuiteGenerationsHandler, routePrivilege.getSuiteGenerations),
+  });
+
+  fastify.get('/v1/admin/trs/simulation-studio/suites/:id/generations/latest', {
+    ...SetOptionsBodyAndParams(getLatestSuiteGenerationHandler, routePrivilege.getSuiteGenerations),
   });
 
   fastify.get('/v1/admin/trs/simulation-studio/generations/:generationId/context-configs', {
@@ -714,36 +640,6 @@ function Routes(fastify: FastifyInstance): void {
   });
 
   //--------------------------------- END SIMULATION STUDIO -----------------------------------------------------
-
-  fastify.get('/v1/admin/simulation/messages', {
-    ...SetOptionsBodyAndParams(getSimulationMessagesHandler, routePrivilege.getSimulationMessages),
-  });
-  fastify.get('/v1/admin/simulation/items', {
-    ...SetOptionsBodyAndParams(fetchSimulationItemsHandler, routePrivilege.getSimulationMessages),
-  });
-  fastify.post('/v1/dlh/stage', {
-    ...SetOptionsBodyAndParams(stageSimulationItemsHandler, routePrivilege.fetchFromDlh),
-  });
-
-  fastify.post('/v1/admin/dlh/fetch/count', {
-    ...SetOptionsBodyAndParams(fetchCountDlhHandler, routePrivilege.fetchFromDlh),
-  });
-
-  fastify.get('/v1/admin/trs/masking/all-fetch', {
-    ...SetOptionsBodyAndParams(fetchCountApiFlow, routePrivilege.fetchFromDlh),
-  });
-
-  fastify.post('/v1/admin/trs/masking/active-configs', {
-    ...SetOptionsBodyAndParams(findActiveMaskConfigsHandler, routePrivilege.fetchFromDlh),
-  });
-
-  fastify.post('/v1/admin/trs/evaluations/save', {
-    ...SetOptionsBodyAndParams(saveEvaluationsInResultsTableHandler, routePrivilege.getAllEvaluations),
-  });
-
-  fastify.post('/v1/admin/trs-simulation/save', {
-    ...SetOptionsBodyAndParams(saveRecordInTrsSimulationHandler, routePrivilege.saveRecordInTrsSimulation),
-  });
 }
 
 export default Routes;

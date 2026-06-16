@@ -229,7 +229,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     };
   }
   const creditorByEdgeE = creditorByEdge as unknown as Edge[];
-  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = debtorByEdge as unknown as Edge[];
 
   if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
     return { code: 404, message: 'Entity does not exist in the database.' };
@@ -485,7 +485,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     };
   }
   const creditorByEdgeE = creditorByEdge as unknown as Edge[];
-  const debtorByEdgeE = creditorByEdge as unknown as Edge[];
+  const debtorByEdgeE = debtorByEdge as unknown as Edge[];
 
   if (!creditorByEdgeE.some((eachDocument) => eachDocument.id) && !debtorByEdgeE.some((eachDocument) => eachDocument.id)) {
     return { code: 404, message: 'Account does not exist in the database.' };

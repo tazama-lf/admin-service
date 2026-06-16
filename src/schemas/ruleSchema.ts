@@ -17,20 +17,20 @@ export const Band = Type.Composite([
   }),
 ]);
 
-export type Case = Static<typeof Case>;
-export const Case = Type.Composite([
-  OutcomeResult,
-  Type.Object({
-    value: Type.String(),
-  }),
-]);
+export type Expression = Static<typeof Expression>;
+export const Expression = Type.Composite([OutcomeResult, Type.Object({ value: Type.String() })]);
 
-export type Config = Static<typeof Config>;
+export type Case = Static<typeof Case>;
+export const Case = Type.Object({
+  expressions: Type.Array(Expression),
+  alternative: OutcomeResult,
+});
+
 export const Config = Type.Object({
   parameters: Type.Optional(Type.Record(Type.Optional(Type.Union([Type.String(), Type.Number()])), Type.Optional(Type.Unknown()))),
   exitConditions: Type.Optional(Type.Array(OutcomeResult)),
   bands: Type.Optional(Type.Array(Band)),
-  cases: Type.Optional(Type.Array(Case)),
+  cases: Type.Optional(Case),
 });
 
 export type Rule = Static<typeof RuleSchema>;

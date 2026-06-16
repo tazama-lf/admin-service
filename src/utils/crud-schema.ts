@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Type, type Static, type TObject, type TSchema } from '@sinclair/typebox';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
 import type { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fastify';
 import fp from 'fastify-plugin';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { PoolClient } from 'pg';
 import { configuration } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
@@ -14,8 +17,21 @@ export interface CrudSchemas {
   Create: TSchema;
   Update: TSchema;
   Id?: TSchema;
-  Query?: typeof DefaultQuery;
+  Query?: TObject;
 }
+
+// Opt-in atomic batch (array) submission for the POST route (#436). Supplied only by the
+// configuration entities that want it (rule, typology); when absent the POST route accepts a
+// single object exactly as before. `runInTransaction` is injected per call site (so the generic
+// factory never hard-codes a pool-specific helper) and pins one client for the whole batch.
+export interface BatchCreateOptions {
+  runInTransaction: <T>(work: (client: PoolClient) => Promise<T>) => Promise<T>;
+  maxItems?: number;
+}
+
+// Default upper bound on a single batch, matching the existing list `keys` batch-fetch cap (#423):
+// bounds the transaction size and the request payload.
+const DEFAULT_BATCH_MAX_ITEMS = 200;
 
 type IdParamConfig = { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] };
 
@@ -24,15 +40,23 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
   repo: CrudRepository<TEntity, TId>;
   schemas: CrudSchemas;
   idParam?: IdParamConfig;
+  batch?: BatchCreateOptions;
 }
 
 const DefaultQuery = Type.Object({
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  limit: Type.Optional(Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.Literal('all')])),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   sort: Type.Optional(Type.String()),
   order: Type.Optional(Type.Union([Type.Literal('ASC'), Type.Literal('DESC')])),
   filters: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
+
+// Shared error body for every CRUD route, so the documented 400/404 shapes stay consistent in one
+// place and surface a description in the generated OpenAPI spec.
+const ErrorResponse = Type.Object(
+  { message: Type.String({ description: 'Human-readable description of why the request failed.' }) },
+  { description: 'Standard error response returned for validation (400) and not-found (404) errors.' },
+);
 
 const makeIdSchema = (
   cfg?: { kind: 'single'; name?: string } | { kind: 'cfg' } | { kind: 'composite'; names: readonly [string, string] },
@@ -53,8 +77,41 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
   opts: BuildCrudOptions<TEntity, TId>,
 ): FastifyPluginAsync => {
   const plugin: FastifyPluginAsync = async (app: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse>) => {
-    const { prefix, repo, schemas, idParam } = opts;
+    const { prefix, repo, schemas, idParam, batch } = opts;
     const { Entity, Create, Update } = schemas;
+    const batchMaxItems = batch?.maxItems ?? DEFAULT_BATCH_MAX_ITEMS;
+
+    // When batch submission is enabled the POST body accepts BOTH a single object and an array.
+    // The array branch's items use an unconstrained schema (Type.Unknown) so the app-wide
+    // `removeAdditional: 'all'` does NOT strip their fields and malformed ITEMS reach the handler,
+    // where per-item validation reports the offending index (item[i]); the union's single-object
+    // branch still enforces the full Create schema, preserving today's single-object behaviour.
+    const BatchItem = Type.Unknown({ description: 'A configuration object following the entity Create schema.' });
+    const CreateBody = batch
+      ? Type.Union([Create, Type.Array(BatchItem, { minItems: 1, maxItems: batchMaxItems })], {
+          description:
+            'A single configuration object, or a non-empty array (atomic batch insert) of configuration objects following the same schema.',
+        })
+      : Create;
+    // Response serialization: the single-object 201 always keeps the strict Entity schema (and its
+    // OpenAPI 201), on batch routes too. Only the batch ARRAY reply skips the schema serializer (see
+    // the POST handler), because a Union([Entity, Array(Entity)]) breaks fast-json-stringify when
+    // Entity is recursive (e.g. TypologySchema.expression). The accepted request shapes remain fully
+    // documented via CreateBody (the #436 OpenAPI acceptance criterion).
+    const CreateResponseSchema = batch ? { 201: Entity, 400: ErrorResponse } : { 201: Entity };
+
+    // Batch runtime: the transaction runner and a standalone per-item validator are bundled together
+    // so they share a single existence fact (`batch` enabled <=> both present). This lets the handler
+    // narrow once and treat `validateItem` as non-optional, guaranteeing validation is never skipped.
+    // The validator mirrors the app-wide Ajv config (see src/clients/fastify.ts) and is compiled from
+    // the full Create schema so it can surface an item[i] message for the offending array element.
+    const batchRuntime = batch
+      ? (() => {
+          const itemAjv = new Ajv({ removeAdditional: 'all', useDefaults: true, coerceTypes: 'array', strictTuples: false });
+          addFormats(itemAjv);
+          return { runInTransaction: batch.runInTransaction, validateItem: itemAjv.compile(Create) };
+        })()
+      : undefined;
 
     // --- Build path and param schema based on idParam ---
     const singleName: string = idParam?.kind === 'single' ? (idParam.name ?? 'id') : 'id';
@@ -81,9 +138,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
     const ListResponse = Type.Object({
       data: Type.Array(Entity),
       meta: Type.Object({
-        total: Type.Integer(),
-        limit: Type.Integer(),
-        offset: Type.Integer(),
+        total: Type.Integer({
+          description: 'Total number of rows matching the query (a real COUNT(*), not the size of the returned page).',
+        }),
+        limit: Type.Integer({ description: 'Page size applied to this response. Equals total on the limit=all path.' }),
+        offset: Type.Integer({ description: 'Row offset applied to this response. Always 0 on the limit=all path.' }),
       }),
     });
     // --- LIST --- AUTH:EXAMPLE(LIST_V1_ADMIN_RAW_HISTORY_PACS002)
@@ -93,16 +152,25 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           querystring: QuerySchema,
-          response: { 200: ListResponse },
+          response: { 200: ListResponse, 400: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
           : [validateTenantMiddleware],
       },
       async (req, reply) => {
-        const queryParams = req.query as Static<typeof QuerySchema>;
+        // The batch-fetch set (#423) is validated/bounded only by the per-entity Query schema
+        // (rule + typology, maxItems 200); entities without it have `keys` stripped by Ajv. It is
+        // typed here so the handler can forward it without widening the generic fallback schema.
+        const queryParams = req.query as Static<typeof DefaultQuery> & { keys?: Array<{ id: string; cfg: string }> };
         const { tenantId } = req as ITenantRequest;
-        const { limit = 20, offset = 0, sort, order = 'ASC', filters } = queryParams;
+        const { limit = 20, offset = 0, sort, order = 'ASC', filters, keys } = queryParams;
+
+        // `limit=all` and a non-zero `offset` are mutually exclusive: an unbounded fetch has no
+        // page to skip into, so combining them is a client error rather than a silent no-op (#422).
+        if (limit === 'all' && offset !== 0) {
+          return await reply.code(400).send({ message: 'offset cannot be combined with limit=all' });
+        }
 
         type SortField = Extract<keyof TEntity, string>;
 
@@ -113,10 +181,15 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           sort: sort as SortField | undefined,
           order,
           filters,
+          // Only forward the batch-fetch set when the per-entity schema kept it; entities out of
+          // scope (e.g. network_map) have `keys` stripped to undefined and must not receive it.
+          ...(keys ? { keys } : {}),
         };
 
         const { data, total } = await repo.list(params);
-        return await reply.send({ data, meta: { total, limit, offset } });
+        // For the unbounded path report the truthful window: the whole set was returned from offset 0.
+        const meta = limit === 'all' ? { total, limit: total, offset: 0 } : { total, limit, offset };
+        return await reply.send({ data, meta });
       },
     );
 
@@ -127,7 +200,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -149,8 +222,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       {
         schema: {
           tags: [prefix],
-          body: Create,
-          response: { 201: Entity },
+          body: CreateBody,
+          response: CreateResponseSchema,
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -158,6 +231,38 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
       },
       async (req, reply) => {
         const { tenantId } = req as ITenantRequest;
+
+        // Batch path: an array body is inserted all-or-nothing inside one injected transaction,
+        // with the pinned client threaded into every create so the rows share one BEGIN/COMMIT.
+        if (batchRuntime && Array.isArray(req.body)) {
+          const items = req.body as TEntity[];
+
+          // Validate each item up-front (before opening a transaction) so a malformed batch never
+          // partially inserts and the client gets an error that names the offending index.
+          for (let i = 0; i < items.length; i++) {
+            if (!batchRuntime.validateItem(items[i])) {
+              const firstError = batchRuntime.validateItem.errors?.[0];
+              const detail = firstError ? `${firstError.instancePath || '/'} ${firstError.message}`.trim() : 'invalid item';
+              return await reply.code(400).send({ message: `item[${i}]: ${detail}` });
+            }
+          }
+
+          const created = await batchRuntime.runInTransaction(async (client) => {
+            const results: TEntity[] = [];
+            // Inserts run serially: a single pinned PoolClient cannot execute concurrent queries.
+            for (const item of items) {
+              results.push(await repo.create(item, tenantId, client));
+            }
+            return results;
+          });
+          // The route's 201 schema is the single Entity (object); an array can't be serialized
+          // against it, and a Union serializer breaks on recursive schemas (typology.expression).
+          // Bypass the schema serializer for this array reply only - the single-object path below
+          // keeps the Entity serializer (and its OpenAPI 201).
+          reply.serializer((payload) => JSON.stringify(payload));
+          return await reply.code(201).send(created);
+        }
+
         const created = await repo.create(req.body as TEntity, tenantId);
         return await reply.code(201).send(created);
       },
@@ -171,7 +276,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           tags: [prefix],
           params: IdParam,
           body: Update,
-          response: { 200: Entity, 404: Type.Object({ message: Type.String() }) },
+          response: { 200: Entity, 404: ErrorResponse },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -194,7 +299,10 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Type.Object({ success: Type.Boolean() }) },
+          response: {
+            200: Type.Object({ success: Type.Boolean({ description: 'Always true when a row was deleted.' }) }),
+            404: ErrorResponse,
+          },
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -205,9 +313,64 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         const { tenantId } = req as ITenantRequest;
 
         const ok = await repo.remove(makeRepositoryId(p, tenantId));
-        return { success: ok };
+        // Parity with GET/PUT: a missing row is a 404, not a 200 { success: false } (#420).
+        if (!ok) return await reply.code(404).send({ message: 'Not found' });
+        return { success: true };
       },
     );
+
+    // --- ACTIVATE / DEACTIVATE --- only for entities that expose the lifecycle actions
+    // (network_map). The activate swap is atomic in the repository; the route just maps a
+    // null result (missing target) to 404, mirroring GET/PUT/DELETE. AUTH:EXAMPLE(POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_ACTIVATE)
+    const activateFn = repo.activate;
+    if (activateFn) {
+      app.post(
+        `${prefix}${idPath}/activate`,
+        {
+          schema: {
+            tags: [prefix],
+            params: IdParam,
+            response: { 200: Entity, 404: ErrorResponse },
+          },
+          preHandler: configuration.AUTHENTICATED
+            ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_ACTIVATE`)]
+            : [validateTenantMiddleware],
+        },
+        async (req, reply) => {
+          const p = req.params as Record<string, string>;
+          const { tenantId } = req as ITenantRequest;
+
+          const activated = await activateFn(makeRepositoryId(p, tenantId));
+          if (!activated) return await reply.code(404).send({ message: 'Not found' });
+          return activated;
+        },
+      );
+    }
+
+    const deactivateFn = repo.deactivate;
+    if (deactivateFn) {
+      app.post(
+        `${prefix}${idPath}/deactivate`,
+        {
+          schema: {
+            tags: [prefix],
+            params: IdParam,
+            response: { 200: Entity, 404: ErrorResponse },
+          },
+          preHandler: configuration.AUTHENTICATED
+            ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_DEACTIVATE`)]
+            : [validateTenantMiddleware],
+        },
+        async (req, reply) => {
+          const p = req.params as Record<string, string>;
+          const { tenantId } = req as ITenantRequest;
+
+          const deactivated = await deactivateFn(makeRepositoryId(p, tenantId));
+          if (!deactivated) return await reply.code(404).send({ message: 'Not found' });
+          return deactivated;
+        },
+      );
+    }
 
     await Promise.resolve(true);
   };

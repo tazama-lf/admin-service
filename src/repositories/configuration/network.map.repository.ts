@@ -1,29 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { handlePostExecuteSqlStatement, withConfigurationTransaction } from '../../services/database.logic.service';
 import type { ConfigVersion, CrudRepository } from '../repository.base';
+import { listConfiguration, type ConfigListDescriptor } from './config-list.shared';
+
+const networkMapListDescriptor: ConfigListDescriptor = {
+  table: 'network_map',
+  sortColumns: { cfg: 'cfg' },
+  defaultSort: 'cfg',
+  uniqueKeyOrder: ['cfg'],
+  filters: [
+    { key: 'active', column: 'active', cast: '::boolean' },
+    { key: 'cfg', column: 'cfg' },
+  ],
+};
 
 export const NetworkMapRepo: CrudRepository<NetworkMap, ConfigVersion> = {
-  list: async function ({ limit, offset, sort, order, filters, tenantId }): Promise<{ data: NetworkMap[]; total: number }> {
-    sort ??= 'cfg';
-    const filter: { field: string; value: string } = { field: 'cfg', value: '' };
-    if (filters) {
-      const [[field, value]] = Object.entries(filters);
-      filter.field = field;
-      filter.value = value;
-    }
-    const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
-      {
-        text: `SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit, tenantId],
-      } satisfies PgQueryConfig,
-      'configuration',
-    );
-
-    return queryRes.rows.length > 0
-      ? { data: queryRes.rows.map((values) => values.configuration), total: queryRes.rowCount! }
-      : { data: [], total: 0 };
+  list: async function (params): Promise<{ data: NetworkMap[]; total: number }> {
+    return await listConfiguration<NetworkMap>(networkMapListDescriptor, params);
   },
 
   get: async function ({ cfg, tenantId }): Promise<NetworkMap | null> {
@@ -78,5 +73,55 @@ export const NetworkMapRepo: CrudRepository<NetworkMap, ConfigVersion> = {
       'configuration',
     );
     return queryRes.rowCount ? true : false;
+  },
+
+  // Promote one network map to active and demote the current active map in a single
+  // atomic swap. `active` is a generated STORED column derived from the JSON, so the flag
+  // is flipped by rewriting `configuration` via jsonb_set (a direct UPDATE of `active` is
+  // rejected). The partial unique index `idx_networkmap_active_tenant` (one active map per
+  // tenant) is non-deferrable and checked per-row, so the demote MUST happen before the
+  // promote inside one transaction - otherwise two rows are transiently active and the
+  // insert/update fails with 23505 depending on physical row order. The existence check
+  // runs first and outside the transaction: a missing target returns null with no writes,
+  // so no rollback is ever needed.
+  activate: async function ({ cfg, tenantId }): Promise<NetworkMap | null> {
+    const existence = await handlePostExecuteSqlStatement<{ exists: number }>(
+      {
+        text: 'SELECT 1 FROM network_map WHERE cfg = $1 AND tenantId = $2;',
+        values: [cfg, tenantId],
+      } satisfies PgQueryConfig,
+      'configuration',
+    );
+    if (!existence.rowCount) return null;
+
+    const dtTme = new Date().toISOString();
+    return await withConfigurationTransaction(async (client) => {
+      // Demote the currently-active map (if any) first - bumping updDtTm for data-warehouse deltas.
+      await client.query(
+        "UPDATE network_map SET configuration = jsonb_set(jsonb_set(configuration, '{active}', 'false'), '{updDtTm}', to_jsonb($1::text)) WHERE tenantId = $2 AND active = true AND cfg <> $3;",
+        [dtTme, tenantId, cfg],
+      );
+      // Promote the target and return its new state.
+      const activated = await client.query<{ configuration: NetworkMap }>(
+        "UPDATE network_map SET configuration = jsonb_set(jsonb_set(configuration, '{active}', 'true'), '{updDtTm}', to_jsonb($1::text)) WHERE tenantId = $2 AND cfg = $3 RETURNING configuration;",
+        [dtTme, tenantId, cfg],
+      );
+      return activated.rows[0].configuration;
+    });
+  },
+
+  // Set a single network map inactive. Zero active maps is a legal state, so this is one
+  // atomic statement with no transaction and no unique-index concern. Returns null when the
+  // target does not exist.
+  deactivate: async function ({ cfg, tenantId }): Promise<NetworkMap | null> {
+    const dtTme = new Date().toISOString();
+    const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
+      {
+        text: "UPDATE network_map SET configuration = jsonb_set(jsonb_set(configuration, '{active}', 'false'), '{updDtTm}', to_jsonb($1::text)) WHERE cfg = $2 AND tenantId = $3 RETURNING configuration;",
+        values: [dtTme, cfg, tenantId],
+      } satisfies PgQueryConfig,
+      'configuration',
+    );
+    return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 };

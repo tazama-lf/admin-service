@@ -571,14 +571,139 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
-| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL |
-| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
-| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate` and `POST {cfg}/deactivate` |
+| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST (single or batch),PUT,DEL |
+| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST (single or batch),PUT,DEL |
 
-For all GET queries:
- * You can either do a pure GET, which will list all items; 
- * You can do a GET with a query parameter to find, for example, only Active networkmaps: /v1/admin/configuration/network_map?filters[active]=true;
- * Right now, if you specify more than one query param, only the first one will take afffect. 
+### Configuration LIST query contract
+
+The three configuration LIST endpoints (`network_map`, `rule`, `typology`) share a common query
+contract, implemented by a single parameterised helper. A bare `GET` is **safe by default**: it
+returns the first page only, not the whole table.
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer `1-100`, or `all` | `20` | Page size. Use `all` to return the full tenant-scoped set in one response. `all` is mutually exclusive with a non-zero `offset` (returns `400`). Values above `100` return `400`. |
+| `offset` | integer `>= 0` | `0` | Rows to skip for pagination. Cannot be combined with `limit=all`. |
+| `sort` | per-entity allowlist | `id` (rule/typology), `cfg` (network_map) | Lead ordering column. The remaining unique-key column is always appended so paging is deterministic. A value outside the allowlist returns `400`. |
+| `order` | `ASC` or `DESC` | `ASC` | Sort direction. |
+| `filters[<field>]` | string | - | Exact-match filters. **All** supplied filters are ANDed (not just the first). Each `<field>` is allowlisted per entity; unknown keys are ignored. |
+| `keys` | array of `{ id, cfg }` | - | Targeted batch fetch (rule/typology only): return exactly the listed composite `(id, cfg)` pairs in one query. Maximum 200 pairs (`400` past the cap). Supplied as `keys[0][id]=..&keys[0][cfg]=..`. |
+
+Per-entity allowlists: `rule`/`typology` accept `sort`/`filters` of `id` and `cfg`; `network_map`
+accepts `cfg` and `active` (`true`/`false`).
+
+#### Response shape
+
+```json
+{
+  "data": [ /* entity objects */ ],
+  "meta": { "total": 128, "limit": 20, "offset": 0 }
+}
+```
+
+`meta.total` is the real `COUNT(*)` of all matching rows (not the size of the returned page), so a
+client can compute the number of pages. On the `limit=all` path, `meta.limit` equals `total` and
+`meta.offset` is `0`.
+
+#### Examples
+
+```http
+GET /v1/admin/configuration/network_map?filters[active]=true HTTP/1.1
+GET /v1/admin/configuration/rule?limit=50&offset=50&sort=id&order=DESC HTTP/1.1
+GET /v1/admin/configuration/typology?limit=all HTTP/1.1
+GET /v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&keys[1][id]=R1&keys[1][cfg]=1.0.0&limit=all HTTP/1.1
+```
+
+### Configuration POST contract (single or batch)
+
+The `rule` and `typology` POST endpoints accept **either** a single configuration object **or** an
+array of configuration objects in one request. `network_map` is intentionally excluded (its
+single-active-per-tenant invariant and `activate`/`deactivate` swap make atomic bulk insert
+semantics ambiguous), so its POST accepts a single object only.
+
+#### Accepted body shapes
+
+A single object (unchanged, backwards compatible):
+
+```json
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } }
+```
+
+An array of objects (batch). A common shape is one entity identity (`id` is slow-changing) submitted
+with several config versions (`cfg` is the high-churn part of the key) in a single atomic insert:
+
+```json
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { /* ... */ } }
+]
+```
+
+Each array element must follow the same Create schema as the single-object body. Unknown
+top-level fields are stripped before insert on both paths (no mass-assignment via the array form).
+
+#### Semantics
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Array bounds | `minItems` 1, `maxItems` 200 by default. An empty array or one over the cap returns `400`. |
+| Validation | Every item is validated **before** any insert. The first invalid item returns `400` with a body message of the form `item[<index>]: <path> <reason>`, identifying which element failed. |
+| Atomicity | All items in a batch are inserted inside a single configuration-pool transaction. If any insert fails the whole batch is rolled back - it is all-or-nothing, never a partial write. |
+| Tenant scoping | Every item is stamped with the `tenantId` from the auth token, exactly as the single-object path. |
+| Success status | `201 Created` for both the single-object and the array form. |
+
+#### Response body note
+
+For the **single-object** path the `201` response body is the created entity, serialized against the
+entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
+
+For the **array** path the success body (the array of created entities) is returned with the
+per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
+compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
+the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
+response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
+remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
+per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
+a single uniform code path over a bespoke per-entity serializer for the batch array case only.
+
+#### Examples
+
+A single rule (the single-object form):
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } }
+```
+
+A batch of rule config versions - one `id`, several `cfg` values, inserted atomically:
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { } }
+]
+```
+
+A batch of typology config versions (note typology's required `rules`, `expression`, `workflow`
+fields - there is no `config` field on a typology):
+
+```http
+POST /v1/admin/configuration/typology HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.0", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } },
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.1", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } }
+]
+```
 
 
 ---
@@ -587,17 +712,17 @@ For all GET queries:
 
 ### List Operation
 
-When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain.
+When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain. Every supplied filter is applied (ANDed), and ordering is deterministic: the chosen `sort` column followed by the remaining unique-key columns.
 
-The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin.
+The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin, where `total` is a separate `COUNT(*)` of all matching rows (not the size of the returned page). The CRUD plugin then shapes the HTTP response as `{ data, meta }`.
 
 ### Get Operation
 
-The `get` method retrieves a single entity record based on the combination of `cfg` and tenantId. If the record exists, it returns the parsed configuration object.
+The `get` method retrieves a single entity record based on its unique key and `tenantId` — `(id, cfg)` for rule and typology, and `(cfg)` for network_map. If the record exists, it returns the parsed configuration object; otherwise the endpoint responds `404`.
 
 ### Create Operation
 
-The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation.
+The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation. The `create` method also accepts an optional transaction `client`; when supplied (by the batch POST path) the insert runs on that pinned client so a multi-item batch commits or rolls back atomically. See **Configuration POST contract (single or batch)** above for the `rule`/`typology` array form.
 
 ### Update Operation
 
@@ -605,7 +730,22 @@ The update process replaces an existing configuration record that matches `cfg` 
 
 ### Delete Operation
 
-The deletion process removes the record from the table matching the same `cfg` and `tenantId` identifiers. It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
+The deletion process removes the record from the table matching its unique key and `tenantId`. When a row is deleted it returns `200` with `{ "success": true }`. When no matching row exists it returns `404` (parity with GET and PUT), rather than `200 { "success": false }`.
+
+### Activate / Deactivate Operation (network_map only)
+
+Network maps carry a single-active-per-tenant invariant, enforced at the database level by the partial unique index `idx_networkmap_active_tenant on network_map (tenantId) where active = true`. Two dedicated actions switch which map is active without a full `PUT` replace:
+
+```http
+POST /v1/admin/configuration/network_map/{cfg}/activate HTTP/1.1
+POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
+```
+
+**Activate** promotes the target map and demotes the currently-active map (if any) in a single atomic swap, returning the activated map. Because `active` (and `cfg`) are generated `STORED` columns derived from the `configuration` JSONB, the flag is flipped by rewriting the JSON with `jsonb_set` rather than a direct `UPDATE`. The partial unique index is non-deferrable and checked per row, so the swap runs inside one transaction and demotes the current map **before** promoting the target - at no instant are two rows active, regardless of physical row order (a single multi-row `UPDATE` would otherwise risk a `23505` unique-violation). The target's existence is checked first and outside the transaction: a missing map returns `404` with no writes (no rollback needed). `updDtTm` is bumped on both the demoted and promoted records.
+
+**Deactivate** sets a single map inactive in one atomic statement (zero active maps is a legal state, so no transaction is required), bumps `updDtTm`, and returns the deactivated map, or `404` when the target does not exist.
+
+> Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
 
 ---
 

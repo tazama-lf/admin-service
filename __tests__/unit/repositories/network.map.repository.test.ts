@@ -76,14 +76,13 @@ describe('NetworkMapRepository', () => {
   });
 
   describe('list', () => {
-    it('should list network maps with default sort and no filters', async () => {
+    it('counts all matching rows and pages deterministically on the generated key (no filters)', async () => {
       const firstMap = createMockNetworkMap();
       const secondMap = { ...createMockNetworkMap(), cfg: '2.0.0', active: false };
 
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ configuration: firstMap }, { configuration: secondMap }],
-        rowCount: 2,
-      });
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: firstMap }, { configuration: secondMap }], rowCount: 2 });
 
       const result = await NetworkMapRepo.list({
         offset: 5,
@@ -93,35 +92,108 @@ describe('NetworkMapRepository', () => {
       });
 
       expect(result).toEqual({ data: [firstMap, secondMap], total: 2 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 DESC OFFSET $4 LIMIT $5;",
-          values: ['cfg', '', 'cfg', 5, 10, mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM network_map WHERE tenantid = $1;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+      // network_map's unique key is the single generated `cfg` column
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM network_map WHERE tenantid = $1 ORDER BY cfg DESC OFFSET $2 LIMIT $3;',
+          values: [mockTenantId, 5, 10],
         },
         'configuration',
       );
     });
 
-    it('should list with the first provided filter and custom sort', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-      });
+    it('applies every supplied filter (ANDed), casting the generated boolean `active` column', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await NetworkMapRepo.list({
         filters: { active: 'true', cfg: '1.0.0' },
         offset: 0,
         limit: 25,
         order: 'ASC',
-        sort: 'active',
         tenantId: mockTenantId,
       });
 
       expect(result).toEqual({ data: [], total: 0 });
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
         {
-          text: "SELECT configuration FROM network_map WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ASC OFFSET $4 LIMIT $5;",
-          values: ['active', 'true', 'active', 0, 25, mockTenantId],
+          text: 'SELECT COUNT(*) AS total FROM network_map WHERE tenantid = $1 AND active = $2::boolean AND cfg = $3;',
+          values: [mockTenantId, 'true', '1.0.0'],
+        },
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM network_map WHERE tenantid = $1 AND active = $2::boolean AND cfg = $3 ORDER BY cfg ASC OFFSET $4 LIMIT $5;',
+          values: [mockTenantId, 'true', '1.0.0', 0, 25],
+        },
+        'configuration',
+      );
+    });
+
+    it('takes total from COUNT (not the page length) and never returns null', async () => {
+      const map = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '42' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: map }], rowCount: null });
+
+      const result = await NetworkMapRepo.list({ offset: 0, limit: 20, order: 'ASC', tenantId: mockTenantId });
+
+      expect(result.total).toBe(42);
+      expect(result.data).toEqual([map]);
+    });
+
+    it('ignores filter fields that are not in the allowlist', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await NetworkMapRepo.list({
+        filters: { nope: 'x', active: 'true' },
+        offset: 0,
+        limit: 20,
+        order: 'ASC',
+        tenantId: mockTenantId,
+      });
+
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        {
+          text: 'SELECT COUNT(*) AS total FROM network_map WHERE tenantid = $1 AND active = $2::boolean;',
+          values: [mockTenantId, 'true'],
+        },
+        'configuration',
+      );
+    });
+
+    it('keeps the ::boolean filter but omits OFFSET and LIMIT when limit is "all" (#422)', async () => {
+      const map = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '1' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ configuration: map }], rowCount: 1 });
+
+      await NetworkMapRepo.list({ filters: { active: 'true' }, limit: 'all', order: 'ASC', tenantId: mockTenantId });
+
+      // The active predicate (cast ::boolean) is preserved; no OFFSET/LIMIT is appended.
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        {
+          text: 'SELECT configuration FROM network_map WHERE tenantid = $1 AND active = $2::boolean ORDER BY cfg ASC;',
+          values: [mockTenantId, 'true'],
         },
         'configuration',
       );

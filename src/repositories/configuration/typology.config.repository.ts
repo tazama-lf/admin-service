@@ -1,30 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { TypologyConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/TypologyConfig';
+import type { PoolClient } from 'pg';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
+import { listConfiguration, type ConfigListDescriptor } from './config-list.shared';
+
+const typologyListDescriptor: ConfigListDescriptor = {
+  table: 'typology',
+  sortColumns: { id: 'typologyid', cfg: 'typologycfg' },
+  defaultSort: 'cfg',
+  uniqueKeyOrder: ['typologyid', 'typologycfg'],
+  filters: [
+    { key: 'id', column: 'typologyid' },
+    { key: 'cfg', column: 'typologycfg' },
+  ],
+  keySetColumns: ['typologyid', 'typologycfg'],
+};
 
 export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
-  list: async function ({ filters, limit, offset, order, sort, tenantId }): Promise<{ data: TypologyConfig[]; total: number }> {
-    sort ??= 'cfg';
-    const filter: { field: string; value: string } = { field: 'typologyid', value: '' };
-    if (filters) {
-      const [[field, value]] = Object.entries(filters);
-      filter.field = field;
-      filter.value = value;
-    }
-
-    const queryRes = await handlePostExecuteSqlStatement<{ configuration: TypologyConfig }>(
-      {
-        text: `SELECT configuration FROM typology WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$5 ${order} OFFSET $3 LIMIT $4;`,
-        values: [filter.field, filter.value, offset, limit, sort, tenantId],
-      } satisfies PgQueryConfig,
-      'configuration',
-    );
-
-    return queryRes.rows.length > 0
-      ? { data: queryRes.rows.map((values) => values.configuration), total: queryRes.rowCount! }
-      : { data: [], total: 0 };
+  list: async function (params): Promise<{ data: TypologyConfig[]; total: number }> {
+    return await listConfiguration<TypologyConfig>(typologyListDescriptor, params);
   },
 
   get: async function ({ id, cfg, tenantId }): Promise<TypologyConfig | null> {
@@ -39,7 +35,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: TypologyConfig, tenantId: string): Promise<TypologyConfig> {
+  create: async function (payload: TypologyConfig, tenantId: string, client?: PoolClient): Promise<TypologyConfig> {
     payload.tenantId = tenantId;
 
     const dtTme = new Date().toISOString();
@@ -52,6 +48,7 @@ export const TypologyConfigRepo: CrudRepository<TypologyConfig> = {
         values: [payload],
       } satisfies PgQueryConfig,
       'configuration',
+      client,
     );
     return queryRes.rows[0].configuration;
   },

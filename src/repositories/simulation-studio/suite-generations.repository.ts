@@ -166,14 +166,6 @@ export const cloneGenerationDataInDb = async (
       text: `
         INSERT INTO trs_suite_generations (
           suite_id, generation_number, status, simulation_type,
-          rule_reo, rule_version,
-          context_count, trigger_count, enrichment_table_count,
-          generated_context_count, generated_trigger_count, generated_enrichment_row_count,
-          context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
-          wizard_snapshot, generation_metadata, created_by, created_by_email, created_at, updated_at
-        )
-        SELECT
-          $1, $2, 'DRAFT', simulation_type,
           rule_name, rule_version,
           context_count, trigger_count, enrichment_table_count,
           generated_context_count, generated_trigger_count, generated_enrichment_row_count,

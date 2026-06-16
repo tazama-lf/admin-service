@@ -362,7 +362,7 @@ describe('Simulation Suites API Handlers', () => {
     it('should return 400 for invalid suiteId', async () => {
       const req = {
         tenantId: mockTenantId,
-        params: { id: 'xyz' },
+        body: { sourceSuiteId: 'xyz' },
         user: { clientId: 'client-001', preferred_username: 'user@test.com' },
       } as unknown as FastifyRequest;
       const reply = buildReply();
@@ -385,7 +385,7 @@ describe('Simulation Suites API Handlers', () => {
 
       const req = {
         tenantId: mockTenantId,
-        params: { id: '101' },
+        body: { sourceSuiteId: 101 },
         user: {
           clientId: 'client-001',
           preferred_username: 'cloner@test.com',
@@ -416,7 +416,7 @@ describe('Simulation Suites API Handlers', () => {
 
       const req = {
         tenantId: mockTenantId,
-        params: { id: '101' },
+        body: { sourceSuiteId: 101 },
         user: {
           clientId: 'client-002',
         },
@@ -435,7 +435,7 @@ describe('Simulation Suites API Handlers', () => {
 
       const req = {
         tenantId: mockTenantId,
-        params: { id: '101' },
+        body: { sourceSuiteId: 101 },
         user: { clientId: 'client-001' },
       } as unknown as FastifyRequest;
       const reply = buildReply();
@@ -448,7 +448,7 @@ describe('Simulation Suites API Handlers', () => {
     it('should handle zero as invalid suiteId', async () => {
       const req = {
         tenantId: mockTenantId,
-        params: { id: '0' },
+        body: { sourceSuiteId: 0 },
         user: { clientId: 'client-001' },
       } as unknown as FastifyRequest;
       const reply = buildReply();

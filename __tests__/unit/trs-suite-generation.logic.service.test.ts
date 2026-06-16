@@ -213,8 +213,8 @@ describe('resumeGeneration', () => {
     const resumed = { id: 1, suite_id: 42, status: 'DRAFT' } as any;
     (generationsRepo.resumeGenerationInDb as jest.Mock).mockResolvedValue(resumed);
 
-    await expect(resumeGeneration(42)).resolves.toEqual(resumed);
-    expect(generationsRepo.resumeGenerationInDb).toHaveBeenCalledWith(42);
+    await expect(resumeGeneration(42, 10)).resolves.toEqual(resumed);
+    expect(generationsRepo.resumeGenerationInDb).toHaveBeenCalledWith(42, 10);
   });
 
   it('returns null when no DRAFT generation exists', async () => {

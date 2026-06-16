@@ -169,9 +169,9 @@ export const getLatestGenerationForSuite = async (suiteId: number): Promise<Suit
   }
 };
 
-export const resumeGeneration = async (suiteId: number): Promise<SuiteGeneration | null> => {
+export const resumeGeneration = async (suiteId: number, generationId: number): Promise<SuiteGeneration | null> => {
   try {
-    return await resumeGenerationInDb(suiteId);
+    return await resumeGenerationInDb(suiteId, generationId);
   } catch (error) {
     throw new HttpException(
       `Failed to resume generation: ${error instanceof Error ? error.message : 'Unknown error'}`,

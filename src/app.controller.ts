@@ -2605,7 +2605,13 @@ export const resumeGenerationHandler = async (req: FastifyRequest, reply: Fastif
       reply.status(400).send({ success: false, message: 'Invalid suite ID' });
       return;
     }
-    const resumeGenerationResult = await resumeGeneration(suiteId);
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const resumeGenerationResult = await resumeGeneration(suiteId, generationId);
     reply.status(200).send({ success: true, message: 'Generation resumed', data: resumeGenerationResult });
     loggerService.log('End - Resume generation');
   } catch (err) {

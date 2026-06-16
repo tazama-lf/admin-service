@@ -332,13 +332,13 @@ describe('Simulation Suites API Handlers', () => {
       (trsSuiteGenerationService.resumeGeneration as jest.Mock).mockResolvedValue(resumeResult);
 
       const req = {
-        params: { suiteId: '101' },
+        params: { suiteId: '101', generationId: '10' },
       } as unknown as FastifyRequest;
       const reply = buildReply();
 
       await resumeGenerationHandler(req, reply as FastifyReply);
 
-      expect(trsSuiteGenerationService.resumeGeneration).toHaveBeenCalledWith(101);
+      expect(trsSuiteGenerationService.resumeGeneration).toHaveBeenCalledWith(101, 10);
       expect(reply.status).toHaveBeenCalledWith(200);
       expect(reply.send).toHaveBeenCalledWith({ success: true, message: 'Generation resumed', data: resumeResult });
     });
@@ -348,7 +348,7 @@ describe('Simulation Suites API Handlers', () => {
       (trsSuiteGenerationService.resumeGeneration as jest.Mock).mockRejectedValue(error);
 
       const req = {
-        params: { suiteId: '101' },
+        params: { suiteId: '101', generationId: '10' },
       } as unknown as FastifyRequest;
       const reply = buildReply();
 

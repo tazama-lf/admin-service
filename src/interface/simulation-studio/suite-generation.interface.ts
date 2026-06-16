@@ -345,3 +345,11 @@ export interface UpsertEnrichmentFieldStrategyDto {
 export interface SuiteEnrichmentTableWithStrategies extends SuiteEnrichmentTable {
   field_strategies: EnrichmentFieldStrategy[];
 }
+
+export interface CloneGenerationRequestDto {
+  sourceGenerationId: number;
+}
+
+export interface CloneSuiteRequestDto {
+  sourceSuiteId: number;
+}

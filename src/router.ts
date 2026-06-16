@@ -682,11 +682,11 @@ function Routes(fastify: FastifyInstance): void {
     ...SetOptionsBodyAndParams(updateWizardProgressHandler, routePrivilege.updateWizardProgress),
   });
 
-  fastify.post('/v1/admin/trs/simulation-studio/generations/:id/clone', {
+  fastify.post('/v1/admin/trs/simulation-studio/generation/clone', {
     ...SetOptionsBodyAndParams(cloneGenerationHandler, routePrivilege.cloneGeneration),
   });
 
-  fastify.post('/v1/admin/trs/simulation-studio/suites/:id/clone', {
+  fastify.post('/v1/admin/trs/simulation-studio/suites/clone', {
     ...SetOptionsBodyAndParams(cloneSuiteHandler, routePrivilege.cloneSuite),
   });
 

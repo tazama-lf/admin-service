@@ -72,7 +72,7 @@ const mockSuite: SimulationSuite = {
   tenant_id: 'tenant-001',
   name: 'Test Suite',
   simulation_type: 'SINGLE_RULE' as any,
-  rule_repo: 'repo-a',
+  rule_name: 'repo-a',
   rule_version: 'v1.0',
   primary_txtp: 'pacs.008',
   primary_txtp_version: '001.08',

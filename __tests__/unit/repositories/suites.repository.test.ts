@@ -514,7 +514,6 @@ describe('Suites Repository', () => {
 
     const result = await updateSimulationSuiteInDb(4, 'tenant-a', {
       description: null,
-      rule_repo: null,
       rule_name: null,
       rule_version: null,
       primary_txtp: null,

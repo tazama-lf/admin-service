@@ -23,7 +23,7 @@ export interface SuiteGeneration {
   generation_number: number;
   status: SuiteGenerationStatus;
   simulation_type: SimulationType;
-  rule_repo?: string;
+  rule_name?: string;
   rule_version?: string;
   context_count: number;
   trigger_count: number;
@@ -40,12 +40,15 @@ export interface SuiteGeneration {
   created_by_email?: string;
   created_at: Date;
   updated_at: Date;
+  run_count?: number;
+  run_result_count?: number;
+  outcome?: string | null;
 }
 
 export interface CreateSuiteGenerationDto {
   suite_id: number;
   simulation_type?: SimulationType;
-  rule_repo?: string;
+  rule_name?: string;
   rule_version?: string;
   wizard_snapshot?: Record<string, unknown>;
   generation_metadata?: Record<string, unknown>;

@@ -9,7 +9,7 @@ const mapRowToGeneration = (row: Record<string, unknown>): SuiteGeneration => ({
   generation_number: row.generation_number as number,
   status: row.status as SuiteGeneration['status'],
   simulation_type: row.simulation_type as SuiteGeneration['simulation_type'],
-  rule_repo: row.rule_repo as string | undefined,
+  rule_name: row.rule_name as string | undefined,
   rule_version: row.rule_version as string | undefined,
   context_count: row.context_count as number,
   trigger_count: row.trigger_count as number,
@@ -32,6 +32,9 @@ const mapRowToGeneration = (row: Record<string, unknown>): SuiteGeneration => ({
   created_by_email: row.created_by_email as string | undefined,
   created_at: new Date(row.created_at as string),
   updated_at: new Date(row.updated_at as string),
+  run_count: row.run_count !== undefined ? Number(row.run_count) : undefined,
+  run_result_count: row.run_result_count !== undefined ? Number(row.run_result_count) : undefined,
+  outcome: (row.last_outcome ?? row.outcome ?? null) as string | null,
 });
 
 export const createSuiteGenerationInDb = async (
@@ -50,7 +53,7 @@ export const createSuiteGenerationInDb = async (
     )
     INSERT INTO trs_suite_generations (
       suite_id, generation_number, status, simulation_type,
-      rule_repo, rule_version,
+      rule_name, rule_version,
       context_count, trigger_count, enrichment_table_count,
       generated_context_count, generated_trigger_count, generated_enrichment_row_count,
       context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
@@ -75,7 +78,7 @@ export const createSuiteGenerationInDb = async (
       values: [
         dto.suite_id,
         dto.simulation_type ?? 'SINGLE_RULE',
-        dto.rule_repo ?? null,
+        dto.rule_name ?? null,
         dto.rule_version ?? null,
         JSON.stringify(dto.wizard_snapshot ?? {}),
         JSON.stringify(dto.generation_metadata ?? {}),
@@ -106,10 +109,24 @@ export const getNextGenerationNumber = async (suiteId: number): Promise<number> 
 
 export const getGenerationsBySuiteId = async (suiteId: number): Promise<SuiteGeneration[]> => {
   const query = `
-    SELECT *
-    FROM trs_suite_generations
-    WHERE suite_id = $1
-    ORDER BY generation_number ASC
+    SELECT
+      g.*,
+      COALESCE(r.run_count, 0) AS run_count,
+      COALESCE(r.run_result_count, 0) AS run_result_count,
+      r.last_outcome
+    FROM trs_suite_generations g
+    LEFT JOIN (
+      SELECT
+        runs.generation_id,
+        COUNT(DISTINCT runs.id)::int AS run_count,
+        COUNT(res.id)::int AS run_result_count,
+        (ARRAY_AGG(runs.outcome ORDER BY runs.id DESC))[1] AS last_outcome
+      FROM trs_simulation_runs runs
+      LEFT JOIN trs_simulation_run_results res ON res.run_id = runs.id
+      GROUP BY runs.generation_id
+    ) r ON r.generation_id = g.id
+    WHERE g.suite_id = $1
+    ORDER BY g.generation_number ASC
   `;
 
   const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
@@ -149,7 +166,7 @@ export const cloneGenerationDataInDb = async (
       text: `
         INSERT INTO trs_suite_generations (
           suite_id, generation_number, status, simulation_type,
-          rule_repo, rule_version,
+          rule_reo, rule_version,
           context_count, trigger_count, enrichment_table_count,
           generated_context_count, generated_trigger_count, generated_enrichment_row_count,
           context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
@@ -157,7 +174,15 @@ export const cloneGenerationDataInDb = async (
         )
         SELECT
           $1, $2, 'DRAFT', simulation_type,
-          rule_repo, rule_version,
+          rule_name, rule_version,
+          context_count, trigger_count, enrichment_table_count,
+          generated_context_count, generated_trigger_count, generated_enrichment_row_count,
+          context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
+          wizard_snapshot, generation_metadata, created_by, created_by_email, created_at, updated_at
+        )
+        SELECT
+          $1, $2, 'DRAFT', simulation_type,
+          rule_name, rule_version,
           context_count, trigger_count, enrichment_table_count,
           0, 0, 0,
           context_field_config_count, trigger_field_config_count, enrichment_field_config_count,

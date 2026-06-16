@@ -64,7 +64,7 @@ const generationRow = {
   generation_number: 1,
   status: 'DRAFT',
   simulation_type: 'SINGLE_RULE',
-  rule_repo: null,
+  rule_name: null,
   rule_version: null,
   context_count: 0,
   trigger_count: 0,
@@ -220,18 +220,18 @@ describe('createSuiteGenerationInDb — optional fields', () => {
     expect(callValues[1]).toBe('INTEGRATION_TESTING');
   });
 
-  it('passes non-null rule_repo and rule_version when provided', async () => {
+  it('passes non-null rule_name and rule_version when provided', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb(
-      { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_repo: 'repo-a', rule_version: 'v1' },
+      { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_name: 'rule-a', rule_version: 'v1' },
       'user-1',
     );
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('repo-a');
+    expect(callValues[2]).toBe('rule-a');
     expect(callValues[3]).toBe('v1');
   });
 
-  it('passes null for optional rule_repo and rule_version when absent', async () => {
+  it('passes null for optional rule_name and rule_version when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
@@ -499,13 +499,13 @@ describe('createSuiteGenerationInDb — optional fields', () => {
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(['SINGLE_RULE']) }), 'simulation');
   });
 
-  it('passes null for optional rule_repo, rule_version, userEmail when absent', async () => {
+  it('passes null for optional rule_name, rule_version, userEmail when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
     await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
 
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBeNull(); // rule_repo
+    expect(callValues[2]).toBeNull(); // rule_name
     expect(callValues[3]).toBeNull(); // rule_version
     expect(callValues[7]).toBeNull(); // userEmail
   });

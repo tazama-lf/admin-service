@@ -130,7 +130,7 @@ export const createSuiteGeneration = async (suite: SimulationSuite, userId: stri
       {
         suite_id: suite.id,
         simulation_type: suite.simulation_type,
-        rule_repo: suite.rule_repo,
+        rule_name: suite.rule_name,
         rule_version: suite.rule_version,
         wizard_snapshot: suite.wizard_progress,
         generation_metadata: {},

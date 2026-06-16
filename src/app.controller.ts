@@ -101,6 +101,8 @@ import type {
   BulkEnrichmentUpdateItemDto,
   UpsertTxtpMappingDto,
   TxtpMappingParamsDto,
+  CloneGenerationRequestDto,
+  CloneSuiteRequestDto,
 } from './interface/simulation-studio/suite-generation.interface';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
@@ -2417,8 +2419,8 @@ export const cloneGenerationHandler = async (req: FastifyRequest, reply: Fastify
   try {
     loggerService.log('Start - Clone generation');
     const authReq = req as AuthenticatedRequest;
-    const { id } = req.params as { id: string };
-    const generationId = parseInt(id, 10);
+    const { sourceGenerationId } = req.body as CloneGenerationRequestDto;
+    const generationId = parseInt(sourceGenerationId.toString(), 10);
     if (isNaN(generationId)) {
       reply.status(400).send({ success: false, message: 'Invalid generation ID' });
       return;
@@ -2441,8 +2443,8 @@ export const cloneSuiteHandler = async (req: FastifyRequest, reply: FastifyReply
     loggerService.log('Start - Clone suite');
     const authReq = req as AuthenticatedRequest;
     const { tenantId } = req as ITenantRequest;
-    const { id } = req.params as { id: string };
-    const suiteId = parseInt(id, 10);
+    const { sourceSuiteId } = req.body as CloneSuiteRequestDto;
+    const suiteId = parseInt(sourceSuiteId.toString(), 10);
     if (isNaN(suiteId)) {
       reply.status(400).send({ success: false, message: 'Invalid suite ID' });
       return;

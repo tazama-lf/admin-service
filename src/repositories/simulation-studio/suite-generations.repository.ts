@@ -209,11 +209,11 @@ export const cloneGenerationDataInDb = async (
               INSERT INTO trs_suite_context_field_strategies (
                 context_txtp_config_id, field_path, strategy_code,
                 static_value, range_min, range_max,
-                generator_type, generator_options, is_required_override, created_at
+                faker_semantic_type, generator_options, is_required_override, created_at
               )
               SELECT $1, field_path, strategy_code,
                      static_value, range_min, range_max,
-                     generator_type, generator_options, is_required_override, NOW()
+                     faker_semantic_type, generator_options, is_required_override, NOW()
               FROM trs_suite_context_field_strategies WHERE context_txtp_config_id = $2
             `,
             values: [newId, oldId],
@@ -263,15 +263,15 @@ export const cloneGenerationDataInDb = async (
         await handlePostExecuteSqlStatement<Record<string, unknown>>(
           {
             text: `
-              INSERT INTO trs_suite_trigger_field_overrides (
-                trigger_txtp_config_id, field_path, override_type,
+              INSERT INTO trs_suite_trigger_field_strategies (
+                trigger_txtp_config_id, field_path, strategy_code,
                 static_value, range_min, range_max,
-                generator_type, generator_options, created_at
+                faker_semantic_type, generator_options, created_at
               )
-              SELECT $1, field_path, override_type,
+              SELECT $1, field_path, strategy_code,
                      static_value, range_min, range_max,
-                     generator_type, generator_options, NOW()
-              FROM trs_suite_trigger_field_overrides WHERE trigger_txtp_config_id = $2
+                     faker_semantic_type, generator_options, NOW()
+              FROM trs_suite_trigger_field_strategies WHERE trigger_txtp_config_id = $2
             `,
             values: [newId, oldId],
           } satisfies PgQueryConfig,

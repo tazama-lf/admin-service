@@ -1174,7 +1174,7 @@ describe('cloneGenerationDataInDb', () => {
     expect(trigCall.text).toContain('trs_suite_trigger_txtp_configs');
 
     const overrideCall = mockDb.mock.calls[3][0] as { text: string; values: unknown[] };
-    expect(overrideCall.text).toContain('trs_suite_trigger_field_overrides');
+    expect(overrideCall.text).toContain('trs_suite_trigger_field_strategies');
     expect(overrideCall.values[0]).toBe(40);
     expect(overrideCall.values[1]).toBe(30);
   });

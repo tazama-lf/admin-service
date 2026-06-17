@@ -14,9 +14,15 @@ import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 const mockActivate = jest.fn();
 const mockDeactivate = jest.fn();
+const mockPublishServiceChannel = jest.fn();
 
 jest.mock('../../src', () => ({
-  configuration: { AUTHENTICATED: false },
+  configuration: {
+    AUTHENTICATED: false,
+    functionName: 'admin-service',
+    SERVICE_CHANNEL_SOURCE_URI_PREFIX: '',
+    SERVICE_CHANNEL_PRODUCER: 'service-channel',
+  },
   loggerService: {
     log: jest.fn(),
     error: jest.fn(),
@@ -24,6 +30,10 @@ jest.mock('../../src', () => ({
     debug: jest.fn(),
     warn: jest.fn(),
   },
+  serviceChannelProducer: {
+    publishServiceChannel: (...args: unknown[]) => mockPublishServiceChannel(...args),
+  },
+  isServiceChannelConnected: () => true,
 }));
 
 jest.mock('../../src/repositories/configuration/network.map.repository', () => ({
@@ -80,6 +90,7 @@ describe('POST /v1/admin/configuration/network_map/:cfg/(de)activate (#434)', ()
   beforeEach(() => {
     mockActivate.mockReset();
     mockDeactivate.mockReset();
+    mockPublishServiceChannel.mockReset();
   });
 
   describe('activate', () => {
@@ -90,7 +101,10 @@ describe('POST /v1/admin/configuration/network_map/:cfg/(de)activate (#434)', ()
       const response = await app.inject({ method: 'POST', url: '/v1/admin/configuration/network_map/2.0.0/activate' });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ cfg: '2.0.0', active: true });
+      expect(response.json()).toMatchObject({
+        data: { cfg: '2.0.0', active: true },
+        reloadDispatched: { status: true, outcome: 'published' },
+      });
       expect(mockActivate).toHaveBeenCalledWith(expect.objectContaining({ cfg: '2.0.0' }));
     });
 

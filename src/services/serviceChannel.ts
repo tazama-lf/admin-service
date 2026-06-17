@@ -31,7 +31,7 @@ export const handleServiceChannelAck = async (data: Uint8Array): Promise<void> =
     const ack = deserialize<ServiceChannelAckData>(data);
     const { correlationId, outcome, error } = ack.data ?? {};
     const line =
-      `Service-channel ack received (type: ${ack.type}, source: ${ack.source}, ` +
+      `Service-channel ack received (id: ${ack.id}, type: ${ack.type}, source: ${ack.source}, ` +
       `correlationId: ${correlationId}, outcome: ${outcome})${error !== undefined ? `: ${error}` : ''}`;
     if (outcome === 'error') {
       loggerService.error(line);

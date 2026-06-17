@@ -79,6 +79,22 @@ describe('handleServiceChannelAck - B3 fire-and-log ack sink (#445)', () => {
     expect(mockWarn).not.toHaveBeenCalled();
   });
 
+  it('includes the ack envelope id in the advisory line so each ack stays fully traceable', async () => {
+    // The id is the CloudEvent envelope id minted by the acking instance; the sink contract requires
+    // it in the logged fields. Build with an explicit id so the assertion is deterministic.
+    const ack = construct<AckData>({
+      type: ServiceChannelType.NETWORK_MAP_ACTIVATED,
+      source: 'event-director',
+      id: 'ack-id-trace-1',
+      data: { correlationId: 'corr-trace-1', outcome: 'success' },
+      datacontenttype: 'application/json',
+    });
+    await handleServiceChannelAck(new TextEncoder().encode(JSON.stringify(ack)));
+
+    expect(mockLog).toHaveBeenCalledTimes(1);
+    expect(String(mockLog.mock.calls[0][0])).toContain('ack-id-trace-1');
+  });
+
   it('escalates an error ack to loggerService.error, carrying correlationId, source, outcome and the error string', async () => {
     await handleServiceChannelAck(makeAckBytes('rule-processor', 'corr-error-1', 'error', 'tenantId missing'));
 

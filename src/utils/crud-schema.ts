@@ -6,11 +6,12 @@ import type { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fast
 import fp from 'fastify-plugin';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { PoolClient } from 'pg';
-import { configuration } from '..';
+import { configuration, loggerService } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
 import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 import type { ITenantRequest } from '../interface/ITenantRequest';
+import { publishNetworkMapActivated } from '../services/serviceChannel';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -324,13 +325,21 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
     // null result (missing target) to 404, mirroring GET/PUT/DELETE. AUTH:EXAMPLE(POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_ACTIVATE)
     const activateFn = repo.activate;
     if (activateFn) {
+      const ActivateResponse = Type.Object({
+        data: Entity,
+        reloadDispatched: Type.Object({
+          status: Type.Boolean(),
+          outcome: Type.String(),
+        }),
+      });
+
       app.post(
         `${prefix}${idPath}/activate`,
         {
           schema: {
             tags: [prefix],
             params: IdParam,
-            response: { 200: Entity, 404: ErrorResponse },
+            response: { 200: ActivateResponse, 400: ErrorResponse, 404: ErrorResponse },
           },
           preHandler: configuration.AUTHENTICATED
             ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_ACTIVATE`)]
@@ -339,10 +348,41 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         async (req, reply) => {
           const p = req.params as Record<string, string>;
           const { tenantId } = req as ITenantRequest;
+          if (req.body !== undefined && (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body))) {
+            return await reply.code(400).send({ message: 'body must be a JSON object' });
+          }
+
+          const payload = (req.body ?? {}) as Record<string, unknown>;
+          const { reloadMode } = payload;
+
+          if (reloadMode !== undefined && reloadMode !== 'none' && reloadMode !== 'broadcast') {
+            return await reply.code(400).send({ message: 'reloadMode must be one of: none, broadcast' });
+          }
 
           const activated = await activateFn(makeRepositoryId(p, tenantId));
           if (!activated) return await reply.code(404).send({ message: 'Not found' });
-          return activated;
+
+          if (reloadMode === 'none') {
+            return {
+              data: activated,
+              reloadDispatched: { status: false, outcome: 'suppressed' },
+            };
+          }
+
+          const activationData = activated as Partial<{ cfg: string; tenantId: string }>;
+          const reloadDispatched = await publishNetworkMapActivated(
+            typeof activationData.cfg === 'string' ? activationData.cfg : p.cfg,
+            typeof activationData.tenantId === 'string' ? activationData.tenantId : tenantId,
+          );
+
+          if (!reloadDispatched.status) {
+            loggerService.warn(`Network-map reload dispatch degraded: ${reloadDispatched.outcome}`);
+          }
+
+          return {
+            data: activated,
+            reloadDispatched,
+          };
         },
       );
     }

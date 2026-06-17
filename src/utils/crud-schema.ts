@@ -257,10 +257,17 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
             return results;
           });
           // The route's 201 schema is the single Entity (object); an array can't be serialized
-          // against it, and a Union serializer breaks on recursive schemas (typology.expression).
-          // Bypass the schema serializer for this array reply only - the single-object path below
-          // keeps the Entity serializer (and its OpenAPI 201).
-          reply.serializer((payload) => JSON.stringify(payload));
+          // against it directly, and a Union/Array serializer breaks on recursive schemas
+          // (typology.expression). So instead of dumping the raw rows with JSON.stringify (which
+          // would echo the repository's key order and any off-schema fields, diverging from the
+          // single-object reply), reuse THIS route's compiled Entity serializer per element and
+          // join them into a JSON array. Each element is then shaped identically to a single create.
+          const serializeEntity = reply.getSerializationFunction('201');
+          reply.serializer(
+            serializeEntity
+              ? (payload) => `[${(payload as TEntity[]).map((item) => serializeEntity(item as Record<string, unknown>)).join(',')}]`
+              : (payload) => JSON.stringify(payload),
+          );
           return await reply.code(201).send(created);
         }
 

@@ -231,6 +231,24 @@ describe('POST batch (array) submission on buildCrudPlugin (#436)', () => {
       expect(body).toHaveLength(1);
     });
 
+    it('serializes each batch element identically to the single-object create (consistent schema shaping)', async () => {
+      // The repository returns the persisted row with keys in a NON-schema order. The single-object
+      // 201 path runs through the Entity (fast-json-stringify) serializer, which emits declared keys
+      // in SCHEMA order; a raw JSON.stringify of the array would instead echo the row's insertion
+      // order, so the two replies diverge for the same entity. Each batch element must be byte-for-
+      // byte the same serialization the single-object route produces.
+      const row = (id: string): Record<string, unknown> => ({ config: {}, cfg: '1.0.0', creDtTm: '2026-01-01T00:00:00.000Z', id });
+      mockRuleCreate.mockImplementation((payload: Record<string, unknown>) => Promise.resolve(row(payload.id as string)));
+
+      const single = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: validRule('r1') });
+      const batch = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: [validRule('r1')] });
+
+      expect(single.statusCode).toBe(201);
+      expect(batch.statusCode).toBe(201);
+      // A batch element is the schema-serialized object, not a raw dump of the repository row.
+      expect(batch.payload).toBe(`[${single.payload}]`);
+    });
+
     it('rolls the whole batch back when any item fails (all-or-nothing)', async () => {
       mockRuleCreate
         .mockImplementationOnce((payload: unknown) => Promise.resolve(payload))
@@ -427,7 +445,7 @@ describe('POST batch (array) submission on buildCrudPlugin (#436)', () => {
       expect(body).not.toHaveProperty('serverOnly');
     });
 
-    it('returns the array 201 with the serializer bypassed (stays an array, keeps off-schema fields)', async () => {
+    it('serializes each array element through the Entity serializer too (consistent with the single-object reply)', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/v1/admin/configuration/rule',
@@ -436,11 +454,14 @@ describe('POST batch (array) submission on buildCrudPlugin (#436)', () => {
 
       expect(response.statusCode).toBe(201);
       const body = response.json() as Array<Record<string, unknown>>;
-      // Not coerced through the single-object Entity serializer: it stays an array of length 2 and
-      // retains fields outside the Entity schema (proof the array reply skips schema serialization).
+      // Each element runs through the SAME Entity serializer as the single-object path: the reply
+      // stays an array of length 2, and off-schema fields (serverOnly) are dropped from every
+      // element - the array reply is shaped consistently with a single create, not a raw row dump.
       expect(Array.isArray(body)).toBe(true);
       expect(body).toHaveLength(2);
-      expect(body[0]).toMatchObject({ id: 'r1', cfg: '1.0.0', serverOnly: 'secret' });
+      expect(body[0]).toEqual({ id: 'r1', cfg: '1.0.0' });
+      expect(body[1]).toEqual({ id: 'r2', cfg: '1.0.0' });
+      expect(body[0]).not.toHaveProperty('serverOnly');
     });
   });
 });

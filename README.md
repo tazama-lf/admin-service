@@ -660,14 +660,15 @@ top-level fields are stripped before insert on both paths (no mass-assignment vi
 For the **single-object** path the `201` response body is the created entity, serialized against the
 entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
 
-For the **array** path the success body (the array of created entities) is returned with the
-per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
-compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
-the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
-response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
-remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
-per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
-a single uniform code path over a bespoke per-entity serializer for the batch array case only.
+For the **array** path the success body (the array of created entities) is serialized **element by
+element** with that same entity serializer, then joined into a JSON array - so every element is shaped
+identically to a single-object create (declared keys in schema order, schema-bound formatting). The
+route cannot hand the whole array to one schema serializer because a `Type.Union` of the single entity
+and an array of items cannot be compiled by `fast-json-stringify` when the entity schema is recursive
+(typology's `expression`); reusing the per-element entity serializer keeps the array reply consistent
+with the single-object reply without compiling a recursive union. One consequence remains in the
+generated OpenAPI: the array request items are typed as a generic object (`{}`); the per-item shape is
+the entity Create schema documented above.
 
 #### Examples
 

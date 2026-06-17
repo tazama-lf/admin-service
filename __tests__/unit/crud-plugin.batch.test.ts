@@ -249,6 +249,18 @@ describe('POST batch (array) submission on buildCrudPlugin (#436)', () => {
       expect(batch.payload).toBe(`[${single.payload}]`);
     });
 
+    it('returns the batch array reply as application/json (so clients render it as JSON, like every other route)', async () => {
+      const single = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: validRule('r1') });
+      const batch = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: [validRule('r1')] });
+
+      expect(batch.statusCode).toBe(201);
+      // The custom array serializer emits a string; without an explicit content type Fastify would
+      // default to text/plain, so a client (e.g. Postman) renders the body as raw text instead of
+      // JSON. The array reply must advertise application/json, consistent with the single-object path.
+      expect(batch.headers['content-type']).toMatch(/application\/json/);
+      expect(batch.headers['content-type']).toBe(single.headers['content-type']);
+    });
+
     it('rolls the whole batch back when any item fails (all-or-nothing)', async () => {
       mockRuleCreate
         .mockImplementationOnce((payload: unknown) => Promise.resolve(payload))

@@ -668,7 +668,8 @@ and an array of items cannot be compiled by `fast-json-stringify` when the entit
 (typology's `expression`); reusing the per-element entity serializer keeps the array reply consistent
 with the single-object reply without compiling a recursive union. One consequence remains in the
 generated OpenAPI: the array request items are typed as a generic object (`{}`); the per-item shape is
-the entity Create schema documented above.
+the entity Create schema documented above. The array reply is sent with
+`Content-Type: application/json`, the same as the single-object reply.
 
 #### Examples
 

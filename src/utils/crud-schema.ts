@@ -268,6 +268,9 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
               ? (payload) => `[${(payload as TEntity[]).map((item) => serializeEntity(item as Record<string, unknown>)).join(',')}]`
               : (payload) => JSON.stringify(payload),
           );
+          // A custom serializer returns a string, so Fastify would default the reply to text/plain;
+          // set the content type explicitly so the array is advertised as JSON, like every other route.
+          reply.type('application/json; charset=utf-8');
           return await reply.code(201).send(created);
         }
 

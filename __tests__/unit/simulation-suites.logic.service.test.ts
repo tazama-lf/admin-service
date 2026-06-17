@@ -5,6 +5,7 @@ process.env.ACTIVE_CONDITIONS_ONLY = 'true';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as simulationSuitesRepository from '../../src/repositories/simulation-studio/suites.repository';
+import * as suiteGenerationsRepository from '../../src/repositories/simulation-studio/suite-generations.repository';
 import * as trsGenService from '../../src/services/trs-suite-generation.logic.service';
 import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
@@ -21,6 +22,12 @@ jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   createContextTxtpConfig: jest.fn(),
   recalculateGenerationCounts: jest.fn(),
   cloneGeneration: jest.fn(),
+  getLatestGenerationBySuiteId: jest.fn(),
+  getNextGenerationNumber: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
+}));
+
+jest.mock('../../src/repositories/simulation-studio/suite-generations.repository', () => ({
   getLatestGenerationBySuiteId: jest.fn(),
   getNextGenerationNumber: jest.fn(),
   cloneGenerationDataInDb: jest.fn(),
@@ -304,6 +311,42 @@ describe('Simulation Suites Logic Service', () => {
       await expect(simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail)).rejects.toThrow(
         'Failed to clone suite: DB error',
       );
+    });
+
+    it('clones suite and generation when source generation exists', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+      const sourceGen = { id: 10, suite_id: 1, generation_number: 1 };
+      const newGen = { id: 11, suite_id: 2, generation_number: 1 };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(sourceGen as never);
+      (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock).mockResolvedValue(1 as never);
+      (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(newGen as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail);
+
+      expect(result).toEqual({ suite: { ...newSuite, generation_id: newGen.id }, generation_id: newGen.id });
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledWith(
+        sourceGen.id,
+        newSuite.id,
+        1,
+        mockUserId,
+        mockUserEmail,
+      );
+    });
+
+    it('clones suite without generation when no source generation exists', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(null as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId);
+
+      expect(result).toEqual({ suite: newSuite, generation_id: null });
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).not.toHaveBeenCalled();
     });
   });
 });

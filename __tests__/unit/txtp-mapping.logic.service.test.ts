@@ -46,7 +46,7 @@ describe('txtp-mapping.logic.service', () => {
     expect(result[1].id).toBe(2);
   });
 
-  it('throws 400 for invalid ids while inserting', async () => {
+  it('throws 400 for invalid primary_txtp_id while inserting', async () => {
     await expect(
       createTxtpMapping({
         primary_txtp_id: 0,
@@ -54,6 +54,37 @@ describe('txtp-mapping.logic.service', () => {
         mapping: [],
       }),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('throws 400 for invalid related_txtp_id while inserting', async () => {
+    await expect(
+      createTxtpMapping({
+        primary_txtp_id: 123,
+        related_txtp_id: -1,
+        mapping: [],
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('throws 400 when mapping is not an array', async () => {
+    await expect(
+      createTxtpMapping({
+        primary_txtp_id: 123,
+        related_txtp_id: 456,
+        mapping: 'not-an-array' as unknown as [],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('wraps non-Error thrown value from createTxtpMapping as 500 HttpException', async () => {
+    (mappingRepo.insertTxtpMappingInDb as jest.Mock).mockRejectedValue('string error');
+    await expect(
+      createTxtpMapping({
+        primary_txtp_id: 123,
+        related_txtp_id: 456,
+        mapping: [{ primary: 'a', related: 'b' }],
+      }),
+    ).rejects.toMatchObject({ status: 500 });
   });
 
   it('throws 400 when a mapping item has invalid shape', async () => {

@@ -660,14 +660,16 @@ top-level fields are stripped before insert on both paths (no mass-assignment vi
 For the **single-object** path the `201` response body is the created entity, serialized against the
 entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
 
-For the **array** path the success body (the array of created entities) is returned with the
-per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
-compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
-the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
-response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
-remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
-per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
-a single uniform code path over a bespoke per-entity serializer for the batch array case only.
+For the **array** path the success body (the array of created entities) is serialized **element by
+element** with that same entity serializer, then joined into a JSON array - so every element is shaped
+identically to a single-object create (declared keys in schema order, schema-bound formatting). The
+route cannot hand the whole array to one schema serializer because a `Type.Union` of the single entity
+and an array of items cannot be compiled by `fast-json-stringify` when the entity schema is recursive
+(typology's `expression`); reusing the per-element entity serializer keeps the array reply consistent
+with the single-object reply without compiling a recursive union. One consequence remains in the
+generated OpenAPI: the array request items are typed as a generic object (`{}`); the per-item shape is
+the entity Create schema documented above. The array reply is sent with
+`Content-Type: application/json`, the same as the single-object reply.
 
 #### Examples
 
@@ -746,6 +748,12 @@ POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
 **Deactivate** sets a single map inactive in one atomic statement (zero active maps is a legal state, so no transaction is required), bumps `updDtTm`, and returns the deactivated map, or `404` when the target does not exist.
 
 > Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
+
+#### Service-channel reload signalling and ack sink
+
+After an `activate` commits, admin-service can broadcast a `network-map.activated` CloudEvent on the service channel so downstream consumers (for example event-director) reload the promoted map. The per-request `reloadMode` body field controls this (`broadcast` by default, `none` to suppress); dispatch is advisory and degrades without failing the activation (the DB commit is the source of truth), reported back under `reloadDispatched`.
+
+Consumers reply with an ack on the reply subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel-ack`). admin-service runs a standing **fire-and-log ack sink** on that subject: each ack is logged as a single advisory line carrying the acking `source`, the `correlationId` (the activation event's id) and the `outcome`. A `success` ack logs at info; an `outcome: error` ack escalates to `error` so a failed downstream fulfilment of an activation admin-service dispatched is surfaced. The sink is advisory only - it never blocks or fails an activation, performs no aggregation or tally, and swallows a malformed ack (logged at `warn`) so a single bad message cannot tear down the subscription.
 
 ---
 

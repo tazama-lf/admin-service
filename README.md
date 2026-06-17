@@ -747,6 +747,12 @@ POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
 
 > Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
 
+#### Service-channel reload signalling and ack sink
+
+After an `activate` commits, admin-service can broadcast a `network-map.activated` CloudEvent on the service channel so downstream consumers (for example event-director) reload the promoted map. The per-request `reloadMode` body field controls this (`broadcast` by default, `none` to suppress); dispatch is advisory and degrades without failing the activation (the DB commit is the source of truth), reported back under `reloadDispatched`.
+
+Consumers reply with an ack on the reply subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel-ack`). admin-service runs a standing **fire-and-log ack sink** on that subject: each ack is logged as a single advisory line carrying the acking `source`, the `correlationId` (the activation event's id) and the `outcome`. A `success` ack logs at info; an `outcome: error` ack escalates to `error` so a failed downstream fulfilment of an activation admin-service dispatched is surfaced. The sink is advisory only - it never blocks or fails an activation, performs no aggregation or tally, and swallows a malformed ack (logged at `warn`) so a single bad message cannot tear down the subscription.
+
 ---
 
 ## 5) Error Handling and Query Safety

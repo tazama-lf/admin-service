@@ -2,6 +2,7 @@
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
+import { handleServiceChannelAck } from './services/serviceChannel';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
 import { Database } from '@tazama-lf/frms-coe-lib/lib/config/database.config';
 import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
@@ -49,6 +50,23 @@ const connect = async (): Promise<void> => {
 
   if (!producerConnected) {
     loggerService.warn('Service-channel producer unavailable after 10 retries; continuing without broadcast dispatch.');
+  }
+
+  if (producerConnected) {
+    try {
+      const subscribed = await serviceChannelProducer.initServiceChannel(
+        handleServiceChannelAck,
+        configuration.SERVICE_CHANNEL_CONSUMER,
+        loggerService,
+      );
+      if (subscribed) {
+        loggerService.log('Service-channel ack sink subscribed');
+      } else {
+        loggerService.warn('Service-channel ack sink could not subscribe; continuing without ack logging.');
+      }
+    } catch (error) {
+      loggerService.warn(`Service-channel ack sink subscription failed: ${util.inspect(error)}`);
+    }
   }
 
   const fastify = await initializeFastifyClient();

@@ -30,6 +30,7 @@ import {
   getTransactionTypesHandler,
   getPayloadByTransactionTypeHandler,
   getConfigByTransactionTypeHandler,
+  getConfigByTransactionTypeHandlerw3,
   getRelatedTransactionsHandler,
   createSimulationLogsHandler,
   getRuleFlowStatusHandler,
@@ -336,6 +337,10 @@ function Routes(fastify: FastifyInstance): void {
 
   fastify.get('/v1/admin/config/:transactionType/:version', {
     ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandler, routePrivilege.getTcsConfig),
+  });
+
+  fastify.get('/v1/admin/config/w3/:transactionType/:version', {
+    ...SetOptionsBodyAndParams(getConfigByTransactionTypeHandlerw3, routePrivilege.getTcsConfig),
   });
 
   fastify.put('/v1/admin/tcs/config/:id/write', {

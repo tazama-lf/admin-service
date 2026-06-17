@@ -298,6 +298,21 @@ describe('POST /v1/admin/configuration/network_map/:cfg/activate -> publishes ne
       expect(response.statusCode).toBe(400);
       expect(mockPublishServiceChannel).not.toHaveBeenCalled();
     });
+
+    it('rejects a non-object body with 400 and does not activate or publish', async () => {
+      mockActivate.mockResolvedValue(makeMap('2.0.0', true));
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/admin/configuration/network_map/2.0.0/activate',
+        payload: 'broadcast',
+        headers: { 'content-type': 'application/json' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(mockActivate).not.toHaveBeenCalled();
+      expect(mockPublishServiceChannel).not.toHaveBeenCalled();
+    });
   });
 
   describe('degrade-not-exit when the producer is disconnected (AC#2)', () => {
@@ -329,7 +344,7 @@ describe('POST /v1/admin/configuration/network_map/:cfg/activate -> publishes ne
       const body = response.json();
       expect(body).toMatchObject({
         data: { cfg: '2.0.0', active: true },
-        reloadDispatched: { status: false, outcome: 'nats publish failed' },
+        reloadDispatched: { status: false, outcome: 'publish failed' },
       });
       expect(mockWarn).toHaveBeenCalled();
     });

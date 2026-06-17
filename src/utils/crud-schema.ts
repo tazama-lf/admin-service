@@ -348,7 +348,11 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         async (req, reply) => {
           const p = req.params as Record<string, string>;
           const { tenantId } = req as ITenantRequest;
-          const payload = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
+          if (req.body !== undefined && (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body))) {
+            return await reply.code(400).send({ message: 'body must be a JSON object' });
+          }
+
+          const payload = (req.body ?? {}) as Record<string, unknown>;
           const { reloadMode } = payload;
 
           if (reloadMode !== undefined && reloadMode !== 'none' && reloadMode !== 'broadcast') {

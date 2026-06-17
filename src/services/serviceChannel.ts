@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { construct, ServiceChannelType, validateEnvelope } from '@tazama-lf/frms-coe-lib';
 import type { NetworkMapActivatedData } from '@tazama-lf/frms-coe-lib/lib/interfaces/service-channel';
-import { configuration, isServiceChannelConnected, serviceChannelProducer } from '..';
+import { configuration, isServiceChannelConnected, loggerService, serviceChannelProducer } from '..';
 
 export interface ReloadDispatchStatus {
   status: boolean;
@@ -39,8 +39,10 @@ export const publishNetworkMapActivated = async (cfg: string, tenantId: string):
 
     return { status: true, outcome: 'published' };
   } catch (error) {
-    if (error instanceof Error && error.message) {
-      return { status: false, outcome: error.message };
+    if (error instanceof Error) {
+      loggerService.warn(`Failed to publish network-map.activated: ${error.message}`);
+    } else {
+      loggerService.warn('Failed to publish network-map.activated: unknown error');
     }
     return { status: false, outcome: 'publish failed' };
   }

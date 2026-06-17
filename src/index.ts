@@ -35,10 +35,14 @@ const connect = async (): Promise<void> => {
 
   for (let retryCount = 0; retryCount < 10; retryCount++) {
     loggerService.log('Connecting service-channel producer...');
-    if (await serviceChannelProducer.initServiceChannelProducer(loggerService)) {
-      producerConnected = true;
-      loggerService.log('Service-channel producer connected');
-      break;
+    try {
+      if (await serviceChannelProducer.initServiceChannelProducer(loggerService)) {
+        producerConnected = true;
+        loggerService.log('Service-channel producer connected');
+        break;
+      }
+    } catch (error) {
+      loggerService.warn(`Service-channel producer connection attempt ${retryCount + 1}/10 failed: ${util.inspect(error)}`);
     }
     await setTimeout(5000);
   }

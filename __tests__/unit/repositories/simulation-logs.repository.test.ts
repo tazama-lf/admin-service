@@ -36,27 +36,6 @@ const createSimulationLogsLegacy = async (
     createdByEmail,
   });
 
-const createSimulationLogsLegacy = async (
-  userId: string,
-  tenantId: string,
-  ruleId: string,
-  oldData: Record<string, unknown>,
-  newData: Record<string, unknown>,
-  description: string,
-  category: string,
-  createdByEmail?: string,
-) =>
-  createSimulationLogsInDb({
-    userId,
-    tenantId,
-    ruleId,
-    oldData,
-    newData,
-    description,
-    category,
-    createdByEmail,
-  });
-
 describe('Simulation Logs Repository', () => {
   beforeEach(() => {
     jest.clearAllMocks();

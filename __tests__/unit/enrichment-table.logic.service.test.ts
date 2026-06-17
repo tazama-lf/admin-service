@@ -10,6 +10,10 @@ jest.mock('../../src/repositories/simulation-studio/enrichment-tables.repository
   deleteEnrichmentTableInDb: jest.fn(),
 }));
 
+jest.mock('../../src/repositories/simulation-studio/enrichment-field-strategies.repository', () => ({
+  getEnrichmentFieldStrategiesByTableId: jest.fn(),
+}));
+
 jest.mock('../../src', () => ({
   loggerService: { log: jest.fn(), error: jest.fn() },
   configuration: {},
@@ -17,9 +21,11 @@ jest.mock('../../src', () => ({
 
 import { HttpException } from '../../src/utils/error';
 import * as enrichmentTableRepo from '../../src/repositories/simulation-studio/enrichment-tables.repository';
+import * as enrichmentFieldStrategiesRepo from '../../src/repositories/simulation-studio/enrichment-field-strategies.repository';
 import {
   createEnrichmentTable,
   getEnrichmentTables,
+  getEnrichmentTablesWithStrategies,
   bulkUpdateEnrichmentTables,
   deleteEnrichmentTable,
 } from '../../src/services/enrichment-table.logic.service';
@@ -231,5 +237,40 @@ describe('deleteEnrichmentTable', () => {
   it('wraps non-Error thrown value', async () => {
     (enrichmentTableRepo.deleteEnrichmentTableInDb as jest.Mock).mockRejectedValue('string error');
     await expect(deleteEnrichmentTable(30)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+describe('getEnrichmentTablesWithStrategies', () => {
+  it('returns tables with their field strategies', async () => {
+    const strategies = [{ id: 1, table_id: 30, field_name: 'account' }];
+    (enrichmentTableRepo.getEnrichmentTablesByGenerationId as jest.Mock).mockResolvedValue([mockTable] as never);
+    (enrichmentFieldStrategiesRepo.getEnrichmentFieldStrategiesByTableId as jest.Mock).mockResolvedValue(strategies as never);
+
+    const result = await getEnrichmentTablesWithStrategies(1);
+
+    expect(result).toEqual([{ ...mockTable, field_strategies: strategies }]);
+    expect(enrichmentFieldStrategiesRepo.getEnrichmentFieldStrategiesByTableId).toHaveBeenCalledWith(mockTable.id);
+  });
+
+  it('returns empty array when no tables exist', async () => {
+    (enrichmentTableRepo.getEnrichmentTablesByGenerationId as jest.Mock).mockResolvedValue([] as never);
+
+    const result = await getEnrichmentTablesWithStrategies(1);
+
+    expect(result).toEqual([]);
+    expect(enrichmentFieldStrategiesRepo.getEnrichmentFieldStrategiesByTableId).not.toHaveBeenCalled();
+  });
+
+  it('wraps error in HttpException 500', async () => {
+    (enrichmentTableRepo.getEnrichmentTablesByGenerationId as jest.Mock).mockRejectedValue(new Error('db fail') as never);
+
+    await expect(getEnrichmentTablesWithStrategies(1)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('not found', 404);
+    (enrichmentTableRepo.getEnrichmentTablesByGenerationId as jest.Mock).mockRejectedValue(err as never);
+
+    await expect(getEnrichmentTablesWithStrategies(1)).rejects.toBe(err);
   });
 });

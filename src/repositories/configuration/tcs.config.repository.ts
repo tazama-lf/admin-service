@@ -459,6 +459,45 @@ export const getSchemaByTransactionType = async (
   };
 };
 
+export const getSchemaByTransactionTypew3 = async (
+  transactionType: string,
+  version: string,
+  tenantId: string,
+): Promise<{
+  schema: unknown;
+  mapping: unknown;
+  functions: unknown;
+}> => {
+  if (!transactionType || !version || !tenantId) {
+    throw new Error('Transaction type, version, and tenant ID are required');
+  }
+
+  const query = `
+    SELECT
+      schema,
+      mapping,
+      functions
+    FROM tcs_config
+    WHERE transaction_type = $1 AND version = $2 AND tenant_id = $3
+  `;
+
+  const result = await handlePostExecuteSqlStatement<{
+    schema: unknown;
+    mapping: unknown;
+    functions: unknown;
+  }>({ text: query, values: [transactionType, version, tenantId] } satisfies PgQueryConfig, 'configuration');
+
+  if (result.rows.length === 0) {
+    throw new Error('Configuration not found');
+  }
+
+  return {
+    schema: result.rows[0].schema,
+    mapping: result.rows[0].mapping,
+    functions: result.rows[0].functions,
+  };
+};
+
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
   const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);
@@ -514,6 +553,33 @@ export const updateConfigByStatus = async (id: string, status: string, tenantId:
   }
 
   return result.rows.length;
+};
+
+interface ActiveConfigTuple {
+  tenant_id: string;
+  txtp: string;
+  txtp_version: string;
+  endpoint_path: string;
+}
+
+export const findActiveConfigsByTuples = async (tuples: ActiveConfigTuple[]): Promise<Array<Record<string, unknown>>> => {
+  if (tuples.length === 0) return [];
+
+  const conditions = tuples.map((_, i) => {
+    const base = i * 3;
+    return `(tenant_id = $${base + 1} AND transaction_type = $${base + 2} AND version = $${base + 3})`;
+  });
+
+  const values = tuples.flatMap(({ tenant_id: tenantId, txtp, txtp_version: txtpVersion }) => [tenantId, txtp, txtpVersion]);
+
+  const query = `SELECT * FROM tcs_config WHERE publishing_status = 'active' AND (${conditions.join(' OR ')})`;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: query, values } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return result.rows;
 };
 
 export const getRelatedTransactions = async (tenantId: string): Promise<string[]> => {

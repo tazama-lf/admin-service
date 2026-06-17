@@ -648,6 +648,18 @@ describe('updateTriggerTxtpConfigInDb', () => {
     expect(result!.faker_seed).toBe(99);
   });
 
+  it('updates expected_independent_variable', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, expected_independent_variable: true }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { expected_independent_variable: true });
+    expect(result!.expected_independent_variable).toBe(true);
+  });
+
+  it('updates related_txtp_config_id', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, related_txtp_config_id: 7 }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { related_txtp_config_id: 7 });
+    expect(result!.related_txtp_config_id).toBe(7);
+  });
+
   it('fetches existing row when no fields to update', async () => {
     mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
     const result = await updateTriggerTxtpConfigInDb(20, {});
@@ -1185,6 +1197,14 @@ describe('getEnrichmentFieldStrategiesByTableId', () => {
     mockDb.mockResolvedValue({ rows: [] });
 
     expect(await getEnrichmentFieldStrategiesByTableId(30)).toEqual([]);
+  });
+
+  it('passes through generator_options when already an object', async () => {
+    const rowWithObjectOptions = { ...enrichmentFieldStrategyRow, generator_options: { min: 1, max: 99 } };
+    mockDb.mockResolvedValue({ rows: [rowWithObjectOptions] });
+
+    const result = await getEnrichmentFieldStrategiesByTableId(30);
+    expect(result[0].generator_options).toEqual({ min: 1, max: 99 });
   });
 });
 

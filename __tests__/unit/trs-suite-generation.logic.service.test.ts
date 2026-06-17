@@ -66,44 +66,6 @@ import {
   updateGenerationStatus,
 } from '../../src/services/trs-suite-generation.logic.service';
 import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
-import {
-  createSuiteGeneration,
-  getGenerationsForSuite,
-  getLatestGenerationForSuite,
-  resumeGeneration,
-  updateWizardProgress,
-  deleteTriggerTxtpConfig,
-  recalculateGenerationCounts,
-  getGenerationSummary,
-  updateGenerationStatus,
-} from '../../src/services/trs-suite-generation.logic.service';
-import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
-import {
-  createSuiteGeneration,
-  getGenerationsForSuite,
-  getLatestGenerationForSuite,
-  resumeGeneration,
-  updateWizardProgress,
-  deleteTriggerTxtpConfig,
-  recalculateGenerationCounts,
-  getGenerationSummary,
-  updateGenerationStatus,
-} from '../../src/services/trs-suite-generation.logic.service';
-import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
-import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
-import {
-  createSuiteGeneration,
-  getGenerationsForSuite,
-  getLatestGenerationForSuite,
-  resumeGeneration,
-  updateWizardProgress,
-  deleteTriggerTxtpConfig,
-  recalculateGenerationCounts,
-  getGenerationSummary,
-  updateGenerationStatus,
-} from '../../src/services/trs-suite-generation.logic.service';
-import type { SimulationSuite } from '../../src/interface/simulation-suites.interface';
-import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
 import type { SuiteGeneration } from '../../src/interface/suite-generation.interface';
 
 const mockSuite: SimulationSuite = {
@@ -246,28 +208,27 @@ describe('getLatestGenerationForSuite', () => {
   // ── resumeGeneration ────────────────────────────────────────────────────────
 
   describe('resumeGeneration', () => {
-    it('returns latest generation for suite', async () => {
+    it('returns resumed generation', async () => {
       const resumed = { id: 1, suite_id: 42 } as any;
-      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(resumed as never);
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockResolvedValue(resumed as never);
 
-      await expect(resumeGeneration(42)).resolves.toBe(resumed);
-      expect(generationsRepo.getLatestGenerationBySuiteId).toHaveBeenCalledWith(42);
+      await expect(resumeGeneration(42, 1)).resolves.toBe(resumed);
+      expect(generationsRepo.resumeGenerationInDb).toHaveBeenCalledWith(42, 1);
     });
 
-    it('returns null when no generation exists', async () => {
-      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(null as never);
+    it('returns null when no matching generation exists', async () => {
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockResolvedValue(null as never);
       await expect(resumeGeneration(42, 10)).resolves.toBeNull();
     });
 
     it('wraps repository errors in HttpException 500', async () => {
-      (generationsRepo.getLatestGenerationBySuiteId as jest.Mock).mockRejectedValue(new Error('db down') as never);
-      await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
+      (generationsRepo.resumeGenerationInDb as jest.Mock).mockRejectedValue(new Error('db down') as never);
+      await expect(resumeGeneration(42, 1)).rejects.toMatchObject({ status: 500 });
     });
 
     it('wraps non-Error thrown value in HttpException 500', async () => {
       (generationsRepo.resumeGenerationInDb as jest.Mock).mockRejectedValue('string error');
-
-      await expect(resumeGeneration(42)).rejects.toMatchObject({ status: 500 });
+      await expect(resumeGeneration(42, 1)).rejects.toMatchObject({ status: 500 });
     });
   });
 });

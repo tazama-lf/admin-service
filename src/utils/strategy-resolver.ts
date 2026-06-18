@@ -72,6 +72,24 @@ const randInt = (min: number, max: number): number => Math.floor(rand(min, max +
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
+/**
+ * Resolves a static_value to a single concrete value.
+ * A comma-separated string (e.g. "50,100,150") is treated as a list of candidates,
+ * and one is selected at random. A single value is returned as-is.
+ */
+const pickStaticValue = (value: unknown): unknown => {
+  if (typeof value === 'string' && value.includes(',')) {
+    const options = value
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v !== '');
+
+    if (options.length > 0) return pick(options);
+  }
+
+  return value ?? null;
+};
+
 const generateBic = (): string =>
   `${Array.from({ length: 4 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[randInt(0, 25)]).join('')}${pick(
     ISO_COUNTRIES,
@@ -96,6 +114,7 @@ const SEMANTIC_GENERATORS: Partial<Record<string, () => unknown>> = {
   date_only: () => generateDateIso().split('T')[0],
   timestamp_ms: () => Math.floor(rand(Date.now() - 30 * 864e5, Date.now())),
   full_name: () => `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+  name: () => `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
   first_name: () => pick(FIRST_NAMES),
   last_name: () => pick(LAST_NAMES),
   phone_number: () => `+${randInt(1, 999)}${Array.from({ length: 9 }, () => randInt(0, 9)).join('')}`,
@@ -136,12 +155,10 @@ export const applyStrategy = (template: Record<string, unknown> | undefined, str
   for (const s of strategies) {
     switch (s.strategy_code) {
       case 'keep_sample':
-      case 'copy':
-        // keep template value as-is
         break;
 
       case 'static':
-        setNestedValue(base, s.field_path, s.static_value ?? null);
+        setNestedValue(base, s.field_path, pickStaticValue(s.static_value));
         break;
 
       case 'range': {
@@ -151,15 +168,11 @@ export const applyStrategy = (template: Record<string, unknown> | undefined, str
         break;
       }
 
-      case 'generated': {
+      case 'random': {
         const generator = SEMANTIC_GENERATORS[s.faker_semantic_type?.toLowerCase() ?? ''];
-        setNestedValue(base, s.field_path, generator?.() ?? randomUUID());
+        setNestedValue(base, s.field_path, generator?.() ?? null);
         break;
       }
-
-      case 'null':
-        setNestedValue(base, s.field_path, null);
-        break;
 
       case 'skip':
       case 'remove':

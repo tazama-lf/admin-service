@@ -11,6 +11,21 @@ const mapRow = (row: Record<string, unknown>): FakerSemanticDataType => ({
   name: row.name as string,
 });
 
+export const getFakerSemanticNameById = async (id: number): Promise<string | undefined> => {
+  const query = `
+        SELECT name
+        FROM trs_faker_semantic_data_types
+        WHERE id = $1
+    `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    { text: query, values: [id] } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return result.rows[0]?.name as string | undefined;
+};
+
 export const getFakerSemanticDataFromDb = async (): Promise<FakerSemanticDataType[]> => {
   const query = `
         SELECT id, name

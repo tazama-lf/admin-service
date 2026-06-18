@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { EnrichmentFieldStrategy } from '../../interface/simulation-studio/suite-generation.interface';
+import type {
+  EnrichmentFieldStrategy,
+  UpsertEnrichmentFieldStrategyDto,
+} from '../../interface/simulation-studio/suite-generation.interface';
 
 const mapRow = (row: Record<string, unknown>): EnrichmentFieldStrategy => ({
   id: row.id as number,
@@ -19,6 +22,57 @@ const mapRow = (row: Record<string, unknown>): EnrichmentFieldStrategy => ({
       : (row.generator_options as Record<string, unknown>),
   created_at: new Date(row.created_at as string),
 });
+
+/**
+ * Inserts a single field-strategy row. Callers that need replace-all semantics
+ * for a table should call `deleteEnrichmentFieldStrategiesByTableIdInDb` first;
+ * we intentionally avoid an ON CONFLICT clause because the unique constraint on
+ * (enrichment_table_id, column_name) is not guaranteed by every deployment's
+ * schema.
+ */
+export const insertEnrichmentFieldStrategyInDb = async (
+  enrichmentTableId: number,
+  dto: UpsertEnrichmentFieldStrategyDto,
+): Promise<EnrichmentFieldStrategy> => {
+  const query = `
+    INSERT INTO trs_suite_enrichment_field_strategies (
+      enrichment_table_id, column_name, column_type, strategy_code,
+      static_value, range_min, range_max,
+      generator_type, generator_options, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+    RETURNING *
+  `;
+
+  const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: query,
+      values: [
+        enrichmentTableId,
+        dto.column_name,
+        dto.column_type ?? null,
+        dto.strategy_code,
+        dto.static_value !== undefined ? JSON.stringify(dto.static_value) : null,
+        dto.range_min ?? null,
+        dto.range_max ?? null,
+        dto.generator_type ?? null,
+        JSON.stringify(dto.generator_options ?? {}),
+      ],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+
+  return mapRow(result.rows[0]);
+};
+
+export const deleteEnrichmentFieldStrategiesByTableIdInDb = async (enrichmentTableId: number): Promise<void> => {
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: 'DELETE FROM trs_suite_enrichment_field_strategies WHERE enrichment_table_id = $1',
+      values: [enrichmentTableId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};
 
 export const getEnrichmentFieldStrategiesByTableId = async (enrichmentTableId: number): Promise<EnrichmentFieldStrategy[]> => {
   const result = await handlePostExecuteSqlStatement<Record<string, unknown>>(

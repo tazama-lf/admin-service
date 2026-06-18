@@ -11,8 +11,30 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../repositories/simulation-studio/enrichment-tables.repository';
-import { getEnrichmentFieldStrategiesByTableId } from '../repositories/simulation-studio/enrichment-field-strategies.repository';
+import {
+  getEnrichmentFieldStrategiesByTableId,
+  insertEnrichmentFieldStrategyInDb,
+  deleteEnrichmentFieldStrategiesByTableIdInDb,
+} from '../repositories/simulation-studio/enrichment-field-strategies.repository';
+import { fieldStrategiesFromSchemaTemplate } from '../utils/enrichment-schema-template';
 import { HttpException, HttpStatus } from '../utils/error';
+
+/**
+ * Re-derive `trs_suite_enrichment_field_strategies` rows from the UI-supplied
+ * schema_template_json. Replaces any existing rows for the table so the strategy
+ * set always reflects the latest UI submission. No-op when no schema is supplied.
+ */
+const syncFieldStrategiesFromSchemaTemplate = async (
+  tableId: number,
+  schemaTemplateJson: Record<string, unknown> | undefined,
+): Promise<void> => {
+  if (schemaTemplateJson === undefined) return;
+  await deleteEnrichmentFieldStrategiesByTableIdInDb(tableId);
+  const rows = fieldStrategiesFromSchemaTemplate(schemaTemplateJson);
+  for (const row of rows) {
+    await insertEnrichmentFieldStrategyInDb(tableId, row);
+  }
+};
 
 export const createEnrichmentTable = async (
   generationId: number,
@@ -32,6 +54,7 @@ export const createEnrichmentTable = async (
       payload_template_json: payloadTemplateJson,
       schema_template_json: schemaTemplateJson,
     });
+    await syncFieldStrategiesFromSchemaTemplate(table.id, schemaTemplateJson);
     return table;
   } catch (error) {
     if (error instanceof HttpException) throw error;
@@ -86,6 +109,10 @@ export const bulkUpdateEnrichmentTables = async (
           if (!updated) {
             throw new HttpException(`Enrichment table ${tableId} not found for generation ${generationId}`, HttpStatus.NOT_FOUND);
           }
+        }
+        // Re-sync field strategies whenever the UI sends a fresh schema_template_json.
+        if (updateFields.schema_template_json !== undefined) {
+          await syncFieldStrategiesFromSchemaTemplate(tableId, updateFields.schema_template_json);
         }
       }),
     );

@@ -23,41 +23,93 @@ export interface FieldStrategyInput {
   faker_semantic_type?: string;
 }
 
-// ── Dot-path helpers ──────────────────────────────────────────────────────────
+// ── Path helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Tokenises a field path with optional bracket-indexed array segments. Returns
+ * a sequence of string keys and numeric indices.
+ *
+ *   "accounts[0].balance.amount" → ["accounts", 0, "balance", "amount"]
+ *   "items[3]"                   → ["items", 3]
+ *   "plain.field"                → ["plain", "field"]
+ *
+ * Tokens that look like just digits between dots (e.g. `arr.0.x`) are also
+ * promoted to numeric indices so dotted-array shorthand keeps working.
+ */
+const parsePath = (path: string): Array<string | number> => {
+  const tokens: Array<string | number> = [];
+  for (const segment of path.split('.')) {
+    if (segment === '') continue;
+    const bracketRe = /([^[\]]+)|\[(\d+)\]/g;
+    let m: RegExpExecArray | null;
+    while ((m = bracketRe.exec(segment)) !== null) {
+      const [, plain, bracketed] = m;
+      if (bracketed) {
+        tokens.push(Number(bracketed));
+      } else if (plain) {
+        tokens.push(/^\d+$/.test(plain) ? Number(plain) : plain);
+      }
+    }
+  }
+  return tokens;
+};
 
 const setNestedValue = (obj: Record<string, unknown>, path: string, value: unknown): void => {
-  const parts = path.split('.');
-  let cur: Record<string, unknown> = obj;
+  const tokens = parsePath(path);
+  if (tokens.length === 0) return;
 
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const part = parts[i];
+  let cur: Record<string, unknown> | unknown[] = obj;
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const key = tokens[i];
+    const next = tokens[i + 1];
+    const nextIsIndex = typeof next === 'number';
 
-    if (cur[part] == null || typeof cur[part] !== 'object') {
-      cur[part] = {};
+    if (typeof key === 'number') {
+      const arr = cur as unknown[];
+      if (arr[key] == null || typeof arr[key] !== 'object') {
+        arr[key] = nextIsIndex ? [] : {};
+      }
+      cur = arr[key] as Record<string, unknown> | unknown[];
+    } else {
+      const rec = cur as Record<string, unknown>;
+      if (rec[key] == null || typeof rec[key] !== 'object') {
+        rec[key] = nextIsIndex ? [] : {};
+      }
+      cur = rec[key] as Record<string, unknown> | unknown[];
     }
-
-    cur = cur[part] as Record<string, unknown>;
   }
 
-  cur[parts[parts.length - 1]] = value;
+  const leaf = tokens[tokens.length - 1];
+  if (typeof leaf === 'number') {
+    (cur as unknown[])[leaf] = value;
+  } else {
+    (cur as Record<string, unknown>)[leaf] = value;
+  }
 };
 
 /**
- * Walks a JSON Schema (draft-style: `properties`) and returns the leaf `type` string
- * at the given dot-path. Used to choose a type-appropriate random value when a
- * `random` strategy was configured without a resolvable semantic generator.
+ * Walks a JSON Schema (draft-style: `properties`, `items`) and returns the leaf
+ * `type` string at the given path. Honours bracket-indexed segments by stepping
+ * through array `items` schemas (object or tuple form).
  */
 const getSchemaTypeAtPath = (schema: Record<string, unknown> | undefined, path: string): string | undefined => {
   if (!schema) return undefined;
   let node: Record<string, unknown> | undefined = schema;
-  for (const part of path.split('.')) {
-    const props = node?.properties as Record<string, unknown> | undefined;
-    const next = props?.[part] as Record<string, unknown> | undefined;
-    if (!next) return undefined;
-    node = next;
+
+  for (const token of parsePath(path)) {
+    if (!node) return undefined;
+    if (typeof token === 'number') {
+      const items = node.items as Record<string, unknown> | Array<Record<string, unknown>> | undefined;
+      if (!items) return undefined;
+      node = Array.isArray(items) ? items[token] : items;
+    } else {
+      const props = node.properties as Record<string, unknown> | undefined;
+      node = props?.[token] as Record<string, unknown> | undefined;
+    }
   }
+
   const t = node?.type;
-  return typeof t === 'string' ? t : undefined;
+  return typeof t === 'string' ? t.toLowerCase() : undefined;
 };
 
 /**
@@ -78,20 +130,23 @@ const randomByJsonSchemaType = (type: string | undefined): unknown => {
 };
 
 const removeNestedValue = (obj: Record<string, unknown>, path: string): void => {
-  const parts = path.split('.');
-  let cur: Record<string, unknown> = obj;
+  const tokens = parsePath(path);
+  if (tokens.length === 0) return;
 
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const part = parts[i];
-
-    if (cur[part] == null || typeof cur[part] !== 'object') {
-      return;
-    }
-
-    cur = cur[part] as Record<string, unknown>;
+  let cur: Record<string, unknown> | unknown[] = obj;
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const key = tokens[i];
+    const child = typeof key === 'number' ? (cur as unknown[])[key] : (cur as Record<string, unknown>)[key];
+    if (child == null || typeof child !== 'object') return;
+    cur = child as Record<string, unknown> | unknown[];
   }
 
-  Reflect.deleteProperty(cur, parts[parts.length - 1]);
+  const leaf = tokens[tokens.length - 1];
+  if (typeof leaf === 'number') {
+    (cur as unknown[]).splice(leaf, 1);
+  } else {
+    Reflect.deleteProperty(cur as Record<string, unknown>, leaf);
+  }
 };
 
 // ── Semantic generators ───────────────────────────────────────────────────────

@@ -300,22 +300,58 @@ export const cloneGenerationDataInDb = async (
     );
   }
 
-  // 4. Clone enrichment tables
-  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+  // 4. Clone enrichment tables and their field strategies
+  const enrRows = await handlePostExecuteSqlStatement<{ old_id: number; new_id: number }>(
     {
       text: `
-        INSERT INTO trs_suite_enrichment_tables (
-          generation_id, table_name, table_order, row_count,
-          payload_template_json, schema_template_json, faker_profile, created_at
+        WITH inserted AS (
+          INSERT INTO trs_suite_enrichment_tables (
+            generation_id, table_name, table_order, row_count,
+            payload_template_json, schema_template_json, faker_profile, created_at
+          )
+          SELECT $1, table_name, table_order, row_count,
+                 payload_template_json, schema_template_json, faker_profile, NOW()
+          FROM trs_suite_enrichment_tables WHERE generation_id = $2
+          RETURNING id
+        ),
+        source AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY table_order ASC) AS rn
+          FROM trs_suite_enrichment_tables WHERE generation_id = $2
+        ),
+        target AS (
+          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
         )
-        SELECT $1, table_name, table_order, row_count,
-               payload_template_json, schema_template_json, faker_profile, NOW()
-        FROM trs_suite_enrichment_tables WHERE generation_id = $2
+        SELECT source.id AS old_id, target.id AS new_id
+        FROM source JOIN target ON source.rn = target.rn
       `,
       values: [newGen.id, sourceGenerationId],
     } satisfies PgQueryConfig,
     'simulation',
   );
+
+  if (enrRows.rows.length > 0) {
+    await Promise.all(
+      enrRows.rows.map(async ({ old_id: oldId, new_id: newId }) => {
+        await handlePostExecuteSqlStatement<Record<string, unknown>>(
+          {
+            text: `
+              INSERT INTO trs_suite_enrichment_field_strategies (
+                enrichment_table_id, column_name, column_type, strategy_code,
+                static_value, range_min, range_max,
+                generator_type, generator_options, created_at
+              )
+              SELECT $1, column_name, column_type, strategy_code,
+                     static_value, range_min, range_max,
+                     generator_type, generator_options, NOW()
+              FROM trs_suite_enrichment_field_strategies WHERE enrichment_table_id = $2
+            `,
+            values: [newId, oldId],
+          } satisfies PgQueryConfig,
+          'simulation',
+        );
+      }),
+    );
+  }
 
   // 5. Clone runs + run results (only for historical generations that already ran)
   if (cloneRuns) {

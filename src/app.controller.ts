@@ -127,7 +127,7 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
-import { getFakerSemanticData } from './services/faker-semantic-data.logic.service';
+import { getFakerSemanticData, getFakerSemanticName } from './services/faker-semantic-data.logic.service';
 import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interface/simulation-studio/trigger-txtp.interface';
 import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
 import { getSuiteResult, saveRunResult } from './services/simulation-run-results.logic.service';
@@ -2535,6 +2535,17 @@ export const getFakerSemanticDataHandler = async (req: FastifyRequest, reply: Fa
   }
 };
 
+// field_strategies store the semantic-type id; resolve each to the generator name expected by applyStrategy.
+const resolveSemanticNames = async <T extends { faker_semantic_type?: string }>(strategies: T[]): Promise<T[]> =>
+  await Promise.all(
+    strategies.map(async (s) => {
+      if (s.faker_semantic_type == null) return s;
+      const name = await getFakerSemanticName(Number(s.faker_semantic_type));
+      loggerService.log(`[resolveSemanticNames] id=${JSON.stringify(s.faker_semantic_type)} -> name=${JSON.stringify(name)}`);
+      return { ...s, faker_semantic_type: name };
+    }),
+  );
+
 // ── Generate sample context messages ──────────────────────────────────────────
 
 export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -2558,21 +2569,25 @@ export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: 
 
     const sorted = [...configs].sort((a, b) => a.display_order - b.display_order);
 
-    const result = sorted.map((cfg) => {
-      const count = cfg.message_count > 0 ? cfg.message_count : 1;
-      const payloads: Array<Record<string, unknown>> = [];
-      for (let i = 1; i <= count; i++) {
-        payloads.push(applyStrategy(cfg.sample_payload_snapshot, cfg.field_strategies ?? []));
-      }
-      return {
-        context_txtp_config_id: cfg.context_txtp_config_id,
-        txtp: cfg.txtp,
-        txtp_version: cfg.txtp_version,
-        display_order: cfg.display_order,
-        message_count: count,
-        payloads,
-      };
-    });
+    const result = await Promise.all(
+      sorted.map(async (cfg) => {
+        const count = cfg.message_count > 0 ? cfg.message_count : 1;
+        const strategies = await resolveSemanticNames(cfg.field_strategies ?? []);
+        const payloads: Array<Record<string, unknown>> = [];
+        for (let i = 1; i <= count; i++) {
+          payloads.push(applyStrategy(cfg.sample_payload_snapshot, strategies));
+        }
+
+        return {
+          context_txtp_config_id: cfg.context_txtp_config_id,
+          txtp: cfg.txtp,
+          txtp_version: cfg.txtp_version,
+          display_order: cfg.display_order,
+          message_count: count,
+          payloads,
+        };
+      }),
+    );
 
     reply.status(200).send({ success: true, data: result });
     loggerService.log('End - Generate sample context messages');
@@ -2609,15 +2624,17 @@ export const generateSampleTriggerMessagesHandler = async (req: FastifyRequest, 
     const hasRelated = !!primary.related_transaction && primary.related_transaction !== '';
     const toGenerate = hasRelated ? sorted : [primary];
 
-    const result = toGenerate.map((cfg) => ({
-      trigger_txtp_config_id: cfg.trigger_txtp_config_id,
-      txtp: cfg.txtp,
-      txtp_version: cfg.txtp_version,
-      display_order: cfg.display_order,
-      related_transaction: cfg.related_transaction ?? null,
-      related_txtp_config_id: cfg.related_txtp_config_id ?? null,
-      payload: applyStrategy(cfg.payload_template_json, cfg.field_strategies),
-    }));
+    const result = await Promise.all(
+      toGenerate.map(async (cfg) => ({
+        trigger_txtp_config_id: cfg.trigger_txtp_config_id,
+        txtp: cfg.txtp,
+        txtp_version: cfg.txtp_version,
+        display_order: cfg.display_order,
+        related_transaction: cfg.related_transaction ?? null,
+        related_txtp_config_id: cfg.related_txtp_config_id ?? null,
+        payload: applyStrategy(cfg.payload_template_json, await resolveSemanticNames(cfg.field_strategies)),
+      })),
+    );
 
     reply.status(200).send({ success: true, data: result });
     loggerService.log('End - Generate sample trigger messages');
@@ -2647,29 +2664,33 @@ export const generateSampleEnrichmentRowsHandler = async (req: FastifyRequest, r
       return;
     }
 
-    const result = tables.map((table) => {
-      const count = table.row_count > 0 ? table.row_count : 1;
-      const rows: Array<Record<string, unknown>> = [];
-      // Map enrichment field strategies to the unified FieldStrategyInput shape.
-      const strategies = table.field_strategies.map((s) => ({
-        field_path: s.column_name,
-        strategy_code: s.strategy_code,
-        static_value: s.static_value,
-        range_min: s.range_min,
-        range_max: s.range_max,
-        faker_semantic_type: s.generator_type,
-      }));
-      for (let i = 0; i < count; i++) {
-        rows.push(applyStrategy(table.payload_template_json, strategies));
-      }
-      return {
-        enrichment_table_id: table.id,
-        table_name: table.table_name,
-        table_order: table.table_order,
-        row_count: count,
-        rows,
-      };
-    });
+    const result = await Promise.all(
+      tables.map(async (table) => {
+        const count = table.row_count > 0 ? table.row_count : 1;
+        const rows: Array<Record<string, unknown>> = [];
+        // Map enrichment field strategies to the unified FieldStrategyInput shape.
+        const strategies = await resolveSemanticNames(
+          table.field_strategies.map((s) => ({
+            field_path: s.column_name,
+            strategy_code: s.strategy_code,
+            static_value: s.static_value,
+            range_min: s.range_min,
+            range_max: s.range_max,
+            faker_semantic_type: s.generator_type,
+          })),
+        );
+        for (let i = 0; i < count; i++) {
+          rows.push(applyStrategy(table.payload_template_json, strategies));
+        }
+        return {
+          enrichment_table_id: table.id,
+          table_name: table.table_name,
+          table_order: table.table_order,
+          row_count: count,
+          rows,
+        };
+      }),
+    );
 
     reply.status(200).send({ success: true, data: result });
     loggerService.log('End - Generate sample enrichment rows');

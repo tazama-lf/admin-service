@@ -16,6 +16,7 @@ import {
   resumeGenerationInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { deleteTriggerTxtpConfigInDb } from '../repositories/simulation-studio/trigger-txtp-configs.repository';
+import { incrementSuiteIterationCountInDb } from '../repositories/simulation-studio/suites.repository';
 import { handlePostExecuteSqlStatement } from './database.logic.service';
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { HttpException, HttpStatus } from '../utils/error';
@@ -126,7 +127,7 @@ export const getGenerationSummary = async (generationId: number): Promise<Genera
 
 export const createSuiteGeneration = async (suite: SimulationSuite, userId: string, userEmail?: string): Promise<SuiteGeneration> => {
   try {
-    return await createSuiteGenerationInDb(
+    const generation = await createSuiteGenerationInDb(
       {
         suite_id: suite.id,
         simulation_type: suite.simulation_type,
@@ -138,6 +139,8 @@ export const createSuiteGeneration = async (suite: SimulationSuite, userId: stri
       userId,
       userEmail,
     );
+    await incrementSuiteIterationCountInDb(suite.id);
+    return generation;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -183,7 +186,7 @@ export const resumeGeneration = async (suiteId: number, generationId: number): P
 export const updateGenerationStatus = async (generationId: number, status: string): Promise<SuiteGeneration> => {
   try {
     // Validate status against enum values
-    const validStatuses = ['DRAFT', 'READY', 'RUNNING', 'COMPLETED', 'FAILED'];
+    const validStatuses = ['DRAFT', 'READY', 'RUNNING', 'COMPLETED', 'FAILED', 'TIME_OUT'];
     if (!validStatuses.includes(status)) {
       throw new HttpException(`Invalid generation status: ${status}. Allowed values: ${validStatuses.join(', ')}`, HttpStatus.BAD_REQUEST);
     }
@@ -214,7 +217,9 @@ export const cloneGeneration = async (sourceGenerationId: number, userId: string
     const source = await getGenerationByIdFromDb(sourceGenerationId);
     if (!source) throw new HttpException(`Generation ${sourceGenerationId} not found`, HttpStatus.NOT_FOUND);
     const nextNum = await getNextGenerationNumber(source.suite_id);
-    return await cloneGenerationDataInDb(sourceGenerationId, source.suite_id, nextNum, userId, userEmail);
+    const newGen = await cloneGenerationDataInDb(sourceGenerationId, source.suite_id, nextNum, userId, userEmail);
+    await incrementSuiteIterationCountInDb(source.suite_id);
+    return newGen;
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(

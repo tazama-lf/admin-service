@@ -345,3 +345,23 @@ export const updateSimulationSuiteInDb = async (
     last_run_at: row.last_run_at ? new Date(row.last_run_at) : undefined,
   };
 };
+
+export const incrementSuiteIterationCountInDb = async (suiteId: number): Promise<void> => {
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: 'UPDATE trs_simulation_suites SET iteration_count = iteration_count + 1, updated_at = NOW() WHERE id = $1',
+      values: [suiteId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};
+
+export const incrementSuiteRunCountInDb = async (suiteId: number): Promise<void> => {
+  await handlePostExecuteSqlStatement<Record<string, unknown>>(
+    {
+      text: 'UPDATE trs_simulation_suites SET run_count = run_count + 1, updated_at = NOW() WHERE id = $1',
+      values: [suiteId],
+    } satisfies PgQueryConfig,
+    'simulation',
+  );
+};

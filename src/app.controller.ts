@@ -2716,6 +2716,7 @@ export const saveRunResultHandler = async (req: FastifyRequest, reply: FastifyRe
       gen_id: body.gen_id,
       trigger_id: body.trigger_id ?? null,
       rule_result: body.rule_result,
+      outcome: body.outcome,
     });
 
     reply.status(201).send({

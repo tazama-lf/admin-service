@@ -13,6 +13,7 @@ import {
   getSimulationSuiteByIdFromDb,
   createSimulationSuiteInDb,
   updateSimulationSuiteInDb,
+  incrementSuiteIterationCountInDb,
 } from '../repositories/simulation-studio/suites.repository';
 import { createSuiteGeneration, createContextTxtpConfig, recalculateGenerationCounts } from './trs-suite-generation.logic.service';
 import { createTriggerTxtpConfig } from './trigger-txtp-config.logic.service';
@@ -173,17 +174,22 @@ export const cloneSuite = async (sourceSuiteId: number, tenantId: string, userId
 
     const maxGenNum = Math.max(...allGenerations.map((g) => g.generation_number));
     const latestGen = allGenerations.find((g) => g.generation_number === maxGenNum)!;
-    const historicalGens = allGenerations.filter((g) => g.generation_number !== maxGenNum && HISTORICAL_STATUSES.has(g.status));
 
-    // Clone historical generations first (preserving their original generation numbers)
-    for (const srcGen of historicalGens.sort((a, b) => a.generation_number - b.generation_number)) {
+    // All generations except DRAFT are copied with their original status + runs (includes latest if not DRAFT)
+    const gensToPreserve = allGenerations
+      .filter((g) => HISTORICAL_STATUSES.has(g.status))
+      .sort((a, b) => a.generation_number - b.generation_number);
+
+    for (const srcGen of gensToPreserve) {
       const nextNum = await getNextGenerationNumber(newSuite.id);
       await cloneGenerationDataInDb(srcGen.id, newSuite.id, nextNum, userId, userEmail, true);
+      await incrementSuiteIterationCountInDb(newSuite.id);
     }
 
-    // Clone latest generation as DRAFT (no runs)
+    // Always add a new DRAFT cloned from the latest generation (the working copy)
     const nextNum = await getNextGenerationNumber(newSuite.id);
     const newLatestGen = await cloneGenerationDataInDb(latestGen.id, newSuite.id, nextNum, userId, userEmail, false);
+    await incrementSuiteIterationCountInDb(newSuite.id);
 
     return { suite: { ...newSuite, generation_id: newLatestGen.id }, generation_id: newLatestGen.id };
   } catch (error) {

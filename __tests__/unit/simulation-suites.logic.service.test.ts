@@ -356,9 +356,10 @@ describe('Simulation Suites Logic Service', () => {
       const failedGen = { id: 11, suite_id: 1, generation_number: 2, status: 'FAILED' };
       const draftGen = { id: 12, suite_id: 1, generation_number: 3, status: 'DRAFT' };
       const latestGen = { id: 13, suite_id: 1, generation_number: 4, status: 'RUNNING' };
-      const clonedHistorical1 = { id: 20, suite_id: 2, generation_number: 1 };
-      const clonedHistorical2 = { id: 21, suite_id: 2, generation_number: 2 };
-      const clonedLatest = { id: 22, suite_id: 2, generation_number: 3 };
+      const clonedCompleted = { id: 20, suite_id: 2, generation_number: 1 };
+      const clonedFailed = { id: 21, suite_id: 2, generation_number: 2 };
+      const clonedRunningPreserved = { id: 22, suite_id: 2, generation_number: 3 };
+      const clonedDraft = { id: 23, suite_id: 2, generation_number: 4 };
 
       (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
       (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
@@ -371,16 +372,19 @@ describe('Simulation Suites Logic Service', () => {
       (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock)
         .mockResolvedValueOnce(1 as never)
         .mockResolvedValueOnce(2 as never)
-        .mockResolvedValueOnce(3 as never);
+        .mockResolvedValueOnce(3 as never)
+        .mockResolvedValueOnce(4 as never);
       (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock)
-        .mockResolvedValueOnce(clonedHistorical1 as never)
-        .mockResolvedValueOnce(clonedHistorical2 as never)
-        .mockResolvedValueOnce(clonedLatest as never);
+        .mockResolvedValueOnce(clonedCompleted as never)
+        .mockResolvedValueOnce(clonedFailed as never)
+        .mockResolvedValueOnce(clonedRunningPreserved as never)
+        .mockResolvedValueOnce(clonedDraft as never);
 
       const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail);
 
-      // DRAFT gen (id:12) skipped; COMPLETED and FAILED cloned with runs; latest cloned as DRAFT
-      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledTimes(3);
+      // DRAFT gen (id:12) skipped; COMPLETED/FAILED/RUNNING cloned with runs;
+      // latest gen (RUNNING) also cloned as new DRAFT working copy
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledTimes(4);
       expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
         1,
         completedGen.id,
@@ -406,9 +410,18 @@ describe('Simulation Suites Logic Service', () => {
         3,
         mockUserId,
         mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        4,
+        latestGen.id,
+        newSuite.id,
+        4,
+        mockUserId,
+        mockUserEmail,
         false,
       );
-      expect(result).toEqual({ suite: { ...newSuite, generation_id: clonedLatest.id }, generation_id: clonedLatest.id });
+      expect(result).toEqual({ suite: { ...newSuite, generation_id: clonedDraft.id }, generation_id: clonedDraft.id });
     });
   });
 });

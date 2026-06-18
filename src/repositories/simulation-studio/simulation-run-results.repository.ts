@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { incrementSuiteRunCountInDb } from './suites.repository';
 
 export interface RunResultEntry {
   id: number;
@@ -53,6 +54,7 @@ export interface SaveRunResultDto {
   gen_id: number;
   trigger_id: number | null;
   rule_result: RuleResultPayload;
+  outcome?: string;
 }
 
 interface GenerationLookupRow {
@@ -96,7 +98,7 @@ export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id
 
   const subRuleRef = dto.rule_result.subRuleRef ?? 'none';
   const independentVariable = dto.rule_result.indpdntVarbl ?? null;
-  const runResultOutcome = subRuleRef.toLowerCase().includes('err') ? 'FAILED' : 'SUCCESS';
+  const runResultOutcome = dto.outcome ?? (subRuleRef.toLowerCase().includes('err') ? 'FAILED' : 'SUCCESS');
 
   if (existingRunResult.rowCount) {
     runId = existingRunResult.rows[0].id;
@@ -112,6 +114,7 @@ export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id
 
     const insertRunResult = await handlePostExecuteSqlStatement<RunInsertRow>(insertRunQuery, 'simulation');
     runId = insertRunResult.rows[0].id;
+    await incrementSuiteRunCountInDb(gen.suite_id);
   }
 
   const insertResultQuery: PgQueryConfig = {

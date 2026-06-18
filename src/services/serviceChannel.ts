@@ -3,6 +3,7 @@ import { construct, deserialize, ServiceChannelType, validateEnvelope } from '@t
 import type { NetworkMapActivatedData } from '@tazama-lf/frms-coe-lib/lib/interfaces/service-channel';
 import { configuration, isServiceChannelConnected, loggerService, serviceChannelProducer } from '..';
 import * as util from 'node:util';
+import { recordCascadeAck } from './cascade';
 
 export interface ReloadDispatchStatus {
   status: boolean;
@@ -37,6 +38,11 @@ export const handleServiceChannelAck = async (data: Uint8Array): Promise<void> =
       loggerService.error(line);
     } else {
       loggerService.log(line);
+      // Forward to a waiting cascade orchestrator. Success-only: an error ack proves delivery but not
+      // adoption, so it must not count toward a tier's quorum (it has already been surfaced at error above).
+      if (typeof correlationId === 'string') {
+        recordCascadeAck(correlationId, ack.source);
+      }
     }
   } catch (err) {
     loggerService.warn(`Discarding malformed service-channel ack: ${util.inspect(err)}`);

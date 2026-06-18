@@ -12,6 +12,8 @@ import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repos
 import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 import type { ITenantRequest } from '../interface/ITenantRequest';
 import { publishNetworkMapActivated } from '../services/serviceChannel';
+import { dispatchCascade } from '../services/cascade';
+import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces/NetworkMap';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -365,8 +367,8 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           const payload = (req.body ?? {}) as Record<string, unknown>;
           const { reloadMode } = payload;
 
-          if (reloadMode !== undefined && reloadMode !== 'none' && reloadMode !== 'broadcast') {
-            return await reply.code(400).send({ message: 'reloadMode must be one of: none, broadcast' });
+          if (reloadMode !== undefined && reloadMode !== 'none' && reloadMode !== 'broadcast' && reloadMode !== 'cascade') {
+            return await reply.code(400).send({ message: 'reloadMode must be one of: none, broadcast, cascade' });
           }
 
           const activated = await activateFn(makeRepositoryId(p, tenantId));
@@ -380,10 +382,16 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           }
 
           const activationData = activated as Partial<{ cfg: string; tenantId: string }>;
-          const reloadDispatched = await publishNetworkMapActivated(
-            typeof activationData.cfg === 'string' ? activationData.cfg : p.cfg,
-            typeof activationData.tenantId === 'string' ? activationData.tenantId : tenantId,
-          );
+          const resolvedCfg = typeof activationData.cfg === 'string' ? activationData.cfg : p.cfg;
+          const resolvedTenant = typeof activationData.tenantId === 'string' ? activationData.tenantId : tenantId;
+
+          // `cascade` fires the detached audience-addressed wavefront and returns synchronously; `broadcast`
+          // (the default) publishes the single un-addressed activation. Both leave the activation lifecycle
+          // and response shape unchanged - the activation has already been committed above.
+          const reloadDispatched =
+            reloadMode === 'cascade'
+              ? dispatchCascade(activated as unknown as NetworkMap, resolvedCfg, resolvedTenant)
+              : await publishNetworkMapActivated(resolvedCfg, resolvedTenant);
 
           if (!reloadDispatched.status) {
             loggerService.warn(`Network-map reload dispatch degraded: ${reloadDispatched.outcome}`);

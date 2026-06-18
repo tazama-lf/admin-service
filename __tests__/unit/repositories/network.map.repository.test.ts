@@ -234,6 +234,38 @@ describe('NetworkMapRepository', () => {
     });
   });
 
+  describe('getActive', () => {
+    it('should return the tenant single active map, querying on the active flag (highlander)', async () => {
+      const configuration = createMockNetworkMap();
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ configuration }],
+        rowCount: 1,
+      });
+
+      const result = await NetworkMapRepo.getActive!(mockTenantId);
+
+      expect(result).toEqual(configuration);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        {
+          text: 'SELECT configuration FROM network_map WHERE tenantId = $1 AND active = true LIMIT 1;',
+          values: [mockTenantId],
+        },
+        'configuration',
+      );
+    });
+
+    it('should return null when the tenant has no active map', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const result = await NetworkMapRepo.getActive!(mockTenantId);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('create', () => {
     it('should set both creDtTm and updDtTm to the same ISO 8601 timestamp', async () => {
       // Mock Date.prototype.toISOString to return predictable timestamp

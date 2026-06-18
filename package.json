@@ -1,6 +1,6 @@
 {
   "name": "admin-service",
-  "version": "4.0.0-rc.6",
+  "version": "4.0.0-rc.7",
   "description": "admin service",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -34,7 +34,7 @@
     "@sinclair/typebox": "^0.34.41",
     "@tazama-lf/auth-lib": "4.0.0-rc.4",
     "@tazama-lf/frms-coe-lib": "8.2.0-rc.3",
-    "@tazama-lf/frms-coe-startup-lib": "3.1.0-rc.6",
+    "@tazama-lf/frms-coe-startup-lib": "3.1.0-rc.7",
     "@tazama-lf/tcs-lib": "1.0.156-rc.2",
     "ajv": "^8.17.1",
     "dotenv": "^17.2.0",

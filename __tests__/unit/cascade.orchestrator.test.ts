@@ -142,17 +142,25 @@ describe('wavefront order + first-ack gating - single-processor tiers (#446 AC1,
   it('addresses event-adjudicator FIRST and addresses no other tier until EA acks', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(publishedAudience(0)).toBe('event-adjudicator');
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(0), 'event-adjudicator');
+    await tick();
+    recordCascadeAck(publishedEventId(1), 'typology-001');
+    await tick();
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 
   it('addresses typology-processor only after EA acks, then event-director only after TP acks', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(1);
 
@@ -170,6 +178,10 @@ describe('wavefront order + first-ack gating - single-processor tiers (#446 AC1,
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(3);
     expect(publishedAudience(2)).toBe('event-director');
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 
   it('converges once event-director acks, in strict EA -> TP -> ED audience order', async () => {
@@ -225,7 +237,7 @@ describe('typology-processor multi-distinct-processor quorum (#446 open-refineme
   it('does NOT advance to event-director until EVERY distinct typology.id has acked', async () => {
     const map = makeMap([makeTypology('typology-001', 'a@1.0.0'), makeTypology('typology-002', 'b@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     recordCascadeAck(publishedEventId(0), 'event-adjudicator');
     await tick();
@@ -246,6 +258,10 @@ describe('typology-processor multi-distinct-processor quorum (#446 open-refineme
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(3);
     expect(publishedAudience(2)).toBe('event-director');
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 
   it('skips the typology-processor tier entirely when the map has zero typologies (resolved option a)', async () => {
@@ -327,7 +343,7 @@ describe('Phase 5 sink additively forwards acks to the orchestrator (#446 AC3)',
   it('drives an in-flight cascade forward when an ack arrives through the real handleServiceChannelAck sink', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(1);
 
@@ -339,12 +355,18 @@ describe('Phase 5 sink additively forwards acks to the orchestrator (#446 AC3)',
     expect(publishedAudience(1)).toBe('typology-processor');
     // The sink keeps its advisory fire-and-log behaviour for the same ack.
     expect(mockLog).toHaveBeenCalled();
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(1), 'typology-001');
+    await tick();
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 
   it('does NOT advance the wavefront when a forwarded ack reports an error outcome (delivery is not adoption)', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(1);
 
@@ -356,6 +378,14 @@ describe('Phase 5 sink additively forwards acks to the orchestrator (#446 AC3)',
     expect(mockPublish).toHaveBeenCalledTimes(1);
     // The sink still surfaces the failed adoption on its error channel.
     expect(mockError).toHaveBeenCalled();
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(0), 'event-adjudicator');
+    await tick();
+    recordCascadeAck(publishedEventId(1), 'typology-001');
+    await tick();
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 });
 
@@ -363,7 +393,7 @@ describe('ack ingestion robustness - acks with no matching waiter (#446 AC3)', (
   it('ignores an ack for an unknown correlationId without throwing or addressing any tier', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(1);
 
@@ -372,12 +402,20 @@ describe('ack ingestion robustness - acks with no matching waiter (#446 AC3)', (
     }).not.toThrow();
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(1);
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(0), 'event-adjudicator');
+    await tick();
+    recordCascadeAck(publishedEventId(1), 'typology-001');
+    await tick();
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 
   it('ignores a late, repeat ack for an already-converged tier (no double-advance)', async () => {
     const map = makeMap([makeTypology('typology-001', '001@1.0.0')]);
 
-    void runCascade(map, map.cfg, map.tenantId);
+    const result = runCascade(map, map.cfg, map.tenantId);
     await tick();
     recordCascadeAck(publishedEventId(0), 'event-adjudicator');
     await tick();
@@ -387,5 +425,11 @@ describe('ack ingestion robustness - acks with no matching waiter (#446 AC3)', (
     recordCascadeAck(publishedEventId(0), 'event-adjudicator');
     await tick();
     expect(mockPublish).toHaveBeenCalledTimes(2);
+
+    // Settle the detached cascade so the test leaves no live per-tier timer or abandoned waiter.
+    recordCascadeAck(publishedEventId(1), 'typology-001');
+    await tick();
+    recordCascadeAck(publishedEventId(2), 'event-director');
+    await expect(result).resolves.toEqual({ converged: true });
   });
 });

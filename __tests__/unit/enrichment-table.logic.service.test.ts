@@ -12,6 +12,8 @@ jest.mock('../../src/repositories/simulation-studio/enrichment-tables.repository
 
 jest.mock('../../src/repositories/simulation-studio/enrichment-field-strategies.repository', () => ({
   getEnrichmentFieldStrategiesByTableId: jest.fn(),
+  insertEnrichmentFieldStrategyInDb: jest.fn(),
+  deleteEnrichmentFieldStrategiesByTableIdInDb: jest.fn(),
 }));
 
 jest.mock('../../src', () => ({

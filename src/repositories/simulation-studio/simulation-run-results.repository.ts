@@ -114,7 +114,6 @@ export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id
 
     const insertRunResult = await handlePostExecuteSqlStatement<RunInsertRow>(insertRunQuery, 'simulation');
     runId = insertRunResult.rows[0].id;
-    await incrementSuiteRunCountInDb(gen.suite_id);
   }
 
   const insertResultQuery: PgQueryConfig = {
@@ -127,6 +126,7 @@ export const saveRunResultInDb = async (dto: SaveRunResultDto): Promise<{ run_id
   };
 
   const insertResultResult = await handlePostExecuteSqlStatement<RunInsertRow>(insertResultQuery, 'simulation');
+  await incrementSuiteRunCountInDb(gen.suite_id);
 
   return { run_id: runId, result_id: insertResultResult.rows[0].id, outcome: runResultOutcome };
 };

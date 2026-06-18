@@ -359,7 +359,7 @@ export const incrementSuiteIterationCountInDb = async (suiteId: number): Promise
 export const incrementSuiteRunCountInDb = async (suiteId: number): Promise<void> => {
   await handlePostExecuteSqlStatement<Record<string, unknown>>(
     {
-      text: 'UPDATE trs_simulation_suites SET run_count = run_count + 1, updated_at = NOW() WHERE id = $1',
+      text: 'UPDATE trs_simulation_suites SET run_count = run_count + 1, updated_at = NOW(), last_run_at = NOW() WHERE id = $1',
       values: [suiteId],
     } satisfies PgQueryConfig,
     'simulation',

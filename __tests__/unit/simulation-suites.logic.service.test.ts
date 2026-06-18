@@ -15,6 +15,7 @@ jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
   getSimulationSuiteByIdFromDb: jest.fn(),
   createSimulationSuiteInDb: jest.fn(),
   updateSimulationSuiteInDb: jest.fn(),
+  incrementSuiteIterationCountInDb: jest.fn(),
 }));
 
 jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
@@ -68,6 +69,7 @@ describe('Simulation Suites Logic Service', () => {
     (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
     (triggerService.createTriggerTxtpConfig as jest.Mock).mockResolvedValue({ trigger_txtp_config_id: 1, field_overrides: [] });
     (trsGenService.recalculateGenerationCounts as jest.Mock).mockResolvedValue(undefined);
+    (simulationSuitesRepository.incrementSuiteIterationCountInDb as jest.Mock).mockResolvedValue(undefined as never);
   });
 
   describe('getSimulationSuites', () => {

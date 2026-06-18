@@ -154,9 +154,21 @@ describe('txtp-mapping.logic.service', () => {
     await expect(getTxtpMappings(111, 222)).rejects.toBeInstanceOf(HttpException);
   });
 
+  it('wraps non-Error thrown value from getTxtpMappings as 500 HttpException', async () => {
+    (mappingRepo.getTxtpMappingByIdsInDb as jest.Mock).mockRejectedValue('string error' as never);
+
+    await expect(getTxtpMappings(111, 222)).rejects.toMatchObject({ status: 500, message: expect.stringContaining('Unknown error') });
+  });
+
   it('wraps non-HttpException errors from deleteTxtpMapping as 500 HttpException', async () => {
     (mappingRepo.deleteTxtpMappingByIdsInDb as jest.Mock).mockRejectedValue(new Error('db delete failed'));
 
     await expect(deleteTxtpMapping(111, 222)).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('wraps non-Error thrown value from deleteTxtpMapping as 500 HttpException', async () => {
+    (mappingRepo.deleteTxtpMappingByIdsInDb as jest.Mock).mockRejectedValue('string error' as never);
+
+    await expect(deleteTxtpMapping(111, 222)).rejects.toMatchObject({ status: 500, message: expect.stringContaining('Unknown error') });
   });
 });

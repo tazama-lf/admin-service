@@ -1303,4 +1303,42 @@ describe('cloneGenerationDataInDb', () => {
     const enrichCall = mockDb.mock.calls[3][0] as { text: string };
     expect(enrichCall.text).toContain('trs_suite_enrichment_tables');
   });
+
+  it('clones runs and run results when cloneRuns=true and runs exist', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never) // gen insert
+      .mockResolvedValueOnce({ rows: [] } as never) // ctx txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // trig txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // enrichment
+      .mockResolvedValueOnce({ rows: [{ old_run_id: 50, new_run_id: 60 }] } as never) // runs insert
+      .mockResolvedValueOnce({ rows: [] } as never); // run_results insert
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1', undefined, true);
+
+    const runsCall = mockDb.mock.calls[4][0] as { text: string; values: unknown[] };
+    expect(runsCall.text).toContain('trs_simulation_runs');
+    expect(runsCall.values[0]).toBe(5); // targetSuiteId
+    expect(runsCall.values[1]).toBe(99); // newGen.id
+
+    const resultsCall = mockDb.mock.calls[5][0] as { text: string; values: unknown[] };
+    expect(resultsCall.text).toContain('trs_simulation_run_results');
+    expect(resultsCall.values[0]).toBe(60); // newRunId
+    expect(resultsCall.values[1]).toBe(50); // oldRunId
+  });
+
+  it('skips run_results insert when cloneRuns=true but no runs exist', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never) // gen insert
+      .mockResolvedValueOnce({ rows: [] } as never) // ctx txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // trig txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // enrichment
+      .mockResolvedValueOnce({ rows: [] } as never); // runs insert — no rows
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1', undefined, true);
+
+    // Only 5 calls — no run_results call since runs were empty
+    expect(mockDb).toHaveBeenCalledTimes(5);
+    const runsCall = mockDb.mock.calls[4][0] as { text: string };
+    expect(runsCall.text).toContain('trs_simulation_runs');
+  });
 });

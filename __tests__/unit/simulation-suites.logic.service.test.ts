@@ -349,5 +349,66 @@ describe('Simulation Suites Logic Service', () => {
       expect(result).toEqual({ suite: newSuite, generation_id: null });
       expect(suiteGenerationsRepository.cloneGenerationDataInDb).not.toHaveBeenCalled();
     });
+
+    it('clones historical COMPLETED/FAILED gens with runs and latest gen as DRAFT', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+      const completedGen = { id: 10, suite_id: 1, generation_number: 1, status: 'COMPLETED' };
+      const failedGen = { id: 11, suite_id: 1, generation_number: 2, status: 'FAILED' };
+      const draftGen = { id: 12, suite_id: 1, generation_number: 3, status: 'DRAFT' };
+      const latestGen = { id: 13, suite_id: 1, generation_number: 4, status: 'RUNNING' };
+      const clonedHistorical1 = { id: 20, suite_id: 2, generation_number: 1 };
+      const clonedHistorical2 = { id: 21, suite_id: 2, generation_number: 2 };
+      const clonedLatest = { id: 22, suite_id: 2, generation_number: 3 };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([
+        completedGen,
+        failedGen,
+        draftGen,
+        latestGen,
+      ] as never);
+      (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock)
+        .mockResolvedValueOnce(1 as never)
+        .mockResolvedValueOnce(2 as never)
+        .mockResolvedValueOnce(3 as never);
+      (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock)
+        .mockResolvedValueOnce(clonedHistorical1 as never)
+        .mockResolvedValueOnce(clonedHistorical2 as never)
+        .mockResolvedValueOnce(clonedLatest as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail);
+
+      // DRAFT gen (id:12) skipped; COMPLETED and FAILED cloned with runs; latest cloned as DRAFT
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledTimes(3);
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        1,
+        completedGen.id,
+        newSuite.id,
+        1,
+        mockUserId,
+        mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        2,
+        failedGen.id,
+        newSuite.id,
+        2,
+        mockUserId,
+        mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        3,
+        latestGen.id,
+        newSuite.id,
+        3,
+        mockUserId,
+        mockUserEmail,
+        false,
+      );
+      expect(result).toEqual({ suite: { ...newSuite, generation_id: clonedLatest.id }, generation_id: clonedLatest.id });
+    });
   });
 });

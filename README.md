@@ -571,7 +571,7 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
-| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate` and `POST {cfg}/deactivate` |
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate`, `POST {cfg}/deactivate` and `POST /reload` |
 | 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST (single or batch),PUT,DEL |
 | 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST (single or batch),PUT,DEL |
 
@@ -758,6 +758,21 @@ After an `activate` commits, admin-service can broadcast a `network-map.activate
 > Cascade ack-correlation assumes the deploy convention `typology.id == FUNCTION_NAME`: a typology-processor's ack `source` is its `FUNCTION_NAME`, and the typology-processor quorum is computed from the distinct `typology.id` values in the activated map, so the two must match for an ack to count toward quorum. A map reaching the typology-processor tier with zero typologies is a configuration error the admin-service configuration endpoints are expected to reject upfront; the cascade tolerates it by skipping that tier.
 
 Consumers reply with an ack on the reply subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel-ack`). admin-service runs a standing **fire-and-log ack sink** on that subject: each ack is logged as a single advisory line carrying the acking `source`, the `correlationId` (the activation event's id) and the `outcome`. A `success` ack logs at info; an `outcome: error` ack escalates to `error` so a failed downstream fulfilment of an activation admin-service dispatched is surfaced. The sink is advisory only - it never blocks or fails an activation, performs no aggregation or tally, and swallows a malformed ack (logged at `warn`) so a single bad message cannot tear down the subscription. When a `cascade` is in flight, the sink additively forwards each **successful** ack (by `correlationId` and `source`) to the cascade orchestrator so the wavefront can advance; an `error` ack still logs at `error` but does not count toward a tier's quorum (delivery is not adoption).
+
+#### Dedicated reload endpoint (no DB write, loud 503)
+
+```http
+POST /v1/admin/configuration/network_map/reload HTTP/1.1
+```
+
+The reload endpoint re-dispatches a `network-map.activated` signal for the tenant's **current active** network map without changing any state. It is a control-plane action - no row is written, no activation is performed - for when a consumer needs to be (re-)driven to reload the map that is already active (for example a consumer that started late, missed the original broadcast, or needs a fresh cascade). It is a sibling of `activate` rather than part of it: there is no `{cfg}` in the path because the endpoint always operates on whichever map is active for the tenant, resolved server-side via the single-active-per-tenant index (`getActive`). When the tenant has no active map there is nothing to reload, so the endpoint returns `404` (`No active network map`). The `cfg` and `tenantId` carried on the dispatched CloudEvent are derived from the fetched active map, not from the request.
+
+Its contract deliberately diverges from `activate` in two ways:
+
+- **`reloadMode` is required**, and must be `broadcast` or `cascade`. There is no default. A missing or unrecognised mode returns `400`. `reloadMode: 'none'` also returns `400` with a tailored message - on a dedicated reload endpoint `none` would dispatch nothing, so accepting it as a silent success would be a footgun (an operator who fat-fingered `none` would believe a reload had fired when it had not). On `activate`, `none` is legitimate (suppress the side-channel signal while still committing the activation); here it has no meaning.
+- **Dispatch failure is loud.** Unlike `activate`, where signalling is advisory and degrades to a `reloadDispatched: { status: false }` field on an otherwise-successful `200`, the reload endpoint has no underlying DB commit to fall back on - the dispatch *is* the whole operation. So when the service channel is unavailable it returns **`503`** with `{ error, event: 'network-map.activated', dispatched: false }` (and logs at `warn`), making a failed reload impossible to miss. A successful dispatch returns `200` with `{ event: 'network-map.activated', dispatched: true, outcome }`. `broadcast` and `cascade` share this success/failure shape; `cascade` drives the same ordered, ack-gated wavefront described above and reports `outcome: 'cascade initiated'` on success.
+
+The endpoint requires the `POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_RELOAD` privilege and is served by a dedicated plugin (`buildServiceChannelPlugin`) kept separate from the CRUD plugin, since it performs no persistence.
 
 ---
 

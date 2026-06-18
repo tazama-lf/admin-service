@@ -28,7 +28,7 @@ jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
 }));
 
 jest.mock('../../src/repositories/simulation-studio/suite-generations.repository', () => ({
-  getLatestGenerationBySuiteId: jest.fn(),
+  getGenerationsBySuiteId: jest.fn(),
   getNextGenerationNumber: jest.fn(),
   cloneGenerationDataInDb: jest.fn(),
 }));
@@ -315,12 +315,12 @@ describe('Simulation Suites Logic Service', () => {
 
     it('clones suite and generation when source generation exists', async () => {
       const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
-      const sourceGen = { id: 10, suite_id: 1, generation_number: 1 };
+      const sourceGen = { id: 10, suite_id: 1, generation_number: 1, status: 'COMPLETED' };
       const newGen = { id: 11, suite_id: 2, generation_number: 1 };
 
       (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
       (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
-      (suiteGenerationsRepository.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(sourceGen as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([sourceGen] as never);
       (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock).mockResolvedValue(1 as never);
       (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(newGen as never);
 
@@ -333,6 +333,7 @@ describe('Simulation Suites Logic Service', () => {
         1,
         mockUserId,
         mockUserEmail,
+        false,
       );
     });
 
@@ -341,7 +342,7 @@ describe('Simulation Suites Logic Service', () => {
 
       (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
       (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
-      (suiteGenerationsRepository.getLatestGenerationBySuiteId as jest.Mock).mockResolvedValue(null as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([] as never);
 
       const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId);
 

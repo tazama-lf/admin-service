@@ -18,7 +18,7 @@ import { createSuiteGeneration, createContextTxtpConfig, recalculateGenerationCo
 import { createTriggerTxtpConfig } from './trigger-txtp-config.logic.service';
 import {
   getNextGenerationNumber,
-  getLatestGenerationBySuiteId,
+  getGenerationsBySuiteId,
   cloneGenerationDataInDb,
 } from '../repositories/simulation-studio/suite-generations.repository';
 import { HttpException, HttpStatus } from '../utils/error';
@@ -134,10 +134,12 @@ export interface ClonedSuite {
   generation_id: number | null;
 }
 
+const HISTORICAL_STATUSES = new Set(['FAILED', 'COMPLETED', 'RUNNING']);
+
 /**
- * Clones a suite: creates new suite record (clone_source_suite_id set),
- * then clones the latest generation of source suite into the new suite.
- * Reuses cloneGenerationDataInDb so generation clone logic is not duplicated.
+ * Clones a suite: creates a new suite, then copies all generations from the source.
+ * - Latest generation (by generation_number) → always cloned as DRAFT (no runs copied).
+ * - Other generations → only FAILED/COMPLETED/RUNNING are copied; status + runs preserved.
  */
 export const cloneSuite = async (sourceSuiteId: number, tenantId: string, userId: string, userEmail?: string): Promise<ClonedSuite> => {
   try {
@@ -146,7 +148,7 @@ export const cloneSuite = async (sourceSuiteId: number, tenantId: string, userId
 
     const newSuite = await createSimulationSuiteInDb(
       {
-        name: `${source.name} (Copy)`,
+        name: source.name,
         description: source.description,
         simulation_type: source.simulation_type,
         rule_repo: source.rule_repo ?? '',
@@ -164,15 +166,26 @@ export const cloneSuite = async (sourceSuiteId: number, tenantId: string, userId
       userEmail,
     );
 
-    const sourceGen = await getLatestGenerationBySuiteId(sourceSuiteId);
-    if (!sourceGen) {
+    const allGenerations = await getGenerationsBySuiteId(sourceSuiteId);
+    if (allGenerations.length === 0) {
       return { suite: newSuite, generation_id: null };
     }
 
-    const nextNum = await getNextGenerationNumber(newSuite.id);
-    const newGen = await cloneGenerationDataInDb(sourceGen.id, newSuite.id, nextNum, userId, userEmail);
+    const maxGenNum = Math.max(...allGenerations.map((g) => g.generation_number));
+    const latestGen = allGenerations.find((g) => g.generation_number === maxGenNum)!;
+    const historicalGens = allGenerations.filter((g) => g.generation_number !== maxGenNum && HISTORICAL_STATUSES.has(g.status));
 
-    return { suite: { ...newSuite, generation_id: newGen.id }, generation_id: newGen.id };
+    // Clone historical generations first (preserving their original generation numbers)
+    for (const srcGen of historicalGens.sort((a, b) => a.generation_number - b.generation_number)) {
+      const nextNum = await getNextGenerationNumber(newSuite.id);
+      await cloneGenerationDataInDb(srcGen.id, newSuite.id, nextNum, userId, userEmail, true);
+    }
+
+    // Clone latest generation as DRAFT (no runs)
+    const nextNum = await getNextGenerationNumber(newSuite.id);
+    const newLatestGen = await cloneGenerationDataInDb(latestGen.id, newSuite.id, nextNum, userId, userEmail, false);
+
+    return { suite: { ...newSuite, generation_id: newLatestGen.id }, generation_id: newLatestGen.id };
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(

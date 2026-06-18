@@ -148,10 +148,11 @@ export const getGenerationByIdFromDb = async (generationId: number): Promise<Sui
 
 /**
  * Clones a generation (and all its child data) into a new generation under targetSuiteId.
- * Copies: context_txtp_configs + field_strategies, trigger_txtp_configs + field_overrides,
- * enrichment_tables. Returns the new generation.
+ * Copies: context_txtp_configs + field_strategies, trigger_txtp_configs + field_strategies,
+ * enrichment_tables, and optionally runs + run_results.
  *
- * Shared by both cloneGeneration and cloneSuite.
+ * cloneRuns=true  → preserve original status + copy runs/run_results (historical generations)
+ * cloneRuns=false → force status=DRAFT, skip runs (latest generation being carried forward)
  */
 export const cloneGenerationDataInDb = async (
   sourceGenerationId: number,
@@ -159,6 +160,7 @@ export const cloneGenerationDataInDb = async (
   targetGenerationNumber: number,
   userId: string,
   userEmail?: string,
+  cloneRuns = false,
 ): Promise<SuiteGeneration> => {
   // 1. Clone the generation row
   const newGenResult = await handlePostExecuteSqlStatement<Record<string, unknown>>(
@@ -173,10 +175,10 @@ export const cloneGenerationDataInDb = async (
           wizard_snapshot, generation_metadata, created_by, created_by_email, created_at, updated_at
         )
         SELECT
-          $1, $2, 'DRAFT', simulation_type,
+          $1, $2, ${cloneRuns ? 'status' : "'DRAFT'"}, simulation_type,
           rule_name, rule_version,
           context_count, trigger_count, enrichment_table_count,
-          0, 0, 0,
+          ${cloneRuns ? 'generated_context_count, generated_trigger_count, generated_enrichment_row_count' : '0, 0, 0'},
           context_field_config_count, trigger_field_config_count, enrichment_field_config_count,
           wizard_snapshot, generation_metadata, $3, $4, NOW(), NOW()
         FROM trs_suite_generations WHERE id = $5
@@ -314,6 +316,55 @@ export const cloneGenerationDataInDb = async (
     } satisfies PgQueryConfig,
     'simulation',
   );
+
+  // 5. Clone runs + run results (only for historical generations that already ran)
+  if (cloneRuns) {
+    const runRows = await handlePostExecuteSqlStatement<{ old_run_id: number; new_run_id: number }>(
+      {
+        text: `
+          WITH inserted AS (
+            INSERT INTO trs_simulation_runs (
+              suite_id, generation_id, rule_name, rule_version, outcome, trigger_count, created_at, updated_at
+            )
+            SELECT $1, $2, rule_name, rule_version, outcome, trigger_count, NOW(), NOW()
+            FROM trs_simulation_runs WHERE generation_id = $3
+            RETURNING id
+          ),
+          source AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn
+            FROM trs_simulation_runs WHERE generation_id = $3
+          ),
+          target AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
+          )
+          SELECT source.id AS old_run_id, target.id AS new_run_id
+          FROM source JOIN target ON source.rn = target.rn
+        `,
+        values: [targetSuiteId, newGen.id, sourceGenerationId],
+      } satisfies PgQueryConfig,
+      'simulation',
+    );
+
+    if (runRows.rows.length > 0) {
+      await Promise.all(
+        runRows.rows.map(async ({ old_run_id: oldRunId, new_run_id: newRunId }) => {
+          await handlePostExecuteSqlStatement<Record<string, unknown>>(
+            {
+              text: `
+                INSERT INTO trs_simulation_run_results (
+                  run_id, outcome, independent_variable, sub_rule_ref, rule_result, trigger_id, received_at
+                )
+                SELECT $1, outcome, independent_variable, sub_rule_ref, rule_result, trigger_id, NOW()
+                FROM trs_simulation_run_results WHERE run_id = $2
+              `,
+              values: [newRunId, oldRunId],
+            } satisfies PgQueryConfig,
+            'simulation',
+          );
+        }),
+      );
+    }
+  }
 
   return newGen;
 };

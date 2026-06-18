@@ -271,6 +271,43 @@ describe('POST /v1/admin/configuration/network_map/:cfg/activate -> publishes ne
     });
   });
 
+  describe('reloadMode: cascade runs the detached orchestrator (#446)', () => {
+    const tick = async (): Promise<void> => {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    };
+
+    it('accepts cascade and returns an immediate initiated status without blocking on convergence', async () => {
+      mockActivate.mockResolvedValue(makeMap('2.0.0', true));
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/admin/configuration/network_map/2.0.0/activate',
+        payload: { reloadMode: 'cascade' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        data: { cfg: '2.0.0', active: true },
+        reloadDispatched: { status: true, outcome: 'cascade initiated' },
+      });
+    });
+
+    it('starts the wavefront by addressing the event-adjudicator tier first (audience-addressed)', async () => {
+      mockActivate.mockResolvedValue(makeMap('2.0.0', true));
+
+      await app.inject({
+        method: 'POST',
+        url: '/v1/admin/configuration/network_map/2.0.0/activate',
+        payload: { reloadMode: 'cascade' },
+      });
+      await tick();
+
+      expect(mockPublishServiceChannel).toHaveBeenCalled();
+      const event = decodePublishedEvent(0);
+      expect(event.audience).toBe('event-adjudicator');
+    });
+  });
+
   describe('input validation', () => {
     it('rejects an unknown reloadMode value with 400 and does not activate or publish', async () => {
       mockActivate.mockResolvedValue(makeMap('2.0.0', true));
@@ -278,7 +315,7 @@ describe('POST /v1/admin/configuration/network_map/:cfg/activate -> publishes ne
       const response = await app.inject({
         method: 'POST',
         url: '/v1/admin/configuration/network_map/2.0.0/activate',
-        payload: { reloadMode: 'cascade' },
+        payload: { reloadMode: 'bogus' },
       });
 
       expect(response.statusCode).toBe(400);

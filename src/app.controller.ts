@@ -90,6 +90,7 @@ import {
   bulkUpdateTriggerConfigs,
   getTriggerConfigById,
 } from './services/trigger-txtp-config.logic.service';
+import { getContextTxtpConfigsByGenerationId } from './repositories/simulation-studio/context-txtp-configs.repository';
 import {
   createEnrichmentTable,
   bulkUpdateEnrichmentTables,
@@ -2575,7 +2576,7 @@ export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: 
         const strategies = await resolveSemanticNames(cfg.field_strategies ?? []);
         const payloads: Array<Record<string, unknown>> = [];
         for (let i = 1; i <= count; i++) {
-          payloads.push(applyStrategy(cfg.sample_payload_snapshot, strategies));
+          payloads.push(applyStrategy(cfg.sample_payload_snapshot, strategies, cfg.schema_snapshot));
         }
 
         return {
@@ -2624,6 +2625,14 @@ export const generateSampleTriggerMessagesHandler = async (req: FastifyRequest, 
     const hasRelated = !!primary.related_transaction && primary.related_transaction !== '';
     const toGenerate = hasRelated ? sorted : [primary];
 
+    // Triggers don't store their own JSON schema — borrow it from the context config for
+    // the same txtp+version in this generation (suite's primary txtp is always a context config).
+    const contextConfigs = await getContextTxtpConfigsByGenerationId(genId);
+    const schemaByTxtp = new Map<string, Record<string, unknown> | undefined>();
+    for (const c of contextConfigs) {
+      schemaByTxtp.set(`${c.txtp}@${c.txtp_version}`, c.schema_snapshot);
+    }
+
     const result = await Promise.all(
       toGenerate.map(async (cfg) => ({
         trigger_txtp_config_id: cfg.trigger_txtp_config_id,
@@ -2632,7 +2641,11 @@ export const generateSampleTriggerMessagesHandler = async (req: FastifyRequest, 
         display_order: cfg.display_order,
         related_transaction: cfg.related_transaction ?? null,
         related_txtp_config_id: cfg.related_txtp_config_id ?? null,
-        payload: applyStrategy(cfg.payload_template_json, await resolveSemanticNames(cfg.field_strategies)),
+        payload: applyStrategy(
+          cfg.payload_template_json,
+          await resolveSemanticNames(cfg.field_strategies),
+          schemaByTxtp.get(`${cfg.txtp}@${cfg.txtp_version}`),
+        ),
       })),
     );
 

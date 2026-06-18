@@ -42,6 +42,41 @@ const setNestedValue = (obj: Record<string, unknown>, path: string, value: unkno
   cur[parts[parts.length - 1]] = value;
 };
 
+/**
+ * Walks a JSON Schema (draft-style: `properties`) and returns the leaf `type` string
+ * at the given dot-path. Used to choose a type-appropriate random value when a
+ * `random` strategy was configured without a resolvable semantic generator.
+ */
+const getSchemaTypeAtPath = (schema: Record<string, unknown> | undefined, path: string): string | undefined => {
+  if (!schema) return undefined;
+  let node: Record<string, unknown> | undefined = schema;
+  for (const part of path.split('.')) {
+    const props = node?.properties as Record<string, unknown> | undefined;
+    const next = props?.[part] as Record<string, unknown> | undefined;
+    if (!next) return undefined;
+    node = next;
+  }
+  const t = node?.type;
+  return typeof t === 'string' ? t : undefined;
+};
+
+/**
+ * Type-driven random value when `random` was configured without a usable
+ * semantic generator. Keeps the payload schema-valid instead of writing null.
+ */
+const randomByJsonSchemaType = (type: string | undefined): unknown => {
+  switch (type) {
+    case 'number':
+    case 'integer':
+      return randInt(1, 10000);
+    case 'boolean':
+      return Math.random() > 0.5;
+    case 'string':
+    default:
+      return randomUUID();
+  }
+};
+
 const removeNestedValue = (obj: Record<string, unknown>, path: string): void => {
   const parts = path.split('.');
   let cur: Record<string, unknown> = obj;
@@ -148,7 +183,11 @@ const SEMANTIC_GENERATORS: Partial<Record<string, () => unknown>> = {
  *
  * Does NOT mutate the input template.
  */
-export const applyStrategy = (template: Record<string, unknown> | undefined, strategies: FieldStrategyInput[]): Record<string, unknown> => {
+export const applyStrategy = (
+  template: Record<string, unknown> | undefined,
+  strategies: FieldStrategyInput[],
+  schema?: Record<string, unknown>,
+): Record<string, unknown> => {
   const base = JSON.parse(JSON.stringify(template ?? {})) as Record<string, unknown>;
   const removePaths = new Set<string>();
 
@@ -170,7 +209,8 @@ export const applyStrategy = (template: Record<string, unknown> | undefined, str
 
       case 'random': {
         const generator = SEMANTIC_GENERATORS[s.faker_semantic_type?.toLowerCase() ?? ''];
-        setNestedValue(base, s.field_path, generator?.() ?? null);
+        const value = generator ? generator() : randomByJsonSchemaType(getSchemaTypeAtPath(schema, s.field_path));
+        setNestedValue(base, s.field_path, value);
         break;
       }
 

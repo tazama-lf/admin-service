@@ -21,6 +21,9 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  SERVICE_CHANNEL_PRODUCER?: string;
+  SERVICE_CHANNEL_CONSUMER?: string;
+  SERVICE_CHANNEL_SOURCE_URI_PREFIX?: string;
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -41,6 +44,21 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
   },
   {
     name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_PRODUCER',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_CONSUMER',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_SOURCE_URI_PREFIX',
     type: 'string',
     optional: true,
   },

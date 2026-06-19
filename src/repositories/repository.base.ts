@@ -42,4 +42,7 @@ export interface CrudRepository<TEntity, TId extends AllowedId = Node> {
   // implement these; the CRUD factory registers the activate/deactivate routes only when present.
   activate?: (id: TId) => Promise<TEntity | null>;
   deactivate?: (id: TId) => Promise<TEntity | null>;
+  // Fetch the tenant's single active entity. Only meaningful for entities with a single-active
+  // invariant (network_map); the DB enforces at most one active row per tenant, so this returns 0 or 1.
+  getActive?: (tenantId: string) => Promise<TEntity | null>;
 }

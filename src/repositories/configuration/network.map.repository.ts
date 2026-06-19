@@ -33,6 +33,23 @@ export const NetworkMapRepo: CrudRepository<NetworkMap, ConfigVersion> = {
     return queryRes.rows.length > 0 ? queryRes.rows[0].configuration : null;
   },
 
+  // Fetch the tenant's single active network map. The partial unique index
+  // `idx_networkmap_active_tenant` enforces at most one active map per tenant, so this query
+  // returns 0 or 1 row - the result itself is the existence gate (a missing active map is null,
+  // not an error). `active` is a generated STORED column, so it is filtered directly. LIMIT 1 is
+  // defensive belt-and-braces against the (index-prevented) two-active case.
+  getActive: async function (tenantId: string): Promise<NetworkMap | null> {
+    const queryRes = await handlePostExecuteSqlStatement<{ configuration: NetworkMap }>(
+      {
+        text: 'SELECT configuration FROM network_map WHERE tenantId = $1 AND active = true LIMIT 1;',
+        values: [tenantId],
+      } satisfies PgQueryConfig,
+      'configuration',
+    );
+
+    return queryRes.rows.length > 0 ? queryRes.rows[0].configuration : null;
+  },
+
   create: async function (payload: NetworkMap, tenantId: string): Promise<NetworkMap> {
     payload.tenantId = tenantId;
 

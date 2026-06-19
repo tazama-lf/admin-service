@@ -6,11 +6,14 @@ import type { FastifyInstance, FastifyPluginAsync, RawServerDefault } from 'fast
 import fp from 'fastify-plugin';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { PoolClient } from 'pg';
-import { configuration } from '..';
+import { configuration, loggerService } from '..';
 import { tokenHandler } from '../auth/authHandler';
 import type { AllowedId, CrudRepository, ListQuery } from '../repositories/repository.base';
 import { validateTenantMiddleware } from '../middleware/tenantMiddleware';
 import type { ITenantRequest } from '../interface/ITenantRequest';
+import { publishNetworkMapActivated } from '../services/serviceChannel';
+import { dispatchCascade } from '../services/cascade';
+import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces/NetworkMap';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -52,8 +55,9 @@ const DefaultQuery = Type.Object({
 });
 
 // Shared error body for every CRUD route, so the documented 400/404 shapes stay consistent in one
-// place and surface a description in the generated OpenAPI spec.
-const ErrorResponse = Type.Object(
+// place and surface a description in the generated OpenAPI spec. Exported so sibling plugins (e.g. the
+// service-channel reload route) reuse the exact same error shape.
+export const ErrorResponse = Type.Object(
   { message: Type.String({ description: 'Human-readable description of why the request failed.' }) },
   { description: 'Standard error response returned for validation (400) and not-found (404) errors.' },
 );
@@ -256,10 +260,20 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
             return results;
           });
           // The route's 201 schema is the single Entity (object); an array can't be serialized
-          // against it, and a Union serializer breaks on recursive schemas (typology.expression).
-          // Bypass the schema serializer for this array reply only - the single-object path below
-          // keeps the Entity serializer (and its OpenAPI 201).
-          reply.serializer((payload) => JSON.stringify(payload));
+          // against it directly, and a Union/Array serializer breaks on recursive schemas
+          // (typology.expression). So instead of dumping the raw rows with JSON.stringify (which
+          // would echo the repository's key order and any off-schema fields, diverging from the
+          // single-object reply), reuse THIS route's compiled Entity serializer per element and
+          // join them into a JSON array. Each element is then shaped identically to a single create.
+          const serializeEntity = reply.getSerializationFunction('201');
+          reply.serializer(
+            serializeEntity
+              ? (payload) => `[${(payload as TEntity[]).map((item) => serializeEntity(item as Record<string, unknown>)).join(',')}]`
+              : (payload) => JSON.stringify(payload),
+          );
+          // A custom serializer returns a string, so Fastify would default the reply to text/plain;
+          // set the content type explicitly so the array is advertised as JSON, like every other route.
+          reply.type('application/json; charset=utf-8');
           return await reply.code(201).send(created);
         }
 
@@ -324,13 +338,21 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
     // null result (missing target) to 404, mirroring GET/PUT/DELETE. AUTH:EXAMPLE(POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_ACTIVATE)
     const activateFn = repo.activate;
     if (activateFn) {
+      const ActivateResponse = Type.Object({
+        data: Entity,
+        reloadDispatched: Type.Object({
+          status: Type.Boolean(),
+          outcome: Type.String(),
+        }),
+      });
+
       app.post(
         `${prefix}${idPath}/activate`,
         {
           schema: {
             tags: [prefix],
             params: IdParam,
-            response: { 200: Entity, 404: ErrorResponse },
+            response: { 200: ActivateResponse, 400: ErrorResponse, 404: ErrorResponse },
           },
           preHandler: configuration.AUTHENTICATED
             ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_ACTIVATE`)]
@@ -339,10 +361,47 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         async (req, reply) => {
           const p = req.params as Record<string, string>;
           const { tenantId } = req as ITenantRequest;
+          if (req.body !== undefined && (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body))) {
+            return await reply.code(400).send({ message: 'body must be a JSON object' });
+          }
+
+          const payload = (req.body ?? {}) as Record<string, unknown>;
+          const { reloadMode } = payload;
+
+          if (reloadMode !== undefined && reloadMode !== 'none' && reloadMode !== 'broadcast' && reloadMode !== 'cascade') {
+            return await reply.code(400).send({ message: 'reloadMode must be one of: none, broadcast, cascade' });
+          }
 
           const activated = await activateFn(makeRepositoryId(p, tenantId));
           if (!activated) return await reply.code(404).send({ message: 'Not found' });
-          return activated;
+
+          if (reloadMode === 'none') {
+            return {
+              data: activated,
+              reloadDispatched: { status: false, outcome: 'suppressed' },
+            };
+          }
+
+          const activationData = activated as Partial<{ cfg: string; tenantId: string }>;
+          const resolvedCfg = typeof activationData.cfg === 'string' ? activationData.cfg : p.cfg;
+          const resolvedTenant = typeof activationData.tenantId === 'string' ? activationData.tenantId : tenantId;
+
+          // `cascade` fires the detached audience-addressed wavefront and returns synchronously; `broadcast`
+          // (the default) publishes the single un-addressed activation. Both leave the activation lifecycle
+          // and response shape unchanged - the activation has already been committed above.
+          const reloadDispatched =
+            reloadMode === 'cascade'
+              ? dispatchCascade(activated as unknown as NetworkMap, resolvedCfg, resolvedTenant)
+              : await publishNetworkMapActivated(resolvedCfg, resolvedTenant);
+
+          if (!reloadDispatched.status) {
+            loggerService.warn(`Network-map reload dispatch degraded: ${reloadDispatched.outcome}`);
+          }
+
+          return {
+            data: activated,
+            reloadDispatched,
+          };
         },
       );
     }

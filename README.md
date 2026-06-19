@@ -571,7 +571,7 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
-| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate` and `POST {cfg}/deactivate` |
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate`, `POST {cfg}/deactivate` and `POST /reload` |
 | 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST (single or batch),PUT,DEL |
 | 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST (single or batch),PUT,DEL |
 
@@ -660,14 +660,16 @@ top-level fields are stripped before insert on both paths (no mass-assignment vi
 For the **single-object** path the `201` response body is the created entity, serialized against the
 entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
 
-For the **array** path the success body (the array of created entities) is returned with the
-per-reply serializer bypassed: a `Type.Union` of the single entity and an array of items cannot be
-compiled by `fast-json-stringify` when the entity schema is recursive (typology's `expression`), so
-the array reply uses plain JSON serialization instead of a schema-bound serializer. The single-object
-response is unaffected and keeps its entity serializer (and its OpenAPI `201`). One consequence
-remains in the generated OpenAPI: the array request items are typed as a generic object (`{}`); the
-per-item shape is the entity Create schema documented above. This is a deliberate trade-off favouring
-a single uniform code path over a bespoke per-entity serializer for the batch array case only.
+For the **array** path the success body (the array of created entities) is serialized **element by
+element** with that same entity serializer, then joined into a JSON array - so every element is shaped
+identically to a single-object create (declared keys in schema order, schema-bound formatting). The
+route cannot hand the whole array to one schema serializer because a `Type.Union` of the single entity
+and an array of items cannot be compiled by `fast-json-stringify` when the entity schema is recursive
+(typology's `expression`); reusing the per-element entity serializer keeps the array reply consistent
+with the single-object reply without compiling a recursive union. One consequence remains in the
+generated OpenAPI: the array request items are typed as a generic object (`{}`); the per-item shape is
+the entity Create schema documented above. The array reply is sent with
+`Content-Type: application/json`, the same as the single-object reply.
 
 #### Examples
 
@@ -746,6 +748,31 @@ POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
 **Deactivate** sets a single map inactive in one atomic statement (zero active maps is a legal state, so no transaction is required), bumps `updDtTm`, and returns the deactivated map, or `404` when the target does not exist.
 
 > Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
+
+#### Service-channel reload signalling and ack sink
+
+After an `activate` commits, admin-service can broadcast a `network-map.activated` CloudEvent on the service channel so downstream consumers (for example event-director) reload the promoted map. The per-request `reloadMode` body field controls this (`broadcast` by default, `none` to suppress, `cascade` for an ordered handshake); dispatch is advisory and degrades without failing the activation (the DB commit is the source of truth), reported back under `reloadDispatched`.
+
+`reloadMode: cascade` runs an ordered, audience-addressed, ack-gated reload wavefront instead of a single fan-out. admin-service addresses the tiers most-downstream first - event-adjudicator, then typology-processor, then event-director - by stamping the CloudEvents `audience` extension on each `network-map.activated` event (every tier publishes on the same producer subject; the `audience` does the addressing). A tier is addressed only after the previous tier reaches quorum: the single-processor tiers (event-adjudicator, event-director) advance on the first ack, while the typology-processor tier requires one ack from every distinct typology in the activated map (de-duplicated on `typology.id` alone) before event-director is addressed. A typology-processor tier with no typologies is skipped straight to event-director. The orchestrator is fire-and-return: the activate response reports `{ status: true, outcome: 'cascade initiated' }` immediately (the wavefront then runs detached, unchanged response latency and lifecycle), and degrades to `{ status: false, outcome: 'service channel unavailable' }` when the channel is down. A tier that does not reach quorum within the per-tier window (`CASCADE_TIER_TIMEOUT_MS`, 30s) is logged at `error` as a stall and the cascade aborts; it never throws back into the activation path.
+
+> Cascade ack-correlation assumes the deploy convention `typology.id == FUNCTION_NAME`: a typology-processor's ack `source` is its `FUNCTION_NAME`, and the typology-processor quorum is computed from the distinct `typology.id` values in the activated map, so the two must match for an ack to count toward quorum. A map reaching the typology-processor tier with zero typologies is a configuration error the admin-service configuration endpoints are expected to reject upfront; the cascade tolerates it by skipping that tier.
+
+Consumers reply with an ack on the reply subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel-ack`). admin-service runs a standing **fire-and-log ack sink** on that subject: each ack is logged as a single advisory line carrying the acking `source`, the `correlationId` (the activation event's id) and the `outcome`. A `success` ack logs at info; an `outcome: error` ack escalates to `error` so a failed downstream fulfilment of an activation admin-service dispatched is surfaced. The sink is advisory only - it never blocks or fails an activation, performs no aggregation or tally, and swallows a malformed ack (logged at `warn`) so a single bad message cannot tear down the subscription. When a `cascade` is in flight, the sink additively forwards each **successful** ack (by `correlationId` and `source`) to the cascade orchestrator so the wavefront can advance; an `error` ack still logs at `error` but does not count toward a tier's quorum (delivery is not adoption).
+
+#### Dedicated reload endpoint (no DB write, loud 503)
+
+```http
+POST /v1/admin/configuration/network_map/reload HTTP/1.1
+```
+
+The reload endpoint re-dispatches a `network-map.activated` signal for the tenant's **current active** network map without changing any state. It is a control-plane action - no row is written, no activation is performed - for when a consumer needs to be (re-)driven to reload the map that is already active (for example a consumer that started late, missed the original broadcast, or needs a fresh cascade). It is a sibling of `activate` rather than part of it: there is no `{cfg}` in the path because the endpoint always operates on whichever map is active for the tenant, resolved server-side via the single-active-per-tenant index (`getActive`). When the tenant has no active map there is nothing to reload, so the endpoint returns `404` (`No active network map`). The `cfg` and `tenantId` carried on the dispatched CloudEvent are derived from the fetched active map, not from the request.
+
+Its contract deliberately diverges from `activate` in two ways:
+
+- **`reloadMode` is required**, and must be `broadcast` or `cascade`. There is no default. A missing or unrecognised mode returns `400`. `reloadMode: 'none'` also returns `400` with a tailored message - on a dedicated reload endpoint `none` would dispatch nothing, so accepting it as a silent success would be a footgun (an operator who fat-fingered `none` would believe a reload had fired when it had not). On `activate`, `none` is legitimate (suppress the side-channel signal while still committing the activation); here it has no meaning.
+- **Dispatch failure is loud.** Unlike `activate`, where signalling is advisory and degrades to a `reloadDispatched: { status: false }` field on an otherwise-successful `200`, the reload endpoint has no underlying DB commit to fall back on - the dispatch *is* the whole operation. So when the service channel is unavailable it returns **`503`** with `{ error, event: 'network-map.activated', dispatched: false }` (and logs at `warn`), making a failed reload impossible to miss. A successful dispatch returns `200` with `{ event: 'network-map.activated', dispatched: true, outcome }`. `broadcast` and `cascade` share this success/failure shape; `cascade` drives the same ordered, ack-gated wavefront described above and reports `outcome: 'cascade initiated'` on success.
+
+The endpoint requires the `POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_RELOAD` privilege and is served by a dedicated plugin (`buildServiceChannelPlugin`) kept separate from the CRUD plugin, since it performs no persistence.
 
 ---
 

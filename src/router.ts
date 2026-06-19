@@ -122,6 +122,7 @@ import {
   TypologyListQuery,
 } from './schemas';
 import { buildCrudPlugin } from './utils/crud-schema';
+import { buildServiceChannelPlugin } from './utils/service-channel-routes';
 import { SetOptionsBodyAndParams } from './utils/schema-utils';
 import { withConfigurationTransaction } from './services/database.logic.service';
 
@@ -228,6 +229,15 @@ function Routes(fastify: FastifyInstance): void {
       repo: NetworkMapRepo,
       schemas: { Entity: NetworkMapSchema, Create: NetworkMapSchema, Update: NetworkMapSchema, Query: NetworkMapListQuery },
       idParam: { kind: 'cfg' },
+    }),
+  );
+
+  // Dedicated no-DB-write reload endpoint (POST <prefix>/reload): re-fires network-map.activated for
+  // the tenant's active map with a loud, retryable 503 when the service channel is down (#447).
+  fastify.register(
+    buildServiceChannelPlugin({
+      prefix: '/v1/admin/configuration/network_map',
+      repo: NetworkMapRepo,
     }),
   );
 

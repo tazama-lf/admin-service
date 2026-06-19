@@ -50,16 +50,16 @@ describe('Simulation Logs Logic Service', () => {
         createdByEmail: mockEmail,
       });
 
-      expect(simulationLogsRepository.createSimulationLogsInDb).toHaveBeenCalledWith(
-        mockUserId,
-        mockTenantId,
-        mockRuleId,
-        { config: 'old' },
-        { config: 'new' },
-        'Test log',
-        'rule',
-        mockEmail,
-      );
+      expect(simulationLogsRepository.createSimulationLogsInDb).toHaveBeenCalledWith({
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        ruleId: mockRuleId,
+        oldData: { config: 'old' },
+        newData: { config: 'new' },
+        description: 'Test log',
+        category: 'rule',
+        createdByEmail: mockEmail,
+      });
     });
 
     it('should create log with empty description when not provided', async () => {
@@ -75,16 +75,16 @@ describe('Simulation Logs Logic Service', () => {
         createdByEmail: mockEmail,
       });
 
-      expect(simulationLogsRepository.createSimulationLogsInDb).toHaveBeenCalledWith(
-        mockUserId,
-        mockTenantId,
-        mockRuleId,
-        { config: 'old' },
-        { config: 'new' },
-        '',
-        'rule',
-        mockEmail,
-      );
+      expect(simulationLogsRepository.createSimulationLogsInDb).toHaveBeenCalledWith({
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        ruleId: mockRuleId,
+        oldData: { config: 'old' },
+        newData: { config: 'new' },
+        description: '',
+        category: 'rule',
+        createdByEmail: mockEmail,
+      });
     });
 
     it('should throw error when log creation fails', async () => {

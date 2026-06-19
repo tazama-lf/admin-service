@@ -59,16 +59,27 @@ export const getSimulationLogsFromDb = async (options: SimulationLogQueryOptions
   }));
 };
 
-export const createSimulationLogsInDb = async (
-  userId: string,
-  tenantId: string,
-  ruleId: string,
-  oldData: Record<string, unknown>,
-  newData: Record<string, unknown>,
-  description: string,
-  category: string,
-  createdByEmail?: string,
-): Promise<void> => {
+export interface CreateSimulationLogDbPayload {
+  userId: string;
+  tenantId: string;
+  ruleId: string;
+  oldData: Record<string, unknown>;
+  newData: Record<string, unknown>;
+  description: string;
+  category: string;
+  createdByEmail?: string;
+}
+
+export const createSimulationLogsInDb = async ({
+  userId,
+  tenantId,
+  ruleId,
+  oldData,
+  newData,
+  description,
+  category,
+  createdByEmail,
+}: CreateSimulationLogDbPayload): Promise<void> => {
   const columns = [
     'created_by',
     'tenant_id',

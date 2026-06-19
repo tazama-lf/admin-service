@@ -11,7 +11,16 @@ export const createSimulationLogs = async ({
   category,
   createdByEmail,
 }: SimulationLogRequest): Promise<void> => {
-  await createSimulationLogsInDb(userId, tenantId, ruleId, oldData, newData, description, category, createdByEmail);
+  await createSimulationLogsInDb({
+    userId,
+    tenantId,
+    ruleId,
+    oldData,
+    newData,
+    description,
+    category,
+    createdByEmail,
+  });
 };
 
 export const getSimulationLogs = async (

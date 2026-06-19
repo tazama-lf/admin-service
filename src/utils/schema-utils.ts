@@ -13,15 +13,17 @@ export const SetOptionsBodyAndParams = (
   handler: RouteHandlerMethod,
   claim: Claim,
   bodySchemaName?: TSchema,
-  paramSchemaName?: TSchema,
+  querySchemaName?: TSchema,
+  paramsSchemaName?: TSchema,
 ): { preHandler?: preHandler[]; handler: RouteHandlerMethod; schema: FastifySchema } => {
   loggerService.debug(`Authentication is ${configuration.AUTHENTICATED ? 'ENABLED' : 'DISABLED'} for ${handler.name}`);
   const preHandlers: preHandler[] = configuration.AUTHENTICATED
     ? [validateTenantMiddleware, tokenHandler(claim)]
     : [validateTenantMiddleware];
-  const querystring = paramSchemaName ? { querystring: paramSchemaName } : undefined;
+  const querystring = querySchemaName ? { querystring: querySchemaName } : undefined;
+  const params = paramsSchemaName ? { params: paramsSchemaName } : undefined;
   const body = bodySchemaName ? { body: bodySchemaName } : undefined;
-  const schema: FastifySchema = { ...querystring, ...body };
+  const schema: FastifySchema = { ...querystring, ...params, ...body };
   return {
     preHandler: preHandlers,
     handler,

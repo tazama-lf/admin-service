@@ -1,7 +1,7 @@
 import type { AccountCondition, EntityCondition } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import * as util from 'node:util';
-import type { Config, AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
+import type { AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import type { ITenantRequest } from './interface/ITenantRequest';
@@ -31,6 +31,7 @@ import {
   handleGetAllTransactionTypes,
   handleGetPayloadByTransactionType,
   handleGetConfigByTransactionType,
+  handleGetConfigByTransactionTypew3,
   handleGetRelatedTransactions,
 } from './services/tcs-config.logic.service';
 import { handleGetDataModelJson, handleUpsertDataModelJson } from './services/data-model.logic.service';
@@ -60,8 +61,59 @@ import {
 } from './services/rule.logic.service';
 import type { CloneRuleHandlerReqBody, CreateRuleHandlerReqBody } from './interface/rule.interface';
 import { getSimulationLogs, createSimulationLogs } from './services/simulation-logs.logic.service';
+import {
+  getSimulationSuites,
+  getSimulationSuitesCounts,
+  getSimulationSuiteById,
+  createSimulationSuite,
+  updateSimulationSuite,
+  cloneSuite,
+} from './services/simulation-suites.logic.service';
+import {
+  getGenerationsForSuite,
+  getLatestGenerationForSuite,
+  addContextTxtpConfig,
+  getContextConfigsWithStrategies,
+  bulkUpdateContextConfigs,
+  deleteContextTxtpConfig,
+  recalculateGenerationCounts,
+  getGenerationSummary,
+  updateWizardProgress,
+  deleteTriggerTxtpConfig,
+  resumeGeneration,
+  updateGenerationStatus,
+  cloneGeneration,
+} from './services/trs-suite-generation.logic.service';
+import {
+  addTriggerTxtpConfig,
+  getTriggerConfigsWithStrategies,
+  bulkUpdateTriggerConfigs,
+  getTriggerConfigById,
+} from './services/trigger-txtp-config.logic.service';
+import { getContextTxtpConfigsByGenerationId } from './repositories/simulation-studio/context-txtp-configs.repository';
+import {
+  createEnrichmentTable,
+  bulkUpdateEnrichmentTables,
+  deleteEnrichmentTable,
+  getEnrichmentTables,
+  getEnrichmentTablesWithStrategies,
+} from './services/enrichment-table.logic.service';
+import { createTxtpMapping, getTxtpMappings, deleteTxtpMapping } from './services/txtp-mapping.logic.service';
+import type {
+  BulkEnrichmentUpdateItemDto,
+  UpsertTxtpMappingDto,
+  TxtpMappingParamsDto,
+  CloneGenerationRequestDto,
+  CloneSuiteRequestDto,
+} from './interface/simulation-studio/suite-generation.interface';
 import { decodeInnerToken } from './utils/decode-token';
 import type { ISimulationBody } from './interface/simulattionLogs.interface';
+import type {
+  SimulationSuitesQueryDto,
+  CreateSimulationSuiteDto,
+  UpdateSimulationSuiteDto,
+  SimulationSuiteIdParamsDto,
+} from './interface/simulation-studio/simulation-suites.interface';
 import {
   handleCreatePushJob,
   handleGetAllJobs,
@@ -76,6 +128,17 @@ import {
   handleValidateExisting,
   handleValidateActive,
 } from './services/job.logic.service';
+import { getFakerSemanticData, getFakerSemanticName } from './services/faker-semantic-data.logic.service';
+import type { AddTriggerTxtpConfigDto, BulkTriggerConfigItemDto } from './interface/simulation-studio/trigger-txtp.interface';
+import type { AddContextTxtpConfigDto, BulkConfigItemDto } from './interface/simulation-studio/context-txtp.interface';
+import { getSuiteResult, saveRunResult } from './services/simulation-run-results.logic.service';
+
+const scheduleRecalculateGenerationCounts = (generationId: number): void => {
+  // Prevent unhandled promise rejections while keeping count updates async/non-blocking.
+  void recalculateGenerationCounts(generationId).catch((error: unknown) => {
+    loggerService.error(`Failed to recalculate generation counts for generation ${generationId}. \n${util.inspect(error)}`);
+  });
+};
 
 export const reportRequestHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle report request');
@@ -274,7 +337,7 @@ export const writeConfigUpdateHandler = async (req: FastifyRequest, reply: Fasti
     const updateData = req.body as Record<string, unknown>;
     const { tenantId } = req as ITenantRequest;
 
-    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData as Partial<Config>);
+    const updatedConfig = await handleUpdateConfig(parseInt(id), tenantId, updateData);
     reply.code(200).send({ success: true, message: 'Config updated successfully', config: updatedConfig });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to update config');
@@ -1496,6 +1559,36 @@ export const getConfigByTransactionTypeHandler = async (req: FastifyRequest, rep
   }
 };
 
+export const getConfigByTransactionTypeHandlerw3 = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  loggerService.log('Start - Handle get config by transaction type request');
+  try {
+    const { tenantId } = req as ITenantRequest;
+
+    const { transactionType, version } = req.params as { transactionType: string; version: string };
+
+    if (!transactionType || !version) {
+      reply.status(400).send({
+        success: false,
+        message: `Transaction type and version are required. Received: transactionType=${transactionType}, version=${version}`,
+      });
+      return;
+    }
+
+    const config = await handleGetConfigByTransactionTypew3(transactionType, version, tenantId);
+
+    reply.status(200).send({
+      success: true,
+      transactionType,
+      tenantId,
+      config,
+    });
+  } catch (error: unknown) {
+    ErrorHandler.sendError(reply, error, 'Failed to get config by transaction type');
+  } finally {
+    loggerService.log('End - Handle get config by transaction type request');
+  }
+};
+
 export const getRelatedTransactionsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   loggerService.log('Start - Handle get related transactions request');
   try {
@@ -1567,5 +1660,1108 @@ export const putDataModelJsonHandler = async (req: FastifyRequest, reply: Fastif
     ErrorHandler.sendError(reply, error, 'Failed to save data model JSON');
   } finally {
     loggerService.log('End - Handle put data model JSON request');
+  }
+};
+
+// Simulation Studio
+
+/**
+ * WIZARD STEP 1: POST - Create Simulation Suite with Rule & Details
+ *
+ * Flow:
+ * 1. User fills "Rule & Details" form (Step 1 of 7)
+ * 2. POST to /v1/admin/simulation-studio/suites with:
+ *    - name: "Suite Name"
+ *    - description: "..." (optional)
+ *    - rule_name: "Selected Rule"
+ *    - rule_version: "v1.0"
+ *    - primary_txtp: "pacs.008"
+ *    - primary_txtp_version: "v1.0"
+ * 3. Suite created in DB with status="DRAFT", wizard_progress.currentStep=1
+ * 4. Response includes suite ID for use in subsequent PATCH requests
+ *
+ * Example Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "id": 123,
+ *     "name": "Test Suite",
+ *     "wizard_progress": { "currentStep": 1, "completedSteps": [1] },
+ *     ...
+ *   }
+ * }
+ */
+export const createSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create simulation suite');
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const payload = req.body as CreateSimulationSuiteDto;
+
+    const simulation = await createSimulationSuite(payload, tenantId, userId, userEmail);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite created successfully',
+      data: simulation,
+    };
+
+    reply.status(201).send(body);
+    loggerService.log('End - Create simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to create simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to create simulation suite');
+  }
+};
+
+export const getSimulationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suites');
+    const { tenantId } = req as ITenantRequest;
+    const query = req.query as SimulationSuitesQueryDto;
+
+    // Parse query parameters
+    const options = {
+      tenantId,
+      search: query.search,
+      status: query.status,
+      ruleName: query.rule_name,
+      txtp: query.txtp,
+      updatedFrom: query.updated_from ? new Date(query.updated_from) : undefined,
+      updatedTo: query.updated_to ? new Date(query.updated_to) : undefined,
+      limit: query.limit ?? 20,
+      offset: query.offset ?? 0,
+    };
+
+    const result = await getSimulationSuites(options);
+
+    const body = {
+      success: true,
+      message: 'Simulation suites retrieved successfully',
+      suites: result.data,
+      total: result.total,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Get simulation suites');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suites. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites');
+  }
+};
+
+export const getSimulationSuitesCountsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suites counts');
+    const { tenantId } = req as ITenantRequest;
+    const counts = await getSimulationSuitesCounts(tenantId);
+
+    reply.status(200).send({ success: true, data: counts });
+    loggerService.log('End - Get simulation suites counts');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suites counts. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suites counts');
+  }
+};
+
+export const getSimulationByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get simulation suite by ID');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({
+        success: false,
+        message: 'Invalid simulation suite ID',
+      });
+      return;
+    }
+
+    const simulation = await getSimulationSuiteById(simulationId, tenantId);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite retrieved successfully',
+      suite: simulation,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Get simulation suite by ID');
+  } catch (err) {
+    const failMessage = `Failed to retrieve simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve simulation suite');
+  }
+};
+
+/**
+ * WIZARD STEPS 2-7: PATCH - Update Simulation Suite with Additional Data
+ *
+ * Flow for each step transition:
+ * 1. User completes Step N (2, 3, 4, 5, 6, or 7) on UI
+ * 2. PATCH to /v1/admin/simulation-studio/suites/:id with:
+ *    - wizard_progress: { currentStep: N, completedSteps: [1, 2, ..., N-1], stepNData: {...} }
+ *    - Other fields to update (status, metadata, etc.)
+ * 3. Suite updated in DB with new wizard progress
+ * 4. Response includes updated suite for UI validation
+ *
+ * Step Descriptions:
+ * - Step 1: Rule & Details (done via POST)
+ * - Step 2: TXTP Selection
+ * - Step 3: Trigger Data
+ * - Step 4: Enrichment Data
+ * - Step 5: Preview & Save
+ * - Step 6: Simulation Results
+ * - Step 7: Final confirmation
+ *
+ * Example PATCH body for Step 2:
+ * {
+ *   "wizard_progress": {
+ *     "currentStep": 2,
+ *     "completedSteps": [1],
+ *     "step2Data": { "txtp": "pacs.008", ... }
+ *   }
+ * }
+ */
+export const updateSimulationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update simulation suite');
+    const { tenantId } = req as ITenantRequest;
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const simulationId = parseInt(id, 10);
+    const payload = req.body as UpdateSimulationSuiteDto;
+
+    if (!id || isNaN(simulationId)) {
+      reply.status(400).send({
+        success: false,
+        message: 'Invalid simulation suite ID',
+      });
+      return;
+    }
+
+    const updatedSimulation = await updateSimulationSuite(simulationId, tenantId, payload);
+
+    const body = {
+      success: true,
+      message: 'Simulation suite updated successfully',
+      suite: updatedSimulation,
+    };
+
+    reply.status(200).send(body);
+    loggerService.log('End - Update simulation suite');
+  } catch (err) {
+    const failMessage = `Failed to update simulation suite. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to update simulation suite');
+  }
+};
+
+export const getSuiteGenerationsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get suite generations');
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const suiteId = parseInt(id, 10);
+
+    if (!id || isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const generations = await getGenerationsForSuite(suiteId);
+
+    reply.status(200).send({ success: true, data: generations });
+    loggerService.log('End - Get suite generations');
+  } catch (err) {
+    const failMessage = `Failed to retrieve suite generations. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve suite generations');
+  }
+};
+
+export const getLatestSuiteGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get latest suite generation');
+    const { id } = req.params as SimulationSuiteIdParamsDto;
+    const suiteId = parseInt(id, 10);
+
+    if (!id || isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid simulation suite ID' });
+      return;
+    }
+
+    const generation = await getLatestGenerationForSuite(suiteId);
+
+    if (!generation) {
+      reply.status(404).send({ success: false, message: 'No generation found for suite' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: generation });
+    loggerService.log('End - Get latest suite generation');
+  } catch (err) {
+    const failMessage = `Failed to retrieve latest suite generation. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve latest suite generation');
+  }
+};
+
+export const getGenerationContextConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get generation context txtp configs');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+    const { tenantId } = req as ITenantRequest;
+
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const configs = await getContextConfigsWithStrategies(genId, tenantId);
+
+    reply.status(200).send({ success: true, data: configs });
+    loggerService.log('End - Get generation context txtp configs');
+  } catch (err) {
+    const failMessage = `Failed to retrieve context txtp configs. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve context txtp configs');
+  }
+};
+
+// ── Step 2: POST new context txtp config (Add TXTP) ─────────────────────────
+
+export const addContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Add context txtp config');
+    const { tenantId } = req as ITenantRequest;
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const dto = req.body as AddContextTxtpConfigDto;
+    const created = await addContextTxtpConfig(generationId, dto, tenantId);
+    scheduleRecalculateGenerationCounts(generationId);
+
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Add context txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to add context txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to add context txtp config');
+  }
+};
+
+// ── Step 2: PATCH bulk update context configs (message_count + field strategies) ──
+
+export const updateContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Bulk update context txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const items = req.body as BulkConfigItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
+
+    const { tenantId } = req as ITenantRequest;
+    const updated = await bulkUpdateContextConfigs(generationId, items, tenantId);
+    void recalculateGenerationCounts(generationId);
+
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Bulk update context txtp configs');
+  } catch (err) {
+    loggerService.error(`Failed to bulk update context txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update context txtp configs');
+  }
+};
+
+// ── Step 3: GET all trigger configs + field strategies ───────────────────────
+
+export const getTriggerConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const configs = await getTriggerConfigsWithStrategies(generationId);
+    reply.status(200).send({ success: true, data: configs });
+    loggerService.log('End - Get trigger txtp configs');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve trigger txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve trigger txtp configs');
+  }
+};
+
+// ── Step 3: POST new trigger txtp config (Add TXTP) ──────────────────────────
+
+export const addTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Add trigger txtp config');
+    const { tenantId } = req as ITenantRequest;
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const dto = req.body as AddTriggerTxtpConfigDto;
+    const created = await addTriggerTxtpConfig(generationId, dto, tenantId);
+    scheduleRecalculateGenerationCounts(generationId);
+
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Add trigger txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to add trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to add trigger txtp config');
+  }
+};
+
+// ── Step 3: PATCH bulk update trigger configs ─────────────────────────────────
+
+export const bulkUpdateTriggerConfigsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Bulk update trigger txtp configs');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const items = req.body as BulkTriggerConfigItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
+
+    const updated = await bulkUpdateTriggerConfigs(generationId, items);
+    void recalculateGenerationCounts(generationId);
+
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Bulk update trigger txtp configs');
+  } catch (err) {
+    loggerService.error(`Failed to bulk update trigger txtp configs. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update trigger txtp configs');
+  }
+};
+
+// ── Step 3: GET trigger config by ID ─────────────────────────────────────────
+
+export const getTriggerConfigByIdHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger txtp config by ID');
+    const { configId: configIdStr } = req.params as { configId: string };
+    const configId = parseInt(configIdStr, 10);
+
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+
+    const config = await getTriggerConfigById(configId);
+
+    if (!config) {
+      reply.status(404).send({ success: false, message: `Trigger config with id ${configId} not found` });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: config });
+    loggerService.log('End - Get trigger txtp config by ID');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve trigger txtp config');
+  }
+};
+
+// ── Step 4: POST create enrichment table ─────────────────────────────────────
+
+export const createEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create enrichment table');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const {
+      table_name: tableName,
+      row_count: rowCount,
+      payload_template_json: payloadTemplateJson,
+      schema_template_json: schemaTemplateJson,
+    } = req.body as {
+      table_name: string;
+      row_count?: number;
+      payload_template_json?: Record<string, unknown>;
+      schema_template_json?: Record<string, unknown>;
+    };
+
+    if (!tableName || typeof tableName !== 'string') {
+      reply.status(400).send({ success: false, message: 'table_name is required' });
+      return;
+    }
+
+    const created = await createEnrichmentTable(generationId, tableName, rowCount ?? 1, payloadTemplateJson, schemaTemplateJson);
+    scheduleRecalculateGenerationCounts(generationId);
+    reply.status(201).send({ success: true, data: created });
+    loggerService.log('End - Create enrichment table');
+  } catch (err) {
+    loggerService.error(`Failed to create enrichment table. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create enrichment table');
+  }
+};
+
+// ── Step 4: GET all enrichment tables with field strategies ───────────────────
+
+export const getEnrichmentTablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get enrichment tables');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const tables = await getEnrichmentTables(generationId);
+    reply.status(200).send({ success: true, data: tables });
+    loggerService.log('End - Get enrichment tables');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve enrichment tables. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve enrichment tables');
+  }
+};
+
+// ── Step 4: PATCH bulk update enrichment tables ───────────────────────────────
+
+export const bulkUpdateEnrichmentTablesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Bulk update enrichment tables');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const items = req.body as BulkEnrichmentUpdateItemDto[];
+    if (!Array.isArray(items) || items.length === 0) {
+      reply.status(400).send({ success: false, message: 'Request body must be a non-empty array' });
+      return;
+    }
+
+    const updated = await bulkUpdateEnrichmentTables(generationId, items);
+
+    reply.status(200).send({ success: true, data: updated });
+    loggerService.log('End - Bulk update enrichment tables');
+  } catch (err) {
+    loggerService.error(`Failed to bulk update enrichment tables. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to bulk update enrichment tables');
+  }
+};
+
+// ── Step 4: DELETE enrichment table ──────────────────────────────────────────
+
+export const deleteEnrichmentTableHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete enrichment table');
+    const { tableId: tableIdStr, generationId: generationIdStr } = req.params as { tableId: string; generationId: string };
+    const tableId = parseInt(tableIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(tableId)) {
+      reply.status(400).send({ success: false, message: 'Invalid table ID' });
+      return;
+    }
+
+    await deleteEnrichmentTable(tableId);
+    scheduleRecalculateGenerationCounts(generationId);
+    reply.status(200).send({ success: true, message: 'Enrichment table deleted' });
+    loggerService.log('End - Delete enrichment table');
+  } catch (err) {
+    loggerService.error(`Failed to delete enrichment table. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete enrichment table');
+  }
+};
+
+// ── Step 5: GET generation summary ───────────────────────────────────────────
+
+export const getGenerationSummaryHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get generation summary');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    const summary = await getGenerationSummary(generationId);
+    if (!summary) {
+      reply.status(404).send({ success: false, message: 'Generation not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: summary });
+    loggerService.log('End - Get generation summary');
+  } catch (err) {
+    loggerService.error(`Failed to retrieve generation summary. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to retrieve generation summary');
+  }
+};
+
+// ── PATCH wizard progress ─────────────────────────────────────────────────────
+
+export const updateWizardProgressHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update wizard progress');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const { current_step_num: currentStepNum, completed_step_num: completedStepNum } = req.body as {
+      current_step_num: number;
+      completed_step_num: number;
+    };
+    if (!currentStepNum || typeof currentStepNum !== 'number') {
+      reply.status(400).send({ success: false, message: 'current_step_num is required' });
+      return;
+    }
+    if (!completedStepNum || typeof completedStepNum !== 'number') {
+      reply.status(400).send({ success: false, message: 'completed_step_num is required' });
+      return;
+    }
+    const completedSteps = Array.from({ length: completedStepNum }, (_, i) => i + 1);
+    await updateWizardProgress(generationId, currentStepNum, completedSteps);
+    reply.status(200).send({ success: true, message: `Step ${currentStepNum} saved, steps 1-${completedStepNum} complete` });
+    loggerService.log('End - Update wizard progress');
+  } catch (err) {
+    loggerService.error(`Failed to update wizard progress. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to update wizard progress');
+  }
+};
+
+// ── DELETE context txtp config ────────────────────────────────────────────────
+
+export const deleteContextTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete context txtp config');
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
+    const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    await deleteContextTxtpConfig(configId);
+    scheduleRecalculateGenerationCounts(generationId);
+    reply.status(200).send({ success: true, message: 'Context txtp config deleted' });
+    loggerService.log('End - Delete context txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to delete context txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete context txtp config');
+  }
+};
+
+// ── DELETE trigger txtp config ────────────────────────────────────────────────
+
+export const deleteTriggerTxtpConfigHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete trigger txtp config');
+    const { configId: configIdStr, generationId: generationIdStr } = req.params as { configId: string; generationId: string };
+    const configId = parseInt(configIdStr, 10);
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(configId)) {
+      reply.status(400).send({ success: false, message: 'Invalid config ID' });
+      return;
+    }
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    await deleteTriggerTxtpConfig(configId);
+    scheduleRecalculateGenerationCounts(generationId);
+    reply.status(200).send({ success: true, message: 'Trigger txtp config deleted' });
+    loggerService.log('End - Delete trigger txtp config');
+  } catch (err) {
+    loggerService.error(`Failed to delete trigger txtp config. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete trigger txtp config');
+  }
+};
+
+export const upsertContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create context mapping');
+    const dto = req.body as UpsertTxtpMappingDto;
+    const mapping = await createTxtpMapping(dto);
+    reply.status(201).send({ success: true, data: mapping });
+    loggerService.log('End - Create context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to create context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create context mapping');
+  }
+};
+
+export const getContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get context mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (mappings.length === 0) {
+      reply.status(200).send({ success: true, data: {} });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: mappings });
+    loggerService.log('End - Get context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to get context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get context mapping');
+  }
+};
+
+export const deleteContextMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete context mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const deleted = await deleteTxtpMapping(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (!deleted) {
+      reply.status(404).send({ success: false, message: 'Context mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, message: 'Context mapping deleted' });
+    loggerService.log('End - Delete context mapping');
+  } catch (err) {
+    loggerService.error(`Failed to delete context mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete context mapping');
+  }
+};
+
+export const upsertTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Create trigger mapping');
+    const dto = req.body as UpsertTxtpMappingDto;
+    const mapping = await createTxtpMapping(dto);
+    reply.status(201).send({ success: true, data: mapping });
+    loggerService.log('End - Create trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to create trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to create trigger mapping');
+  }
+};
+
+export const getTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get trigger mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (mappings.length === 0) {
+      reply.status(200).send({ success: true, data: {} });
+      return;
+    }
+
+    reply.status(200).send({ success: true, data: mappings });
+    loggerService.log('End - Get trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to get trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get trigger mapping');
+  }
+};
+
+export const deleteTriggerMappingHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Delete trigger mapping');
+    const { primaryTxtpId, relatedTxtpId } = req.params as TxtpMappingParamsDto;
+    const deleted = await deleteTxtpMapping(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
+
+    if (!deleted) {
+      reply.status(404).send({ success: false, message: 'Trigger mapping not found' });
+      return;
+    }
+
+    reply.status(200).send({ success: true, message: 'Trigger mapping deleted' });
+    loggerService.log('End - Delete trigger mapping');
+  } catch (err) {
+    loggerService.error(`Failed to delete trigger mapping. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to delete trigger mapping');
+  }
+};
+
+export const resumeGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Resume generation');
+    const { suiteId: suiteIdStr } = req.params as { suiteId: string };
+    const suiteId = parseInt(suiteIdStr, 10);
+    if (isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID' });
+      return;
+    }
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const resumeGenerationResult = await resumeGeneration(suiteId, generationId);
+    reply.status(200).send({ success: true, message: 'Generation resumed', data: resumeGenerationResult });
+    loggerService.log('End - Resume generation');
+  } catch (err) {
+    loggerService.error(`Failed to resume generation. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to resume generation');
+  }
+};
+
+// ── Clone generation ──────────────────────────────────────────────────────────
+
+export const cloneGenerationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Clone generation');
+    const authReq = req as AuthenticatedRequest;
+    const { sourceGenerationId } = req.body as CloneGenerationRequestDto;
+    const generationId = parseInt(sourceGenerationId.toString(), 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const cloned = await cloneGeneration(generationId, userId, userEmail);
+    reply.status(201).send({ success: true, data: cloned });
+    loggerService.log('End - Clone generation');
+  } catch (err) {
+    loggerService.error(`Failed to clone generation. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to clone generation');
+  }
+};
+
+// ── Clone suite ───────────────────────────────────────────────────────────────
+
+export const cloneSuiteHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Clone suite');
+    const authReq = req as AuthenticatedRequest;
+    const { tenantId } = req as ITenantRequest;
+    const { sourceSuiteId } = req.body as CloneSuiteRequestDto;
+    const suiteId = parseInt(sourceSuiteId.toString(), 10);
+    if (isNaN(suiteId)) {
+      reply.status(400).send({ success: false, message: 'Invalid suite ID' });
+      return;
+    }
+    const userId = authReq.user?.clientId ?? authReq.user?.sub ?? authReq.user?.preferred_username ?? 'system';
+    const userEmail = authReq.user?.preferred_username ?? undefined;
+    const cloned = await cloneSuite(suiteId, tenantId, userId, userEmail);
+    reply.status(201).send({ success: true, data: cloned });
+    loggerService.log('End - Clone suite');
+  } catch (err) {
+    loggerService.error(`Failed to clone suite. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to clone suite');
+  }
+};
+
+export const updateGenerationStatusHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Update generation status');
+    const { generationId: generationIdStr } = req.params as { generationId: string };
+    const { status } = req.body as { status: string };
+
+    const generationId = parseInt(generationIdStr, 10);
+    if (isNaN(generationId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generation ID' });
+      return;
+    }
+
+    if (!status) {
+      reply.status(400).send({ success: false, message: 'Status is required' });
+      return;
+    }
+
+    const updated = await updateGenerationStatus(generationId, status);
+    reply.status(200).send({ success: true, message: 'Generation status updated', data: updated });
+    loggerService.log('End - Update generation status');
+  } catch (err) {
+    loggerService.error(`Failed to update generation status. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to update generation status');
+  }
+};
+
+export const getFakerSemanticDataHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get faker semantic data');
+    const data = await getFakerSemanticData();
+    reply.status(200).send({ success: true, data });
+    loggerService.log('End - Get faker semantic data');
+  } catch (err) {
+    loggerService.error(`Failed to get faker semantic data. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to get faker semantic data');
+  }
+};
+
+// field_strategies store the semantic-type id; resolve each to the generator name expected by applyStrategy.
+const resolveSemanticNames = async <T extends { faker_semantic_type?: string }>(strategies: T[]): Promise<T[]> =>
+  await Promise.all(
+    strategies.map(async (s) => {
+      if (s.faker_semantic_type == null) return s;
+      const name = await getFakerSemanticName(Number(s.faker_semantic_type));
+      loggerService.log(`[resolveSemanticNames] id=${JSON.stringify(s.faker_semantic_type)} -> name=${JSON.stringify(name)}`);
+      return { ...s, faker_semantic_type: name };
+    }),
+  );
+
+// ── Generate sample context messages ──────────────────────────────────────────
+
+export const generateSampleMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample context messages');
+    const { generationId } = req.params as { generationId: string };
+    const { tenantId } = req as ITenantRequest;
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
+
+    const configs = await getContextConfigsWithStrategies(genId, tenantId);
+    if (!configs.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const sorted = [...configs].sort((a, b) => a.display_order - b.display_order);
+
+    const result = await Promise.all(
+      sorted.map(async (cfg) => {
+        const count = cfg.message_count > 0 ? cfg.message_count : 1;
+        const strategies = await resolveSemanticNames(cfg.field_strategies ?? []);
+        const payloads: Array<Record<string, unknown>> = [];
+        for (let i = 1; i <= count; i++) {
+          payloads.push(applyStrategy(cfg.sample_payload_snapshot, strategies, cfg.schema_snapshot));
+        }
+
+        return {
+          context_txtp_config_id: cfg.context_txtp_config_id,
+          txtp: cfg.txtp,
+          txtp_version: cfg.txtp_version,
+          display_order: cfg.display_order,
+          message_count: count,
+          payloads,
+        };
+      }),
+    );
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample context messages');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample messages. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample messages');
+  }
+};
+
+// ── Generate sample trigger messages ─────────────────────────────────────────
+
+export const generateSampleTriggerMessagesHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample trigger messages');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
+
+    const configs = await getTriggerConfigsWithStrategies(genId);
+    if (!configs.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const sorted = [...configs].sort((a, b) => a.display_order - b.display_order);
+
+    // Primary is always the first config. Related is included only when related_transaction exists.
+    const [primary] = sorted;
+    const hasRelated = !!primary.related_transaction && primary.related_transaction !== '';
+    const toGenerate = hasRelated ? sorted : [primary];
+
+    // Triggers don't store their own JSON schema — borrow it from the context config for
+    // the same txtp+version in this generation (suite's primary txtp is always a context config).
+    const contextConfigs = await getContextTxtpConfigsByGenerationId(genId);
+    const schemaByTxtp = new Map<string, Record<string, unknown> | undefined>();
+    for (const c of contextConfigs) {
+      schemaByTxtp.set(`${c.txtp}@${c.txtp_version}`, c.schema_snapshot);
+    }
+
+    const result = await Promise.all(
+      toGenerate.map(async (cfg) => ({
+        trigger_txtp_config_id: cfg.trigger_txtp_config_id,
+        txtp: cfg.txtp,
+        txtp_version: cfg.txtp_version,
+        display_order: cfg.display_order,
+        related_transaction: cfg.related_transaction ?? null,
+        related_txtp_config_id: cfg.related_txtp_config_id ?? null,
+        payload: applyStrategy(
+          cfg.payload_template_json,
+          await resolveSemanticNames(cfg.field_strategies),
+          schemaByTxtp.get(`${cfg.txtp}@${cfg.txtp_version}`),
+        ),
+      })),
+    );
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample trigger messages');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample trigger messages. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample trigger messages');
+  }
+};
+
+// ── Generate sample enrichment rows ──────────────────────────────────────────
+
+export const generateSampleEnrichmentRowsHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Generate sample enrichment rows');
+    const { generationId } = req.params as { generationId: string };
+    const genId = parseInt(generationId, 10);
+    if (!generationId || isNaN(genId)) {
+      reply.status(400).send({ success: false, message: 'Invalid generationId' });
+      return;
+    }
+
+    const { applyStrategy } = await import('./utils/strategy-resolver.js');
+
+    const tables = await getEnrichmentTablesWithStrategies(genId);
+    if (!tables.length) {
+      reply.status(200).send({ success: true, data: [] });
+      return;
+    }
+
+    const result = await Promise.all(
+      tables.map(async (table) => {
+        const count = table.row_count > 0 ? table.row_count : 1;
+        const rows: Array<Record<string, unknown>> = [];
+        // Map enrichment field strategies to the unified FieldStrategyInput shape.
+        const strategies = await resolveSemanticNames(
+          table.field_strategies.map((s) => ({
+            field_path: s.column_name,
+            strategy_code: s.strategy_code,
+            static_value: s.static_value,
+            range_min: s.range_min,
+            range_max: s.range_max,
+            faker_semantic_type: s.generator_type,
+          })),
+        );
+        for (let i = 0; i < count; i++) {
+          rows.push(applyStrategy(table.payload_template_json, strategies));
+        }
+        return {
+          enrichment_table_id: table.id,
+          table_name: table.table_name,
+          table_order: table.table_order,
+          row_count: count,
+          rows,
+        };
+      }),
+    );
+
+    reply.status(200).send({ success: true, data: result });
+    loggerService.log('End - Generate sample enrichment rows');
+  } catch (err) {
+    loggerService.error(`Failed to generate sample enrichment rows. \n${util.inspect(err)}`);
+    ErrorHandler.sendError(reply, err, 'Failed to generate sample enrichment rows');
+  }
+};
+
+export const getSuiteResultHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Get suite result');
+    const { suiteId } = req.params as { suiteId: string };
+    const result = await getSuiteResult(Number(suiteId));
+    reply.status(200).send({
+      success: true,
+      message: 'Suite result retrieved successfully',
+      data: result,
+    });
+    loggerService.log('End - Get suite result');
+  } catch (err) {
+    const failMessage = `Failed to get suite result. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to get suite result');
+  }
+};
+
+export const saveRunResultHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  try {
+    loggerService.log('Start - Save run result');
+    const body = req.body as {
+      gen_id: number;
+      trigger_id: number | null;
+      rule_result: Record<string, unknown>;
+      outcome?: string;
+    };
+
+    if (!body.gen_id || !body.rule_result) {
+      reply.status(400).send({ success: false, message: 'gen_id and rule_result are required' });
+      return;
+    }
+
+    const result = await saveRunResult({
+      gen_id: body.gen_id,
+      trigger_id: body.trigger_id ?? null,
+      rule_result: body.rule_result,
+      outcome: body.outcome,
+    });
+
+    reply.status(201).send({
+      success: true,
+      message: 'Run result saved successfully',
+      data: result,
+    });
+    loggerService.log('End - Save run result');
+  } catch (err) {
+    const failMessage = `Failed to save run result. \n${util.inspect(err)}`;
+    loggerService.error(failMessage);
+    ErrorHandler.sendError(reply, err, 'Failed to save run result');
   }
 };

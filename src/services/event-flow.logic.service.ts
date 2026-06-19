@@ -11,14 +11,15 @@ import { parseConditionAccount, parseConditionEntity } from '../utils/parse-cond
 import { updateCache } from '../utils/update-cache';
 import { v4 } from 'uuid';
 
-const saveConditionEdges = async (
-  perspective: string,
-  conditionId: string,
-  entityAccntId: string,
-  condition: ConditionEdge,
-  memberType: 'entity' | 'account',
-  tenantId: string,
-): Promise<void> => {
+const saveConditionEdges = async (args: {
+  perspective: string;
+  conditionId: string;
+  entityAccntId: string;
+  condition: ConditionEdge;
+  memberType: 'entity' | 'account';
+  tenantId: string;
+}): Promise<void> => {
+  const { perspective, conditionId, entityAccntId, condition, memberType, tenantId } = args;
   condition.tenantId ||= tenantId;
   switch (perspective) {
     case 'both':
@@ -91,7 +92,14 @@ export const handlePostConditionEntity = async (
       await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, updDtTm: nowDateTime });
     }
 
-    await saveConditionEdges(condition.prsptv, condId, entityIdentifier, condition, 'entity', tenantId);
+    await saveConditionEdges({
+      perspective: condition.prsptv,
+      conditionId: condId,
+      entityAccntId: entityIdentifier,
+      condition,
+      memberType: 'entity',
+      tenantId,
+    });
 
     const report = await databaseManager.getEntityConditionsByGraph(condEntityId, condSchemeProprietary, tenantId);
 
@@ -131,7 +139,7 @@ export const handleGetConditionsForEntity = async (
   loggerService.trace('successfully parsed parameters', fnName, params.id);
   const accountExist = (await databaseManager.getEntity(params.id, params.schmenm, tenantId))!;
 
-  if (!accountExist?.id) {
+  if (!accountExist.id) {
     return { result: 'Entity does not exist in the database', code: 404 };
   }
 
@@ -195,7 +203,7 @@ export const handleUpdateExpiryDateForConditionsOfEntity = async (
     return { code: 404, message: 'No records were found in the database using the provided data.' };
   }
 
-  const resultByEdge = report[0];
+  const [resultByEdge] = report;
 
   if (!resultByEdge.governed_as_creditor_by.length && !resultByEdge.governed_as_debtor_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular entity in the database.' };
@@ -288,7 +296,7 @@ export const handlePostConditionAccount = async (
           await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId, updDtTm: nowDateTime });
           await databaseManager.saveAccount(accountIdentifier, tenantId, nowDateTime);
         } catch (err) {
-          throw Error('Error: while trying to save new account: ' + (err as { message: string }).message);
+          throw Error(`Error: while trying to save new account: ${err instanceof Error ? err.message : String(err)}`);
         }
         loggerService.log('New account was added after not being found while forceCret was set to true');
       } else {
@@ -298,7 +306,14 @@ export const handlePostConditionAccount = async (
       await databaseManager.saveCondition({ ...condition, creDtTm: nowDateTime, tenantId, updDtTm: nowDateTime });
     }
 
-    await saveConditionEdges(condition.prsptv, condId, accountIdentifier, condition, 'account', tenantId);
+    await saveConditionEdges({
+      perspective: condition.prsptv,
+      conditionId: condId,
+      entityAccntId: accountIdentifier,
+      condition,
+      memberType: 'account',
+      tenantId,
+    });
 
     const report = await databaseManager.getAccountConditionsByGraph(condAccountId, condSchemeProprietary, tenantId, condMemberid);
 
@@ -364,7 +379,7 @@ export const handleGetConditionsForAccount = async (
   if (params.agt) {
     const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt, tenantId))!;
 
-    if (!accountExist?.id) {
+    if (!accountExist.id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 
@@ -444,7 +459,7 @@ export const handleUpdateExpiryDateForConditionsOfAccount = async (
     return { code: 404, message: 'No records were found in the database using the provided data.' };
   }
 
-  const resultByEdge = report[0];
+  const [resultByEdge] = report;
 
   if (!resultByEdge.governed_as_creditor_account_by.length && !resultByEdge.governed_as_debtor_account_by.length) {
     return { code: 404, message: 'Active conditions do not exist for this particular account in the database.' };

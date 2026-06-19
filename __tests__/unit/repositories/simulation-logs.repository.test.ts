@@ -15,6 +15,27 @@ jest.mock('../../../src', () => ({
 
 import { getSimulationLogsFromDb, createSimulationLogsInDb } from '../../../src/repositories/configuration/simulation-logs.repository';
 
+const createSimulationLogsLegacy = async (
+  userId: string,
+  tenantId: string,
+  ruleId: string,
+  oldData: Record<string, unknown>,
+  newData: Record<string, unknown>,
+  description: string,
+  category: string,
+  createdByEmail?: string,
+) =>
+  createSimulationLogsInDb({
+    userId,
+    tenantId,
+    ruleId,
+    oldData,
+    newData,
+    description,
+    category,
+    createdByEmail,
+  });
+
 describe('Simulation Logs Repository', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -168,7 +189,7 @@ describe('Simulation Logs Repository', () => {
       expect(callArg.text).toContain('ORDER BY created_at');
     });
 
-    it('should default to created_at for invalid sortBy field', async () => {
+    it('should reflect undefined sort field for invalid sortBy input', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
         rows: [],
         rowCount: 0,
@@ -181,7 +202,7 @@ describe('Simulation Logs Repository', () => {
       });
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain('ORDER BY created_at');
+      expect(callArg.text).toContain('ORDER BY created_at DESC');
     });
 
     it('should get simulation logs with limit', async () => {
@@ -403,7 +424,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -438,7 +459,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -474,7 +495,7 @@ describe('Simulation Logs Repository', () => {
       const oldData = { status: 'old', count: 1 };
       const newData = { status: 'new', count: 2 };
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         'rule-789',
@@ -496,7 +517,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '12345',
@@ -518,7 +539,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -539,7 +560,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -569,7 +590,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -591,7 +612,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -622,7 +643,7 @@ describe('Simulation Logs Repository', () => {
         boolean: false,
       };
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',
@@ -644,7 +665,7 @@ describe('Simulation Logs Repository', () => {
         rowCount: 1,
       });
 
-      await createSimulationLogsInDb(
+      await createSimulationLogsLegacy(
         'user-123',
         'tenant-456',
         '789',

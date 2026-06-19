@@ -20,6 +20,7 @@ import {
   findAllTransactionTypes,
   getPayloadByTransactionType,
   getSchemaByTransactionType,
+  getSchemaByTransactionTypew3,
   getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
@@ -394,6 +395,23 @@ export const handleGetConfigByTransactionType = async (transactionType: string, 
     loggerService.error(
       `No config found for txtp: ${transactionType}, version: ${version}, tenant: ${tenantId}. Error: ${errorMessage.message}`,
       'handleGetConfigByTransactionType',
+    );
+    throw new Error('Configuration not found');
+  }
+};
+
+export const handleGetConfigByTransactionTypew3 = async (transactionType: string, version: string, tenantId: string): Promise<unknown> => {
+  try {
+    loggerService.log(`Getting config for transaction type: ${transactionType}, version: ${version}, tenant: ${tenantId}`);
+
+    const config = await getSchemaByTransactionTypew3(transactionType, version, tenantId);
+
+    return config;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(
+      `No config found for txtp: ${transactionType}, version: ${version}, tenant: ${tenantId}. Error: ${errorMessage.message}`,
+      'handleGetConfigByTransactionTypew3',
     );
     throw new Error('Configuration not found');
   }

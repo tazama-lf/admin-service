@@ -13,7 +13,9 @@ export enum SimulationType {
   INTEGRATION_TESTING = 'INTEGRATION_TESTING',
 }
 
-export type ContextFieldStrategyCode = 'keep_sample' | 'static' | 'range' | 'generated' | 'null' | 'skip';
+export type FieldStrategyCode = 'keep_sample' | 'static' | 'range' | 'skip' | 'random';
+/** @deprecated Use FieldStrategyCode instead */
+export type ContextFieldStrategyCode = FieldStrategyCode;
 
 export interface SuiteGeneration {
   id: number;
@@ -21,7 +23,7 @@ export interface SuiteGeneration {
   generation_number: number;
   status: SuiteGenerationStatus;
   simulation_type: SimulationType;
-  rule_repo?: string;
+  rule_name?: string;
   rule_version?: string;
   context_count: number;
   trigger_count: number;
@@ -38,12 +40,15 @@ export interface SuiteGeneration {
   created_by_email?: string;
   created_at: Date;
   updated_at: Date;
+  run_count?: number;
+  run_result_count?: number;
+  outcome?: string | null;
 }
 
 export interface CreateSuiteGenerationDto {
   suite_id: number;
   simulation_type?: SimulationType;
-  rule_repo?: string;
+  rule_name?: string;
   rule_version?: string;
   wizard_snapshot?: Record<string, unknown>;
   generation_metadata?: Record<string, unknown>;
@@ -62,6 +67,8 @@ export interface SuiteContextTxtpConfig {
   sample_payload_snapshot?: Record<string, unknown>;
   faker_seed?: number;
   generator_profile: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
   created_at: Date;
 }
 
@@ -75,18 +82,22 @@ export interface CreateContextTxtpConfigDto {
   sample_payload_snapshot?: Record<string, unknown>;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
 }
 
 export interface UpdateContextTxtpConfigDto {
   message_count?: number;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
 }
 
 export interface AddContextTxtpConfigDto {
   txtp: string;
   txtp_version: string;
   message_count?: number;
+  related_context_txtp_id?: number;
 }
 
 // ── Context Field Strategies ─────────────────────────────────────────────────
@@ -95,7 +106,7 @@ export interface ContextFieldStrategy {
   id: number;
   context_txtp_config_id: number;
   field_path: string;
-  strategy_code: ContextFieldStrategyCode;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -107,7 +118,7 @@ export interface ContextFieldStrategy {
 
 export interface UpsertFieldStrategyDto {
   field_path: string;
-  strategy_code: ContextFieldStrategyCode;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -124,6 +135,8 @@ export interface ContextTxtpConfigWithStrategies {
   display_order: number;
   schema_snapshot: Record<string, unknown>;
   sample_payload_snapshot?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
   field_strategies: ContextFieldStrategy[];
 }
 
@@ -137,7 +150,6 @@ export interface BulkConfigItemDto {
 
 // ── Trigger TXTP Config ──────────────────────────────────────────────────────
 
-export type TriggerOverrideType = 'static' | 'range' | 'generated' | 'remove' | 'null';
 export type TriggerExpectedBand = 'good' | 'neutral' | 'bad' | 'error';
 
 export interface SuiteTriggerTxtpConfig {
@@ -154,6 +166,8 @@ export interface SuiteTriggerTxtpConfig {
   notes?: string;
   faker_seed?: number;
   generator_profile: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
   created_at: Date;
 }
 
@@ -170,6 +184,8 @@ export interface CreateTriggerTxtpConfigDto {
   notes?: string;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
+  related_transaction?: string | null;
 }
 
 export interface UpdateTriggerTxtpConfigDto {
@@ -181,19 +197,21 @@ export interface UpdateTriggerTxtpConfigDto {
   notes?: string;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
+  related_txtp_config_id?: number | null;
 }
 
 export interface AddTriggerTxtpConfigDto {
   txtp: string;
   txtp_version: string;
   message_count?: number;
+  related_trigger_txtp_id?: number;
 }
 
-export interface TriggerFieldOverride {
+export interface TriggerFieldStrategy {
   id: number;
   trigger_txtp_config_id: number;
   field_path: string;
-  override_type: TriggerOverrideType;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -202,9 +220,9 @@ export interface TriggerFieldOverride {
   created_at: Date;
 }
 
-export interface UpsertTriggerFieldOverrideDto {
+export interface UpsertTriggerFieldStrategyDto {
   field_path: string;
-  override_type: TriggerOverrideType;
+  strategy_code: FieldStrategyCode;
   static_value?: unknown;
   range_min?: number;
   range_max?: number;
@@ -212,7 +230,7 @@ export interface UpsertTriggerFieldOverrideDto {
   generator_options?: Record<string, unknown>;
 }
 
-export interface TriggerTxtpConfigWithOverrides {
+export interface TriggerTxtpConfigWithStrategies {
   trigger_txtp_config_id: number;
   txtp: string;
   txtp_version: string;
@@ -222,7 +240,9 @@ export interface TriggerTxtpConfigWithOverrides {
   link_to_context_pairs: boolean;
   expected_result_band?: TriggerExpectedBand;
   notes?: string;
-  field_overrides: TriggerFieldOverride[];
+  related_txtp_config_id?: number | null;
+  field_strategies: TriggerFieldStrategy[];
+  related_transaction?: string | null;
 }
 
 export interface BulkTriggerConfigItemDto {
@@ -234,13 +254,35 @@ export interface BulkTriggerConfigItemDto {
   notes?: string;
   faker_seed?: number;
   generator_profile?: Record<string, unknown>;
-  field_overrides?: UpsertTriggerFieldOverrideDto[];
+  field_strategies?: UpsertTriggerFieldStrategyDto[];
 }
 
-// ── Enrichment Tables ────────────────────────────────────────────────────────
+// ── Context/Trigger Mapping ──────────────────────────────────────────────────
 
-export type EnrichmentFieldStrategyCode = 'static' | 'range' | 'generated' | 'null' | 'copy';
+export interface MappingPair {
+  primary: string;
+  related: string;
+}
 
+export interface TxtpMapping {
+  id: number;
+  primary_tx_id: number;
+  related_tx_id: number;
+  mapping: MappingPair[];
+}
+
+export interface UpsertTxtpMappingDto {
+  primary_txtp_id: number;
+  related_txtp_id: number;
+  mapping: MappingPair[];
+}
+
+export interface TxtpMappingParamsDto {
+  primaryTxtpId: string;
+  relatedTxtpId: string;
+}
+
+// ── Enrichment Tables ───────────────────────────────────────────────────────
 export interface SuiteEnrichmentTable {
   id: number;
   generation_id: number;
@@ -276,4 +318,41 @@ export interface BulkEnrichmentUpdateItemDto {
   payload_template_json?: Record<string, unknown>;
   schema_template_json?: Record<string, unknown>;
   faker_profile?: Record<string, unknown>;
+}
+
+export interface EnrichmentFieldStrategy {
+  id: number;
+  enrichment_table_id: number;
+  column_name: string;
+  column_type: string;
+  strategy_code: FieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options: Record<string, unknown>;
+  created_at: Date;
+}
+
+export interface UpsertEnrichmentFieldStrategyDto {
+  column_name: string;
+  column_type?: string;
+  strategy_code: FieldStrategyCode;
+  static_value?: unknown;
+  range_min?: number;
+  range_max?: number;
+  generator_type?: string;
+  generator_options?: Record<string, unknown>;
+}
+
+export interface SuiteEnrichmentTableWithStrategies extends SuiteEnrichmentTable {
+  field_strategies: EnrichmentFieldStrategy[];
+}
+
+export interface CloneGenerationRequestDto {
+  sourceGenerationId: number;
+}
+
+export interface CloneSuiteRequestDto {
+  sourceSuiteId: number;
 }

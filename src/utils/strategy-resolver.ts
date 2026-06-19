@@ -186,6 +186,11 @@ const generateBic = (): string =>
   )}${Array.from({ length: 2 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[randInt(0, 25)]).join('')}`;
 
 const generateDateIso = (): string => new Date(rand(Date.now() - 365 * 864e5, Date.now())).toISOString();
+// Generates a float with exactly `decimals` precision
+const randFixed = (min: number, max: number, decimals = 2): number => {
+  const factor = 10 ** decimals;
+  return Math.round((Math.random() * (max - min) + min) * factor) / factor;
+};
 
 const SEMANTIC_GENERATORS: Partial<Record<string, () => unknown>> = {
   uuid: () => randomUUID(),
@@ -194,11 +199,11 @@ const SEMANTIC_GENERATORS: Partial<Record<string, () => unknown>> = {
   bic: generateBic,
   swift: generateBic,
   account_number: () => Array.from({ length: 12 }, () => randInt(0, 9)).join(''),
-  amount: () => parseFloat(rand(1, 100000).toFixed(2)),
-  amount_small: () => parseFloat(rand(0.01, 999.99).toFixed(2)),
-  amount_large: () => parseFloat(rand(10000, 10_000_000).toFixed(2)),
+  amount: () => randFixed(1, 100000, 2),
+  amount_small: () => randFixed(0.01, 999.99, 2),
+  amount_large: () => randFixed(10000, 10_000_000, 2),
+  exchange_rate: () => randFixed(0.5, 150, 6),
   currency: () => pick(ISO_CURRENCIES),
-  exchange_rate: () => parseFloat(rand(0.5, 150).toFixed(6)),
   date_iso: generateDateIso,
   datetime_iso: generateDateIso,
   date_only: () => generateDateIso().split('T')[0],
@@ -258,7 +263,7 @@ export const applyStrategy = (
       case 'range': {
         const min = s.range_min ?? 0;
         const max = s.range_max ?? 1;
-        setNestedValue(base, s.field_path, parseFloat(rand(min, max).toFixed(2)));
+        setNestedValue(base, s.field_path, randFixed(min, max, 2));
         break;
       }
 

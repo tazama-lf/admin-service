@@ -137,9 +137,9 @@ export const handleGetConditionsForEntity = async (
   const fnName = 'getConditionsForEntity';
 
   loggerService.trace('successfully parsed parameters', fnName, params.id);
-  const accountExist = (await databaseManager.getEntity(params.id, params.schmenm, tenantId))!;
+  const accountExist = await databaseManager.getEntity(params.id, params.schmenm, tenantId);
 
-  if (!accountExist.id) {
+  if (!accountExist?.id) {
     return { result: 'Entity does not exist in the database', code: 404 };
   }
 
@@ -377,9 +377,9 @@ export const handleGetConditionsForAccount = async (
 
   let report: RawConditionResponse[] = [];
   if (params.agt) {
-    const accountExist = (await databaseManager.getAccount(params.id, params.schmenm, params.agt, tenantId))!;
+    const accountExist = await databaseManager.getAccount(params.id, params.schmenm, params.agt, tenantId);
 
-    if (!accountExist.id) {
+    if (!accountExist?.id) {
       return { result: 'Account does not exist in the database', code: 404 };
     }
 

@@ -72,7 +72,7 @@ describe('Mapping API Handlers', () => {
     await getContextMappingHandler(req, reply as FastifyReply);
 
     expect(reply.status).toHaveBeenCalledWith(200);
-    expect(reply.send).toHaveBeenCalledWith({ success: true, data: {} });
+    expect(reply.send).toHaveBeenCalledWith({ success: true, data: [] });
   });
 
   it('returns context mappings with 200 when found', async () => {
@@ -130,7 +130,7 @@ describe('Mapping API Handlers', () => {
     await getTriggerMappingHandler(req, reply as FastifyReply);
 
     expect(reply.status).toHaveBeenCalledWith(200);
-    expect(reply.send).toHaveBeenCalledWith({ success: true, data: {} });
+    expect(reply.send).toHaveBeenCalledWith({ success: true, data: [] });
   });
 
   it('returns trigger mappings with 200 when found', async () => {

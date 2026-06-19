@@ -62,7 +62,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
     related_transaction: tcsRow.related_transaction ?? null,
   });
 
-  const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
+  const schemaFallback = schema && typeof schema === 'object' ? ((schema.properties as Record<string, unknown> | undefined) ?? schema) : {};
   const fieldPaths = flattenPayloadPaths(samplePayload ?? schemaFallback);
   const fieldStrategies = await Promise.all(
     fieldPaths.map(async (path) => await upsertFieldStrategyInDb(config.id, { field_path: path, strategy_code: 'keep_sample' })),
@@ -119,7 +119,8 @@ export const createContextTxtpConfig = async (
       related_transaction: tcsRow.related_transaction ?? null,
     });
 
-    const schemaFallback = (schema.properties as Record<string, unknown> | undefined) ?? schema;
+    const schemaFallback =
+      schema && typeof schema === 'object' ? ((schema.properties as Record<string, unknown> | undefined) ?? schema) : {};
     const fieldPaths = flattenPayloadPaths(samplePayload ?? schemaFallback);
     const fieldStrategies = await Promise.all(
       fieldPaths.map(async (path) => await upsertFieldStrategyInDb(primaryConfig.id, { field_path: path, strategy_code: 'keep_sample' })),

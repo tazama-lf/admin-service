@@ -531,7 +531,7 @@ describe('Simulation Suites API Handlers', () => {
       expect(ErrorHandler.sendError).toHaveBeenCalledWith(reply, error, 'Failed to clone suite');
     });
 
-    it('should handle zero as invalid suiteId', async () => {
+    it('should handle zero as a valid suiteId (passes NaN check, calls cloneSuite)', async () => {
       const req = {
         tenantId: mockTenantId,
         body: { sourceSuiteId: 0 },

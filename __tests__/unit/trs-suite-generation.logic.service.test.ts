@@ -469,267 +469,267 @@ describe('updateGenerationStatus', () => {
 
     await expect(updateGenerationStatus(1, 'COMPLETED')).rejects.toMatchObject({ status: 500 });
   });
+});
 
-  // ── cloneGeneration ──────────────────────────────────────────────────────────
+// ── cloneGeneration ──────────────────────────────────────────────────────────
 
-  describe('cloneGeneration', () => {
-    const sourceGen = { id: 5, suite_id: 42, generation_number: 1 } as any;
-    const clonedGen = { id: 6, suite_id: 42, generation_number: 2 } as any;
+describe('cloneGeneration', () => {
+  const sourceGen = { id: 5, suite_id: 42, generation_number: 1 } as any;
+  const clonedGen = { id: 6, suite_id: 42, generation_number: 2 } as any;
 
-    it('clones generation with next generation number', async () => {
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceGen);
-      (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
-      (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(clonedGen);
+  it('clones generation with next generation number', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceGen);
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
+    (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(clonedGen);
 
-      const result = await cloneGeneration(5, 'user-2', 'user2@test.com');
+    const result = await cloneGeneration(5, 'user-2', 'user2@test.com');
 
-      expect(result).toEqual(clonedGen);
-      expect(generationsRepo.getGenerationByIdFromDb).toHaveBeenCalledWith(5);
-      expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(42);
-      expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(5, 42, 2, 'user-2', 'user2@test.com');
+    expect(result).toEqual(clonedGen);
+    expect(generationsRepo.getGenerationByIdFromDb).toHaveBeenCalledWith(5);
+    expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(42);
+    expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(5, 42, 2, 'user-2', 'user2@test.com');
+  });
+
+  it('works without userEmail', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceGen);
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
+    (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(clonedGen);
+
+    await cloneGeneration(5, 'user-2');
+
+    expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(5, 42, 2, 'user-2', undefined);
+  });
+
+  it('throws 404 when source generation not found', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(null);
+
+    await expect(cloneGeneration(999, 'user-2')).rejects.toMatchObject({
+      status: 404,
+      message: expect.stringContaining('not found'),
     });
+    expect(generationsRepo.getNextGenerationNumber).not.toHaveBeenCalled();
+  });
 
-    it('works without userEmail', async () => {
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceGen);
-      (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
-      (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(clonedGen);
+  it('rethrows HttpException from repository as-is', async () => {
+    const httpErr = new HttpException('source locked', 409);
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(httpErr);
 
-      await cloneGeneration(5, 'user-2');
+    await expect(cloneGeneration(5, 'user-2')).rejects.toBe(httpErr);
+  });
 
-      expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(5, 42, 2, 'user-2', undefined);
-    });
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(new Error('db error'));
 
-    it('throws 404 when source generation not found', async () => {
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(null);
+    await expect(cloneGeneration(5, 'user-2')).rejects.toMatchObject({ status: 500 });
+  });
 
-      await expect(cloneGeneration(999, 'user-2')).rejects.toMatchObject({
-        status: 404,
-        message: expect.stringContaining('not found'),
-      });
-      expect(generationsRepo.getNextGenerationNumber).not.toHaveBeenCalled();
-    });
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue('unknown error');
 
-    it('rethrows HttpException from repository as-is', async () => {
-      const httpErr = new HttpException('source locked', 409);
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(httpErr);
+    await expect(cloneGeneration(5, 'user-2')).rejects.toMatchObject({ status: 500 });
+  });
 
-      await expect(cloneGeneration(5, 'user-2')).rejects.toBe(httpErr);
-    });
+  it('passes source suite_id to getNextGenerationNumber', async () => {
+    const sourceWithDiffSuite = { ...sourceGen, suite_id: 99 };
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceWithDiffSuite);
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(3);
+    (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue({ ...clonedGen, suite_id: 99 });
 
-    it('wraps unknown Error in HttpException 500', async () => {
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(new Error('db error'));
+    await cloneGeneration(5, 'user-2');
 
-      await expect(cloneGeneration(5, 'user-2')).rejects.toMatchObject({ status: 500 });
-    });
+    expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(99);
+  });
+});
 
-    it('wraps non-Error thrown value in HttpException 500', async () => {
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue('unknown error');
+// ── updateWizardProgress ─────────────────────────────────────────────────────
 
-      await expect(cloneGeneration(5, 'user-2')).rejects.toMatchObject({ status: 500 });
-    });
+describe('updateWizardProgress', () => {
+  it('updates wizard progress successfully', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
 
-    it('passes source suite_id to getNextGenerationNumber', async () => {
-      const sourceWithDiffSuite = { ...sourceGen, suite_id: 99 };
-      (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(sourceWithDiffSuite);
-      (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(3);
-      (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue({ ...clonedGen, suite_id: 99 });
+    await updateWizardProgress(1, 2, [1, 2]);
 
-      await cloneGeneration(5, 'user-2');
+    expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(1, 2, [1, 2]);
+  });
 
-      expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(99);
+  it('rethrows HttpException from repository', async () => {
+    const httpErr = new HttpException('read-only', 403);
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+
+    await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue('error string');
+
+    await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── deleteTriggerTxtpConfig ──────────────────────────────────────────────────
+
+describe('deleteTriggerTxtpConfig', () => {
+  it('deletes trigger config successfully', async () => {
+    (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+
+    await deleteTriggerTxtpConfig(10);
+
+    expect(triggerConfigsRepo.deleteTriggerTxtpConfigInDb).toHaveBeenCalledWith(10);
+  });
+
+  it('throws 404 when trigger config not found', async () => {
+    (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
+
+    await expect(deleteTriggerTxtpConfig(999)).rejects.toMatchObject({
+      status: 404,
+      message: expect.stringContaining('not found'),
     });
   });
 
-  // ── updateWizardProgress ─────────────────────────────────────────────────────
+  it('rethrows HttpException from repository', async () => {
+    const httpErr = new HttpException('in use', 409);
+    (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(httpErr);
 
-  describe('updateWizardProgress', () => {
-    it('updates wizard progress successfully', async () => {
-      (generationsRepo.updateWizardProgressInDb as jest.Mock).mockResolvedValue(undefined);
+    await expect(deleteTriggerTxtpConfig(10)).rejects.toBe(httpErr);
+  });
 
-      await updateWizardProgress(1, 2, [1, 2]);
+  it('wraps unknown Error in HttpException 500', async () => {
+    (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('db down'));
 
-      expect(generationsRepo.updateWizardProgressInDb).toHaveBeenCalledWith(1, 2, [1, 2]);
-    });
+    await expect(deleteTriggerTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
+  });
 
-    it('rethrows HttpException from repository', async () => {
-      const httpErr = new HttpException('read-only', 403);
-      (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(httpErr);
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('error');
 
-      await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toBe(httpErr);
-    });
+    await expect(deleteTriggerTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
+  });
+});
 
-    it('wraps unknown Error in HttpException 500', async () => {
-      (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue(new Error('db fail'));
+// ── recalculateGenerationCounts ──────────────────────────────────────────────
 
-      await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
-    });
+describe('recalculateGenerationCounts', () => {
+  it('recalculates and updates counts from all three tables', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ total: '5' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '3' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '2' }] });
+    (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
 
-    it('wraps non-Error thrown value in HttpException 500', async () => {
-      (generationsRepo.updateWizardProgressInDb as jest.Mock).mockRejectedValue('error string');
+    await recalculateGenerationCounts(1);
 
-      await expect(updateWizardProgress(1, 2, [1, 2])).rejects.toMatchObject({ status: 500 });
+    expect(dbService.handlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
+    expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(1, {
+      context_count: 5,
+      trigger_count: 3,
+      enrichment_table_count: 2,
     });
   });
 
-  // ── deleteTriggerTxtpConfig ──────────────────────────────────────────────────
+  it('handles zero counts from empty tables', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '0' }] });
+    (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
 
-  describe('deleteTriggerTxtpConfig', () => {
-    it('deletes trigger config successfully', async () => {
-      (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(true);
+    await recalculateGenerationCounts(1);
 
-      await deleteTriggerTxtpConfig(10);
-
-      expect(triggerConfigsRepo.deleteTriggerTxtpConfigInDb).toHaveBeenCalledWith(10);
-    });
-
-    it('throws 404 when trigger config not found', async () => {
-      (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockResolvedValue(false);
-
-      await expect(deleteTriggerTxtpConfig(999)).rejects.toMatchObject({
-        status: 404,
-        message: expect.stringContaining('not found'),
-      });
-    });
-
-    it('rethrows HttpException from repository', async () => {
-      const httpErr = new HttpException('in use', 409);
-      (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(httpErr);
-
-      await expect(deleteTriggerTxtpConfig(10)).rejects.toBe(httpErr);
-    });
-
-    it('wraps unknown Error in HttpException 500', async () => {
-      (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('db down'));
-
-      await expect(deleteTriggerTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
-    });
-
-    it('wraps non-Error thrown value in HttpException 500', async () => {
-      (triggerConfigsRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('error');
-
-      await expect(deleteTriggerTxtpConfig(10)).rejects.toMatchObject({ status: 500 });
+    expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(1, {
+      context_count: 0,
+      trigger_count: 0,
+      enrichment_table_count: 0,
     });
   });
 
-  // ── recalculateGenerationCounts ──────────────────────────────────────────────
+  it('rethrows HttpException from database or repository', async () => {
+    const httpErr = new HttpException('forbidden', 403);
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(httpErr);
 
-  describe('recalculateGenerationCounts', () => {
-    it('recalculates and updates counts from all three tables', async () => {
-      (dbService.handlePostExecuteSqlStatement as jest.Mock)
-        .mockResolvedValueOnce({ rows: [{ total: '5' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '3' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '2' }] });
-      (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
-
-      await recalculateGenerationCounts(1);
-
-      expect(dbService.handlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
-      expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(1, {
-        context_count: 5,
-        trigger_count: 3,
-        enrichment_table_count: 2,
-      });
-    });
-
-    it('handles zero counts from empty tables', async () => {
-      (dbService.handlePostExecuteSqlStatement as jest.Mock)
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] });
-      (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
-
-      await recalculateGenerationCounts(1);
-
-      expect(generationsRepo.updateGenerationCountsInDb).toHaveBeenCalledWith(1, {
-        context_count: 0,
-        trigger_count: 0,
-        enrichment_table_count: 0,
-      });
-    });
-
-    it('rethrows HttpException from database or repository', async () => {
-      const httpErr = new HttpException('forbidden', 403);
-      (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(httpErr);
-
-      await expect(recalculateGenerationCounts(1)).rejects.toBe(httpErr);
-    });
-
-    it('wraps unknown Error in HttpException 500', async () => {
-      (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(new Error('connection fail'));
-
-      await expect(recalculateGenerationCounts(1)).rejects.toMatchObject({ status: 500 });
-    });
-
-    it('wraps non-Error thrown value in HttpException 500', async () => {
-      (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue('network error');
-
-      await expect(recalculateGenerationCounts(1)).rejects.toMatchObject({ status: 500 });
-    });
-
-    it('parses string totals as base-10 integers', async () => {
-      (dbService.handlePostExecuteSqlStatement as jest.Mock)
-        .mockResolvedValueOnce({ rows: [{ total: '10' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '20' }] })
-        .mockResolvedValueOnce({ rows: [{ total: '30' }] });
-      (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
-
-      await recalculateGenerationCounts(1);
-
-      const call = (generationsRepo.updateGenerationCountsInDb as jest.Mock).mock.calls[0];
-      expect(call[1]).toEqual({
-        context_count: 10,
-        trigger_count: 20,
-        enrichment_table_count: 30,
-      });
-    });
+    await expect(recalculateGenerationCounts(1)).rejects.toBe(httpErr);
   });
 
-  // ── getGenerationSummary ─────────────────────────────────────────────────────
+  it('wraps unknown Error in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue(new Error('connection fail'));
 
-  describe('getGenerationSummary', () => {
-    const summary = {
-      id: 1,
-      suite_id: 42,
-      generation_number: 1,
-      context_configs: [],
-      trigger_configs: [],
-      enrichment_tables: [],
-    } as any;
+    await expect(recalculateGenerationCounts(1)).rejects.toMatchObject({ status: 500 });
+  });
 
-    it('returns generation summary when found', async () => {
-      (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(summary);
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue('network error');
 
-      const result = await getGenerationSummary(1);
+    await expect(recalculateGenerationCounts(1)).rejects.toMatchObject({ status: 500 });
+  });
 
-      expect(result).toEqual(summary);
-      expect(generationsRepo.getGenerationSummaryFromDb).toHaveBeenCalledWith(1);
+  it('parses string totals as base-10 integers', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ total: '10' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '20' }] })
+      .mockResolvedValueOnce({ rows: [{ total: '30' }] });
+    (generationsRepo.updateGenerationCountsInDb as jest.Mock).mockResolvedValue(undefined);
+
+    await recalculateGenerationCounts(1);
+
+    const call = (generationsRepo.updateGenerationCountsInDb as jest.Mock).mock.calls[0];
+    expect(call[1]).toEqual({
+      context_count: 10,
+      trigger_count: 20,
+      enrichment_table_count: 30,
     });
+  });
+});
 
-    it('returns null when generation not found', async () => {
-      (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(null);
+// ── getGenerationSummary ─────────────────────────────────────────────────────
 
-      const result = await getGenerationSummary(999);
+describe('getGenerationSummary', () => {
+  const summary = {
+    id: 1,
+    suite_id: 42,
+    generation_number: 1,
+    context_configs: [],
+    trigger_configs: [],
+    enrichment_tables: [],
+  } as any;
 
-      expect(result).toBeNull();
-    });
+  it('returns generation summary when found', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(summary);
 
-    it('rethrows HttpException from repository', async () => {
-      const httpErr = new HttpException('access denied', 403);
-      (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(httpErr);
+    const result = await getGenerationSummary(1);
 
-      await expect(getGenerationSummary(1)).rejects.toBe(httpErr);
-    });
+    expect(result).toEqual(summary);
+    expect(generationsRepo.getGenerationSummaryFromDb).toHaveBeenCalledWith(1);
+  });
 
-    it('wraps unknown Error in HttpException 500', async () => {
-      (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(new Error('db timeout'));
+  it('returns null when generation not found', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockResolvedValue(null);
 
-      await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
-    });
+    const result = await getGenerationSummary(999);
 
-    it('wraps non-Error thrown value in HttpException 500', async () => {
-      (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('error');
+    expect(result).toBeNull();
+  });
 
-      await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
-    });
+  it('rethrows HttpException from repository', async () => {
+    const httpErr = new HttpException('access denied', 403);
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(httpErr);
+
+    await expect(getGenerationSummary(1)).rejects.toBe(httpErr);
+  });
+
+  it('wraps unknown Error in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(new Error('db timeout'));
+
+    await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('error');
+
+    await expect(getGenerationSummary(1)).rejects.toMatchObject({ status: 500 });
   });
 });

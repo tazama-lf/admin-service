@@ -2345,7 +2345,7 @@ export const getContextMappingHandler = async (req: FastifyRequest, reply: Fasti
     const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
 
     if (mappings.length === 0) {
-      reply.status(200).send({ success: true, data: {} });
+      reply.status(200).send({ success: true, data: [] });
       return;
     }
 
@@ -2396,7 +2396,7 @@ export const getTriggerMappingHandler = async (req: FastifyRequest, reply: Fasti
     const mappings = await getTxtpMappings(parseInt(primaryTxtpId, 10), parseInt(relatedTxtpId, 10));
 
     if (mappings.length === 0) {
-      reply.status(200).send({ success: true, data: {} });
+      reply.status(200).send({ success: true, data: [] });
       return;
     }
 

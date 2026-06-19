@@ -202,17 +202,14 @@ export const cloneGenerationDataInDb = async (
           SELECT $1, txtp, txtp_version, display_order, message_count,
                  schema_snapshot, sample_payload_snapshot, faker_seed, generator_profile, NOW()
           FROM trs_suite_context_txtp_configs WHERE generation_id = $2
-          RETURNING id
+          RETURNING id, display_order
         ),
         source AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY display_order ASC) AS rn
+          SELECT id, display_order
           FROM trs_suite_context_txtp_configs WHERE generation_id = $2
-        ),
-        target AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
         )
-        SELECT source.id AS old_id, target.id AS new_id
-        FROM source JOIN target ON source.rn = target.rn
+        SELECT source.id AS old_id, inserted.id AS new_id
+        FROM source JOIN inserted ON source.display_order = inserted.display_order
       `,
       values: [newGen.id, sourceGenerationId],
     } satisfies PgQueryConfig,
@@ -259,17 +256,14 @@ export const cloneGenerationDataInDb = async (
                  expected_independent_variable, expected_result_band, notes,
                  faker_seed, generator_profile, NOW()
           FROM trs_suite_trigger_txtp_configs WHERE generation_id = $2
-          RETURNING id
+          RETURNING id, display_order
         ),
         source AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY display_order ASC) AS rn
+          SELECT id, display_order
           FROM trs_suite_trigger_txtp_configs WHERE generation_id = $2
-        ),
-        target AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
         )
-        SELECT source.id AS old_id, target.id AS new_id
-        FROM source JOIN target ON source.rn = target.rn
+        SELECT source.id AS old_id, inserted.id AS new_id
+        FROM source JOIN inserted ON source.display_order = inserted.display_order
       `,
       values: [newGen.id, sourceGenerationId],
     } satisfies PgQueryConfig,
@@ -312,17 +306,14 @@ export const cloneGenerationDataInDb = async (
           SELECT $1, table_name, table_order, row_count,
                  payload_template_json, schema_template_json, faker_profile, NOW()
           FROM trs_suite_enrichment_tables WHERE generation_id = $2
-          RETURNING id
+          RETURNING id, table_order
         ),
         source AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY table_order ASC) AS rn
+          SELECT id, table_order
           FROM trs_suite_enrichment_tables WHERE generation_id = $2
-        ),
-        target AS (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn FROM inserted
         )
-        SELECT source.id AS old_id, target.id AS new_id
-        FROM source JOIN target ON source.rn = target.rn
+        SELECT source.id AS old_id, inserted.id AS new_id
+        FROM source JOIN inserted ON source.table_order = inserted.table_order
       `,
       values: [newGen.id, sourceGenerationId],
     } satisfies PgQueryConfig,

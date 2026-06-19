@@ -242,7 +242,7 @@ export interface TriggerTxtpConfigWithStrategies {
   notes?: string;
   related_txtp_config_id?: number | null;
   field_strategies: TriggerFieldStrategy[];
-  related_transaction?: string;
+  related_transaction?: string | null;
 }
 
 export interface BulkTriggerConfigItemDto {

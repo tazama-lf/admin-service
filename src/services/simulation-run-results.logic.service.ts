@@ -21,7 +21,10 @@ export const saveRunResult = async (dto: SaveRunResultDto): Promise<{ run_id: nu
     return { run_id: result.run_id, result_id: result.result_id };
   } catch (error) {
     if (error instanceof HttpException) throw error;
-    throw new HttpException(`Failed to save run result: ${(error as Error).message}`, HttpStatus.INTERNAL_SERVER_ERROR);
+    throw new HttpException(
+      `Failed to save run result: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 };
 
@@ -34,6 +37,9 @@ export const getSuiteResult = async (suiteId: number): Promise<SuiteResultRow> =
     return result;
   } catch (error) {
     if (error instanceof HttpException) throw error;
-    throw new HttpException(`Failed to get suite results: ${(error as Error).message}`, HttpStatus.INTERNAL_SERVER_ERROR);
+    throw new HttpException(
+      `Failed to get suite results: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 };

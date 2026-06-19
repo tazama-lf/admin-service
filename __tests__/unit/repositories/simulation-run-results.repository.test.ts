@@ -171,8 +171,8 @@ describe('saveRunResultInDb', () => {
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existing run check
       .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 }) // run insert
-      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }); // result insert
 
     const result = await saveRunResultInDb(mockDto);
 
@@ -184,15 +184,14 @@ describe('saveRunResultInDb', () => {
   it('reuses existing run when found for gen_id', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
-      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check
-      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check (reuse, no increment)
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }); // result insert
 
     const result = await saveRunResultInDb(mockDto);
 
     expect(result.run_id).toBe(7);
     expect(result.result_id).toBe(200);
-    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(4);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(3);
   });
 
   it('throws when generation not found', async () => {
@@ -206,12 +205,12 @@ describe('saveRunResultInDb', () => {
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existing run check
       .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 }) // run insert
-      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }); // result insert
 
     await saveRunResultInDb(mockDto);
 
-    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[3];
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[4];
     const values = (insertResultCall[0] as { values: unknown[] }).values;
     expect(values[3]).toBe('.02');
     expect(values[4]).toBe(500);
@@ -221,9 +220,8 @@ describe('saveRunResultInDb', () => {
   it('sets outcome to FAILED when subRuleRef contains err', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
-      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check (reuse)
-      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check (reuse, no increment)
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }); // result insert
 
     await saveRunResultInDb({ ...mockDto, rule_result: { ...mockDto.rule_result, subRuleRef: '.err' } });
 
@@ -237,12 +235,12 @@ describe('saveRunResultInDb', () => {
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existing run check
       .mockResolvedValueOnce({ rows: [{ id: 10 }], rowCount: 1 }) // run insert
-      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 100 }], rowCount: 1 }); // result insert
 
     await saveRunResultInDb({ ...mockDto, rule_result: { id: 'rule01@1.0.0', cfg: 'none', wght: 0, prcgTm: 1000, tenantId: 'cbe' } });
 
-    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[3];
+    const insertResultCall = mockHandlePostExecuteSqlStatement.mock.calls[4];
     const values = (insertResultCall[0] as { values: unknown[] }).values;
     expect(values[3]).toBe('none');
     expect(values[4]).toBeNull();
@@ -251,9 +249,8 @@ describe('saveRunResultInDb', () => {
   it('passes trigger_id to result insert', async () => {
     mockHandlePostExecuteSqlStatement
       .mockResolvedValueOnce({ rows: [mockGenRow], rowCount: 1 }) // gen lookup
-      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check (reuse)
-      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }) // result insert
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 }); // suite run_count increment
+      .mockResolvedValueOnce({ rows: [{ id: 7 }], rowCount: 1 }) // existing run check (reuse, no increment)
+      .mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }); // result insert
 
     await saveRunResultInDb({ ...mockDto, trigger_id: 42 });
 

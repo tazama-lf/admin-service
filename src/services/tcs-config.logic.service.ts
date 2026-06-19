@@ -411,7 +411,7 @@ export const handleGetConfigByTransactionTypew3 = async (transactionType: string
     const errorMessage = error as { message: string };
     loggerService.error(
       `No config found for txtp: ${transactionType}, version: ${version}, tenant: ${tenantId}. Error: ${errorMessage.message}`,
-      'handleGetConfigByTransactionType',
+      'handleGetConfigByTransactionTypew3',
     );
     throw new Error('Configuration not found');
   }

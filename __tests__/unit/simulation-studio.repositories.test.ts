@@ -17,15 +17,19 @@ import {
   getNextGenerationNumber,
   getGenerationsBySuiteId,
   getLatestGenerationBySuiteId,
+  resumeGenerationInDb,
+  updateGenerationStatusInDb,
   updateGenerationCountsInDb,
   getGenerationSummaryFromDb,
   updateWizardProgressInDb,
-  resumeGenerationInDb,
+  getGenerationByIdFromDb,
+  cloneGenerationDataInDb,
 } from '../../src/repositories/simulation-studio/suite-generations.repository';
 import {
   createContextTxtpConfigInDb,
   updateContextTxtpConfigInDb,
   getContextTxtpConfigsByGenerationId,
+  getContextTxtpConfigById,
   deleteContextTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/context-txtp-configs.repository';
 import {
@@ -36,11 +40,12 @@ import {
   createTriggerTxtpConfigInDb,
   updateTriggerTxtpConfigInDb,
   getTriggerTxtpConfigsByGenerationId,
+  getTriggerTxtpConfigByIdInDb,
   deleteTriggerTxtpConfigInDb,
 } from '../../src/repositories/simulation-studio/trigger-txtp-configs.repository';
 import {
-  upsertTriggerFieldOverrideInDb,
-  getTriggerFieldOverridesByConfigId,
+  upsertTriggerFieldStrategyInDb,
+  getTriggerFieldStrategiesByConfigId,
 } from '../../src/repositories/simulation-studio/trigger-field-strategies.repository';
 import {
   createEnrichmentTableInDb,
@@ -49,6 +54,7 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../../src/repositories/simulation-studio/enrichment-tables.repository';
+import { getEnrichmentFieldStrategiesByTableId } from '../../src/repositories/simulation-studio/enrichment-field-strategies.repository';
 
 const mockDb = db.handlePostExecuteSqlStatement as jest.Mock;
 
@@ -58,7 +64,7 @@ const generationRow = {
   generation_number: 1,
   status: 'DRAFT',
   simulation_type: 'SINGLE_RULE',
-  rule_repo: null,
+  rule_name: null,
   rule_version: null,
   context_count: 0,
   trigger_count: 0,
@@ -105,6 +111,20 @@ const fieldStrategyRow = {
   is_required_override: null,
   created_at: '2026-05-01T00:00:00.000Z',
   updated_at: '2026-05-01T00:00:00.000Z',
+};
+
+const enrichmentFieldStrategyRow = {
+  id: 1,
+  enrichment_table_id: 30,
+  column_name: 'amount',
+  column_type: null,
+  strategy_code: 'range',
+  static_value: null,
+  range_min: 1,
+  range_max: 99,
+  generator_type: null,
+  generator_options: '{"min":1,"max":99}',
+  created_at: '2026-05-01T00:00:00.000Z',
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -200,18 +220,18 @@ describe('createSuiteGenerationInDb — optional fields', () => {
     expect(callValues[1]).toBe('INTEGRATION_TESTING');
   });
 
-  it('passes non-null rule_repo and rule_version when provided', async () => {
+  it('passes non-null rule_name and rule_version when provided', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb(
-      { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_repo: 'repo-a', rule_version: 'v1' },
+      { suite_id: 42, simulation_type: 'SINGLE_RULE' as any, rule_name: 'rule-a', rule_version: 'v1' },
       'user-1',
     );
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBe('repo-a');
+    expect(callValues[2]).toBe('rule-a');
     expect(callValues[3]).toBe('v1');
   });
 
-  it('passes null for optional rule_repo and rule_version when absent', async () => {
+  it('passes null for optional rule_name and rule_version when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
     await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
@@ -319,33 +339,89 @@ describe('getContextTxtpConfigsByGenerationId', () => {
 });
 
 describe('deleteContextTxtpConfigInDb', () => {
-  it('returns true when row deleted', async () => {
-    mockDb.mockResolvedValue({ rows: [{ id: 10 }] } as never);
+  it('returns true when target and related rows are deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '2' }] } as never);
     expect(await deleteContextTxtpConfigInDb(10)).toBe(true);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_context_txtp_configs') }),
       'simulation',
     );
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('related_txtp_config_id') }), 'simulation');
   });
 
   it('returns false when row not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] } as never);
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '0' }] } as never);
     expect(await deleteContextTxtpConfigInDb(999)).toBe(false);
+  });
+
+  it('returns false when rows array is empty (deleted_count defaults to 0)', async () => {
+    mockDb.mockResolvedValue({ rows: [] } as never);
+    expect(await deleteContextTxtpConfigInDb(10)).toBe(false);
+  });
+});
+
+describe('createContextTxtpConfigInDb — object-typed row fields', () => {
+  it('handles schema_snapshot, sample_payload_snapshot, and generator_profile already as objects', async () => {
+    const objectRow = {
+      ...contextConfigRow,
+      schema_snapshot: { type: 'object' },
+      sample_payload_snapshot: { test: 'payload' },
+      generator_profile: { mode: 'fast' },
+      related_txtp_config_id: 5,
+    };
+    mockDb.mockResolvedValue({ rows: [objectRow] });
+
+    const result = await createContextTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 100,
+      schema_snapshot: { type: 'object' },
+      sample_payload_snapshot: { test: 'payload' },
+    });
+
+    expect(result.schema_snapshot).toEqual({ type: 'object' });
+    expect(result.sample_payload_snapshot).toEqual({ test: 'payload' });
+    expect(result.generator_profile).toEqual({ mode: 'fast' });
+    expect(result.related_txtp_config_id).toBe(5);
+  });
+
+  it('handles null sample_payload_snapshot (maps to undefined)', async () => {
+    const noPayloadRow = {
+      ...contextConfigRow,
+      sample_payload_snapshot: null,
+      related_txtp_config_id: null,
+    };
+    mockDb.mockResolvedValue({ rows: [noPayloadRow] });
+
+    const result = await createContextTxtpConfigInDb({
+      generation_id: 1,
+      txtp: 'pacs.008',
+      txtp_version: '001.08',
+      display_order: 1,
+      message_count: 100,
+      schema_snapshot: {},
+    });
+
+    expect(result.sample_payload_snapshot).toBeUndefined();
+    expect(result.related_txtp_config_id).toBeNull();
   });
 });
 
 describe('deleteTriggerTxtpConfigInDb', () => {
-  it('returns true when row deleted', async () => {
-    mockDb.mockResolvedValue({ rows: [{ id: 20 }] } as never);
+  it('returns true when target and related rows are deleted', async () => {
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '2' }] } as never);
     expect(await deleteTriggerTxtpConfigInDb(20)).toBe(true);
     expect(mockDb).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('DELETE FROM trs_suite_trigger_txtp_configs') }),
       'simulation',
     );
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('related_txtp_config_id') }), 'simulation');
   });
 
   it('returns false when row not found', async () => {
-    mockDb.mockResolvedValue({ rows: [] } as never);
+    mockDb.mockResolvedValue({ rows: [{ deleted_count: '0' }] } as never);
     expect(await deleteTriggerTxtpConfigInDb(999)).toBe(false);
   });
 });
@@ -423,13 +499,13 @@ describe('createSuiteGenerationInDb — optional fields', () => {
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(['SINGLE_RULE']) }), 'simulation');
   });
 
-  it('passes null for optional rule_repo, rule_version, userEmail when absent', async () => {
+  it('passes null for optional rule_name, rule_version, userEmail when absent', async () => {
     mockDb.mockResolvedValue({ rows: [generationRow] });
 
     await createSuiteGenerationInDb({ suite_id: 42, simulation_type: 'INTEGRATION_TESTING' as any }, 'user-1');
 
     const callValues = (mockDb.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(callValues[2]).toBeNull(); // rule_repo
+    expect(callValues[2]).toBeNull(); // rule_name
     expect(callValues[3]).toBeNull(); // rule_version
     expect(callValues[7]).toBeNull(); // userEmail
   });
@@ -454,11 +530,11 @@ const triggerConfigRow = {
   created_at: '2026-05-01T00:00:00.000Z',
 };
 
-const triggerOverrideRow = {
+const triggerStrategyRow = {
   id: 1,
   trigger_txtp_config_id: 20,
   field_path: 'amount',
-  override_type: 'null',
+  strategy_code: 'null',
   static_value: null,
   range_min: null,
   range_max: null,
@@ -572,6 +648,18 @@ describe('updateTriggerTxtpConfigInDb', () => {
     expect(result!.faker_seed).toBe(99);
   });
 
+  it('updates expected_independent_variable', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, expected_independent_variable: true }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { expected_independent_variable: true });
+    expect(result!.expected_independent_variable).toBe(true);
+  });
+
+  it('updates related_txtp_config_id', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerConfigRow, related_txtp_config_id: 7 }] });
+    const result = await updateTriggerTxtpConfigInDb(20, { related_txtp_config_id: 7 });
+    expect(result!.related_txtp_config_id).toBe(7);
+  });
+
   it('fetches existing row when no fields to update', async () => {
     mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
     const result = await updateTriggerTxtpConfigInDb(20, {});
@@ -606,39 +694,39 @@ describe('getTriggerTxtpConfigsByGenerationId', () => {
 
 // ── trigger-field-strategies.repository ─────────────────────────────────────
 
-describe('upsertTriggerFieldOverrideInDb', () => {
-  it('upserts row and returns mapped override', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+describe('upsertTriggerFieldStrategyInDb', () => {
+  it('upserts row and returns mapped strategy', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerStrategyRow] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'null',
+      strategy_code: 'null',
     });
 
     expect(result.id).toBe(1);
     expect(result.trigger_txtp_config_id).toBe(20);
-    expect(result.override_type).toBe('null');
+    expect(result.strategy_code).toBe('null');
     expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('ON CONFLICT') }), 'simulation');
   });
 
-  it('handles static override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'static', static_value: '"999"' }] });
+  it('handles static strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'static', static_value: '"999"' }] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'static',
+      strategy_code: 'static',
       static_value: '999',
     });
 
-    expect(result.override_type).toBe('static');
+    expect(result.strategy_code).toBe('static');
   });
 
-  it('handles range override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'range', range_min: 1, range_max: 100 }] });
+  it('handles range strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'range', range_min: 1, range_max: 100 }] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'amount',
-      override_type: 'range',
+      strategy_code: 'range',
       range_min: 1,
       range_max: 100,
     });
@@ -648,12 +736,12 @@ describe('upsertTriggerFieldOverrideInDb', () => {
   });
 
   it('handles generator_options as object (not string)', async () => {
-    const rowWithObj = { ...triggerOverrideRow, generator_options: { type: 'bic' } };
+    const rowWithObj = { ...triggerStrategyRow, generator_options: { type: 'bic' } };
     mockDb.mockResolvedValue({ rows: [rowWithObj] });
 
-    const result = await upsertTriggerFieldOverrideInDb(20, {
+    const result = await upsertTriggerFieldStrategyInDb(20, {
       field_path: 'bic',
-      override_type: 'generated',
+      strategy_code: 'generated',
       faker_semantic_type: 'iso20022.bic',
       generator_options: { type: 'bic' },
     });
@@ -661,27 +749,27 @@ describe('upsertTriggerFieldOverrideInDb', () => {
     expect(result.generator_options).toEqual({ type: 'bic' });
   });
 
-  it('handles remove override type', async () => {
-    mockDb.mockResolvedValue({ rows: [{ ...triggerOverrideRow, override_type: 'remove' }] });
-    const result = await upsertTriggerFieldOverrideInDb(20, { field_path: 'field.a', override_type: 'remove' });
-    expect(result.override_type).toBe('remove');
+  it('handles skip strategy_code', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...triggerStrategyRow, strategy_code: 'skip' }] });
+    const result = await upsertTriggerFieldStrategyInDb(20, { field_path: 'field.a', strategy_code: 'skip' });
+    expect(result.strategy_code).toBe('skip');
   });
 });
 
-describe('getTriggerFieldOverridesByConfigId', () => {
-  it('returns mapped overrides array', async () => {
-    mockDb.mockResolvedValue({ rows: [triggerOverrideRow] });
+describe('getTriggerFieldStrategiesByConfigId', () => {
+  it('returns mapped strategies array', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerStrategyRow] });
 
-    const result = await getTriggerFieldOverridesByConfigId(20);
+    const result = await getTriggerFieldStrategiesByConfigId(20);
 
     expect(result).toHaveLength(1);
     expect(result[0].field_path).toBe('amount');
-    expect(result[0].override_type).toBe('null');
+    expect(result[0].strategy_code).toBe('null');
   });
 
   it('returns empty array when no rows', async () => {
     mockDb.mockResolvedValue({ rows: [] });
-    expect(await getTriggerFieldOverridesByConfigId(20)).toEqual([]);
+    expect(await getTriggerFieldStrategiesByConfigId(20)).toEqual([]);
   });
 });
 
@@ -1022,32 +1110,235 @@ describe('updateWizardProgressInDb', () => {
 
 describe('resumeGenerationInDb', () => {
   it('returns latest DRAFT generation when found', async () => {
-    const row = {
-      id: 1,
-      suite_id: 42,
-      generation_number: 2,
-      status: 'DRAFT',
-      simulation_type: 'SINGLE_RULE',
-      wizard_snapshot: {},
-      generation_metadata: {},
-      created_by: 'user-1',
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
-    mockDb.mockResolvedValue({ rows: [row] } as never);
+    mockDb.mockResolvedValue({ rows: [generationRow] });
 
     const result = await resumeGenerationInDb(42);
 
     expect(result).not.toBeNull();
-    expect(result?.suite_id).toBe(42);
-    const callArg = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
-    expect(callArg.text).toContain('DRAFT');
-    expect(callArg.values[0]).toBe(42);
+    expect(result!.suite_id).toBe(42);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [42] }), 'simulation');
   });
 
   it('returns null when no DRAFT generation exists', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await resumeGenerationInDb(42)).toBeNull();
+  });
+});
+
+describe('updateGenerationStatusInDb', () => {
+  it('updates status and returns mapped generation', async () => {
+    mockDb.mockResolvedValue({ rows: [{ ...generationRow, status: 'READY' }] });
+
+    const result = await updateGenerationStatusInDb(1, 'READY');
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('READY');
+    const callArg = mockDb.mock.calls[0][0] as { values: unknown[] };
+    expect(callArg.values).toEqual(['READY', 1]);
+  });
+
+  it('returns null when generation is not found', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await updateGenerationStatusInDb(999, 'COMPLETED')).toBeNull();
+  });
+});
+
+describe('getContextTxtpConfigById', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [contextConfigRow] });
+
+    const result = await getContextTxtpConfigById(1);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [1] }), 'simulation');
+  });
+
+  it('returns null when config does not exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getContextTxtpConfigById(999)).toBeNull();
+  });
+});
+
+describe('getTriggerTxtpConfigByIdInDb', () => {
+  it('returns mapped config when found', async () => {
+    mockDb.mockResolvedValue({ rows: [triggerConfigRow] });
+
+    const result = await getTriggerTxtpConfigByIdInDb(20);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(20);
+    expect(mockDb).toHaveBeenCalledWith(expect.objectContaining({ values: [20] }), 'simulation');
+  });
+
+  it('returns null when config does not exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getTriggerTxtpConfigByIdInDb(999)).toBeNull();
+  });
+});
+
+describe('getEnrichmentFieldStrategiesByTableId', () => {
+  it('returns mapped strategies and defaults null column_type to text', async () => {
+    mockDb.mockResolvedValue({ rows: [enrichmentFieldStrategyRow] });
+
+    const result = await getEnrichmentFieldStrategiesByTableId(30);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].enrichment_table_id).toBe(30);
+    expect(result[0].column_type).toBe('text');
+    expect(result[0].generator_options).toEqual({ min: 1, max: 99 });
+  });
+
+  it('returns empty array when no strategies exist', async () => {
+    mockDb.mockResolvedValue({ rows: [] });
+
+    expect(await getEnrichmentFieldStrategiesByTableId(30)).toEqual([]);
+  });
+
+  it('passes through generator_options when already an object', async () => {
+    const rowWithObjectOptions = { ...enrichmentFieldStrategyRow, generator_options: { min: 1, max: 99 } };
+    mockDb.mockResolvedValue({ rows: [rowWithObjectOptions] });
+
+    const result = await getEnrichmentFieldStrategiesByTableId(30);
+    expect(result[0].generator_options).toEqual({ min: 1, max: 99 });
+  });
+});
+
+// ── getGenerationByIdFromDb ───────────────────────────────────────────────────
+
+describe('getGenerationByIdFromDb', () => {
+  it('returns mapped generation when found', async () => {
+    mockDb.mockResolvedValue({ rows: [generationRow] } as never);
+    const result = await getGenerationByIdFromDb(1);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(mockDb).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('SELECT * FROM trs_suite_generations WHERE id = $1') }),
+      'simulation',
+    );
+  });
+
+  it('returns null when not found', async () => {
     mockDb.mockResolvedValue({ rows: [] } as never);
-    const result = await resumeGenerationInDb(99);
-    expect(result).toBeNull();
+    expect(await getGenerationByIdFromDb(999)).toBeNull();
+  });
+});
+
+// ── cloneGenerationDataInDb ───────────────────────────────────────────────────
+
+describe('cloneGenerationDataInDb', () => {
+  it('inserts new generation row with target suite id and generation number', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99, suite_id: 5, generation_number: 2 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const result = await cloneGenerationDataInDb(1, 5, 2, 'user-1', 'user@test.com');
+
+    expect(result.id).toBe(99);
+    expect(result.suite_id).toBe(5);
+    expect(result.generation_number).toBe(2);
+    // First DB call inserts into trs_suite_generations
+    const firstCall = mockDb.mock.calls[0][0] as { text: string; values: unknown[] };
+    expect(firstCall.text).toContain('INSERT INTO trs_suite_generations');
+    expect(firstCall.values[0]).toBe(5); // targetSuiteId
+    expect(firstCall.values[1]).toBe(2); // targetGenerationNumber
+    expect(firstCall.values[2]).toBe('user-1');
+  });
+
+  it('clones context txtp configs and their field strategies', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ old_id: 10, new_id: 20 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    // Second call = context txtp clone WITH/SELECT
+    const ctxCall = mockDb.mock.calls[1][0] as { text: string };
+    expect(ctxCall.text).toContain('trs_suite_context_txtp_configs');
+
+    // Third call = field strategy insert for mapped config
+    const fsCall = mockDb.mock.calls[2][0] as { text: string; values: unknown[] };
+    expect(fsCall.text).toContain('trs_suite_context_field_strategies');
+    expect(fsCall.values[0]).toBe(20); // newId
+    expect(fsCall.values[1]).toBe(10); // oldId
+  });
+
+  it('clones trigger txtp configs and their field overrides', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ old_id: 30, new_id: 40 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    const trigCall = mockDb.mock.calls[2][0] as { text: string };
+    expect(trigCall.text).toContain('trs_suite_trigger_txtp_configs');
+
+    const overrideCall = mockDb.mock.calls[3][0] as { text: string; values: unknown[] };
+    expect(overrideCall.text).toContain('trs_suite_trigger_field_strategies');
+    expect(overrideCall.values[0]).toBe(40);
+    expect(overrideCall.values[1]).toBe(30);
+  });
+
+  it('clones enrichment tables', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1');
+
+    const enrichCall = mockDb.mock.calls[3][0] as { text: string };
+    expect(enrichCall.text).toContain('trs_suite_enrichment_tables');
+  });
+
+  it('clones runs and run results when cloneRuns=true and runs exist', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never) // gen insert
+      .mockResolvedValueOnce({ rows: [] } as never) // ctx txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // trig txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // enrichment
+      .mockResolvedValueOnce({ rows: [{ old_run_id: 50, new_run_id: 60 }] } as never) // runs insert
+      .mockResolvedValueOnce({ rows: [] } as never); // run_results insert
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1', undefined, true);
+
+    const runsCall = mockDb.mock.calls[4][0] as { text: string; values: unknown[] };
+    expect(runsCall.text).toContain('trs_simulation_runs');
+    expect(runsCall.values[0]).toBe(5); // targetSuiteId
+    expect(runsCall.values[1]).toBe(99); // newGen.id
+
+    const resultsCall = mockDb.mock.calls[5][0] as { text: string; values: unknown[] };
+    expect(resultsCall.text).toContain('trs_simulation_run_results');
+    expect(resultsCall.values[0]).toBe(60); // newRunId
+    expect(resultsCall.values[1]).toBe(50); // oldRunId
+  });
+
+  it('skips run_results insert when cloneRuns=true but no runs exist', async () => {
+    mockDb
+      .mockResolvedValueOnce({ rows: [{ ...generationRow, id: 99 }] } as never) // gen insert
+      .mockResolvedValueOnce({ rows: [] } as never) // ctx txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // trig txtp
+      .mockResolvedValueOnce({ rows: [] } as never) // enrichment
+      .mockResolvedValueOnce({ rows: [] } as never); // runs insert — no rows
+
+    await cloneGenerationDataInDb(1, 5, 2, 'user-1', undefined, true);
+
+    // Only 5 calls — no run_results call since runs were empty
+    expect(mockDb).toHaveBeenCalledTimes(5);
+    const runsCall = mockDb.mock.calls[4][0] as { text: string };
+    expect(runsCall.text).toContain('trs_simulation_runs');
   });
 });

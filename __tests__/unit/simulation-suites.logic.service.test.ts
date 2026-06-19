@@ -5,19 +5,33 @@ process.env.ACTIVE_CONDITIONS_ONLY = 'true';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import * as simulationSuitesService from '../../src/services/simulation-suites.logic.service';
 import * as simulationSuitesRepository from '../../src/repositories/simulation-studio/suites.repository';
+import * as suiteGenerationsRepository from '../../src/repositories/simulation-studio/suite-generations.repository';
 import * as trsGenService from '../../src/services/trs-suite-generation.logic.service';
 import * as triggerService from '../../src/services/trigger-txtp-config.logic.service';
 
 jest.mock('../../src/repositories/simulation-studio/suites.repository', () => ({
+  getSimulationSuitesCountsFromDb: jest.fn(),
   getSimulationSuitesFromDb: jest.fn(),
   getSimulationSuiteByIdFromDb: jest.fn(),
   createSimulationSuiteInDb: jest.fn(),
   updateSimulationSuiteInDb: jest.fn(),
+  incrementSuiteIterationCountInDb: jest.fn(),
 }));
 
 jest.mock('../../src/services/trs-suite-generation.logic.service', () => ({
   createSuiteGeneration: jest.fn(),
   createContextTxtpConfig: jest.fn(),
+  recalculateGenerationCounts: jest.fn(),
+  cloneGeneration: jest.fn(),
+  getLatestGenerationBySuiteId: jest.fn(),
+  getNextGenerationNumber: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
+}));
+
+jest.mock('../../src/repositories/simulation-studio/suite-generations.repository', () => ({
+  getGenerationsBySuiteId: jest.fn(),
+  getNextGenerationNumber: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
 }));
 
 jest.mock('../../src/services/trigger-txtp-config.logic.service', () => ({
@@ -54,6 +68,8 @@ describe('Simulation Suites Logic Service', () => {
     (trsGenService.createSuiteGeneration as jest.Mock).mockResolvedValue({ id: 7, suite_id: 1 });
     (trsGenService.createContextTxtpConfig as jest.Mock).mockResolvedValue({ context_txtp_config_id: 1, field_strategies: [] });
     (triggerService.createTriggerTxtpConfig as jest.Mock).mockResolvedValue({ trigger_txtp_config_id: 1, field_overrides: [] });
+    (trsGenService.recalculateGenerationCounts as jest.Mock).mockResolvedValue(undefined);
+    (simulationSuitesRepository.incrementSuiteIterationCountInDb as jest.Mock).mockResolvedValue(undefined as never);
   });
 
   describe('getSimulationSuites', () => {
@@ -73,6 +89,36 @@ describe('Simulation Suites Logic Service', () => {
 
       await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow(
         'Failed to retrieve simulation suites: DB failure',
+      );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuitesFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuites({ tenantId: mockTenantId } as any)).rejects.toThrow('Unknown error');
+    });
+  });
+
+  describe('getSimulationSuitesCounts', () => {
+    it('should return suites counts', async () => {
+      const response = {
+        total_suites: 10,
+        total_draft_suites: 4,
+        total_completed_suites: 3,
+        latest_run_at: new Date('2026-06-01T00:00:00.000Z'),
+      };
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockResolvedValue(response);
+
+      const result = await simulationSuitesService.getSimulationSuitesCounts(mockTenantId);
+
+      expect(result).toEqual(response);
+      expect(simulationSuitesRepository.getSimulationSuitesCountsFromDb).toHaveBeenCalledWith(mockTenantId);
+    });
+
+    it('should wrap repository errors for counts', async () => {
+      (simulationSuitesRepository.getSimulationSuitesCountsFromDb as jest.Mock).mockRejectedValue(new Error('DB failure'));
+
+      await expect(simulationSuitesService.getSimulationSuitesCounts(mockTenantId)).rejects.toThrow(
+        'Failed to retrieve simulation suites counts: DB failure',
       );
     });
   });
@@ -102,6 +148,11 @@ describe('Simulation Suites Logic Service', () => {
         'Failed to retrieve simulation suite: DB crash',
       );
     });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.getSimulationSuiteById(1, mockTenantId)).rejects.toThrow('Unknown error');
+    });
   });
 
   describe('createSimulationSuite', () => {
@@ -123,6 +174,7 @@ describe('Simulation Suites Logic Service', () => {
         mockUserId,
         mockUserEmail,
       );
+      expect(trsGenService.recalculateGenerationCounts).toHaveBeenCalledWith(7);
     });
 
     it('should validate empty name', async () => {
@@ -157,6 +209,18 @@ describe('Simulation Suites Logic Service', () => {
       await expect(simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId)).rejects.toThrow(
         'Failed to create simulation suite: trigger DB fail',
       );
+    });
+
+    it('skips txtp config creation when primary_txtp is absent', async () => {
+      const suiteWithoutTxtp = { ...mockSuite, primary_txtp: null, primary_txtp_version: null };
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(suiteWithoutTxtp);
+
+      const result = await simulationSuitesService.createSimulationSuite({ name: 'Test' } as any, mockTenantId, mockUserId);
+
+      expect(trsGenService.createContextTxtpConfig).not.toHaveBeenCalled();
+      expect(triggerService.createTriggerTxtpConfig).not.toHaveBeenCalled();
+      expect(trsGenService.recalculateGenerationCounts).not.toHaveBeenCalled();
+      expect(result).toEqual({ ...suiteWithoutTxtp, generation_id: 7 });
     });
   });
 
@@ -208,6 +272,158 @@ describe('Simulation Suites Logic Service', () => {
       await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
         'Failed to update simulation suite: DB update failed',
       );
+    });
+
+    it('wraps non-Error thrown value with Unknown error', async () => {
+      (simulationSuitesRepository.updateSimulationSuiteInDb as jest.Mock).mockRejectedValue('string failure');
+      await expect(simulationSuitesService.updateSimulationSuite(1, mockTenantId, { status: 'DRAFT' } as any)).rejects.toThrow(
+        'Unknown error',
+      );
+    });
+  });
+
+  describe('cloneSuite', () => {
+    it('should clone suite with generation', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId, mockUserEmail)).rejects.toThrow('Suite 999 not found');
+    });
+
+    it('should handle suite not found', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValueOnce(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId)).rejects.toThrow('not found');
+    });
+
+    it('should handle suite without generation', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(null);
+
+      await expect(simulationSuitesService.cloneSuite(999, mockTenantId, mockUserId)).rejects.toThrow('Suite 999 not found');
+    });
+
+    it('should wrap database errors', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId)).rejects.toThrow('Failed to clone suite');
+    });
+
+    it('should pass userEmail parameter', async () => {
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail)).rejects.toThrow(
+        'Failed to clone suite: DB error',
+      );
+    });
+
+    it('clones suite and generation when source generation exists', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+      const sourceGen = { id: 10, suite_id: 1, generation_number: 1, status: 'COMPLETED' };
+      const newGen = { id: 11, suite_id: 2, generation_number: 1 };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([sourceGen] as never);
+      (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock).mockResolvedValue(1 as never);
+      (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(newGen as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail);
+
+      expect(result).toEqual({ suite: { ...newSuite, generation_id: newGen.id }, generation_id: newGen.id });
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledWith(
+        sourceGen.id,
+        newSuite.id,
+        1,
+        mockUserId,
+        mockUserEmail,
+        false,
+      );
+    });
+
+    it('clones suite without generation when no source generation exists', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([] as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId);
+
+      expect(result).toEqual({ suite: newSuite, generation_id: null });
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).not.toHaveBeenCalled();
+    });
+
+    it('clones historical COMPLETED/FAILED gens with runs and latest gen as DRAFT', async () => {
+      const newSuite = { ...mockSuite, id: 2, name: 'Q3 Edge Cases (Copy)' };
+      const completedGen = { id: 10, suite_id: 1, generation_number: 1, status: 'COMPLETED' };
+      const failedGen = { id: 11, suite_id: 1, generation_number: 2, status: 'FAILED' };
+      const draftGen = { id: 12, suite_id: 1, generation_number: 3, status: 'DRAFT' };
+      const latestGen = { id: 13, suite_id: 1, generation_number: 4, status: 'RUNNING' };
+      const clonedCompleted = { id: 20, suite_id: 2, generation_number: 1 };
+      const clonedFailed = { id: 21, suite_id: 2, generation_number: 2 };
+      const clonedRunningPreserved = { id: 22, suite_id: 2, generation_number: 3 };
+      const clonedDraft = { id: 23, suite_id: 2, generation_number: 4 };
+
+      (simulationSuitesRepository.getSimulationSuiteByIdFromDb as jest.Mock).mockResolvedValue(mockSuite as never);
+      (simulationSuitesRepository.createSimulationSuiteInDb as jest.Mock).mockResolvedValue(newSuite as never);
+      (suiteGenerationsRepository.getGenerationsBySuiteId as jest.Mock).mockResolvedValue([
+        completedGen,
+        failedGen,
+        draftGen,
+        latestGen,
+      ] as never);
+      (suiteGenerationsRepository.getNextGenerationNumber as jest.Mock)
+        .mockResolvedValueOnce(1 as never)
+        .mockResolvedValueOnce(2 as never)
+        .mockResolvedValueOnce(3 as never)
+        .mockResolvedValueOnce(4 as never);
+      (suiteGenerationsRepository.cloneGenerationDataInDb as jest.Mock)
+        .mockResolvedValueOnce(clonedCompleted as never)
+        .mockResolvedValueOnce(clonedFailed as never)
+        .mockResolvedValueOnce(clonedRunningPreserved as never)
+        .mockResolvedValueOnce(clonedDraft as never);
+
+      const result = await simulationSuitesService.cloneSuite(1, mockTenantId, mockUserId, mockUserEmail);
+
+      // DRAFT gen (id:12) skipped; COMPLETED/FAILED/RUNNING cloned with runs;
+      // latest gen (RUNNING) also cloned as new DRAFT working copy
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenCalledTimes(4);
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        1,
+        completedGen.id,
+        newSuite.id,
+        1,
+        mockUserId,
+        mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        2,
+        failedGen.id,
+        newSuite.id,
+        2,
+        mockUserId,
+        mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        3,
+        latestGen.id,
+        newSuite.id,
+        3,
+        mockUserId,
+        mockUserEmail,
+        true,
+      );
+      expect(suiteGenerationsRepository.cloneGenerationDataInDb).toHaveBeenNthCalledWith(
+        4,
+        latestGen.id,
+        newSuite.id,
+        4,
+        mockUserId,
+        mockUserEmail,
+        false,
+      );
+      expect(result).toEqual({ suite: { ...newSuite, generation_id: clonedDraft.id }, generation_id: clonedDraft.id });
     });
   });
 });

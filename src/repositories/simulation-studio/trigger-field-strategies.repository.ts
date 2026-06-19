@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { TriggerFieldOverride, UpsertTriggerFieldOverrideDto } from '../../interface/suite-generation.interface';
+import type { TriggerFieldStrategy, UpsertTriggerFieldStrategyDto } from '../../interface/simulation-studio/trigger-txtp.interface';
 
-const mapRow = (row: Record<string, unknown>): TriggerFieldOverride => ({
+const mapRow = (row: Record<string, unknown>): TriggerFieldStrategy => ({
   id: row.id as number,
   trigger_txtp_config_id: row.trigger_txtp_config_id as number,
   field_path: row.field_path as string,
-  override_type: row.override_type as TriggerFieldOverride['override_type'],
+  strategy_code: row.strategy_code as TriggerFieldStrategy['strategy_code'],
   static_value: row.static_value ?? undefined,
   range_min: row.range_min as number | undefined,
   range_max: row.range_max as number | undefined,
@@ -19,20 +19,20 @@ const mapRow = (row: Record<string, unknown>): TriggerFieldOverride => ({
   created_at: new Date(row.created_at as string),
 });
 
-export const upsertTriggerFieldOverrideInDb = async (
+export const upsertTriggerFieldStrategyInDb = async (
   triggerTxtpConfigId: number,
-  dto: UpsertTriggerFieldOverrideDto,
-): Promise<TriggerFieldOverride> => {
+  dto: UpsertTriggerFieldStrategyDto,
+): Promise<TriggerFieldStrategy> => {
   const query = `
-    INSERT INTO trs_suite_trigger_field_overrides (
-      trigger_txtp_config_id, field_path, override_type,
+    INSERT INTO trs_suite_trigger_field_strategies (
+      trigger_txtp_config_id, field_path, strategy_code,
       static_value, range_min, range_max,
       faker_semantic_type, generator_options,
       created_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
     ON CONFLICT (trigger_txtp_config_id, field_path)
     DO UPDATE SET
-      override_type     = EXCLUDED.override_type,
+      strategy_code     = EXCLUDED.strategy_code,
       static_value      = EXCLUDED.static_value,
       range_min         = EXCLUDED.range_min,
       range_max         = EXCLUDED.range_max,
@@ -47,7 +47,7 @@ export const upsertTriggerFieldOverrideInDb = async (
       values: [
         triggerTxtpConfigId,
         dto.field_path,
-        dto.override_type,
+        dto.strategy_code,
         dto.static_value !== undefined ? JSON.stringify(dto.static_value) : null,
         dto.range_min ?? null,
         dto.range_max ?? null,
@@ -61,9 +61,9 @@ export const upsertTriggerFieldOverrideInDb = async (
   return mapRow(result.rows[0]);
 };
 
-export const getTriggerFieldOverridesByConfigId = async (triggerTxtpConfigId: number): Promise<TriggerFieldOverride[]> => {
+export const getTriggerFieldStrategiesByConfigId = async (triggerTxtpConfigId: number): Promise<TriggerFieldStrategy[]> => {
   const query = `
-    SELECT * FROM trs_suite_trigger_field_overrides
+    SELECT * FROM trs_suite_trigger_field_strategies
     WHERE trigger_txtp_config_id = $1
     ORDER BY field_path ASC
   `;

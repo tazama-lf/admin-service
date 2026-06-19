@@ -10,6 +10,8 @@ jest.mock('../../src/repositories/simulation-studio/suite-generations.repository
   updateGenerationCountsInDb: jest.fn(),
   getGenerationSummaryFromDb: jest.fn(),
   updateWizardProgressInDb: jest.fn(),
+  getGenerationByIdFromDb: jest.fn(),
+  cloneGenerationDataInDb: jest.fn(),
 }));
 
 jest.mock('../../src/repositories/simulation-studio/trigger-txtp-configs.repository', () => ({
@@ -37,6 +39,7 @@ import {
   getGenerationSummary,
   updateWizardProgress,
   deleteTriggerTxtpConfig,
+  cloneGeneration,
 } from '../../src/services/trs-suite-generation.logic.service';
 
 const mockSummary = {
@@ -103,6 +106,11 @@ describe('recalculateGenerationCounts', () => {
     await expect(recalculateGenerationCounts(7)).rejects.toBe(err);
   });
 
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (dbService.handlePostExecuteSqlStatement as jest.Mock).mockRejectedValue('string error');
+    await expect(recalculateGenerationCounts(7)).rejects.toMatchObject({ status: 500 });
+  });
+
   it('queries all 3 config tables with correct SQL patterns', async () => {
     (dbService.handlePostExecuteSqlStatement as jest.Mock)
       .mockResolvedValueOnce({ rows: [{ total: '0' }] })
@@ -145,6 +153,11 @@ describe('getGenerationSummary', () => {
     const err = new HttpException('not found', 404);
     (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue(err);
     await expect(getGenerationSummary(7)).rejects.toBe(err);
+  });
+
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (generationsRepo.getGenerationSummaryFromDb as jest.Mock).mockRejectedValue('string error');
+    await expect(getGenerationSummary(7)).rejects.toMatchObject({ status: 500 });
   });
 });
 
@@ -220,5 +233,64 @@ describe('deleteTriggerTxtpConfig', () => {
   it('wraps non-Error thrown value in HttpException 500', async () => {
     (triggerRepo.deleteTriggerTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
     await expect(deleteTriggerTxtpConfig(20)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+// ── cloneGeneration ───────────────────────────────────────────────────────────
+
+describe('cloneGeneration', () => {
+  const mockGen = {
+    id: 7,
+    suite_id: 1,
+    generation_number: 1,
+    status: 'DRAFT',
+    simulation_type: 'SINGLE_RULE',
+    wizard_snapshot: {},
+    generation_metadata: {},
+    created_by: 'u',
+    created_at: new Date(),
+    updated_at: new Date(),
+  } as any;
+
+  const mockCloned = { ...mockGen, id: 8, generation_number: 2 };
+
+  it('fetches source generation, gets next number, calls cloneGenerationDataInDb', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(mockGen);
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
+    (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(mockCloned);
+
+    const result = await cloneGeneration(7, 'user-1', 'u@test.com');
+
+    expect(generationsRepo.getGenerationByIdFromDb).toHaveBeenCalledWith(7);
+    expect(generationsRepo.getNextGenerationNumber).toHaveBeenCalledWith(1);
+    expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(7, 1, 2, 'user-1', 'u@test.com');
+    expect(result.id).toBe(8);
+    expect(result.generation_number).toBe(2);
+  });
+
+  it('throws 404 when source generation not found', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(null);
+    await expect(cloneGeneration(999, 'user-1')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('wraps DB error in HttpException 500', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
+    await expect(cloneGeneration(7, 'user-1')).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rethrows HttpException as-is', async () => {
+    const err = new HttpException('forbidden', 403);
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockRejectedValue(err);
+    await expect(cloneGeneration(7, 'user-1')).rejects.toBe(err);
+  });
+
+  it('works without userEmail', async () => {
+    (generationsRepo.getGenerationByIdFromDb as jest.Mock).mockResolvedValue(mockGen);
+    (generationsRepo.getNextGenerationNumber as jest.Mock).mockResolvedValue(2);
+    (generationsRepo.cloneGenerationDataInDb as jest.Mock).mockResolvedValue(mockCloned);
+
+    await cloneGeneration(7, 'user-1');
+
+    expect(generationsRepo.cloneGenerationDataInDb).toHaveBeenCalledWith(7, 1, 2, 'user-1', undefined);
   });
 });

@@ -29,6 +29,7 @@ jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   findAllTransactionTypes: jest.fn(),
   getPayloadByTransactionType: jest.fn(),
   getSchemaByTransactionType: jest.fn(),
+  getSchemaByTransactionTypew3: jest.fn(),
   getRelatedTransactions: jest.fn(),
 }));
 
@@ -1022,6 +1023,26 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.getRelatedTransactions as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       await expect(tcsConfigService.handleGetRelatedTransactions(mockTenantId)).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('handleGetConfigByTransactionTypew3', () => {
+    it('returns config when found', async () => {
+      const mockSchema = { type: 'object', properties: {} };
+      (tcsConfigRepository.getSchemaByTransactionTypew3 as jest.Mock).mockResolvedValue(mockSchema as never);
+
+      const result = await tcsConfigService.handleGetConfigByTransactionTypew3('pacs.008', '001.08', mockTenantId);
+
+      expect(tcsConfigRepository.getSchemaByTransactionTypew3).toHaveBeenCalledWith('pacs.008', '001.08', mockTenantId);
+      expect(result).toEqual(mockSchema);
+    });
+
+    it('throws error when config not found', async () => {
+      (tcsConfigRepository.getSchemaByTransactionTypew3 as jest.Mock).mockRejectedValue(new Error('not found') as never);
+
+      await expect(tcsConfigService.handleGetConfigByTransactionTypew3('pacs.008', '001.08', mockTenantId)).rejects.toThrow(
+        'Configuration not found',
+      );
     });
   });
 });

@@ -32,7 +32,6 @@ export interface SimulationSuite {
   name: string;
   description?: string;
   simulation_type: SimulationType;
-  status: SimulationSuiteStatus;
   rule_repo?: string;
   rule_name?: string;
   rule_version?: string;
@@ -127,4 +126,10 @@ export interface SimulationSuitesListResponse {
   total: number;
   limit?: number;
   offset?: number;
+}
+
+export interface SimulationSuitesCountsResponse {
+  total_suites: number;
+  total_run: number;
+  latest_run_at: Date | null;
 }

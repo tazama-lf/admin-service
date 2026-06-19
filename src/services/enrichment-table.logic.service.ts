@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SuiteEnrichmentTable, BulkEnrichmentUpdateItemDto } from '../interface/suite-generation.interface';
+import type {
+  SuiteEnrichmentTable,
+  SuiteEnrichmentTableWithStrategies,
+  BulkEnrichmentUpdateItemDto,
+} from '../interface/simulation-studio/suite-generation.interface';
 import {
   createEnrichmentTableInDb,
   getNextEnrichmentTableOrderInDb,
@@ -7,13 +11,31 @@ import {
   getEnrichmentTablesByGenerationId,
   deleteEnrichmentTableInDb,
 } from '../repositories/simulation-studio/enrichment-tables.repository';
+import {
+  getEnrichmentFieldStrategiesByTableId,
+  insertEnrichmentFieldStrategyInDb,
+  deleteEnrichmentFieldStrategiesByTableIdInDb,
+} from '../repositories/simulation-studio/enrichment-field-strategies.repository';
+import { fieldStrategiesFromSchemaTemplate } from '../utils/enrichment-schema-template';
 import { HttpException, HttpStatus } from '../utils/error';
 
-// ── Step 4: Create enrichment table ──────────────────────────────────────────
-
 /**
- * POST — creates enrichment table row + seeds all payload column names with strategy_code = 'null'.
+ * Re-derive `trs_suite_enrichment_field_strategies` rows from the UI-supplied
+ * schema_template_json. Replaces any existing rows for the table so the strategy
+ * set always reflects the latest UI submission. No-op when no schema is supplied.
  */
+const syncFieldStrategiesFromSchemaTemplate = async (
+  tableId: number,
+  schemaTemplateJson: Record<string, unknown> | undefined,
+): Promise<void> => {
+  if (schemaTemplateJson === undefined) return;
+  await deleteEnrichmentFieldStrategiesByTableIdInDb(tableId);
+  const rows = fieldStrategiesFromSchemaTemplate(schemaTemplateJson);
+  for (const row of rows) {
+    await insertEnrichmentFieldStrategyInDb(tableId, row);
+  }
+};
+
 export const createEnrichmentTable = async (
   generationId: number,
   tableName: string,
@@ -32,7 +54,7 @@ export const createEnrichmentTable = async (
       payload_template_json: payloadTemplateJson,
       schema_template_json: schemaTemplateJson,
     });
-
+    await syncFieldStrategiesFromSchemaTemplate(table.id, schemaTemplateJson);
     return table;
   } catch (error) {
     if (error instanceof HttpException) throw error;
@@ -43,12 +65,9 @@ export const createEnrichmentTable = async (
   }
 };
 
-// ── Step 4: GET all ───────────────────────────────────────────────────────────
-
 export const getEnrichmentTables = async (generationId: number): Promise<SuiteEnrichmentTable[]> => {
   try {
-    const tables = await getEnrichmentTablesByGenerationId(generationId);
-    return tables;
+    return await getEnrichmentTablesByGenerationId(generationId);
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new HttpException(
@@ -58,7 +77,23 @@ export const getEnrichmentTables = async (generationId: number): Promise<SuiteEn
   }
 };
 
-// ── Step 4: Bulk update ───────────────────────────────────────────────────────
+export const getEnrichmentTablesWithStrategies = async (generationId: number): Promise<SuiteEnrichmentTableWithStrategies[]> => {
+  try {
+    const tables = await getEnrichmentTablesByGenerationId(generationId);
+    return await Promise.all(
+      tables.map(async (table) => ({
+        ...table,
+        field_strategies: await getEnrichmentFieldStrategiesByTableId(table.id),
+      })),
+    );
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new HttpException(
+      `Failed to retrieve enrichment tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+};
 
 export const bulkUpdateEnrichmentTables = async (
   generationId: number,
@@ -75,6 +110,10 @@ export const bulkUpdateEnrichmentTables = async (
             throw new HttpException(`Enrichment table ${tableId} not found for generation ${generationId}`, HttpStatus.NOT_FOUND);
           }
         }
+        // Re-sync field strategies whenever the UI sends a fresh schema_template_json.
+        if (updateFields.schema_template_json !== undefined) {
+          await syncFieldStrategiesFromSchemaTemplate(tableId, updateFields.schema_template_json);
+        }
       }),
     );
     return await getEnrichmentTables(generationId);
@@ -86,8 +125,6 @@ export const bulkUpdateEnrichmentTables = async (
     );
   }
 };
-
-// ── Step 4: Delete ────────────────────────────────────────────────────────────
 
 export const deleteEnrichmentTable = async (tableId: number): Promise<void> => {
   try {

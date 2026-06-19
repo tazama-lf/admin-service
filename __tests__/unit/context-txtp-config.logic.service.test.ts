@@ -6,6 +6,7 @@ jest.mock('../../src/repositories/simulation-studio/context-txtp-configs.reposit
   createContextTxtpConfigInDb: jest.fn(),
   updateContextTxtpConfigInDb: jest.fn(),
   getContextTxtpConfigsByGenerationId: jest.fn(),
+  getContextTxtpConfigById: jest.fn(),
   deleteContextTxtpConfigInDb: jest.fn(),
 }));
 
@@ -16,6 +17,7 @@ jest.mock('../../src/repositories/simulation-studio/context-field-strategies.rep
 
 jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   getSchemaByTransactionType: jest.fn(),
+  getSchemaByEndpointPath: jest.fn(),
 }));
 
 jest.mock('@tazama-lf/tcs-lib', () => ({
@@ -40,7 +42,7 @@ import {
   getFieldStrategiesForContextConfig,
   deleteContextTxtpConfig,
 } from '../../src/services/context-txtp-config.logic.service';
-import type { SuiteContextTxtpConfig, ContextFieldStrategy } from '../../src/interface/suite-generation.interface';
+import type { SuiteContextTxtpConfig, ContextFieldStrategy } from '../../src/interface/simulation-studio/suite-generation.interface';
 
 const mockContextConfig: SuiteContextTxtpConfig = {
   id: 10,
@@ -68,6 +70,21 @@ const tcsRowJson = {
   content_type: 'application/json',
   payload_json: { amount: 100, currency: 'USD' },
   payload_xml: null,
+  related_transaction: null,
+};
+
+const tcsRowJsonWithRelated = {
+  ...tcsRowJson,
+  related_transaction: '/default/1.0.0/test/pacs.002.001.10',
+};
+
+const relatedTcsRow = {
+  schema: { type: 'object', properties: { id: {} } },
+  content_type: 'application/json',
+  payload_json: { id: 'abc' },
+  payload_xml: null,
+  transaction_type: 'pacs.002.001.10',
+  version: '001.10',
 };
 
 const tcsRowXml = {
@@ -75,6 +92,7 @@ const tcsRowXml = {
   content_type: 'application/xml',
   payload_xml: { amount: '<xml>' },
   payload_json: null,
+  related_transaction: null,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -153,6 +171,58 @@ describe('createConfigWithDefaultStrategies', () => {
     expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledTimes(2);
   });
 
+  it('flattens nested payload objects recursively', async () => {
+    const nestedPayload = { transaction: { amount: 100, currency: 'USD' } };
+    const tcsNestedPayload = { ...tcsRowJson, payload_json: nestedPayload };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsNestedPayload);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createConfigWithDefaultStrategies({
+      generationId: 1,
+      txtp: 'pacs.008',
+      txtpVersion: '001.08',
+      messageCount: 100,
+      displayOrder: 1,
+      tenantId: 'tenant-001',
+    });
+
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledTimes(2);
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ field_path: 'transaction.amount' }),
+    );
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ field_path: 'transaction.currency' }),
+    );
+  });
+
+  it('returns no field strategies when schema is a non-object primitive', async () => {
+    const tcsStringSchema = {
+      schema: 'not-an-object',
+      content_type: 'application/json',
+      payload_json: null,
+      payload_xml: null,
+      related_transaction: null,
+    };
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsStringSchema);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    const result = await createConfigWithDefaultStrategies({
+      generationId: 1,
+      txtp: 'pacs.008',
+      txtpVersion: '001.08',
+      messageCount: 100,
+      displayOrder: 1,
+      tenantId: 'tenant-001',
+    });
+
+    expect(fieldStrategyRepo.upsertFieldStrategyInDb).not.toHaveBeenCalled();
+    expect(result.field_strategies).toHaveLength(0);
+  });
+
   it('throws when tcs_config row not found', async () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(new Error('Not found'));
     await expect(
@@ -217,6 +287,17 @@ describe('createContextTxtpConfig', () => {
     (tcsRepo.getSchemaByTransactionType as jest.Mock).mockRejectedValue(err);
     await expect(createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001')).rejects.toBe(err);
   });
+
+  it('skips related config when related_transaction is null', async () => {
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+
+    await createContextTxtpConfig(1, 'pacs.008', '001.08', 'tenant-001');
+
+    expect(tcsRepo.getSchemaByEndpointPath).not.toHaveBeenCalled();
+    expect(contextConfigRepo.createContextTxtpConfigInDb).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ── addContextTxtpConfig ─────────────────────────────────────────────────────
@@ -249,6 +330,20 @@ describe('addContextTxtpConfig', () => {
     );
   });
 
+  it('updates related config when related_context_txtp_id provided', async () => {
+    (contextConfigRepo.getContextTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockContextConfig]);
+    (tcsRepo.getSchemaByTransactionType as jest.Mock).mockResolvedValue(tcsRowJson);
+    const newConfig = { ...mockContextConfig, id: 20, display_order: 2 };
+    (contextConfigRepo.createContextTxtpConfigInDb as jest.Mock).mockResolvedValue(newConfig);
+    (fieldStrategyRepo.upsertFieldStrategyInDb as jest.Mock).mockResolvedValue(mockFieldStrategy);
+    (contextConfigRepo.getContextTxtpConfigById as jest.Mock).mockResolvedValue(mockContextConfig);
+    (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
+
+    await addContextTxtpConfig(1, { txtp: 'pacs.002', txtp_version: '001.08', related_context_txtp_id: 10 }, 'tenant-001');
+
+    expect(contextConfigRepo.updateContextTxtpConfigInDb).toHaveBeenCalledWith(10, { related_txtp_config_id: 20 });
+  });
+
   it('wraps error in HttpException 500', async () => {
     (contextConfigRepo.getContextTxtpConfigsByGenerationId as jest.Mock).mockRejectedValue(new Error('DB fail'));
     await expect(addContextTxtpConfig(1, { txtp: 'x', txtp_version: '1' }, 'tenant')).rejects.toMatchObject({ status: 500 });
@@ -274,6 +369,7 @@ describe('getContextConfigsWithStrategies', () => {
     expect(result[0].context_txtp_config_id).toBe(10);
     expect(result[0].txtp).toBe('pacs.008');
     expect(result[0].field_strategies).toEqual([mockFieldStrategy]);
+    expect(result[0].related_txtp_config_id).toBeNull();
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(10);
   });
 
@@ -284,13 +380,14 @@ describe('getContextConfigsWithStrategies', () => {
   });
 
   it('handles multiple configs, fetches strategies for each', async () => {
-    const config2 = { ...mockContextConfig, id: 11, txtp: 'pacs.002' };
+    const config2 = { ...mockContextConfig, id: 11, txtp: 'pacs.002', related_txtp_config_id: 10 };
     (contextConfigRepo.getContextTxtpConfigsByGenerationId as jest.Mock).mockResolvedValue([mockContextConfig, config2]);
     (fieldStrategyRepo.getFieldStrategiesByContextConfigId as jest.Mock).mockResolvedValue([mockFieldStrategy]);
 
     const result = await getContextConfigsWithStrategies(1);
 
     expect(result).toHaveLength(2);
+    expect(result[1].related_txtp_config_id).toBe(10);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledTimes(2);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(10);
     expect(fieldStrategyRepo.getFieldStrategiesByContextConfigId).toHaveBeenCalledWith(11);
@@ -343,10 +440,10 @@ describe('bulkUpdateContextConfigs', () => {
   it('skips upsertFieldStrategyInDb when field_strategies is empty array', async () => {
     (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockResolvedValue(mockContextConfig);
 
-    await bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5, field_strategies: [] }]);
+    await bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 150, field_strategies: [] }]);
 
     expect(fieldStrategyRepo.upsertFieldStrategyInDb).not.toHaveBeenCalled();
-    expect(contextConfigRepo.updateContextTxtpConfigInDb).toHaveBeenCalledWith(10, { message_count: 5 });
+    expect(contextConfigRepo.updateContextTxtpConfigInDb).toHaveBeenCalledWith(10, { message_count: 150 });
   });
 
   it('skips upsertFieldStrategyInDb when field_strategies absent', async () => {
@@ -379,18 +476,22 @@ describe('bulkUpdateContextConfigs', () => {
 
   it('wraps error in HttpException 500', async () => {
     (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockRejectedValue(new Error('DB fail'));
-    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }])).rejects.toMatchObject({ status: 500 });
+    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }], 'tenant-001')).rejects.toMatchObject({
+      status: 500,
+    });
   });
 
   it('rethrows HttpException as-is', async () => {
     const err = new HttpException('not found', 404);
     (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockRejectedValue(err);
-    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }])).rejects.toBe(err);
+    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }], 'tenant-001')).rejects.toBe(err);
   });
 
   it('wraps non-Error thrown value', async () => {
     (contextConfigRepo.updateContextTxtpConfigInDb as jest.Mock).mockRejectedValue('string error');
-    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }])).rejects.toMatchObject({ status: 500 });
+    await expect(bulkUpdateContextConfigs(1, [{ context_txtp_config_id: 10, message_count: 5 }], 'tenant-001')).rejects.toMatchObject({
+      status: 500,
+    });
   });
 });
 

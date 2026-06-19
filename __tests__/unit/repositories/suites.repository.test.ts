@@ -7,6 +7,7 @@ jest.mock('../../../src/services/database.logic.service', () => ({
 }));
 
 import {
+  getSimulationSuitesCountsFromDb,
   getSimulationSuitesFromDb,
   getSimulationSuiteByIdFromDb,
   createSimulationSuiteInDb,
@@ -57,6 +58,47 @@ describe('Suites Repository', () => {
     expect(countQuery.text).toContain('COUNT(*)');
     const dataQuery = mockHandlePostExecuteSqlStatement.mock.calls[1][0] as { text: string };
     expect(dataQuery.text).toContain('ORDER BY updated_at DESC');
+  });
+
+  it('getSimulationSuitesCountsFromDb should return parsed counts and latest run date', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({
+      rows: [
+        {
+          total_suites: '12',
+          total_run: '7',
+          latest_run_at: '2026-06-08T10:15:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getSimulationSuitesCountsFromDb('tenant-a');
+
+    expect(result.total_suites).toBe(12);
+    expect(result.total_run).toBe(7);
+    expect(result.latest_run_at).toBeInstanceOf(Date);
+    expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('COUNT(DISTINCT s.id) AS total_suites'),
+        values: ['tenant-a'],
+      }),
+      'simulation',
+    );
+    const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { text: string };
+    expect(callArg.text).toContain('LEFT JOIN trs_simulation_runs r ON r.suite_id = s.id');
+    expect(callArg.text).toContain('COUNT(r.id) AS total_run');
+    expect(callArg.text).toContain('MAX(r.created_at) AS latest_run_at');
+  });
+
+  it('getSimulationSuitesCountsFromDb should fallback to zeros when row missing', async () => {
+    mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [] });
+
+    const result = await getSimulationSuitesCountsFromDb('tenant-a');
+
+    expect(result).toEqual({
+      total_suites: 0,
+      total_run: 0,
+      latest_run_at: null,
+    });
   });
 
   it('getSimulationSuiteByIdFromDb should return null when missing', async () => {
@@ -138,8 +180,7 @@ describe('Suites Repository', () => {
     expect(result.name).toBe('Suite A');
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
     expect(callArg.values[3]).toBe('SINGLE_RULE');
-    expect(callArg.values[4]).toBe('DRAFT');
-    expect(callArg.values[14]).toBe(JSON.stringify({ currentStep: 1, completedSteps: [1] }));
+    expect(callArg.values[13]).toBe(JSON.stringify({ currentStep: 1, completedSteps: [1] }));
   });
 
   it('createSimulationSuiteInDb should keep provided wizard progress and user email', async () => {
@@ -172,9 +213,9 @@ describe('Suites Repository', () => {
 
     expect(result.name).toBe('Suite B');
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
-    expect(callArg.values[14]).toBe(JSON.stringify({ currentStep: 2, completedSteps: [1, 2] }));
-    expect(callArg.values[15]).toBe(JSON.stringify({ channel: 'wizard' }));
-    expect(callArg.values[17]).toBe('user-a@example.com');
+    expect(callArg.values[13]).toBe(JSON.stringify({ currentStep: 2, completedSteps: [1, 2] }));
+    expect(callArg.values[14]).toBe(JSON.stringify({ channel: 'wizard' }));
+    expect(callArg.values[16]).toBe('user-a@example.com');
   });
 
   it('updateSimulationSuiteInDb should return existing record when payload has no updates', async () => {
@@ -324,8 +365,7 @@ describe('Suites Repository', () => {
     const result = await createSimulationSuiteInDb({ name: 'Suite E', rule_config: ruleConfig } as any, 'tenant-a', 'user-a');
 
     const callArg = mockHandlePostExecuteSqlStatement.mock.calls[0][0] as { values: unknown[] };
-    // rule_config is at index 8 (0-based) in the INSERT values
-    expect(callArg.values[8]).toBe(JSON.stringify(ruleConfig));
+    expect(callArg.values[7]).toBe(JSON.stringify(ruleConfig));
     expect(result.rule_config).toEqual(ruleConfig);
   });
 
@@ -474,7 +514,6 @@ describe('Suites Repository', () => {
 
     const result = await updateSimulationSuiteInDb(4, 'tenant-a', {
       description: null,
-      rule_repo: null,
       rule_name: null,
       rule_version: null,
       primary_txtp: null,

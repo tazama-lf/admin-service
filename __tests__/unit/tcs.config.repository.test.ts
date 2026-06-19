@@ -18,6 +18,7 @@ import {
   createTransactionTypeTable,
   createTazamaDataModelTable,
   updateConfigByStatus,
+  findActiveConfigsByTuples,
 } from '../../src/repositories/configuration/tcs.config.repository';
 import { handlePostExecuteSqlStatement } from '../../src/services/database.logic.service';
 import { ConfigStatus, ContentType } from '@tazama-lf/tcs-lib';
@@ -1323,6 +1324,44 @@ describe('TCS Config Repository', () => {
       } as never);
 
       await expect(updateConfigByStatus('999', ConfigStatus.APPROVED, 'tenant-123')).rejects.toThrow('Configuration not found');
+    });
+  });
+
+  describe('findActiveConfigsByTuples', () => {
+    it('returns empty array when tuples is empty', async () => {
+      const result = await findActiveConfigsByTuples([]);
+      expect(result).toEqual([]);
+      expect(handlePostExecuteSqlStatement).not.toHaveBeenCalled();
+    });
+
+    it('queries active configs matching provided tuples', async () => {
+      const mockRows = [{ tenant_id: 'tenant-1', txtp: 'pacs.008', txtp_version: '001.08', endpoint_path: '/api' }];
+      (handlePostExecuteSqlStatement as jest.Mock).mockResolvedValue({ rows: mockRows } as never);
+
+      const result = await findActiveConfigsByTuples([
+        { tenant_id: 'tenant-1', txtp: 'pacs.008', txtp_version: '001.08', endpoint_path: '/api' },
+      ]);
+
+      expect(result).toEqual(mockRows);
+      expect(handlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining("publishing_status = 'active'"),
+          values: ['tenant-1', 'pacs.008', '001.08'],
+        }),
+        'configuration',
+      );
+    });
+
+    it('builds correct placeholders for multiple tuples', async () => {
+      (handlePostExecuteSqlStatement as jest.Mock).mockResolvedValue({ rows: [] } as never);
+
+      await findActiveConfigsByTuples([
+        { tenant_id: 'tenant-1', txtp: 'pacs.008', txtp_version: '001.08', endpoint_path: '/a' },
+        { tenant_id: 'tenant-2', txtp: 'pacs.002', txtp_version: '001.03', endpoint_path: '/b' },
+      ]);
+
+      const callArg = (handlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: string[] };
+      expect(callArg.values).toEqual(['tenant-1', 'pacs.008', '001.08', 'tenant-2', 'pacs.002', '001.03']);
     });
   });
 });

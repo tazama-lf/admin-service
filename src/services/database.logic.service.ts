@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
-import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
+import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { databaseManager, loggerService } from '..';
 
 export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
@@ -41,6 +41,50 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
     throw new Error(errorMessage.message);
   } finally {
     loggerService.log('Completed handling execution of the query from database service');
+  }
+};
+
+// Executes a statement on the READ-ONLY pool for the given database. Used for query-node
+// user SQL: the lib builds a second pool that connects as a SELECT-only DB role, so the
+// database itself rejects any mutation/DDL (defence-in-depth alongside AST validation).
+// Fails closed when no readonly pool is configured — query-node must never silently fall
+// back to the read/write role.
+export const handleReadonlyExecuteSqlStatement = async <T extends QueryResultRow>(
+  queryConfig: PgQueryConfig,
+  databaseName: string,
+): Promise<QueryResult<T>> => {
+  try {
+    loggerService.log('Started handling read-only execution of the sql statement');
+
+    const readonlyPools: Record<string, Pool | undefined> = {
+      configuration: databaseManager._configurationReadonly,
+      event_history: databaseManager._eventHistoryReadonly,
+      evaluation: databaseManager._evaluationReadonly,
+      raw_history: databaseManager._rawHistoryReadonly,
+      simulation: databaseManager._simulationReadonly,
+    };
+
+    if (!(databaseName in readonlyPools)) {
+      throw new Error('Specified database was not found.');
+    }
+
+    const pool = readonlyPools[databaseName];
+    if (!pool) {
+      throw new Error(
+        `Read-only pool for '${databaseName}' is not configured. Set ${databaseName.toUpperCase()}_DATABASE_READONLY_USER / _READONLY_PASSWORD.`,
+      );
+    }
+
+    return await pool.query<T>(queryConfig.text, queryConfig.values);
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.log(
+      `Failed executing the read-only query with error message: ${errorMessage.message}`,
+      'handleReadonlyExecuteSqlStatement()',
+    );
+    throw new Error(errorMessage.message);
+  } finally {
+    loggerService.log('Completed handling read-only execution of the query');
   }
 };
 

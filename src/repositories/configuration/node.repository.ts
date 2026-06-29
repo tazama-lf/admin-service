@@ -1,4 +1,4 @@
-import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
+import { handlePostExecuteSqlStatement, handleReadonlyExecuteSqlStatement } from '../../services/database.logic.service';
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { Node } from '../../interface/node.interface';
 
@@ -77,12 +77,14 @@ export const getAllNodes = async (
   return result.rows;
 };
 
+// Query-node user SQL runs on the lib's read-only pool (defence-in-depth alongside the AST
+// validation in node.logic.service), NOT the regular read/write pool used for config CRUD.
 export const executeQueryNodeInDb = async (
   query: string,
   dbName: string,
   params: unknown[] = [],
 ): Promise<Array<Record<string, unknown>>> => {
-  const result = await handlePostExecuteSqlStatement(
+  const result = await handleReadonlyExecuteSqlStatement(
     {
       text: query,
       values: params,

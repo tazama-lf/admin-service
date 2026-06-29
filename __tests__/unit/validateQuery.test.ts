@@ -74,29 +74,19 @@ describe('validateSelectQuery', () => {
   });
 
   describe('Invalid queries', () => {
-    it('should reject INSERT queries', () => {
-      const query = 'INSERT INTO users (name) VALUES ($1)';
-      expect(() => validateSelectQuery(query)).toThrow('Only SELECT queries are allowed. Got: insert');
-    });
-
-    it('should reject UPDATE queries', () => {
-      const query = 'UPDATE users SET status = $1 WHERE id = $2';
-      expect(() => validateSelectQuery(query)).toThrow('Only SELECT queries are allowed. Got: update');
-    });
-
-    it('should reject DELETE queries', () => {
-      const query = 'DELETE FROM users WHERE id = $1';
-      expect(() => validateSelectQuery(query)).toThrow('Only SELECT queries are allowed. Got: delete');
-    });
-
-    it('should reject DROP queries', () => {
-      const query = 'DROP TABLE users';
-      expect(() => validateSelectQuery(query)).toThrow('Only SELECT queries are allowed');
+    // Write/DDL statements are no longer rejected here — query-node executes on a read-only
+    // DB role, so the database rejects mutations/DDL. validateSelectQuery only enforces
+    // parseable + single-statement (the AST table/tenant logic depends on that shape).
+    it('should accept INSERT/UPDATE/DELETE/DROP at parse layer (DB role rejects at execution)', () => {
+      expect(() => validateSelectQuery('INSERT INTO users (name) VALUES ($1)')).not.toThrow();
+      expect(() => validateSelectQuery('UPDATE users SET status = $1 WHERE id = $2')).not.toThrow();
+      expect(() => validateSelectQuery('DELETE FROM users WHERE id = $1')).not.toThrow();
+      expect(() => validateSelectQuery('DROP TABLE users')).not.toThrow();
     });
 
     it('should reject multiple statements', () => {
       const query = 'SELECT * FROM users; SELECT * FROM orders';
-      expect(() => validateSelectQuery(query)).toThrow('Only a single SELECT statement is allowed — multiple statements detected.');
+      expect(() => validateSelectQuery(query)).toThrow('Only a single statement is allowed — multiple statements detected.');
     });
 
     it('should reject empty queries', () => {

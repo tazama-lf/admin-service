@@ -489,14 +489,14 @@ describe('Node Logic Service', () => {
     });
 
     it('should throw error when validation fails', async () => {
-      const mockQuery = 'INSERT INTO users VALUES (1)';
+      const mockQuery = 'SELECT * FROM users; SELECT * FROM orders';
 
       (validateQuery.validateSelectQuery as jest.Mock).mockImplementation(() => {
-        throw new Error('Only SELECT queries are allowed. Got: insert');
+        throw new Error('Only a single statement is allowed — multiple statements detected.');
       });
 
       await expect(nodeLogicService.executeSelectQuery({ query: mockQuery, dbName: 'configuration' }, mockTenantId)).rejects.toThrow(
-        new HttpException('Only SELECT queries are allowed. Got: insert', HttpStatus.FORBIDDEN),
+        new HttpException('Only a single statement is allowed — multiple statements detected.', HttpStatus.FORBIDDEN),
       );
 
       expect(nodeRepository.executeQueryNodeInDb).not.toHaveBeenCalled();

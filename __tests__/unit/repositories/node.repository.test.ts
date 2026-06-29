@@ -1,9 +1,12 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockHandlePostExecuteSqlStatement = jest.fn();
+const mockHandleReadonlyExecuteSqlStatement = jest.fn();
 
 jest.mock('../../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: (...args: unknown[]) => mockHandlePostExecuteSqlStatement(...args),
+  // Query-node SQL runs on the read-only pool, not the regular RW pool.
+  handleReadonlyExecuteSqlStatement: (...args: unknown[]) => mockHandleReadonlyExecuteSqlStatement(...args),
 }));
 
 jest.mock('../../../src', () => ({
@@ -209,38 +212,40 @@ describe('Node Repository', () => {
   });
 
   describe('executeQueryNodeInDb', () => {
-    it('should execute query and return rows', async () => {
+    it('should execute query on the read-only pool and return rows', async () => {
       const mockRows = [{ id: 1, name: 'test' }];
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: mockRows, rowCount: 1 });
+      mockHandleReadonlyExecuteSqlStatement.mockResolvedValue({ rows: mockRows, rowCount: 1 });
 
       const result = await executeQueryNodeInDb('SELECT * FROM trs_nodes WHERE id = $1', 'configuration', [1]);
 
       expect(result).toEqual(mockRows);
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+      expect(mockHandleReadonlyExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({ text: 'SELECT * FROM trs_nodes WHERE id = $1', values: [1] }),
         'configuration',
       );
+      // Must NOT use the regular read/write pool.
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
     });
 
     it('should default params to empty array when not provided', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+      mockHandleReadonlyExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
       await executeQueryNodeInDb('SELECT 1', 'configuration');
 
-      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
+      const callArg = (mockHandleReadonlyExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { values: unknown[] };
       expect(callArg.values).toEqual([]);
     });
 
     it('should use the provided dbName', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
+      mockHandleReadonlyExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
       await executeQueryNodeInDb('SELECT 1', 'simulation');
 
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(expect.anything(), 'simulation');
+      expect(mockHandleReadonlyExecuteSqlStatement).toHaveBeenCalledWith(expect.anything(), 'simulation');
     });
 
     it('should propagate errors from database', async () => {
-      mockHandlePostExecuteSqlStatement.mockRejectedValue(new Error('Query failed'));
+      mockHandleReadonlyExecuteSqlStatement.mockRejectedValue(new Error('Query failed'));
 
       await expect(executeQueryNodeInDb('SELECT 1', 'configuration')).rejects.toThrow('Query failed');
     });

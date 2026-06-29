@@ -5,9 +5,6 @@ interface SqlStatement {
   type: string;
 }
 
-/** Statement type discriminants that are part of the SELECT family */
-const SELECT_TYPES = new Set(['select', 'union', 'union all', 'values', 'with', 'with recursive']);
-
 export interface ValidatedQuery {
   ast: SqlStatement[];
   /** Query string that was actually parsed — {{ var }} placeholders replaced with $N.
@@ -16,9 +13,13 @@ export interface ValidatedQuery {
 }
 
 /**
- * Parses the SQL string and asserts it is a single SELECT-family statement.
+ * Parses the SQL string and asserts it is a single statement.
  * Returns the parsed AST and the normalised SQL string (with {{ }} → $N substitution applied).
  * Callers must use parsedSql — not the original input — when slicing by AST _location offsets.
+ *
+ * Write/DDL rejection is NOT done here: query-node executes on a read-only DB role
+ * (see readonly pool), so the database itself rejects any non-SELECT. We only enforce
+ * single-statement + parseable here, which the downstream AST table/tenant logic relies on.
  * Throws a descriptive Error on any violation.
  */
 export const validateSelectQuery = (query: string): ValidatedQuery => {
@@ -40,11 +41,7 @@ export const validateSelectQuery = (query: string): ValidatedQuery => {
   }
 
   if (ast.length > 1) {
-    throw new Error('Only a single SELECT statement is allowed — multiple statements detected.');
-  }
-
-  if (!SELECT_TYPES.has(ast[0].type)) {
-    throw new Error(`Only SELECT queries are allowed. Got: ${ast[0].type}`);
+    throw new Error('Only a single statement is allowed — multiple statements detected.');
   }
 
   return { ast, parsedSql };

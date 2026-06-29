@@ -3,6 +3,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockQuery = jest.fn();
+const mockReadonlyQuery = jest.fn();
 
 jest.mock('../../src', () => ({
   loggerService: {
@@ -14,10 +15,15 @@ jest.mock('../../src', () => ({
     _eventHistory: { query: mockQuery },
     _evaluation: { query: mockQuery },
     _rawHistory: { query: mockQuery },
+    // configuration has a readonly pool; raw_history intentionally does NOT (tests fail-closed).
+    _configurationReadonly: { query: mockReadonlyQuery },
+    _eventHistoryReadonly: { query: mockReadonlyQuery },
+    _evaluationReadonly: { query: mockReadonlyQuery },
+    _simulationReadonly: { query: mockReadonlyQuery },
   },
 }));
 
-import { handlePostExecuteSqlStatement } from '../../src/services/database.logic.service';
+import { handlePostExecuteSqlStatement, handleReadonlyExecuteSqlStatement } from '../../src/services/database.logic.service';
 
 describe('Database Logic Service', () => {
   const mockQueryConfig = { text: 'SELECT 1', values: [] };
@@ -82,5 +88,42 @@ describe('Database Logic Service', () => {
   it('should throw error when query fails', async () => {
     mockQuery.mockRejectedValue(new Error('Connection refused') as never);
     await expect(handlePostExecuteSqlStatement(mockQueryConfig, 'configuration')).rejects.toThrow('Connection refused');
+  });
+
+  describe('handleReadonlyExecuteSqlStatement', () => {
+    it('should execute on the read-only pool, not the read/write pool', async () => {
+      mockReadonlyQuery.mockResolvedValue(mockResult as never);
+
+      const result = await handleReadonlyExecuteSqlStatement(mockQueryConfig, 'configuration');
+
+      expect(result).toEqual(mockResult);
+      expect(mockReadonlyQuery).toHaveBeenCalledWith(mockQueryConfig.text, mockQueryConfig.values);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('should route to the read-only pool matching the dbName', async () => {
+      mockReadonlyQuery.mockResolvedValue(mockResult as never);
+
+      await handleReadonlyExecuteSqlStatement(mockQueryConfig, 'simulation');
+
+      expect(mockReadonlyQuery).toHaveBeenCalledWith(mockQueryConfig.text, mockQueryConfig.values);
+    });
+
+    it('should throw when database name is not found', async () => {
+      await expect(handleReadonlyExecuteSqlStatement(mockQueryConfig, 'unknown_db')).rejects.toThrow('Specified database was not found.');
+    });
+
+    it('should fail closed when no read-only pool is configured for the database', async () => {
+      // raw_history has no _rawHistoryReadonly in the mock — must NOT fall back to the RW pool.
+      await expect(handleReadonlyExecuteSqlStatement(mockQueryConfig, 'raw_history')).rejects.toThrow('Read-only pool for');
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('should propagate errors from the read-only pool', async () => {
+      mockReadonlyQuery.mockRejectedValue(new Error('permission denied for table secret') as never);
+      await expect(handleReadonlyExecuteSqlStatement(mockQueryConfig, 'configuration')).rejects.toThrow(
+        'permission denied for table secret',
+      );
+    });
   });
 });

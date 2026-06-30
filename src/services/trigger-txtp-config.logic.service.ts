@@ -48,8 +48,7 @@ export const createTriggerConfigWithDefaultStrategies = async (
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
 
   const payloadTemplate = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   const config = await createTriggerTxtpConfigInDb({
     generation_id: generationId,
@@ -100,8 +99,7 @@ export const createTriggerTxtpConfig = async (
     const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
 
     const payloadTemplate = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
 
     const primaryConfig = await createTriggerTxtpConfigInDb({
       generation_id: generationId,

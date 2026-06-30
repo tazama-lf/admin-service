@@ -31,7 +31,7 @@ export const validateSelectQuery = (query: string): ValidatedQuery => {
   const parsedSql = query.replace(/\{\{\s*\w+\s*\}\}/g, () => `$${paramIndex++}`);
 
   try {
-    ast = parse(parsedSql, { locationTracking: true }) as SqlStatement[];
+    ast = parse(parsedSql, { locationTracking: true });
   } catch (e) {
     throw new Error(`Invalid SQL syntax: ${(e as Error).message}`);
   }

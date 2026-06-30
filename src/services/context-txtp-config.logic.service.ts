@@ -47,8 +47,7 @@ export const createConfigWithDefaultStrategies = async (opts: CreateConfigOption
   const tcsRow = await getSchemaByTransactionType(txtp, txtpVersion, tenantId);
   const schema = tcsRow.schema as Record<string, unknown>;
   const samplePayload = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   const config = await createContextTxtpConfigInDb({
     generation_id: generationId,
@@ -104,8 +103,7 @@ export const createContextTxtpConfig = async (
 
     const schema = tcsRow.schema as Record<string, unknown>;
     const samplePayload = (tcsRow.content_type === (ContentType.XML as string) ? tcsRow.payload_xml : tcsRow.payload_json) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
 
     const primaryConfig = await createContextTxtpConfigInDb({
       generation_id: generationId,

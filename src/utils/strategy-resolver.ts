@@ -145,7 +145,7 @@ const removeNestedValue = (obj: Record<string, unknown>, path: string): void => 
   if (typeof leaf === 'number') {
     (cur as unknown[]).splice(leaf, 1);
   } else {
-    Reflect.deleteProperty(cur as Record<string, unknown>, leaf);
+    Reflect.deleteProperty(cur, leaf);
   }
 };
 

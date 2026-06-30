@@ -14,7 +14,7 @@ export const getSimulationLogsFromDb = async (options: SimulationLogQueryOptions
     updated_at: 'updated_at',
   };
 
-  const sortField = allowedSortFields[sortBy as SortField] ?? allowedSortFields.created_at;
+  const sortField = allowedSortFields[sortBy] ?? allowedSortFields.created_at;
 
   const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
 

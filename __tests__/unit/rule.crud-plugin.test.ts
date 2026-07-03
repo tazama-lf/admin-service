@@ -132,3 +132,77 @@ describe('GET /v1/admin/configuration/rule response schema', () => {
     expect(body.data[0].config?.cases).toBeUndefined();
   });
 });
+
+// Regression test for
+// https://github.com/tazama-lf/admin-service/issues/467
+//
+// Before the fix, src/schemas/ruleSchema.ts declared
+//   parameters: Type.Optional(Type.Record(Type.Optional(Type.Union([Type.String(), Type.Number()])), Type.Optional(Type.Unknown())))
+// The malformed key schema made TypeBox emit a JSON Schema with no
+// patternProperties/additionalProperties, so Ajv's `removeAdditional: 'all'`
+// stripped every real key from config.parameters on POST/PUT, persisting an
+// empty object. These tests assert that a submitted config.parameters object
+// survives request validation intact and reaches the repository.
+describe('POST /v1/admin/configuration/rule preserves config.parameters', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = Fastify();
+
+    const ajv = new Ajv({
+      removeAdditional: 'all',
+      useDefaults: true,
+      coerceTypes: 'array',
+      strictTuples: false,
+    });
+    addFormats(ajv);
+    app.setValidatorCompiler(({ schema }) => ajv.compile(schema));
+
+    await app.register(
+      buildCrudPlugin({
+        prefix: '/v1/admin/configuration/rule',
+        repo: RuleConfigRepo,
+        schemas: { Entity: RuleSchema, Create: RuleSchema, Update: RuleSchema },
+        idParam: { kind: 'single', name: 'id' },
+      }),
+    );
+
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('does not strip parameter keys from config.parameters on create', async () => {
+    const createMock = RuleConfigRepo.create as jest.Mock;
+    createMock.mockImplementation((payload: unknown) => Promise.resolve(payload as RuleConfig));
+
+    const rule = {
+      id: '016@1.0.0',
+      cfg: '4.0.0',
+      desc: 'Transaction convergence - creditor',
+      config: {
+        parameters: { maxQueryRange: 86400000 },
+        exitConditions: [],
+        bands: [
+          { subRuleRef: '.01', upperLimit: 5, reason: 'No Transaction convergence detected on creditor account' },
+          { subRuleRef: '.02', lowerLimit: 5, reason: 'Transaction convergence detected on creditor account' },
+        ],
+      },
+    };
+
+    const response = await app.inject({ method: 'POST', url: '/v1/admin/configuration/rule', payload: rule });
+
+    expect(response.statusCode).toBe(201);
+
+    // The payload the repository received reflects req.body AFTER Ajv validation:
+    // this is where the strip used to happen.
+    const received = createMock.mock.calls[0][0] as RuleConfig;
+    expect(received.config?.parameters).toEqual({ maxQueryRange: 86400000 });
+
+    // The serialised response must also retain the parameters.
+    const body = response.json() as RuleConfig;
+    expect(body.config?.parameters).toEqual({ maxQueryRange: 86400000 });
+  });
+});

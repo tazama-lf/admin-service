@@ -26,12 +26,15 @@ export const Case = Type.Object({
   alternative: OutcomeResult,
 });
 
-export const Config = Type.Object({
-  parameters: Type.Optional(Type.Record(Type.Optional(Type.Union([Type.String(), Type.Number()])), Type.Optional(Type.Unknown()))),
-  exitConditions: Type.Optional(Type.Array(OutcomeResult)),
-  bands: Type.Optional(Type.Array(Band)),
-  cases: Type.Optional(Case),
-});
+export const Config = Type.Object(
+  {
+    parameters: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    exitConditions: Type.Optional(Type.Array(OutcomeResult)),
+    bands: Type.Optional(Type.Array(Band)),
+    cases: Type.Optional(Case),
+  },
+  { additionalProperties: true },
+);
 
 export type Rule = Static<typeof RuleSchema>;
 export const RuleSchema = Type.Object(

@@ -2,19 +2,26 @@
 import { CreateStorageManager } from '@tazama-lf/frms-coe-lib/lib/services/dbManager';
 import initializeFastifyClient from './clients/fastify';
 import { type AppDatabaseServices, type Configuration, processorConfig } from './config';
+import { handleServiceChannelAck } from './services/serviceChannel';
 import { type DatabaseManagerInstance, LoggerService } from '@tazama-lf/frms-coe-lib';
 import { Database } from '@tazama-lf/frms-coe-lib/lib/config/database.config';
 import { Cache } from '@tazama-lf/frms-coe-lib/lib/config/redis.config';
+import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
+import { setTimeout } from 'node:timers/promises';
 import * as util from 'node:util';
 
 export const loggerService: LoggerService = new LoggerService(processorConfig);
 
-let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
-let configuration: Configuration;
+export let databaseManager: DatabaseManagerInstance<Required<AppDatabaseServices>>;
+export let configuration: Configuration;
+export let serviceChannelProducer: StartupFactory | undefined;
+let producerConnected = false;
+
+export const isServiceChannelConnected = (): boolean => producerConnected;
 
 export const dbInit = async (): Promise<void> => {
   const { db, config } = await CreateStorageManager(
-    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Cache.DISTRIBUTED],
+    [Database.EVENT_HISTORY, Database.CONFIGURATION, Database.EVALUATION, Database.RAW_HISTORY, Database.SIMULATION, Cache.DISTRIBUTED],
     processorConfig.nodeEnv === 'production',
   );
 
@@ -24,13 +31,47 @@ export const dbInit = async (): Promise<void> => {
 };
 
 const connect = async (): Promise<void> => {
-  const fastify = await initializeFastifyClient();
-  fastify.listen({ port: processorConfig.PORT, host: '0.0.0.0' }, (err, address) => {
-    if (err) {
-      throw Error(err.message);
+  serviceChannelProducer = new StartupFactory();
+  producerConnected = false;
+
+  for (let retryCount = 0; retryCount < 10; retryCount++) {
+    loggerService.log('Connecting service-channel producer...');
+    try {
+      if (await serviceChannelProducer.initServiceChannelProducer(loggerService)) {
+        producerConnected = true;
+        loggerService.log('Service-channel producer connected');
+        break;
+      }
+    } catch (error) {
+      loggerService.warn(`Service-channel producer connection attempt ${retryCount + 1}/10 failed: ${util.inspect(error)}`);
     }
-    loggerService.log(`Fastify listening on ${address}`);
-  });
+    await setTimeout(5000);
+  }
+
+  if (!producerConnected) {
+    loggerService.warn('Service-channel producer unavailable after 10 retries; continuing without broadcast dispatch.');
+  }
+
+  if (producerConnected) {
+    try {
+      const subscribed = await serviceChannelProducer.initServiceChannel(
+        handleServiceChannelAck,
+        configuration.SERVICE_CHANNEL_CONSUMER,
+        loggerService,
+      );
+      if (subscribed) {
+        loggerService.log('Service-channel ack sink subscribed');
+      } else {
+        loggerService.warn('Service-channel ack sink could not subscribe; continuing without ack logging.');
+      }
+    } catch (error) {
+      loggerService.warn(`Service-channel ack sink subscription failed: ${util.inspect(error)}`);
+    }
+  }
+
+  const fastify = await initializeFastifyClient();
+  const address = await fastify.listen({ port: processorConfig.PORT, host: '0.0.0.0' });
+  loggerService.log(`Fastify listening on ${address}`);
 };
 
 (async () => {
@@ -45,5 +86,3 @@ const connect = async (): Promise<void> => {
     process.exit(1);
   }
 })();
-
-export { databaseManager, configuration };

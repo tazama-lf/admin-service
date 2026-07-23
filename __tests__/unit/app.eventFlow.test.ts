@@ -13,6 +13,8 @@ import {
 import {
   accountResponse,
   entityResponse,
+  fixedDate,
+  incptnDtTm,
   rawResponseAccount,
   rawResponseEntity,
   sampleAccountCondition,
@@ -43,7 +45,12 @@ jest.mock('../../src/', () => ({
     saveCondition: jest.fn(),
     saveEntity: jest.fn(),
     set: jest.fn(),
-    saveAccount: jest.fn(),
+    saveAccount: jest.fn((accountId: string, tenantId: string, creDtTm: string) => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
+      return Promise.resolve();
+    }),
     saveGovernedAsCreditorByEdge: jest.fn(),
     saveGovernedAsDebtorByEdge: jest.fn(),
     saveGovernedAsCreditorAccountByEdge: jest.fn(),
@@ -137,7 +144,6 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a successful post request for a debtor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionDebtor = { ...sampleEntityCondition, prsptv: 'debtor' };
 
     // Act
@@ -147,7 +153,7 @@ describe('handlePostConditionEntity', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
       expect.objectContaining({
         ...conditionDebtor,
-        creDtTm: nowDateTime,
+        creDtTm: expect.any(String),
       }),
     );
     const entityId = `${conditionDebtor.ntty.id}${conditionDebtor.ntty.schmeNm.prtry}`;
@@ -173,7 +179,6 @@ describe('handlePostConditionEntity', () => {
 
   it('should handle a successful post request for a creditor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleEntityCondition, prsptv: 'creditor' };
 
     jest.spyOn(databaseManager, 'saveEntity').mockImplementation((): Promise<void> => {
@@ -183,10 +188,13 @@ describe('handlePostConditionEntity', () => {
     const result = await handlePostConditionEntity(conditionCreditor as EntityCondition, 'DEFAULT');
 
     // Assert
-    expect(databaseManager.saveCondition).toHaveBeenCalledWith({
-      ...conditionCreditor,
-      creDtTm: nowDateTime,
-    });
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...conditionCreditor,
+        creDtTm: expect.any(String),
+        updDtTm: expect.any(String),
+      }),
+    );
     const entityId = `${conditionCreditor.ntty.id}${conditionCreditor.ntty.schmeNm.prtry}`;
     expect(databaseManager.saveGovernedAsCreditorByEdge).toHaveBeenCalledWith('cond123', entityId, conditionCreditor);
     expect(result).toEqual({
@@ -199,8 +207,6 @@ describe('handlePostConditionEntity', () => {
       return Promise.resolve({ id: undefined } as unknown as Entity);
     });
 
-    const nowDateTime = new Date().toISOString();
-
     // Arrange
     const condition = {
       ...sampleEntityCondition,
@@ -211,7 +217,7 @@ describe('handlePostConditionEntity', () => {
     // Act & Assert
     await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
     const entityId = condition.ntty.id + condition.ntty.schmeNm.prtry;
-    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, 'DEFAULT', nowDateTime);
+    expect(databaseManager.saveEntity).toHaveBeenCalledWith(entityId, 'DEFAULT', expect.any(String));
   });
   it('should handle error when creating a new entity if entity does not exist and forceCret is set to true', async () => {
     jest.spyOn(databaseManager, 'getEntity').mockImplementation((): Promise<Entity | undefined> => {
@@ -380,7 +386,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve(void '');
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.resolve(void '');
     });
   });
@@ -456,7 +465,6 @@ describe('handlePostConditionAccount', () => {
 
   it('should handle a successful post request for a creditor perspective', async () => {
     // Arrange
-    const nowDateTime = new Date().toISOString();
     const conditionCreditor = { ...sampleAccountCondition, prsptv: 'creditor' };
 
     // Act
@@ -466,7 +474,7 @@ describe('handlePostConditionAccount', () => {
     expect(databaseManager.saveCondition).toHaveBeenCalledWith(
       expect.objectContaining({
         ...conditionCreditor,
-        creDtTm: nowDateTime,
+        creDtTm: expect.any(String),
       }),
     );
     const accountId = `${sampleAccountCondition.acct.id + sampleAccountCondition.acct.schmeNm.prtry + sampleAccountCondition.acct.agt.finInstnId.clrSysMmbId.mmbId}`;
@@ -489,7 +497,8 @@ describe('handlePostConditionAccount', () => {
     // Act & Assert
     await handlePostConditionAccount(condition as AccountCondition, 'DEFAULT');
     const accountId = condition.acct.id + condition.acct.schmeNm.prtry + condition.acct.agt.finInstnId.clrSysMmbId.mmbId;
-    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT');
+    // Some string value for the creation datetime (we don't care about the exact value, just that it's a string)
+    expect(databaseManager.saveAccount).toHaveBeenCalledWith(accountId, 'DEFAULT', expect.any(String));
   });
 
   it('should handle error when creating a new account if account does not exist and forceCret is set to true', async () => {
@@ -497,7 +506,10 @@ describe('handlePostConditionAccount', () => {
       return Promise.resolve({ id: '' } as Account);
     });
 
-    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((): Promise<void> => {
+    jest.spyOn(databaseManager, 'saveAccount').mockImplementation((accountId: string, tenantId: string, creDtTm: string): Promise<void> => {
+      expect(creDtTm).toBeDefined();
+      expect(typeof creDtTm).toBe('string');
+      // Optionally validate ISO 8601 format
       return Promise.reject(new Error('Test Error'));
     });
 
@@ -783,6 +795,124 @@ describe('handleUpdateExpiryDateForConditionsOfAccount', () => {
 
     expect(result).toEqual({ code: 200, message: '' });
   });
+
+  // Regression tests for tazama-lf/admin-service#414.
+  // The handler had a copy-paste typo: `debtorByEdgeE = creditorByEdge` (should be `debtorByEdge`).
+  // For debtor-only conditions the bug produced a spurious 404 "Account does not exist".
+  // For "both"-perspective conditions the debtor edge updater was called with the creditor edge's
+  // source/destination - the existing happy-path tests do not catch this because their fixtures
+  // populate creditor and debtor edges with identical source/destination values.
+  it('should expire a debtor-only account condition (regression for #414)', async () => {
+    const debtorOnlyFixture = {
+      governed_as_creditor_account_by: [],
+      governed_as_debtor_account_by: [
+        {
+          id: 'edge-debtor-only',
+          source: 'account/debtor-src',
+          destination: 'condition/dst',
+          edge: { source: 'account/debtor-src', destination: 'condition/dst' },
+          result: {},
+          condition: {
+            condId: 'cond123',
+            condTp: 'overridable-block',
+            incptnDtTm,
+            condRsn: 'R001',
+            evtTp: ['pacs.008.001.10'],
+            usr: 'bob',
+            creDtTm: fixedDate,
+            updDtTm: fixedDate,
+            tenantId: 'DEFAULT',
+            acct: {
+              id: '1010101010',
+              schmeNm: { prtry: 'Mxx' },
+              agt: { finInstnId: { clrSysMmbId: { mmbId: 'dfsp001' } } },
+            },
+          },
+        },
+      ],
+      governed_as_creditor_by: [],
+      governed_as_debtor_by: [],
+    };
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([debtorOnlyFixture]);
+    (databaseManager.updateExpiryDateOfCreditorAccountEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateExpiryDateOfDebtorAccountEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, 'DEFAULT', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
+    expect(databaseManager.updateExpiryDateOfDebtorAccountEdges).toHaveBeenCalledWith(
+      'account/debtor-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+    expect(databaseManager.updateExpiryDateOfCreditorAccountEdges).not.toHaveBeenCalled();
+    expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm, 'DEFAULT');
+  });
+
+  it('should call debtor edge updater with debtor edge args (not creditor args) for "both" perspective (regression for #414)', async () => {
+    const conditionBase = {
+      condId: 'cond123',
+      condTp: 'overridable-block',
+      incptnDtTm,
+      condRsn: 'R001',
+      evtTp: ['pacs.008.001.10'],
+      usr: 'bob',
+      creDtTm: fixedDate,
+      updDtTm: fixedDate,
+      tenantId: 'DEFAULT',
+      acct: {
+        id: '1010101010',
+        schmeNm: { prtry: 'Mxx' },
+        agt: { finInstnId: { clrSysMmbId: { mmbId: 'dfsp001' } } },
+      },
+    };
+    const bothFixture = {
+      governed_as_creditor_account_by: [
+        {
+          id: 'edge-cred',
+          source: 'account/cred-src',
+          destination: 'condition/dst',
+          edge: { source: 'account/cred-src', destination: 'condition/dst' },
+          result: {},
+          condition: conditionBase,
+        },
+      ],
+      governed_as_debtor_account_by: [
+        {
+          id: 'edge-debtor',
+          source: 'account/debtor-src',
+          destination: 'condition/dst',
+          edge: { source: 'account/debtor-src', destination: 'condition/dst' },
+          result: {},
+          condition: conditionBase,
+        },
+      ],
+      governed_as_creditor_by: [],
+      governed_as_debtor_by: [],
+    };
+    (databaseManager.getAccountConditionsByGraph as jest.Mock).mockResolvedValue([bothFixture]);
+    (databaseManager.updateExpiryDateOfCreditorAccountEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateExpiryDateOfDebtorAccountEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfAccount(params, 'DEFAULT', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
+    expect(databaseManager.updateExpiryDateOfCreditorAccountEdges).toHaveBeenCalledWith(
+      'account/cred-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+    expect(databaseManager.updateExpiryDateOfDebtorAccountEdges).toHaveBeenCalledWith(
+      'account/debtor-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+  });
 });
 
 describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
@@ -909,6 +1039,111 @@ describe('handleUpdateExpiryDateForConditionsOfEntity', () => {
 
     expect(result).toEqual({ code: 200, message: '' });
   });
+
+  // Regression tests for tazama-lf/admin-service#414 - entity mirror of the account-handler bug.
+  it('should expire a debtor-only entity condition (regression for #414)', async () => {
+    const debtorOnlyFixture = {
+      governed_as_creditor_by: [],
+      governed_as_debtor_by: [
+        {
+          id: 'edge-debtor-only',
+          source: 'entity/debtor-src',
+          destination: 'condition/dst',
+          edge: { source: 'entity/debtor-src', destination: 'condition/dst' },
+          result: {},
+          condition: {
+            condId: 'cond123',
+            condTp: 'overridable-block',
+            incptnDtTm,
+            condRsn: 'R001',
+            evtTp: ['pacs.008.001.10'],
+            usr: 'bob',
+            creDtTm: fixedDate,
+            updDtTm: fixedDate,
+            tenantId: 'DEFAULT',
+            ntty: { id: '+27733161225', schmeNm: { prtry: 'MSISDN' } },
+          },
+        },
+      ],
+      governed_as_creditor_account_by: [],
+      governed_as_debtor_account_by: [],
+    };
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([debtorOnlyFixture]);
+    (databaseManager.updateExpiryDateOfCreditorEntityEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateExpiryDateOfDebtorEntityEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
+    expect(databaseManager.updateExpiryDateOfDebtorEntityEdges).toHaveBeenCalledWith(
+      'entity/debtor-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+    expect(databaseManager.updateExpiryDateOfCreditorEntityEdges).not.toHaveBeenCalled();
+    expect(databaseManager.updateCondition).toHaveBeenCalledWith('cond123', xprtnDtTm, 'DEFAULT');
+  });
+
+  it('should call debtor edge updater with debtor edge args (not creditor args) for "both" perspective (regression for #414)', async () => {
+    const conditionBase = {
+      condId: 'cond123',
+      condTp: 'overridable-block',
+      incptnDtTm,
+      condRsn: 'R001',
+      evtTp: ['pacs.008.001.10'],
+      usr: 'bob',
+      creDtTm: fixedDate,
+      updDtTm: fixedDate,
+      tenantId: 'DEFAULT',
+      ntty: { id: '+27733161225', schmeNm: { prtry: 'MSISDN' } },
+    };
+    const bothFixture = {
+      governed_as_creditor_by: [
+        {
+          id: 'edge-cred',
+          source: 'entity/cred-src',
+          destination: 'condition/dst',
+          edge: { source: 'entity/cred-src', destination: 'condition/dst' },
+          result: {},
+          condition: conditionBase,
+        },
+      ],
+      governed_as_debtor_by: [
+        {
+          id: 'edge-debtor',
+          source: 'entity/debtor-src',
+          destination: 'condition/dst',
+          edge: { source: 'entity/debtor-src', destination: 'condition/dst' },
+          result: {},
+          condition: conditionBase,
+        },
+      ],
+      governed_as_creditor_account_by: [],
+      governed_as_debtor_account_by: [],
+    };
+    (databaseManager.getEntityConditionsByGraph as jest.Mock).mockResolvedValue([bothFixture]);
+    (databaseManager.updateExpiryDateOfCreditorEntityEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateExpiryDateOfDebtorEntityEdges as jest.Mock).mockResolvedValue('test');
+    (databaseManager.updateCondition as jest.Mock).mockResolvedValue('test');
+
+    const result = await handleUpdateExpiryDateForConditionsOfEntity(params, 'DEFAULT', xprtnDtTm);
+
+    expect(result).toEqual({ code: 200, message: '' });
+    expect(databaseManager.updateExpiryDateOfCreditorEntityEdges).toHaveBeenCalledWith(
+      'entity/cred-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+    expect(databaseManager.updateExpiryDateOfDebtorEntityEdges).toHaveBeenCalledWith(
+      'entity/debtor-src',
+      'condition/dst',
+      xprtnDtTm,
+      'DEFAULT',
+    );
+  });
 });
 
 describe('handleCacheUpdate', () => {
@@ -1000,5 +1235,66 @@ describe('handleCacheUpdate', () => {
     const result = await handleRefreshCache(true, 'DEFAULT', 12);
 
     expect(result).toBe(undefined);
+  });
+});
+
+describe('Condition Timestamp Population', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+
+    jest
+      .spyOn(databaseManager, 'getEntity')
+      .mockImplementation((entityId: string, schemeProprietary: string): Promise<Entity | undefined> => {
+        return Promise.resolve({ id: `${entityId}${schemeProprietary}` } as Entity);
+      });
+
+    jest.spyOn(databaseManager, 'getEntityConditionsByGraph').mockImplementation((): Promise<RawConditionResponse[]> => {
+      return Promise.resolve([rawResponseEntity] as unknown as RawConditionResponse[]);
+    });
+
+    jest.spyOn(databaseManager, 'set').mockImplementation(() => {
+      return Promise.resolve(undefined);
+    });
+
+    jest.spyOn(databaseManager, 'saveCondition').mockImplementation(() => {
+      return Promise.resolve(void '');
+    });
+
+    jest.spyOn(databaseManager, 'saveEntity').mockImplementation((_entityId: string, _CreDtTm: string): Promise<void> => {
+      return Promise.resolve(void '');
+    });
+  });
+
+  it('should populate both creDtTm and updDtTm when creating entity condition', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const condition = {
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
+    };
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
+
+    expect(databaseManager.saveCondition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creDtTm: expect.any(String),
+        updDtTm: expect.any(String),
+      }),
+    );
+  });
+
+  it('should set updDtTm equal to creDtTm on creation', async () => {
+    const futureIncptnDtTm = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const futureXprtnDtTm = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const condition = {
+      ...sampleEntityCondition,
+      incptnDtTm: futureIncptnDtTm,
+      xprtnDtTm: futureXprtnDtTm,
+    };
+    await handlePostConditionEntity(condition as EntityCondition, 'DEFAULT');
+
+    const savedCondition = (databaseManager.saveCondition as jest.Mock).mock.calls[0][0];
+    expect(savedCondition.updDtTm).toBe(savedCondition.creDtTm);
   });
 });

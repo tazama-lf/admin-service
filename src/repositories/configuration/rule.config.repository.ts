@@ -1,29 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import type { RuleConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type { PoolClient } from 'pg';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { CrudRepository } from '../repository.base';
+import { listConfiguration, type ConfigListDescriptor } from './config-list.shared';
+
+const ruleListDescriptor: ConfigListDescriptor = {
+  table: 'rule',
+  sortColumns: { id: 'ruleid', cfg: 'rulecfg' },
+  defaultSort: 'cfg',
+  uniqueKeyOrder: ['ruleid', 'rulecfg'],
+  filters: [
+    { key: 'id', column: 'ruleid' },
+    { key: 'cfg', column: 'rulecfg' },
+  ],
+  keySetColumns: ['ruleid', 'rulecfg'],
+};
 
 export const RuleConfigRepo: CrudRepository<RuleConfig> = {
-  list: async function ({ offset, limit, filters, order, sort, tenantId }): Promise<{ data: RuleConfig[]; total: number }> {
-    sort ??= 'cfg';
-    const filter: { field: string; value: string } = { field: 'ruleid', value: '' };
-    if (filters) {
-      filter.field = filters[0];
-      filter.value = filters[1];
-    }
-
-    const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
-      {
-        text: `SELECT configuration FROM rule WHERE ($2 = '' OR configuration->>$1 = $2) AND tenantId = $6 ORDER BY configuration->>$3 ${order} OFFSET $4 LIMIT $5;`,
-        values: [filter.field, filter.value, sort, offset, limit, tenantId],
-      } satisfies PgQueryConfig,
-      'configuration',
-    );
-
-    return queryRes.rows.length > 0
-      ? { data: queryRes.rows.map((values) => values.configuration), total: queryRes.rowCount! }
-      : { data: [], total: 0 };
+  list: async function (params): Promise<{ data: RuleConfig[]; total: number }> {
+    return await listConfiguration<RuleConfig>(ruleListDescriptor, params);
   },
 
   get: async function ({ id, cfg, tenantId }): Promise<RuleConfig | null> {
@@ -38,19 +35,29 @@ export const RuleConfigRepo: CrudRepository<RuleConfig> = {
     return queryRes.rowCount ? queryRes.rows[0].configuration : null;
   },
 
-  create: async function (payload: RuleConfig, tenantId: string): Promise<RuleConfig> {
+  create: async function (payload: RuleConfig, tenantId: string, client?: PoolClient): Promise<RuleConfig> {
     payload.tenantId = tenantId;
+
+    const dtTme = new Date().toISOString();
+    payload.creDtTm = dtTme;
+    payload.updDtTm = dtTme;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
         text: 'INSERT INTO rule (configuration) VALUES ($1) RETURNING configuration;',
         values: [payload],
       } satisfies PgQueryConfig,
       'configuration',
+      client,
     );
     return queryRes.rows[0].configuration;
   },
 
   update: async function ({ id, cfg, tenantId }, payload: RuleConfig): Promise<RuleConfig | null> {
+    const dtTme = new Date().toISOString();
+    payload.updDtTm = dtTme;
+    payload.tenantId = tenantId;
+
     const queryRes = await handlePostExecuteSqlStatement<{ configuration: RuleConfig }>(
       {
         text: 'UPDATE rule SET configuration = $1 WHERE ruleid = $2 AND rulecfg = $3 AND tenantid = $4 RETURNING configuration;',

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # SPDX-License-Identifier: Apache-2.0
 ARG BUILD_IMAGE=node:20-bullseye
 ARG RUN_IMAGE=gcr.io/distroless/nodejs20-debian11:nonroot
@@ -11,9 +12,8 @@ COPY ./src ./src
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY .npmrc ./
-ARG GH_TOKEN
 
-RUN npm ci --ignore-scripts
+RUN --mount=type=secret,id=GH_TOKEN,env=GH_TOKEN npm ci --ignore-scripts
 RUN npm run build
 
 FROM ${BUILD_IMAGE} AS dep-resolver
@@ -22,8 +22,7 @@ LABEL stage=pre-prod
 
 COPY package*.json ./
 COPY .npmrc ./
-ARG GH_TOKEN
-RUN npm ci --omit=dev --ignore-scripts
+RUN --mount=type=secret,id=GH_TOKEN,env=GH_TOKEN npm ci --omit=dev --ignore-scripts
 
 FROM ${RUN_IMAGE} AS run-env
 USER nonroot
@@ -64,6 +63,24 @@ ENV EVALUATION_DATABASE_USER=''
 ENV EVALUATION_DATABASE_PASSWORD=''
 ENV EVALUATION_DATABASE_HOST=''
 
+ENV RAW_HISTORY_DATABASE_PORT='5432'
+ENV RAW_HISTORY_DATABASE='raw_history'
+ENV RAW_HISTORY_DATABASE_CERT_PATH='/usr/local/share/ca-certificates/ca-certificates.crt'
+ENV RAW_HISTORY_DATABASE_USER=''
+ENV RAW_HISTORY_DATABASE_PASSWORD=''
+ENV RAW_HISTORY_DATABASE_HOST=''
+
+# SIMULATION_DATABASE is intentionally left blank: there is no simulation DB for this service yet.
+# frms-coe-lib skips the simulation store entirely when the db-name var is empty (CreateStorageManager:
+# `Database.SIMULATION && !process.env.SIMULATION_DATABASE`), so a blank name avoids requiring a HOST.
+# Do NOT set this to a non-empty value until the simulation DB is split out into its own service.
+ENV SIMULATION_DATABASE_PORT='5432'
+ENV SIMULATION_DATABASE=''
+ENV SIMULATION_DATABASE_CERT_PATH='/usr/local/share/ca-certificates/ca-certificates.crt'
+ENV SIMULATION_DATABASE_USER=''
+ENV SIMULATION_DATABASE_PASSWORD=''
+ENV SIMULATION_DATABASE_HOST=''
+
 
 # REDIS
 ENV REDIS_DATABASE=0
@@ -80,5 +97,11 @@ ENV SIDECAR_HOST=0.0.0.0:5000
 
 ENV ACTIVE_CONDITIONS_ONLY=false
 ENV CORS_POLICY=prod
+
+# Service Channel
+ENV SERVER_URL=nats://nats:4222
+ENV SERVICE_CHANNEL_PRODUCER=service-channel
+ENV SERVICE_CHANNEL_CONSUMER=service-channel-ack
+ENV SERVICE_CHANNEL_SOURCE_URI_PREFIX=
 
 CMD ["build/index.js"]

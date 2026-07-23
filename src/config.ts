@@ -11,8 +11,9 @@ dotenv.config({
 });
 
 // Just we don't want everything, just what we are configuring, add more fields accordingly
-export type AppDatabaseServices = Required<Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration'>>;
-
+export type AppDatabaseServices = Required<
+  Pick<ManagerConfig, 'redisConfig' | 'eventHistory' | 'evaluation' | 'configuration' | 'rawHistory' | 'simulation'>
+>;
 export type Configuration = ProcessorConfig & AppDatabaseServices & IConfig;
 
 export interface IConfig {
@@ -20,6 +21,9 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  SERVICE_CHANNEL_PRODUCER?: string;
+  SERVICE_CHANNEL_CONSUMER?: string;
+  SERVICE_CHANNEL_SOURCE_URI_PREFIX?: string;
 }
 
 const additionalEnvironmentVariables: AdditionalConfig[] = [
@@ -40,6 +44,21 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
   },
   {
     name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_PRODUCER',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_CONSUMER',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'SERVICE_CHANNEL_SOURCE_URI_PREFIX',
     type: 'string',
     optional: true,
   },

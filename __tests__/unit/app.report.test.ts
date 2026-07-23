@@ -4,12 +4,9 @@ import { handleGetReportRequestByMsgId } from '../../src/services/report.logic.s
 
 jest.mock('@tazama-lf/frms-coe-lib', () => {
   const original = jest.requireActual('@tazama-lf/frms-coe-lib');
-
-  return {
-    ...original,
-  };
+  return { ...original };
 });
-// Mock the module
+
 jest.mock('../../src/', () => ({
   databaseManager: {
     getReportByMessageId: jest.fn(),

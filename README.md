@@ -5,6 +5,37 @@
 
 The **Admin Service** is a Node.js-based API designed for administrative tasks, with a particular focus on report and condition management. It utilizes the Fastify framework to deliver a high-performance and low-overhead API interface. This document offers an in-depth examination of the API, covering setup requirements, a comprehensive overview of the application, and detailed route documentation.
 
+## Timestamp Fields
+
+All entities managed by the Admin Service now include automated timestamp tracking:
+
+### creDtTm (Creation DateTime)
+Indicates when a record was initially created in the system.
+- **Type**: ISO 8601 timestamp string
+- **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
+- **Behavior**: Automatically set during record creation, immutable thereafter
+- **Example**: `"2023-02-03T07:17:52.216Z"`
+
+### updDtTm (Update DateTime) 
+Indicates when a record was last modified.
+- **Type**: ISO 8601 timestamp string 
+- **Format**: `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC timezone)
+- **Behavior**: Automatically updated on every record modification
+- **Example**: `"2023-02-04T10:30:15.789Z"`
+
+### Timestamp Behavior
+- All timestamps are stored and returned in UTC timezone
+- Timestamps are automatically managed by the system and cannot be manually set via API
+- Both fields are included in all GET, POST, and PUT operation responses
+- Timestamps follow ISO 8601 standard for consistent parsing across systems
+
+### forceCret Behavior with Timestamps
+When `forceCret` is set to `true` during entity or account creation:
+- The system will create new records if they don't exist
+- `creDtTm` is automatically set to the current system timestamp using `new Date().toISOString()`
+- New records include both `creDtTm` and initial `updDtTm` values
+- All timestamp fields are validated to ensure they are defined and of string type
+
 ## Pre-requisites
 
 Before you start using the Admin API, ensure that you have the following items:
@@ -101,6 +132,22 @@ GET /v1/admin/reports/getreportbymsgid?msgid=1234567890 HTTP/1.1
       "code": "FST_ERR_VALIDATION",
       "error": "Bad Request",
       "message": "querystring must have required property 'msgid'"
+    }
+    ```
+
+    **Status 200 OK:** Successful response with report data.
+    ```json
+    {
+      "reportData": {
+        "msgId": "1234567890",
+        "evaluationResult": {
+          "status": "completed",
+          "score": 85.5,
+          "riskLevel": "medium"
+        },
+        "creDtTm": "2023-02-03T07:17:52.216Z",
+        "updDtTm": "2023-02-03T09:30:45.123Z"
+      }
     }
     ```
 
@@ -260,6 +307,60 @@ Possible values for some fields mention in the table above
 #### Headers
 No specific headers required for both endpoints.
 
+### Request Examples
+
+```http
+GET /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&synccache=active HTTP/1.1
+```
+
+#### GET Response
+
+- **Status 200 OK:** Successful condition retrieval.
+    ```json
+    {
+      "conditions": [
+        {
+          "condId": "cond-67890-entity",
+          "evtTp": ["pacs.008.001.10"],
+          "condTp": "non-overridable-block",
+          "prsptv": "debtor",
+          "incptnDtTm": "2023-02-03T06:00:00.000Z",
+          "xprtnDtTm": "2023-02-10T23:59:59.999Z",
+          "condRsn": "SUSPICIOUS_ACTIVITY",
+          "status": "active",
+          "creDtTm": "2023-02-03T07:17:52.216Z",
+          "updDtTm": "2023-02-03T07:17:52.216Z"
+        }
+      ]
+    }
+    ```
+
+```http
+GET /v1/admin/event-flow-control/account?id=acc456&schmenm=IBAN&agt=bank001&synccache=all HTTP/1.1
+```
+
+#### GET Response — Account
+
+- **Status 200 OK:** Successful account condition retrieval.
+    ```json
+    {
+      "conditions": [
+        {
+          "condId": "cond-54321-account",
+          "evtTp": ["pacs.002.001.12", "pain.001.001.11"],
+          "condTp": "overridable-block",
+          "prsptv": "both",
+          "incptnDtTm": "2023-02-02T08:00:00.000Z",
+          "xprtnDtTm": "2023-02-09T18:00:00.000Z",
+          "condRsn": "HIGH_RISK_TRANSACTION",
+          "status": "active",
+          "creDtTm": "2023-02-02T08:15:30.456Z",
+          "updDtTm": "2023-02-03T09:20:45.789Z"
+        }
+      ]
+    }
+    ```
+
 
 ```http
 POST /v1/admin/event-flow-control/entity HTTP/1.1
@@ -317,6 +418,18 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
     }
     ```
 
+     **Status 200 OK:** Successful condition creation.
+    ```json
+    {
+      "id": "cond-12345-account",
+      "status": "created",
+      "accountId": "acct-987654",
+      "conditionType": "non-overridable-block",
+      "creDtTm": "2023-02-03T07:17:52.216Z",
+      "updDtTm": "2023-02-03T07:17:52.216Z"
+    }
+    ```
+
 - **Status 500 Internal Server Error:** For server-side errors.
     ```json
     {
@@ -324,6 +437,53 @@ POST /v1/admin/event-flow-control/account HTTP/1.1
       "message": "Internal server error occurred."
     }
     ```
+
+    ```http
+PUT /v1/admin/event-flow-control/entity?id=user123&schmenm=MSISDN&condId=cond-67890-entity HTTP/1.1
+Content-Type: application/json
+```
+
+```json
+{
+  "xprtnDtTm": "2023-02-15T23:59:59.999Z"
+}
+```
+
+#### PUT Response
+
+- **Status 200 OK:** Successful condition update.
+    ```json
+    {
+      "condId": "cond-67890-entity",
+      "status": "updated",
+      "newExpirationDate": "2023-02-15T23:59:59.999Z",
+      "creDtTm": "2023-02-03T07:17:52.216Z",
+      "updDtTm": "2023-02-05T14:22:18.345Z"
+    }
+    ```
+
+```http
+PUT /v1/admin/event-flow-control/account?id=acc456&schmenm=IBAN&agt=bank001&condId=cond-54321-account HTTP/1.1
+Content-Type: application/json
+
+{
+  "xprtnDtTm": "2023-02-20T18:00:00.000Z"
+}
+```
+
+#### PUT Response - Account
+
+- **Status 200 OK:** Successful account condition update.
+    ```json
+    {
+      "condId": "cond-54321-account",
+      "status": "updated", 
+      "newExpirationDate": "2023-02-20T18:00:00.000Z",
+      "creDtTm": "2023-02-02T08:15:30.456Z",
+      "updDtTm": "2023-02-05T16:45:12.678Z"
+    }
+    ```
+
     
 ### Refreshing cache
 
@@ -411,9 +571,142 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 | No. | Config  | File name | Endpoint | Methods | 
 | --- | --- | --------- | -------- | ----------- | 
-| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL |
-| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST,PUT,DEL |
-| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST,PUT,DEL |
+| 1. | Network Map | network.map.repository | `/v1/admin/configuration/network_map` |  GET,POST,PUT,DEL, plus `POST {cfg}/activate`, `POST {cfg}/deactivate` and `POST /reload` |
+| 2. | Rule Configuration |  rule.config.repository | `/v1/admin/configuration/rule` |  GET,POST (single or batch),PUT,DEL |
+| 3. | Typology Configuration | typology.config.repository | `/v1/admin/configuration/typology` | GET,POST (single or batch),PUT,DEL |
+
+### Configuration LIST query contract
+
+The three configuration LIST endpoints (`network_map`, `rule`, `typology`) share a common query
+contract, implemented by a single parameterised helper. A bare `GET` is **safe by default**: it
+returns the first page only, not the whole table.
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer `1-100`, or `all` | `20` | Page size. Use `all` to return the full tenant-scoped set in one response. `all` is mutually exclusive with a non-zero `offset` (returns `400`). Values above `100` return `400`. |
+| `offset` | integer `>= 0` | `0` | Rows to skip for pagination. Cannot be combined with `limit=all`. |
+| `sort` | per-entity allowlist | `id` (rule/typology), `cfg` (network_map) | Lead ordering column. The remaining unique-key column is always appended so paging is deterministic. A value outside the allowlist returns `400`. |
+| `order` | `ASC` or `DESC` | `ASC` | Sort direction. |
+| `filters[<field>]` | string | - | Exact-match filters. **All** supplied filters are ANDed (not just the first). Each `<field>` is allowlisted per entity; unknown keys are ignored. |
+| `keys` | array of `{ id, cfg }` | - | Targeted batch fetch (rule/typology only): return exactly the listed composite `(id, cfg)` pairs in one query. Maximum 200 pairs (`400` past the cap). Supplied as `keys[0][id]=..&keys[0][cfg]=..`. |
+
+Per-entity allowlists: `rule`/`typology` accept `sort`/`filters` of `id` and `cfg`; `network_map`
+accepts `cfg` and `active` (`true`/`false`).
+
+#### Response shape
+
+```json
+{
+  "data": [ /* entity objects */ ],
+  "meta": { "total": 128, "limit": 20, "offset": 0 }
+}
+```
+
+`meta.total` is the real `COUNT(*)` of all matching rows (not the size of the returned page), so a
+client can compute the number of pages. On the `limit=all` path, `meta.limit` equals `total` and
+`meta.offset` is `0`.
+
+#### Examples
+
+```http
+GET /v1/admin/configuration/network_map?filters[active]=true HTTP/1.1
+GET /v1/admin/configuration/rule?limit=50&offset=50&sort=id&order=DESC HTTP/1.1
+GET /v1/admin/configuration/typology?limit=all HTTP/1.1
+GET /v1/admin/configuration/rule?keys[0][id]=EFRuP@1.0.0&keys[0][cfg]=1.0.0&keys[1][id]=R1&keys[1][cfg]=1.0.0&limit=all HTTP/1.1
+```
+
+### Configuration POST contract (single or batch)
+
+The `rule` and `typology` POST endpoints accept **either** a single configuration object **or** an
+array of configuration objects in one request. `network_map` is intentionally excluded (its
+single-active-per-tenant invariant and `activate`/`deactivate` swap make atomic bulk insert
+semantics ambiguous), so its POST accepts a single object only.
+
+#### Accepted body shapes
+
+A single object (unchanged, backwards compatible):
+
+```json
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } }
+```
+
+An array of objects (batch). A common shape is one entity identity (`id` is slow-changing) submitted
+with several config versions (`cfg` is the high-churn part of the key) in a single atomic insert:
+
+```json
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { /* ... */ } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { /* ... */ } }
+]
+```
+
+Each array element must follow the same Create schema as the single-object body. Unknown
+top-level fields are stripped before insert on both paths (no mass-assignment via the array form).
+
+#### Semantics
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Array bounds | `minItems` 1, `maxItems` 200 by default. An empty array or one over the cap returns `400`. |
+| Validation | Every item is validated **before** any insert. The first invalid item returns `400` with a body message of the form `item[<index>]: <path> <reason>`, identifying which element failed. |
+| Atomicity | All items in a batch are inserted inside a single configuration-pool transaction. If any insert fails the whole batch is rolled back - it is all-or-nothing, never a partial write. |
+| Tenant scoping | Every item is stamped with the `tenantId` from the auth token, exactly as the single-object path. |
+| Success status | `201 Created` for both the single-object and the array form. |
+
+#### Response body note
+
+For the **single-object** path the `201` response body is the created entity, serialized against the
+entity schema - unchanged, and the same on batch-enabled routes as on single-only routes.
+
+For the **array** path the success body (the array of created entities) is serialized **element by
+element** with that same entity serializer, then joined into a JSON array - so every element is shaped
+identically to a single-object create (declared keys in schema order, schema-bound formatting). The
+route cannot hand the whole array to one schema serializer because a `Type.Union` of the single entity
+and an array of items cannot be compiled by `fast-json-stringify` when the entity schema is recursive
+(typology's `expression`); reusing the per-element entity serializer keeps the array reply consistent
+with the single-object reply without compiling a recursive union. One consequence remains in the
+generated OpenAPI: the array request items are typed as a generic object (`{}`); the per-item shape is
+the entity Create schema documented above. The array reply is sent with
+`Content-Type: application/json`, the same as the single-object reply.
+
+#### Examples
+
+A single rule (the single-object form):
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+{ "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } }
+```
+
+A batch of rule config versions - one `id`, several `cfg` values, inserted atomically:
+
+```http
+POST /v1/admin/configuration/rule HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.0", "config": { } },
+  { "id": "EFRuP@1.0.0", "cfg": "1.0.1", "config": { } }
+]
+```
+
+A batch of typology config versions (note typology's required `rules`, `expression`, `workflow`
+fields - there is no `config` field on a typology):
+
+```http
+POST /v1/admin/configuration/typology HTTP/1.1
+Content-Type: application/json
+
+[
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.0", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } },
+  { "id": "typology-processor@1.0.0", "cfg": "1.0.1", "rules": [], "expression": [], "workflow": { "alertThreshold": 100 } }
+]
+```
+
 
 ---
 
@@ -421,25 +714,65 @@ Each repository implementation follows a standardized interface, ensuring consis
 
 ### List Operation
 
-When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain.
+When listing entities, the repository constructs a SQL statement dynamically using optional filters and sort parameters. Tenant ID is always included to ensure the query operates within the tenant’s data domain. Every supplied filter is applied (ANDed), and ordering is deterministic: the chosen `sort` column followed by the remaining unique-key columns.
 
-The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin.
+The result is normalized into a consistent `{ data, total }` format expected by the CRUD plugin, where `total` is a separate `COUNT(*)` of all matching rows (not the size of the returned page). The CRUD plugin then shapes the HTTP response as `{ data, meta }`.
 
 ### Get Operation
 
-The `get` method retrieves a single entity record based on the combination of ID, and tenantId. If the record exists, it returns the parsed configuration object.
+The `get` method retrieves a single entity record based on its unique key and `tenantId` — `(id, cfg)` for rule and typology, and `(cfg)` for network_map. If the record exists, it returns the parsed configuration object; otherwise the endpoint responds `404`.
 
 ### Create Operation
 
-The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation.
+The creation method inserts a new configuration entry into the database. The payload is augmented with the tenant identifier from auth token before being stored. The inserted configuration is returned as confirmation. The `create` method also accepts an optional transaction `client`; when supplied (by the batch POST path) the insert runs on that pinned client so a multi-item batch commits or rolls back atomically. See **Configuration POST contract (single or batch)** above for the `rule`/`typology` array form.
 
 ### Update Operation
 
-The update process replaces an existing configuration record that matches the composite key (`id`, `payload: configuration`, and `tenantId`). The repository ensures atomic updates by returning the modified record upon success or `null` if the record does not exist.
+The update process replaces an existing configuration record that matches `cfg` and `tenantId`. The repository ensures atomic updates by returning the modified record upon success or `null` if the record does not exist.
 
 ### Delete Operation
 
-The deletion process removes the record from the table matching the same composite identifiers (id and tenantId). It returns a boolean indicating success, enabling the API to respond with a standardized `{ success: boolean }` payload.
+The deletion process removes the record from the table matching its unique key and `tenantId`. When a row is deleted it returns `200` with `{ "success": true }`. When no matching row exists it returns `404` (parity with GET and PUT), rather than `200 { "success": false }`.
+
+### Activate / Deactivate Operation (network_map only)
+
+Network maps carry a single-active-per-tenant invariant, enforced at the database level by the partial unique index `idx_networkmap_active_tenant on network_map (tenantId) where active = true`. Two dedicated actions switch which map is active without a full `PUT` replace:
+
+```http
+POST /v1/admin/configuration/network_map/{cfg}/activate HTTP/1.1
+POST /v1/admin/configuration/network_map/{cfg}/deactivate HTTP/1.1
+```
+
+**Activate** promotes the target map and demotes the currently-active map (if any) in a single atomic swap, returning the activated map. Because `active` (and `cfg`) are generated `STORED` columns derived from the `configuration` JSONB, the flag is flipped by rewriting the JSON with `jsonb_set` rather than a direct `UPDATE`. The partial unique index is non-deferrable and checked per row, so the swap runs inside one transaction and demotes the current map **before** promoting the target - at no instant are two rows active, regardless of physical row order (a single multi-row `UPDATE` would otherwise risk a `23505` unique-violation). The target's existence is checked first and outside the transaction: a missing map returns `404` with no writes (no rollback needed). `updDtTm` is bumped on both the demoted and promoted records.
+
+**Deactivate** sets a single map inactive in one atomic statement (zero active maps is a legal state, so no transaction is required), bumps `updDtTm`, and returns the deactivated map, or `404` when the target does not exist.
+
+> Network maps are loaded inactive and promoted when ready. Posting a map with `active = true` that would collide with an existing active map is rejected by the unique index (surfaced as a `500`); use `activate` to perform a safe swap instead.
+
+#### Service-channel reload signalling and ack sink
+
+After an `activate` commits, admin-service can broadcast a `network-map.activated` CloudEvent on the service channel so downstream consumers (for example event-director) reload the promoted map. The per-request `reloadMode` body field controls this (`broadcast` by default, `none` to suppress, `cascade` for an ordered handshake); dispatch is advisory and degrades without failing the activation (the DB commit is the source of truth), reported back under `reloadDispatched`.
+
+`reloadMode: cascade` runs an ordered, audience-addressed, ack-gated reload wavefront instead of a single fan-out. admin-service addresses the tiers most-downstream first - event-adjudicator, then typology-processor, then event-director - by stamping the CloudEvents `audience` extension on each `network-map.activated` event (every tier publishes on the same producer subject; the `audience` does the addressing). A tier is addressed only after the previous tier reaches quorum: the single-processor tiers (event-adjudicator, event-director) advance on the first ack, while the typology-processor tier requires one ack from every distinct typology in the activated map (de-duplicated on `typology.id` alone) before event-director is addressed. A typology-processor tier with no typologies is skipped straight to event-director. The orchestrator is fire-and-return: the activate response reports `{ status: true, outcome: 'cascade initiated' }` immediately (the wavefront then runs detached, unchanged response latency and lifecycle), and degrades to `{ status: false, outcome: 'service channel unavailable' }` when the channel is down. A tier that does not reach quorum within the per-tier window (`CASCADE_TIER_TIMEOUT_MS`, 30s) is logged at `error` as a stall and the cascade aborts; it never throws back into the activation path.
+
+> Cascade ack-correlation assumes the deploy convention `typology.id == FUNCTION_NAME`: a typology-processor's ack `source` is its `FUNCTION_NAME`, and the typology-processor quorum is computed from the distinct `typology.id` values in the activated map, so the two must match for an ack to count toward quorum. A map reaching the typology-processor tier with zero typologies is a configuration error the admin-service configuration endpoints are expected to reject upfront; the cascade tolerates it by skipping that tier.
+
+Consumers reply with an ack on the reply subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel-ack`). admin-service runs a standing **fire-and-log ack sink** on that subject: each ack is logged as a single advisory line carrying the acking `source`, the `correlationId` (the activation event's id) and the `outcome`. A `success` ack logs at info; an `outcome: error` ack escalates to `error` so a failed downstream fulfilment of an activation admin-service dispatched is surfaced. The sink is advisory only - it never blocks or fails an activation, performs no aggregation or tally, and swallows a malformed ack (logged at `warn`) so a single bad message cannot tear down the subscription. When a `cascade` is in flight, the sink additively forwards each **successful** ack (by `correlationId` and `source`) to the cascade orchestrator so the wavefront can advance; an `error` ack still logs at `error` but does not count toward a tier's quorum (delivery is not adoption).
+
+#### Dedicated reload endpoint (no DB write, loud 503)
+
+```http
+POST /v1/admin/configuration/network_map/reload HTTP/1.1
+```
+
+The reload endpoint re-dispatches a `network-map.activated` signal for the tenant's **current active** network map without changing any state. It is a control-plane action - no row is written, no activation is performed - for when a consumer needs to be (re-)driven to reload the map that is already active (for example a consumer that started late, missed the original broadcast, or needs a fresh cascade). It is a sibling of `activate` rather than part of it: there is no `{cfg}` in the path because the endpoint always operates on whichever map is active for the tenant, resolved server-side via the single-active-per-tenant index (`getActive`). When the tenant has no active map there is nothing to reload, so the endpoint returns `404` (`No active network map`). The `cfg` and `tenantId` carried on the dispatched CloudEvent are derived from the fetched active map, not from the request.
+
+Its contract deliberately diverges from `activate` in two ways:
+
+- **`reloadMode` is required**, and must be `broadcast` or `cascade`. There is no default. A missing or unrecognised mode returns `400`. `reloadMode: 'none'` also returns `400` with a tailored message - on a dedicated reload endpoint `none` would dispatch nothing, so accepting it as a silent success would be a footgun (an operator who fat-fingered `none` would believe a reload had fired when it had not). On `activate`, `none` is legitimate (suppress the side-channel signal while still committing the activation); here it has no meaning.
+- **Dispatch failure is loud.** Unlike `activate`, where signalling is advisory and degrades to a `reloadDispatched: { status: false }` field on an otherwise-successful `200`, the reload endpoint has no underlying DB commit to fall back on - the dispatch *is* the whole operation. So when the service channel is unavailable it returns **`503`** with `{ error, event: 'network-map.activated', dispatched: false }` (and logs at `warn`), making a failed reload impossible to miss. A successful dispatch returns `200` with `{ event: 'network-map.activated', dispatched: true, outcome }`. `broadcast` and `cascade` share this success/failure shape; `cascade` drives the same ordered, ack-gated wavefront described above and reports `outcome: 'cascade initiated'` on success.
+
+The endpoint requires the `POST_V1_ADMIN_CONFIGURATION_NETWORK_MAP_RELOAD` privilege and is served by a dedicated plugin (`buildServiceChannelPlugin`) kept separate from the CRUD plugin, since it performs no persistence.
 
 ---
 
@@ -544,7 +877,7 @@ For the configuration entities shown earlier, recommended permission strings inc
 **Notes**
 
 * `tenantId` is established by middleware and injected into every repository call.
-* `id: identifier` is provided as a path segment for GET/PUT/DELETE and included in ID construction.
+* `cfg` is provided as the path segment for generated configuration GET/PUT/DELETE routes and included in ID construction.
 * Capability strings follow the `<METHOD><PREFIX_WITH_SLASHES_AS_UNDERSCORES>` pattern (e.g., `GET_V1_ADMIN_CONFIGURATION_RULE`).
 
 ---

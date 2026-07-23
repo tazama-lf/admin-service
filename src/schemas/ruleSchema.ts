@@ -17,21 +17,24 @@ export const Band = Type.Composite([
   }),
 ]);
 
-export type Case = Static<typeof Case>;
-export const Case = Type.Composite([
-  OutcomeResult,
-  Type.Object({
-    value: Type.String(),
-  }),
-]);
+export type Expression = Static<typeof Expression>;
+export const Expression = Type.Composite([OutcomeResult, Type.Object({ value: Type.String() })]);
 
-export type Config = Static<typeof Config>;
-export const Config = Type.Object({
-  parameters: Type.Optional(Type.Record(Type.Optional(Type.Union([Type.String(), Type.Number()])), Type.Optional(Type.Unknown()))),
-  exitConditions: Type.Optional(Type.Array(OutcomeResult)),
-  bands: Type.Optional(Type.Array(Band)),
-  cases: Type.Optional(Type.Array(Case)),
+export type Case = Static<typeof Case>;
+export const Case = Type.Object({
+  expressions: Type.Array(Expression),
+  alternative: OutcomeResult,
 });
+
+export const Config = Type.Object(
+  {
+    parameters: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    exitConditions: Type.Optional(Type.Array(OutcomeResult)),
+    bands: Type.Optional(Type.Array(Band)),
+    cases: Type.Optional(Case),
+  },
+  { additionalProperties: true },
+);
 
 export type Rule = Static<typeof RuleSchema>;
 export const RuleSchema = Type.Object(
@@ -40,6 +43,8 @@ export const RuleSchema = Type.Object(
     cfg: Type.String(),
     config: Config,
     desc: Type.Optional(Type.String()),
+    creDtTm: Type.Optional(Type.String({ format: 'date-time' })),
+    updDtTm: Type.Optional(Type.String({ format: 'date-time' })),
   },
   { additionalProperties: true },
 );

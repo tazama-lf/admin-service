@@ -30,7 +30,7 @@
     "@fastify/cors": "^11.0.1",
     "@fastify/response-validation": "^3.0.3",
     "@fastify/swagger": "^9.5.1",
-    "@fastify/swagger-ui": "^5.2.6",
+    "@fastify/swagger-ui": "^6.1.0",
     "@sinclair/typebox": "^0.34.41",
     "@tazama-lf/auth-lib": "4.0.0-rc.5",
     "@tazama-lf/frms-coe-lib": "8.2.0-rc.6",

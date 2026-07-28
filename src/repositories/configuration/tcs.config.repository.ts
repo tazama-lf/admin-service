@@ -4,6 +4,7 @@ import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, 
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
 import { validateTableName } from '../../utils/enrichment-utils';
+import { HttpException, HttpStatus } from '../../utils/error';
 
 export type { ConfigData, ConfigRow };
 
@@ -519,6 +520,19 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
 export const createTazamaDataModelTable = async (tableName: string): Promise<void> => {
   const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);
+
+  const existsQuery = `
+    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1;
+  `;
+  const existsResult = await handlePostExecuteSqlStatement(
+    { text: existsQuery, values: [safeTableName] } satisfies PgQueryConfig,
+    'event_history',
+  );
+
+  if (existsResult.rows.length > 0) {
+    throw new HttpException(`Table "${safeTableName}" already exists`, HttpStatus.CONFLICT);
+  }
+
   const query = `
     CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       _key text PRIMARY KEY,

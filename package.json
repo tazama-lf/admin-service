@@ -53,7 +53,7 @@
     "@stylistic/eslint-plugin": "^5.2.0",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^24.2.1",
+    "@types/node": "^26.1.1",
     "@types/pg-format": "^1.0.5",
     "@types/qs": "^6.15.0",
     "@typescript-eslint/eslint-plugin": "^8.37.0",

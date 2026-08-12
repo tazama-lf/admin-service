@@ -24,6 +24,7 @@ import {
   getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
+import { HttpException } from '../utils/error';
 
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
@@ -212,6 +213,7 @@ export const handleCreateTazamaDataModelTable = async (tableName: string): Promi
 
     loggerService.log(`Successfully created Tazama data model table: ${tableName}`);
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error creating Tazama data model table: ${errorMessage.message}`, 'handleCreateTazamaDataModelTable');
     throw new Error('Failed to create data model table');

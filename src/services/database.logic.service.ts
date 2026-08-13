@@ -33,12 +33,18 @@ export const handlePostExecuteSqlStatement = async <T extends QueryResultRow>(
         throw new Error('Specified database was not found.');
     }
   } catch (error) {
-    const errorMessage = error as { message: string };
+    const errorMessage = error as { message: string; code?: string };
     loggerService.log(
       `Failed executing the query from database service with error message: ${errorMessage.message}`,
       'handlePostExecuteSqlStatement()',
     );
-    throw new Error(errorMessage.message);
+    // Preserve the Postgres SQLSTATE (e.g. 42P07 duplicate_table) so callers can
+    // distinguish specific database error conditions instead of matching on message text.
+    const wrappedError = new Error(errorMessage.message) as Error & { code?: string };
+    if (errorMessage.code) {
+      wrappedError.code = errorMessage.code;
+    }
+    throw wrappedError;
   } finally {
     loggerService.log('Completed handling execution of the query from database service');
   }

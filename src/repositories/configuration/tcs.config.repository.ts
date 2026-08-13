@@ -534,7 +534,7 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
   }
 
   const query = `
-    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
+    CREATE TABLE "${safeTableName}" (
       _key text PRIMARY KEY,
       data jsonb NOT NULL,
       tenantId text,
@@ -542,7 +542,15 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
     );
   `;
 
-  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
+  try {
+    await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
+  } catch (error) {
+    const pgError = error as { code?: string };
+    if (pgError.code === '42P07') {
+      throw new HttpException(`Table "${safeTableName}" already exists`, HttpStatus.CONFLICT);
+    }
+    throw error;
+  }
 };
 
 export const updateConfigByStatus = async (id: string, status: string, tenantId: string): Promise<number> => {

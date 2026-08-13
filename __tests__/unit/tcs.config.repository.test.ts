@@ -1285,8 +1285,8 @@ describe('TCS Config Repository', () => {
       await createTazamaDataModelTable('tazama_model');
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[1][0] as { text: string };
-      expect(callArg.text).toContain('CREATE TABLE IF NOT EXISTS');
-      expect(callArg.text).toContain('tazama_model');
+      expect(callArg.text).toContain('CREATE TABLE "tazama_model"');
+      expect(callArg.text).not.toContain('IF NOT EXISTS');
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(2, expect.anything(), 'event_history');
     });
 
@@ -1316,6 +1316,26 @@ describe('TCS Config Repository', () => {
         status: 409,
       });
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw a 409 conflict error when CREATE TABLE races and hits duplicate_table (42P07)', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
+        .mockRejectedValueOnce(Object.assign(new Error('relation "tazama_model" already exists'), { code: '42P07' }));
+
+      await expect(createTazamaDataModelTable('tazama_model')).rejects.toMatchObject({
+        message: 'Table "tazama_model" already exists',
+        status: 409,
+      });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledTimes(2);
+    });
+
+    it('should rethrow non-conflict errors from CREATE TABLE unchanged', async () => {
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
+        .mockRejectedValueOnce(new Error('connection terminated'));
+
+      await expect(createTazamaDataModelTable('tazama_model')).rejects.toThrow('connection terminated');
     });
   });
 

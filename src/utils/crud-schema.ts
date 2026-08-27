@@ -14,7 +14,7 @@ import type { ITenantRequest } from '../interface/ITenantRequest';
 import { publishNetworkMapActivated } from '../services/serviceChannel';
 import { dispatchCascade } from '../services/cascade';
 import type { NetworkMap } from '@tazama-lf/frms-coe-lib/lib/interfaces/NetworkMap';
-import type { RateLimitTierConfig } from './rate-limit-tiers';
+import { rateLimitResponses, type RateLimitTierConfig } from './rate-limit-tiers';
 
 export interface CrudSchemas {
   Entity: TSchema;
@@ -60,6 +60,11 @@ interface BuildCrudOptions<TEntity, TId extends AllowedId> {
 
 const rateLimitConfig = (tier?: RateLimitTierConfig): { rateLimit: RateLimitTierConfig } | undefined =>
   tier ? { rateLimit: tier } : undefined;
+
+// Documents (and serializes) the 429 only on routes that actually declare a tier — a route without
+// one can never return it, so its OpenAPI entry stays exactly as it is today.
+const withRateLimitResponse = <T extends object>(responses: T, tier?: RateLimitTierConfig): T | (T & typeof rateLimitResponses) =>
+  tier ? { ...responses, ...rateLimitResponses } : responses;
 
 const DefaultQuery = Type.Object({
   limit: Type.Optional(Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.Literal('all')])),
@@ -171,7 +176,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           querystring: QuerySchema,
-          response: { 200: ListResponse, 400: ErrorResponse },
+          response: withRateLimitResponse({ 200: ListResponse, 400: ErrorResponse }, rateLimit?.list),
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`LIST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -220,7 +225,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: { 200: Entity, 404: ErrorResponse },
+          response: withRateLimitResponse({ 200: Entity, 404: ErrorResponse }, rateLimit?.get),
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`GET${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -244,7 +249,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           body: CreateBody,
-          response: CreateResponseSchema,
+          response: withRateLimitResponse(CreateResponseSchema, rateLimit?.write),
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -308,7 +313,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           tags: [prefix],
           params: IdParam,
           body: Update,
-          response: { 200: Entity, 404: ErrorResponse },
+          response: withRateLimitResponse({ 200: Entity, 404: ErrorResponse }, rateLimit?.write),
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`PUT${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -332,10 +337,13 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
         schema: {
           tags: [prefix],
           params: IdParam,
-          response: {
-            200: Type.Object({ success: Type.Boolean({ description: 'Always true when a row was deleted.' }) }),
-            404: ErrorResponse,
-          },
+          response: withRateLimitResponse(
+            {
+              200: Type.Object({ success: Type.Boolean({ description: 'Always true when a row was deleted.' }) }),
+              404: ErrorResponse,
+            },
+            rateLimit?.write,
+          ),
         },
         preHandler: configuration.AUTHENTICATED
           ? [validateTenantMiddleware, tokenHandler(`DELETE${prefix.replaceAll('/', '_').toUpperCase()}`)]
@@ -372,7 +380,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           schema: {
             tags: [prefix],
             params: IdParam,
-            response: { 200: ActivateResponse, 400: ErrorResponse, 404: ErrorResponse },
+            response: withRateLimitResponse({ 200: ActivateResponse, 400: ErrorResponse, 404: ErrorResponse }, rateLimit?.write),
           },
           preHandler: configuration.AUTHENTICATED
             ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_ACTIVATE`)]
@@ -435,7 +443,7 @@ export const buildCrudPlugin = <TEntity, TId extends AllowedId = { id: string; c
           schema: {
             tags: [prefix],
             params: IdParam,
-            response: { 200: Entity, 404: ErrorResponse },
+            response: withRateLimitResponse({ 200: Entity, 404: ErrorResponse }, rateLimit?.write),
           },
           preHandler: configuration.AUTHENTICATED
             ? [validateTenantMiddleware, tokenHandler(`POST${prefix.replaceAll('/', '_').toUpperCase()}_DEACTIVATE`)]

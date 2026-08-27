@@ -30,6 +30,7 @@ import { buildCrudPlugin } from '../../src/utils/crud-schema';
 import { RuleConfigRepo } from '../../src/repositories/configuration/rule.config.repository';
 import { RuleSchema } from '../../src/schemas/ruleSchema';
 import { RuleListQuery } from '../../src/schemas/configListQuerySchema';
+import { rateLimitErrorResponseBuilder } from '../../src/utils/rate-limit-tiers';
 
 describe('buildCrudPlugin - rate-limit opt-in (issue-rate-limiting)', () => {
   let app: FastifyInstance;
@@ -39,10 +40,8 @@ describe('buildCrudPlugin - rate-limit opt-in (issue-rate-limiting)', () => {
     await app.register(fastifyRateLimit, {
       global: false,
       redis: new Redis(),
-      errorResponseBuilder: (_req, context) => ({
-        statusCode: 429,
-        message: `Rate limit exceeded, retry in ${context.after}`,
-      }),
+      // The production builder, not a copy, so the asserted 429 body is the one the service returns.
+      errorResponseBuilder: rateLimitErrorResponseBuilder,
     });
 
     await app.register(
@@ -78,8 +77,16 @@ describe('buildCrudPlugin - rate-limit opt-in (issue-rate-limiting)', () => {
     expect(r2.statusCode).toBe(200);
     expect(r3.statusCode).toBe(429);
     expect(r3.headers['retry-after']).toBeDefined();
-    expect(r3.json().message).toMatch(/Rate limit exceeded/);
     expect(mockList).toHaveBeenCalledTimes(2);
+    // The body carries ErrorHandler.sendError's fields (success / message / error / statusCode /
+    // details), so a 429 is shaped like every other error response this service returns.
+    expect(r3.json()).toEqual({
+      success: false,
+      error: 'TooManyRequests',
+      message: expect.stringMatching(/^Rate limit exceeded, retry in /) as unknown as string,
+      statusCode: 429,
+      details: expect.stringMatching(/^Rate limit exceeded, retry in /) as unknown as string,
+    });
   });
 
   it('enforces the GET tier independently of the LIST tier (different route, different budget)', async () => {

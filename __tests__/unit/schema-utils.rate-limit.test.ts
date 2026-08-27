@@ -23,12 +23,22 @@ describe('SetOptionsBodyAndParams - rate-limit tier merging', () => {
     expect(options.config).toEqual({ rateLimit: RateLimitTiers.write });
   });
 
-  it('does not disturb the existing schema/preHandler shape when a tier is added', () => {
+  it('does not disturb the existing body/query/params schema or preHandler shape when a tier is added', () => {
     const withoutTier = SetOptionsBodyAndParams(handler, 'someClaim');
     const withTier = SetOptionsBodyAndParams(handler, 'someClaim', undefined, undefined, undefined, RateLimitTiers.read);
+    const { response, ...requestSchema } = withTier.schema;
     expect(withTier.handler).toBe(withoutTier.handler);
-    expect(withTier.schema).toEqual(withoutTier.schema);
+    expect(requestSchema).toEqual(withoutTier.schema);
     expect(withTier.preHandler).toHaveLength(withoutTier.preHandler?.length ?? 0);
+  });
+
+  it('documents a 429 (with Retry-After) only on routes that declare a tier', () => {
+    expect(SetOptionsBodyAndParams(handler, 'someClaim').schema).not.toHaveProperty('response');
+
+    const withTier = SetOptionsBodyAndParams(handler, 'someClaim', undefined, undefined, undefined, RateLimitTiers.read);
+    const response429 = (withTier.schema.response as Record<string, { headers: Record<string, unknown> }>)['429'];
+    expect(response429).toBeDefined();
+    expect(response429.headers).toHaveProperty('retry-after');
   });
 
   it('keeps body/query/params schema args intact alongside a tier', () => {

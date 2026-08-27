@@ -6,7 +6,7 @@ import { tokenHandler } from '../auth/authHandler';
 import { loggerService, configuration } from '../index';
 import type { TSchema } from '@sinclair/typebox';
 import type { Claim } from '../interface/claim.interface';
-import type { RateLimitTierConfig } from './rate-limit-tiers';
+import { rateLimitResponses, type RateLimitTierConfig } from './rate-limit-tiers';
 
 type preHandler = (request: FastifyRequest, reply: FastifyReply) => void | Promise<void>;
 
@@ -26,7 +26,9 @@ export const SetOptionsBodyAndParams = (
   const querystring = querySchemaName ? { querystring: querySchemaName } : undefined;
   const params = paramsSchemaName ? { params: paramsSchemaName } : undefined;
   const body = bodySchemaName ? { body: bodySchemaName } : undefined;
-  const schema: FastifySchema = { ...querystring, ...params, ...body };
+  // Only rate-limited routes document (and serialize) a 429 — an unlimited route can never return one.
+  const response = rateLimit ? { response: rateLimitResponses } : undefined;
+  const schema: FastifySchema = { ...querystring, ...params, ...body, ...response };
   return {
     preHandler: preHandlers,
     handler,

@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { parseQueryString } from './querystringParser';
 import { createRateLimitRedisClient } from './rate-limit-redis';
-import { rateLimitKeyGenerator } from '../utils/rate-limit-tiers';
+import { rateLimitErrorResponseBuilder, rateLimitKeyGenerator } from '../utils/rate-limit-tiers';
 
 // Single source of truth for the documented API version: read it from package.json at startup so
 // the OpenAPI `info.version` cannot drift from the published package version. A missing package.json
@@ -107,11 +107,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
     // Set RATE_LIMIT_FAIL_OPEN=false to fail closed instead.
     skipOnError: configuration.RATE_LIMIT_FAIL_OPEN?.toLowerCase() !== 'false',
     keyGenerator: rateLimitKeyGenerator,
-    errorResponseBuilder: (_req, context) => ({
-      // statusCode must be set explicitly, or the thrown error defaults to a 500 instead of 429.
-      statusCode: 429,
-      message: `Rate limit exceeded, retry in ${context.after}`,
-    }),
+    errorResponseBuilder: rateLimitErrorResponseBuilder,
   });
 
   fastify.register(Routes);

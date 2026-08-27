@@ -23,15 +23,10 @@ const parsedPkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package
 };
 const apiVersion = typeof parsedPkg.version === 'string' && parsedPkg.version.length > 0 ? parsedPkg.version : '0.0.0';
 
-const fastify = Fastify({
-  // Lets req.ip resolve to the real client behind a proxy, for the rate limiter's per-IP fallback.
-  // Only on when TRUST_PROXY=true, since trusting X-Forwarded-For blindly would let a client spoof
-  // its way around rate limiting.
-  trustProxy: configuration.TRUST_PROXY?.toLowerCase() === 'true',
-  routerOptions: {
-    querystringParser: (str) => parseQueryString(str),
-  },
-});
+// Created inside initializeFastifyClient(), not here: this reads configuration.TRUST_PROXY, and
+// configuration is only populated by dbInit() at startup, after this module has already been
+// require()'d — evaluating it at module scope would crash with configuration still undefined.
+let fastify: FastifyInstance;
 
 // The rate-limit Redis client. Created inside initializeFastifyClient(), not here, so it isn't
 // opened before configuration.redisConfig is ready.
@@ -46,6 +41,16 @@ const ajv = new Ajv({
 addFormats(ajv); // <-- add this line
 
 export default async function initializeFastifyClient(): Promise<FastifyInstance> {
+  fastify = Fastify({
+    // Lets req.ip resolve to the real client behind a proxy, for the rate limiter's per-IP fallback.
+    // Only on when TRUST_PROXY=true, since trusting X-Forwarded-For blindly would let a client spoof
+    // its way around rate limiting.
+    trustProxy: configuration.TRUST_PROXY?.toLowerCase() === 'true',
+    routerOptions: {
+      querystringParser: (str) => parseQueryString(str),
+    },
+  });
+
   await fastify.register(fastifySwagger, {
     prefix: '/swagger',
     openapi: {
@@ -116,7 +121,7 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
 
   fastify.swagger();
 
-  return await fastify;
+  return fastify;
 }
 
 export async function destroyFasityClient(): Promise<void> {

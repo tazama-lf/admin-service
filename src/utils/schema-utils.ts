@@ -6,6 +6,7 @@ import { tokenHandler } from '../auth/authHandler';
 import { loggerService, configuration } from '../index';
 import type { TSchema } from '@sinclair/typebox';
 import type { Claim } from '../interface/claim.interface';
+import { rateLimitResponses, type RateLimitTierConfig } from './rate-limit-tiers';
 
 type preHandler = (request: FastifyRequest, reply: FastifyReply) => void | Promise<void>;
 
@@ -15,7 +16,9 @@ export const SetOptionsBodyAndParams = (
   bodySchemaName?: TSchema,
   querySchemaName?: TSchema,
   paramsSchemaName?: TSchema,
-): { preHandler?: preHandler[]; handler: RouteHandlerMethod; schema: FastifySchema } => {
+  // Opt-in: leave unset and the route is not rate limited at all.
+  rateLimit?: RateLimitTierConfig,
+): { preHandler?: preHandler[]; handler: RouteHandlerMethod; schema: FastifySchema; config?: { rateLimit: RateLimitTierConfig } } => {
   loggerService.debug(`Authentication is ${configuration.AUTHENTICATED ? 'ENABLED' : 'DISABLED'} for ${handler.name}`);
   const preHandlers: preHandler[] = configuration.AUTHENTICATED
     ? [validateTenantMiddleware, tokenHandler(claim)]
@@ -23,11 +26,14 @@ export const SetOptionsBodyAndParams = (
   const querystring = querySchemaName ? { querystring: querySchemaName } : undefined;
   const params = paramsSchemaName ? { params: paramsSchemaName } : undefined;
   const body = bodySchemaName ? { body: bodySchemaName } : undefined;
-  const schema: FastifySchema = { ...querystring, ...params, ...body };
+  // Only rate-limited routes document (and serialize) a 429 — an unlimited route can never return one.
+  const response = rateLimit ? { response: rateLimitResponses } : undefined;
+  const schema: FastifySchema = { ...querystring, ...params, ...body, ...response };
   return {
     preHandler: preHandlers,
     handler,
     schema,
+    ...(rateLimit ? { config: { rateLimit } } : {}),
   };
 };
 

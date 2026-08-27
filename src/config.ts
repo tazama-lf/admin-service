@@ -21,6 +21,13 @@ export interface IConfig {
   PORT: number;
   AUTHENTICATED: boolean;
   CORS_POLICY?: 'demo' | 'prod';
+  // Set to 'false' to reject requests when the rate-limit Redis is down. Defaults to fail-open
+  // (let requests through) so a Redis blip doesn't become an outage.
+  RATE_LIMIT_FAIL_OPEN?: string;
+  // Set to 'true' when running behind a reverse proxy/ingress, so the rate limiter's per-IP
+  // fallback reads the real client IP instead of the proxy's. Defaults to false — otherwise a
+  // client could spoof its IP via X-Forwarded-For and dodge rate limiting.
+  TRUST_PROXY?: string;
   SERVICE_CHANNEL_PRODUCER?: string;
   SERVICE_CHANNEL_CONSUMER?: string;
   SERVICE_CHANNEL_SOURCE_URI_PREFIX?: string;
@@ -44,6 +51,16 @@ const additionalEnvironmentVariables: AdditionalConfig[] = [
   },
   {
     name: 'CORS_POLICY',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'RATE_LIMIT_FAIL_OPEN',
+    type: 'string',
+    optional: true,
+  },
+  {
+    name: 'TRUST_PROXY',
     type: 'string',
     optional: true,
   },

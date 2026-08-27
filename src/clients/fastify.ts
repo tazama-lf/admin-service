@@ -5,11 +5,14 @@ import Routes from '../router';
 import { fastifyCors } from '@fastify/cors';
 import { fastifySwagger } from '@fastify/swagger';
 import { fastifySwaggerUi } from '@fastify/swagger-ui';
+import { fastifyRateLimit } from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { configuration } from '..';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { parseQueryString } from './querystringParser';
+import { createRateLimitRedisClient } from './rate-limit-redis';
+import { rateLimitErrorResponseBuilder, rateLimitKeyGenerator } from '../utils/rate-limit-tiers';
 
 // Single source of truth for the documented API version: read it from package.json at startup so
 // the OpenAPI `info.version` cannot drift from the published package version. A missing package.json
@@ -21,10 +24,18 @@ const parsedPkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package
 const apiVersion = typeof parsedPkg.version === 'string' && parsedPkg.version.length > 0 ? parsedPkg.version : '0.0.0';
 
 const fastify = Fastify({
+  // Lets req.ip resolve to the real client behind a proxy, for the rate limiter's per-IP fallback.
+  // Only on when TRUST_PROXY=true, since trusting X-Forwarded-For blindly would let a client spoof
+  // its way around rate limiting.
+  trustProxy: configuration.TRUST_PROXY?.toLowerCase() === 'true',
   routerOptions: {
     querystringParser: (str) => parseQueryString(str),
   },
 });
+
+// The rate-limit Redis client. Created inside initializeFastifyClient(), not here, so it isn't
+// opened before configuration.redisConfig is ready.
+let rateLimitRedis: ReturnType<typeof createRateLimitRedisClient> | undefined;
 
 const ajv = new Ajv({
   removeAdditional: 'all',
@@ -86,6 +97,19 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
     allowedHeaders: '*',
   });
 
+  rateLimitRedis = createRateLimitRedisClient(configuration.redisConfig);
+
+  await fastify.register(fastifyRateLimit, {
+    // Opt-in per route: only routes that declare config.rateLimit get limited.
+    global: false,
+    redis: rateLimitRedis,
+    // Fail-open by default: a Redis blip lets requests through instead of causing an outage.
+    // Set RATE_LIMIT_FAIL_OPEN=false to fail closed instead.
+    skipOnError: configuration.RATE_LIMIT_FAIL_OPEN?.toLowerCase() !== 'false',
+    keyGenerator: rateLimitKeyGenerator,
+    errorResponseBuilder: rateLimitErrorResponseBuilder,
+  });
+
   fastify.register(Routes);
 
   await fastify.ready();
@@ -97,4 +121,5 @@ export default async function initializeFastifyClient(): Promise<FastifyInstance
 
 export async function destroyFasityClient(): Promise<void> {
   await fastify.close();
+  await rateLimitRedis?.quit();
 }

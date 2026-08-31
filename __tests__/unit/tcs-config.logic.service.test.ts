@@ -5,6 +5,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 jest.mock('../../src', () => ({
   loggerService: {
     log: jest.fn(),
+    warn: jest.fn(),
     error: jest.fn(),
   },
 }));
@@ -35,6 +36,7 @@ jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
 
 import * as tcsConfigService from '../../src/services/tcs-config.logic.service';
 import * as tcsConfigRepository from '../../src/repositories/configuration/tcs.config.repository';
+import { HttpException, HttpStatus } from '../../src/utils/error';
 
 describe('TCS Config Logic Service', () => {
   const mockTenantId = 'tenant-123';
@@ -383,6 +385,17 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.createTazamaDataModelTable as jest.Mock).mockRejectedValue(new Error('Table creation failed'));
 
       await expect(tcsConfigService.handleCreateTazamaDataModelTable('test_table')).rejects.toThrow('Failed to create data model table');
+    });
+
+    it('should propagate a 409 conflict when the table already exists', async () => {
+      (tcsConfigRepository.createTazamaDataModelTable as jest.Mock).mockRejectedValue(
+        new HttpException('Table "test_table" already exists', HttpStatus.CONFLICT),
+      );
+
+      await expect(tcsConfigService.handleCreateTazamaDataModelTable('test_table')).rejects.toMatchObject({
+        message: 'Table "test_table" already exists',
+        status: 409,
+      });
     });
   });
 

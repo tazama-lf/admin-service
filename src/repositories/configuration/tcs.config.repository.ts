@@ -4,6 +4,7 @@ import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, 
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
 import type { ConfigData, ConfigRow } from '../../interface/config.interface';
 import { validateTableName } from '../../utils/enrichment-utils';
+import { HttpException, HttpStatus } from '../../utils/error';
 
 export type { ConfigData, ConfigRow };
 
@@ -519,8 +520,21 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
 export const createTazamaDataModelTable = async (tableName: string): Promise<void> => {
   const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);
+
+  const existsQuery = `
+    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1;
+  `;
+  const existsResult = await handlePostExecuteSqlStatement(
+    { text: existsQuery, values: [safeTableName] } satisfies PgQueryConfig,
+    'event_history',
+  );
+
+  if (existsResult.rows.length > 0) {
+    throw new HttpException(`Table "${safeTableName}" already exists`, HttpStatus.CONFLICT);
+  }
+
   const query = `
-    CREATE TABLE IF NOT EXISTS "${safeTableName}" (
+    CREATE TABLE "${safeTableName}" (
       _key text PRIMARY KEY,
       data jsonb NOT NULL,
       tenantId text,
@@ -528,7 +542,15 @@ export const createTazamaDataModelTable = async (tableName: string): Promise<voi
     );
   `;
 
-  await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
+  try {
+    await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'event_history');
+  } catch (error) {
+    const pgError = error as { code?: string };
+    if (pgError.code === '42P07') {
+      throw new HttpException(`Table "${safeTableName}" already exists`, HttpStatus.CONFLICT);
+    }
+    throw error;
+  }
 };
 
 export const updateConfigByStatus = async (id: string, status: string, tenantId: string): Promise<number> => {

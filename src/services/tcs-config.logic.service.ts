@@ -39,6 +39,67 @@ const normalizeDestination = (destination?: string | string[]): string[] =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const XML_TAG_REGEX = /<[^>]+>/g;
+
+const addXmlPathToJson = (root: Record<string, unknown>, path: string[]): void => {
+  let current = root;
+
+  path.forEach((segment) => {
+    const nextValue = current[segment];
+    if (isRecord(nextValue)) {
+      current = nextValue;
+      return;
+    }
+
+    const nextObject: Record<string, unknown> = {};
+    current[segment] = nextObject;
+    current = nextObject;
+  });
+};
+
+const getXmlElementName = (tag: string): string => {
+  const content = tag.slice(1, -1).trim().replace(/^\//, '').replace(/\/$/, '').trim();
+  const [name = ''] = content.split(/\s+/);
+  const [, localName = name] = name.split(':');
+  return localName;
+};
+
+const parseXmlFieldTree = (xml: string): Record<string, unknown> => {
+  const root: Record<string, unknown> = {};
+  const stack: string[] = [];
+  const sanitizedXml = xml.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const tags = sanitizedXml.match(XML_TAG_REGEX) ?? [];
+
+  for (const tag of tags) {
+    if (tag.startsWith('<!') || tag.startsWith('</')) {
+      if (tag.startsWith('</')) stack.pop();
+      continue;
+    }
+
+    const elementName = getXmlElementName(tag);
+    if (!elementName) continue;
+
+    const currentPath = [...stack, elementName];
+    addXmlPathToJson(root, currentPath);
+
+    if (!tag.endsWith('/>')) stack.push(elementName);
+  }
+
+  return root;
+};
+
+const getPayloadForSourceValidation = (config: Config): { payload: unknown; label: string } => {
+  if (config.contentType !== ContentType.XML) {
+    return { payload: config.payload, label: 'payload_json' };
+  }
+
+  if (typeof config.payload !== 'string') {
+    throw new HttpException('payload_xml not found', HttpStatus.BAD_REQUEST);
+  }
+
+  return { payload: parseXmlFieldTree(config.payload), label: 'payload_xml' };
+};
+
 const jsonPathExistsAtAnyLayer = (json: unknown, path: string): boolean => {
   const segments = path.split('.').filter(Boolean);
   if (segments.length === 0) return false;
@@ -73,12 +134,12 @@ const jsonPathExistsAtAnyLayer = (json: unknown, path: string): boolean => {
   return hasPathAtAnyLayer(json);
 };
 
-const validateMappingSourcesExistInPayload = (payload: unknown, source?: string[]): void => {
+const validateMappingSourcesExistInPayload = (payload: unknown, source: string[] | undefined, payloadLabel: string): void => {
   if (!source?.length) return;
 
   const missingSources = source.filter((sourcePath) => !jsonPathExistsAtAnyLayer(payload, sourcePath));
   if (missingSources.length > 0) {
-    throw new HttpException(`Mapping source does not exist in payload_json: ${missingSources.join(', ')}`, HttpStatus.BAD_REQUEST);
+    throw new HttpException(`Mapping source does not exist in ${payloadLabel}: ${missingSources.join(', ')}`, HttpStatus.BAD_REQUEST);
   }
 };
 
@@ -185,6 +246,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
     throw new Error('Failed to create configuration');
   }
 };
+
 export const handleFindConfigByID = async (id: string, tenantId: string): Promise<ConfigResponse> => {
   try {
     const configId = parseInt(id);
@@ -354,7 +416,8 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     };
 
     validateMappingIsUnique(existingMappings, newMapping);
-    validateMappingSourcesExistInPayload(config.payload, normalizedSource);
+    const sourceValidationPayload = getPayloadForSourceValidation(config);
+    validateMappingSourcesExistInPayload(sourceValidationPayload.payload, normalizedSource, sourceValidationPayload.label);
     const dataModelJson = await handleGetDataModelJson(tenantId);
     validateMappingDestinationsExistInDataModel(dataModelJson, newMapping.destination);
 

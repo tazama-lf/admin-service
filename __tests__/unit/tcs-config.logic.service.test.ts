@@ -570,6 +570,83 @@ describe('TCS Config Logic Service', () => {
       expect(result).toEqual(mockUpdatedConfig);
     });
 
+    it('should add mapping when XML source exists in payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: '<?xml version="1.0"?><FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts>',
+      };
+      const newMapping = {
+        source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+        destination: 'transactionDetails.MsgId',
+        type: 'direct',
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [newMapping],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
+    it('should throw HTTP 400 when XML source does not exist in payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: '<FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts>',
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.MissingField'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_xml: FIToFIPmtSts.GrpHdr.MissingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should throw HTTP 400 when XML config has no payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: null,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'payload_xml not found',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
     it('should add mapping when destination exists at any data model JSON layer', async () => {
       const mockConfig = {
         id: 1,

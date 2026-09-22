@@ -131,7 +131,7 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     'configuration',
   );
 
-  if (result.rows.length === 0) {
+  if (result.rowCount === 0 || result.rows.length === 0) {
     return null;
   }
 
@@ -241,10 +241,7 @@ export const updateConfig = async (
     setClauses.push(`endpoint_path = $${paramIndex++}`);
     values.push(updates.endpointPath);
   }
-  if (updates.version !== undefined) {
-    setClauses.push(`version = $${paramIndex++}`);
-    values.push(updates.version);
-  }
+  const expectedVersion = updates.version;
   if (updates.contentType !== undefined) {
     setClauses.push(`content_type = $${paramIndex++}`);
     values.push(updates.contentType);
@@ -297,8 +294,12 @@ export const updateConfig = async (
   }
 
   setClauses.push('updated_at = NOW()');
+  if (expectedVersion !== undefined) {
+    setClauses.push('version = version + 1');
+  }
 
-  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
+  const versionClause = expectedVersion === undefined ? '' : ` AND version = $${paramIndex + 2}`;
+  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}${versionClause}`;
 
   const query = `
     UPDATE tcs_config
@@ -310,6 +311,9 @@ export const updateConfig = async (
   `;
 
   values.push(id, tenantId);
+  if (expectedVersion !== undefined) {
+    values.push(expectedVersion);
+  }
 
   interface UpdateConfigRow {
     id: number;
@@ -336,6 +340,9 @@ export const updateConfig = async (
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
+    if (expectedVersion !== undefined) {
+      throw new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT);
+    }
     throw new Error('Configuration not found');
   }
 

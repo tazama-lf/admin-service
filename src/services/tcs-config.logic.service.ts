@@ -423,7 +423,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
 
     const updatedMappings = [...existingMappings, newMapping];
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings, version: config.version });
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {

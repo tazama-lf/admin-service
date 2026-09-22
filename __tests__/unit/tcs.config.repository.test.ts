@@ -669,6 +669,53 @@ describe('TCS Config Repository', () => {
       await expect(updateConfig(999, 'tenant-123', { status: ConfigStatus.APPROVED })).rejects.toThrow('Configuration not found');
     });
 
+    it('should guard update with expected updated_at revision when provided', async () => {
+      const mockUpdatedRow = {
+        id: 1,
+        msg_fam: 'pacs',
+        transaction_type: 'pacs.008.001.08',
+        endpoint_path: '/api/pacs008',
+        version: '1.0',
+        content_type: ContentType.JSON,
+        schema: { type: 'object' },
+        payload_xml: null,
+        payload_json: { updated: true },
+        comments: null,
+        mapping: [],
+        functions: [],
+        status: ConfigStatus.APPROVED,
+        publishing_status: 'active',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-02',
+        tenant_id: 'tenant-123',
+        created_by: 'user-123',
+        related_transaction: null,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [mockUpdatedRow],
+        rowCount: 1,
+      } as never);
+
+      await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, '2026-01-01T00:00:00.000Z');
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND updated_at = $4');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', '2026-01-01T00:00:00.000Z']);
+    });
+
+    it('should throw HTTP 409 when expected updated_at revision is stale', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, '2026-01-01T00:00:00.000Z')).rejects.toMatchObject({
+        message: 'Configuration was modified by another request; retry',
+        status: 409,
+      });
+    });
+
     it('should handle XML payload update', async () => {
       const mockUpdatedRow = {
         id: 1,

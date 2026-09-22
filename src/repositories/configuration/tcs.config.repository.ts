@@ -295,7 +295,7 @@ export const updateConfig = async (
 
   setClauses.push('updated_at = NOW()');
   if (expectedVersion !== undefined) {
-    setClauses.push('version = version + 1');
+    setClauses.push(`version = $${paramIndex + 1}`);
   }
 
   const versionClause = expectedVersion === undefined ? '' : ` AND version = $${paramIndex + 2}`;

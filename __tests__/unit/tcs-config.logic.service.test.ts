@@ -11,6 +11,7 @@ jest.mock('../../src', () => ({
 }));
 jest.mock('../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: jest.fn(),
+  withConfigurationTransaction: jest.fn(async (work: (client?: unknown) => unknown) => await work(undefined)),
 }));
 
 jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
@@ -40,6 +41,7 @@ jest.mock('../../src/services/data-model.logic.service', () => ({
 import * as tcsConfigService from '../../src/services/tcs-config.logic.service';
 import * as tcsConfigRepository from '../../src/repositories/configuration/tcs.config.repository';
 import { handleGetDataModelJson } from '../../src/services/data-model.logic.service';
+import { withConfigurationTransaction } from '../../src/services/database.logic.service';
 import { HttpException, HttpStatus } from '../../src/utils/error';
 
 describe('TCS Config Logic Service', () => {
@@ -48,9 +50,12 @@ describe('TCS Config Logic Service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (withConfigurationTransaction as jest.Mock).mockImplementation(async (work: (client?: unknown) => unknown) => await work(undefined));
     (handleGetDataModelJson as jest.Mock).mockResolvedValue({
       targetField: 'value',
       newTarget: 'value',
+      oldTarget: 'value',
+      target1: 'value',
       target: 'value',
       transactionDetails: {
         MsgId: 'message-id',
@@ -142,10 +147,13 @@ describe('TCS Config Logic Service', () => {
         endpointPath: '/api/v1/transactions',
         version: '1.0.0',
         schema: { type: 'object' },
+        payload: {
+          field1: 'value',
+        },
         mapping: [
           {
             source: ['field1'],
-            destination: 'target1',
+            destination: 'target',
             type: 'direct',
           },
         ],
@@ -167,6 +175,30 @@ describe('TCS Config Logic Service', () => {
 
       expect(result.result.mapping).toEqual(mockConfig.mapping);
       expect(result.result.functions).toEqual(mockConfig.functions);
+    });
+
+    it('should validate mappings before creating config', async () => {
+      const mockConfig = {
+        msgFam: 'ISO20022',
+        transactionType: 'pacs.008.001.10',
+        endpointPath: '/api/v1/transactions',
+        version: '1.0.0',
+        schema: { type: 'object' },
+        payload: {
+          field1: 'value',
+        },
+        mapping: [
+          {
+            source: ['missingField'],
+            destination: 'target',
+            type: 'direct',
+          },
+        ],
+      };
+
+      await expect(tcsConfigService.handlePostConfig(mockConfig, mockTenantId)).rejects.toThrow('Failed to create configuration');
+
+      expect(tcsConfigRepository.createConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -289,6 +321,59 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' }, '2026-04-07T10:00:00.000Z')).rejects.toThrow(
         'Failed to update configuration',
       );
+    });
+
+    it('should validate updated mappings against XML payload before updating config', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        contentType: 'application/xml',
+        payload: '<Document><FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts></Document>',
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleUpdateConfig(1, mockTenantId, {
+          mapping: [
+            {
+              source: ['FIToFIPmtSts.GrpHdr.MissingField'],
+              destination: 'transactionDetails.MsgId',
+              type: 'direct',
+            },
+          ],
+        }),
+      ).rejects.toThrow('Failed to update configuration');
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should update config when updated mappings are valid', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        payload: {
+          field1: 'value',
+        },
+      };
+      const updates = {
+        mapping: [{ source: ['field1'], destination: 'target', type: 'direct' }],
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        ...updates,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updates);
+
+      expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updates);
+      expect(result).toEqual(mockUpdatedConfig);
     });
   });
 
@@ -468,7 +553,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.updatedAt);
       expect(result.mapping?.[0]).toEqual(newMapping);
     });
 
@@ -485,6 +570,7 @@ describe('TCS Config Logic Service', () => {
         msgFam: 'ISO20022',
         mapping: [existingMapping],
         payload: {
+          oldField: 'value',
           newField: 'value',
         },
         updatedAt: '2026-04-07T09:59:00.000Z',
@@ -780,6 +866,13 @@ describe('TCS Config Logic Service', () => {
         id: 1,
         msgFam: 'ISO20022',
         mapping: [existingMapping],
+        payload: {
+          FIToFIPmtSts: {
+            GrpHdr: {
+              MsgId: 'message-id',
+            },
+          },
+        },
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
@@ -805,6 +898,7 @@ describe('TCS Config Logic Service', () => {
         payload: {
           FIToFIPmtSts: {
             GrpHdr: {
+              MsgId: 'message-id',
               CreDtTm: 'created-at',
             },
           },
@@ -854,6 +948,7 @@ describe('TCS Config Logic Service', () => {
         1,
         mockTenantId,
         expect.objectContaining({ mapping: expect.any(Array) }),
+        mockConfig.updatedAt.toISOString(),
       );
       expect(result).toEqual(mockUpdatedConfig);
     });

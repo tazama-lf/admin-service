@@ -88,7 +88,12 @@ const parseXmlFieldTree = (xml: string): Record<string, unknown> => {
   return root;
 };
 
-const getPayloadForSourceValidation = (config: Config): { payload: unknown; label: string } => {
+interface MappingValidationConfig {
+  contentType?: ContentType;
+  payload?: unknown;
+}
+
+const getPayloadForSourceValidation = (config: MappingValidationConfig): { payload: unknown; label: string } => {
   if (config.contentType !== ContentType.XML) {
     return { payload: config.payload, label: 'payload_json' };
   }
@@ -182,6 +187,27 @@ const validateMappingIsUnique = (existingMappings: FieldMapping[], newMapping: F
   }
 };
 
+const validateMappings = async (mappings: FieldMapping[] | undefined, config: MappingValidationConfig, tenantId: string): Promise<void> => {
+  if (!mappings?.length) return;
+
+  const existingMappings: FieldMapping[] = [];
+  const sourceValidationPayload = getPayloadForSourceValidation(config);
+  const dataModelJson = await handleGetDataModelJson(tenantId);
+
+  for (const mapping of mappings) {
+    const normalizedMapping: FieldMapping = {
+      ...mapping,
+      source: normalizeSource(mapping.source as string | string[] | undefined),
+    };
+
+    validateMappingIsUnique(existingMappings, normalizedMapping);
+    validateMappingSourcesExistInPayload(sourceValidationPayload.payload, normalizedMapping.source, sourceValidationPayload.label);
+    validateMappingDestinationsExistInDataModel(dataModelJson, normalizedMapping.destination);
+
+    existingMappings.push(normalizedMapping);
+  }
+};
+
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
     const userId = config.createdBy ?? 'system';
@@ -211,6 +237,8 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       creDtTm: nowDateTime,
       relatedTransaction: config.relatedTransaction,
     };
+
+    await validateMappings(newConfig.mapping, newConfig, tenantId);
 
     const createdConfigId = await createConfig(newConfig);
 
@@ -303,6 +331,10 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     if (!existingConfig) {
       loggerService.error(`Config with id ${id} not found for tenant ${tenantId}`, 'handleUpdateConfig');
       throw new Error('Configuration not found');
+    }
+
+    if (updates.mapping !== undefined) {
+      await validateMappings(updates.mapping, { ...existingConfig, ...updates }, tenantId);
     }
 
     const updatedConfig = await updateConfig(id, tenantId, updates);
@@ -415,13 +447,8 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
       type: mappingDto.type,
     };
 
-    validateMappingIsUnique(existingMappings, newMapping);
-    const sourceValidationPayload = getPayloadForSourceValidation(config);
-    validateMappingSourcesExistInPayload(sourceValidationPayload.payload, normalizedSource, sourceValidationPayload.label);
-    const dataModelJson = await handleGetDataModelJson(tenantId);
-    validateMappingDestinationsExistInDataModel(dataModelJson, newMapping.destination);
-
     const updatedMappings = [...existingMappings, newMapping];
+    await validateMappings(updatedMappings, config, tenantId);
 
     const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings, version: config.version });
     loggerService.log(`Successfully added mapping to config ${id}`);

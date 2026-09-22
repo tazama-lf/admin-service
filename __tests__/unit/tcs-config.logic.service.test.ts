@@ -553,7 +553,10 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.updatedAt);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
+        mapping: [newMapping],
+        version: mockConfig.version,
+      });
       expect(result.mapping?.[0]).toEqual(newMapping);
     });
 
@@ -948,7 +951,6 @@ describe('TCS Config Logic Service', () => {
         1,
         mockTenantId,
         expect.objectContaining({ mapping: expect.any(Array) }),
-        mockConfig.updatedAt.toISOString(),
       );
       expect(result).toEqual(mockUpdatedConfig);
     });

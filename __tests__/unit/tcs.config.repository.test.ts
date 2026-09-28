@@ -23,6 +23,7 @@ import {
 } from '../../src/repositories/configuration/tcs.config.repository';
 import { handlePostExecuteSqlStatement } from '../../src/services/database.logic.service';
 import { ConfigStatus, ContentType } from '@tazama-lf/tcs-lib';
+import { HttpStatus } from '../../src/utils/error';
 
 const mockHandlePostExecuteSqlStatement = handlePostExecuteSqlStatement as jest.MockedFunction<typeof handlePostExecuteSqlStatement>;
 
@@ -1181,8 +1182,20 @@ describe('TCS Config Repository', () => {
       expect(callArg.values[0]).toBe('/api/pain001-new');
     });
 
-    it('should throw error when only version is provided', async () => {
-      await expect(updateConfig(1, 'tenant-123', { version: '2.0' })).rejects.toThrow('No fields to update');
+    it('should reject an update that only supplies version', async () => {
+      await expect(updateConfig(1, 'tenant-123', { version: '2.0' })).rejects.toMatchObject({
+        message: 'Configuration version cannot be updated directly',
+        status: HttpStatus.BAD_REQUEST,
+      });
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+    });
+
+    it('should reject an update that mixes version with other fields', async () => {
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED, version: '2.0' })).rejects.toMatchObject({
+        message: 'Configuration version cannot be updated directly',
+        status: HttpStatus.BAD_REQUEST,
+      });
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
     });
   });
 

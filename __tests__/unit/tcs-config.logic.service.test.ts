@@ -1017,6 +1017,57 @@ describe('TCS Config Logic Service', () => {
         5,
       );
     });
+
+    it('should reject a mapping source that terminates at a simple array', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          tags: ['a', 'b'],
+        },
+        revision: 1,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, { source: 'tags', destination: 'target', type: 'direct' } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: tags',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should accept a mapping source that traverses an array of objects', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          items: [{ amount: 10 }, { amount: 20 }],
+        },
+        revision: 1,
+      };
+
+      const newMapping = { source: 'items.amount', destination: 'target', type: 'direct' };
+      const mockUpdatedConfig = { ...mockConfig, mapping: [newMapping] };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { mapping: [{ ...newMapping, source: ['items.amount'] }] },
+        1,
+      );
+      expect(result.mapping?.[0]).toEqual(newMapping);
+    });
   });
 
   describe('handleRemoveMapping', () => {

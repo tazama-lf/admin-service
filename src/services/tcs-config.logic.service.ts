@@ -110,7 +110,12 @@ const jsonPathExistsAtAnyLayer = (json: unknown, path: string): boolean => {
   if (segments.length === 0) return false;
 
   const hasPath = (value: unknown, remainingSegments: string[]): boolean => {
-    if (remainingSegments.length === 0) return true;
+    if (remainingSegments.length === 0) {
+      if (Array.isArray(value)) {
+        return value.some((item) => isRecord(item));
+      }
+      return true;
+    }
 
     if (Array.isArray(value)) {
       return value.some((item) => hasPath(item, remainingSegments));

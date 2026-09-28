@@ -227,6 +227,10 @@ export const updateConfig = async (
   updates: Partial<Config> & { relatedTransaction?: string; related_transaction?: string },
   expectedRevision?: number,
 ): Promise<ConfigWithRevision> => {
+  if (updates.version !== undefined) {
+    throw new HttpException('Configuration version cannot be updated directly', HttpStatus.BAD_REQUEST);
+  }
+
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;

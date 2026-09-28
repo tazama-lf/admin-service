@@ -346,7 +346,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       await validateMappings(mergedConfig.mapping, mergedConfig, tenantId);
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.updatedAt);
+    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.revision);
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -462,7 +462,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     const updatedMappings = [...existingMappings, newMapping];
     await validateMappings(updatedMappings, config, tenantId);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.updatedAt);
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.revision);
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -489,12 +489,7 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(
-      id,
-      tenantId,
-      { mapping: updatedMappings.length > 0 ? updatedMappings : [] },
-      config.updatedAt,
-    );
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] }, config.revision);
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
@@ -525,7 +520,7 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, config.updatedAt);
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, config.revision);
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
@@ -557,7 +552,7 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
       id,
       tenantId,
       { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
-      config.updatedAt,
+      config.revision,
     );
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;

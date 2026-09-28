@@ -379,6 +379,7 @@ describe('TCS Config Repository', () => {
         updated_at: '2026-01-01',
         comments: null,
         related_transaction: null,
+        revision: 2,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -390,7 +391,7 @@ describe('TCS Config Repository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe(1);
-      expect(result?.updatedAt).toBe('2026-01-01');
+      expect(result?.revision).toBe(2);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
           values: [1, 'tenant-123'],
@@ -671,8 +672,7 @@ describe('TCS Config Repository', () => {
       await expect(updateConfig(999, 'tenant-123', { status: ConfigStatus.APPROVED })).rejects.toThrow('Configuration not found');
     });
 
-    it('should guard update with expected updated_at when provided', async () => {
-      const expectedUpdatedAt = '2026-01-01T10:00:00.000Z';
+    it('should guard update with expected revision when provided', async () => {
       const mockUpdatedRow = {
         id: 1,
         msg_fam: 'pacs',
@@ -689,10 +689,11 @@ describe('TCS Config Repository', () => {
         status: ConfigStatus.APPROVED,
         publishing_status: 'active',
         created_at: '2026-01-01',
-        updated_at: '2026-01-02T00:00:00.000Z',
+        updated_at: '2026-01-02',
         tenant_id: 'tenant-123',
         created_by: 'user-123',
         related_transaction: null,
+        revision: 4,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -700,35 +701,36 @@ describe('TCS Config Repository', () => {
         rowCount: 1,
       } as never);
 
-      const result = await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, expectedUpdatedAt);
+      const result = await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3);
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
-      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND updated_at = $4');
-      // The pg driver must bind the expected TIMESTAMPTZ back to the exact same ISO string it was given.
-      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', expectedUpdatedAt]);
-      expect(result.updatedAt).toBe('2026-01-02T00:00:00.000Z');
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND revision = $4');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', 3]);
+      expect(result.revision).toBe(4);
     });
 
-    it('should update without an updated_at guard when no expected value is provided', async () => {
+    it('should bump revision without a revision guard when no expected revision is provided', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
-        rows: [{ id: 1, content_type: ContentType.JSON, payload_json: {} }],
+        rows: [{ id: 1, content_type: ContentType.JSON, payload_json: {}, revision: 1 }],
         rowCount: 1,
       } as never);
 
       await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED });
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
-      expect(callArg.text).not.toContain('AND updated_at =');
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).not.toContain('AND revision =');
       expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123']);
     });
 
-    it('should throw HTTP 409 when expected updated_at is stale', async () => {
+    it('should throw HTTP 409 when expected revision is stale', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
         rows: [],
         rowCount: 0,
       } as never);
 
-      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, '2026-01-01T10:00:00.000Z')).rejects.toMatchObject({
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3)).rejects.toMatchObject({
         message: 'Configuration was modified by another request; retry',
         status: 409,
       });

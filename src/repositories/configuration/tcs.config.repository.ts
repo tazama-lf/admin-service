@@ -294,9 +294,6 @@ export const updateConfig = async (
   }
 
   setClauses.push('updated_at = NOW()');
-  if (expectedVersion !== undefined) {
-    setClauses.push(`version = $${paramIndex + 1}`);
-  }
 
   const versionClause = expectedVersion === undefined ? '' : ` AND version = $${paramIndex + 2}`;
   const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}${versionClause}`;

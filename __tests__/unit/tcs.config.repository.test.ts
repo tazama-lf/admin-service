@@ -701,6 +701,7 @@ describe('TCS Config Repository', () => {
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
       expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND version = $4');
+      expect(callArg.text).not.toContain('version = $3');
       expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', '1.0']);
     });
 

@@ -336,8 +336,9 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    if (updates.mapping !== undefined) {
-      await validateMappings(updates.mapping, { ...existingConfig, ...updates }, tenantId);
+    const mergedConfig = { ...existingConfig, ...updates };
+    if (updates.mapping !== undefined || updates.payload !== undefined || updates.contentType !== undefined) {
+      await validateMappings(mergedConfig.mapping, mergedConfig, tenantId);
     }
 
     const updatedConfig = await updateConfig(id, tenantId, updates);

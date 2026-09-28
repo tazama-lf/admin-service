@@ -355,6 +355,25 @@ describe('TCS Config Logic Service', () => {
       expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
     });
 
+    it('should revalidate existing mappings when payload changes', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        payload: { field1: 'value' },
+        mapping: [{ source: ['field1'], destination: 'target', type: 'direct' }],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { payload: { otherField: 'value' } })).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: field1',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
     it('should update config when updated mappings are valid', async () => {
       const mockConfig = {
         id: 1,

@@ -378,6 +378,7 @@ describe('TCS Config Repository', () => {
         updated_at: '2026-01-01',
         comments: null,
         related_transaction: null,
+        revision: 2,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -389,6 +390,7 @@ describe('TCS Config Repository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe(1);
+      expect(result?.revision).toBe(2);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
           values: [1, 'tenant-123'],
@@ -669,7 +671,7 @@ describe('TCS Config Repository', () => {
       await expect(updateConfig(999, 'tenant-123', { status: ConfigStatus.APPROVED })).rejects.toThrow('Configuration not found');
     });
 
-    it('should guard update with expected version revision when provided', async () => {
+    it('should guard update with expected revision when provided', async () => {
       const mockUpdatedRow = {
         id: 1,
         msg_fam: 'pacs',
@@ -690,6 +692,7 @@ describe('TCS Config Repository', () => {
         tenant_id: 'tenant-123',
         created_by: 'user-123',
         related_transaction: null,
+        revision: 4,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -697,21 +700,36 @@ describe('TCS Config Repository', () => {
         rowCount: 1,
       } as never);
 
-      await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED, version: '1.0' });
+      const result = await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3);
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
-      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND version = $4');
-      expect(callArg.text).not.toContain('version = $3');
-      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', '1.0']);
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND revision = $4');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', 3]);
+      expect(result.revision).toBe(4);
     });
 
-    it('should throw HTTP 409 when expected version revision is stale', async () => {
+    it('should bump revision without a revision guard when no expected revision is provided', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 1, content_type: ContentType.JSON, payload_json: {}, revision: 1 }],
+        rowCount: 1,
+      } as never);
+
+      await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED });
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).not.toContain('AND revision =');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123']);
+    });
+
+    it('should throw HTTP 409 when expected revision is stale', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
         rows: [],
         rowCount: 0,
       } as never);
 
-      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED, version: '1.0' })).rejects.toMatchObject({
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3)).rejects.toMatchObject({
         message: 'Configuration was modified by another request; retry',
         status: 409,
       });
@@ -1163,7 +1181,7 @@ describe('TCS Config Repository', () => {
       expect(callArg.values[0]).toBe('/api/pain001-new');
     });
 
-    it('should throw error when only version revision is provided', async () => {
+    it('should throw error when only version is provided', async () => {
       await expect(updateConfig(1, 'tenant-123', { version: '2.0' })).rejects.toThrow('No fields to update');
     });
   });

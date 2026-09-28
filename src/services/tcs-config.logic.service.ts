@@ -341,7 +341,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       await validateMappings(mergedConfig.mapping, mergedConfig, tenantId);
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);
+    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.revision);
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -457,7 +457,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     const updatedMappings = [...existingMappings, newMapping];
     await validateMappings(updatedMappings, config, tenantId);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings, version: config.version });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.revision);
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
@@ -484,11 +484,12 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] }, config.revision);
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
     throw new Error('Failed to remove mapping');
@@ -514,11 +515,12 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, config.revision);
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
     throw new Error('Failed to add function');
@@ -541,10 +543,16 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
+      config.revision,
+    );
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
     throw new Error('Failed to remove function');

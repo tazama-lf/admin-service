@@ -291,23 +291,26 @@ describe('TCS Config Logic Service', () => {
         description: 'Updated description',
       };
 
-      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1 });
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1, revision: 3 });
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
       const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updateData);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData, 3);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
-    it('should throw HTTP 409 when update has a version conflict', async () => {
+    it('should throw HTTP 409 when update has a revision conflict', async () => {
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1, revision: 3 });
       (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
-        new (tcsConfigRepository.ConfigConflictError as any)('Configuration has been modified by another process'),
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
       );
 
-      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' })).rejects.toThrow(
-        'Failed to update configuration',
-      );
+      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' })).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+      });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { msgFam: 'Updated' }, 3);
     });
 
     it('should throw error when config to update is not found', async () => {
@@ -397,7 +400,7 @@ describe('TCS Config Logic Service', () => {
       const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updates);
 
       expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updates);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updates, mockConfig.revision);
       expect(result).toEqual(mockUpdatedConfig);
     });
   });
@@ -560,6 +563,7 @@ describe('TCS Config Logic Service', () => {
           field2: 'value2',
         },
         updatedAt: '2026-04-07T09:59:00.000Z',
+        revision: 4,
       };
 
       const newMapping = {
@@ -578,10 +582,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
-        mapping: [newMapping],
-        version: mockConfig.version,
-      });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result.mapping?.[0]).toEqual(newMapping);
     });
 
@@ -680,7 +681,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
@@ -707,7 +708,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
@@ -791,7 +792,7 @@ describe('TCS Config Logic Service', () => {
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
       expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
@@ -852,7 +853,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
@@ -976,6 +977,7 @@ describe('TCS Config Logic Service', () => {
         1,
         mockTenantId,
         expect.objectContaining({ mapping: expect.any(Array) }),
+        mockConfig.revision,
       );
       expect(result).toEqual(mockUpdatedConfig);
     });
@@ -988,7 +990,7 @@ describe('TCS Config Logic Service', () => {
       ).rejects.toThrow('Failed to add mapping');
     });
 
-    it('should throw HTTP 409 when add mapping has a version conflict', async () => {
+    it('should throw HTTP 409 when add mapping has a revision conflict', async () => {
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
@@ -996,18 +998,24 @@ describe('TCS Config Logic Service', () => {
         payload: {
           field: 'value',
         },
+        revision: 5,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
       await expect(
         tcsConfigService.handleAddMapping(1, mockTenantId, { source: ['field'], destination: 'target', type: 'direct' } as any),
-      ).rejects.toThrow('Failed to add mapping');
+      ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
-        mapping: [{ source: ['field'], destination: 'target', type: 'direct' }],
-      });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { mapping: [{ source: ['field'], destination: 'target', type: 'direct' }] },
+        5,
+      );
     });
   });
 
@@ -1036,7 +1044,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [mappings[1]] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [mappings[1]] }, mockConfig.revision);
       expect(result.mapping?.[0]).toEqual(mappings[1]);
     });
 
@@ -1059,20 +1067,23 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 5)).rejects.toThrow('Failed to remove mapping');
     });
 
-    it('should throw HTTP 409 when remove mapping has a version conflict', async () => {
+    it('should throw HTTP 409 when remove mapping has a revision conflict', async () => {
       const mappings = [{ source: ['field1'], destination: 'target1', type: 'direct' }];
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         mapping: mappings,
+        revision: 6,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
-      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 0)).rejects.toThrow('Failed to remove mapping');
+      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 0)).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, 6);
     });
 
     it('should set mapping to empty array when last mapping is removed', async () => {
@@ -1093,7 +1104,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, mockConfig.revision);
       expect(result.mapping).toEqual([]);
     });
 
@@ -1115,7 +1126,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, mockConfig.revision);
       expect(result.mapping).toEqual([]);
     });
   });
@@ -1147,7 +1158,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -1207,7 +1218,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -1219,23 +1230,29 @@ describe('TCS Config Logic Service', () => {
       );
     });
 
-    it('should throw HTTP 409 when add function has a version conflict', async () => {
+    it('should throw HTTP 409 when add function has a revision conflict', async () => {
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         functions: [],
+        revision: 7,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
-
-      await expect(tcsConfigService.handleAddFunction(1, mockTenantId, { functionName: 'testFn' })).rejects.toThrow(
-        'Failed to add function',
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
       );
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
-        functions: [{ functionName: 'testFn', params: [], tableName: '', columns: [] }],
+      await expect(tcsConfigService.handleAddFunction(1, mockTenantId, { functionName: 'testFn' })).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
       });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { functions: [{ functionName: 'testFn', params: [], tableName: '', columns: [] }] },
+        7,
+      );
     });
   });
 
@@ -1264,7 +1281,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [functions[1]] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [functions[1]] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(functions[1]);
     });
 
@@ -1292,7 +1309,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, mockConfig.revision);
       expect(result.functions).toEqual([]);
     });
 
@@ -1314,7 +1331,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, mockConfig.revision);
       expect(result.functions).toEqual([]);
     });
 
@@ -1331,20 +1348,23 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 10)).rejects.toThrow('Failed to remove function');
     });
 
-    it('should throw HTTP 409 when remove function has a version conflict', async () => {
+    it('should throw HTTP 409 when remove function has a revision conflict', async () => {
       const functions = [{ functionName: 'func1', params: [], tableName: '', columns: [] }];
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         functions,
+        revision: 8,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
-      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 0)).rejects.toThrow('Failed to remove function');
+      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 0)).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, 8);
     });
   });
 

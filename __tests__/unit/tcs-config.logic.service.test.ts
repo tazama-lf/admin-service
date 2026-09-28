@@ -196,7 +196,10 @@ describe('TCS Config Logic Service', () => {
         ],
       };
 
-      await expect(tcsConfigService.handlePostConfig(mockConfig, mockTenantId)).rejects.toThrow('Failed to create configuration');
+      await expect(tcsConfigService.handlePostConfig(mockConfig, mockTenantId)).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: missingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
 
       expect(tcsConfigRepository.createConfig).not.toHaveBeenCalled();
     });
@@ -344,7 +347,10 @@ describe('TCS Config Logic Service', () => {
             },
           ],
         }),
-      ).rejects.toThrow('Failed to update configuration');
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_xml: FIToFIPmtSts.GrpHdr.MissingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
 
       expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
     });

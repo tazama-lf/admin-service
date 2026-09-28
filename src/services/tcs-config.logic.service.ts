@@ -269,6 +269,9 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       result: response,
     };
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
     const errorMessage = error as { message: string };
     loggerService.log(`Error: posting config with error message: ${errorMessage.message}`);
     throw new Error('Failed to create configuration');
@@ -341,6 +344,9 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
     throw new Error('Failed to update configuration');

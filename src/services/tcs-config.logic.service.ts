@@ -25,7 +25,194 @@ import {
   getRelatedTransactions,
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
-import { HttpException } from '../utils/error';
+import { HttpException, HttpStatus } from '../utils/error';
+import { handleGetDataModelJson } from './data-model.logic.service';
+
+const mappingsHaveSameComposite = (mapping: FieldMapping, newMapping: FieldMapping): boolean =>
+  JSON.stringify(mapping.source) === JSON.stringify(newMapping.source) &&
+  JSON.stringify(mapping.destination) === JSON.stringify(newMapping.destination);
+
+const normalizeSource = (source?: string | string[]): string[] | undefined =>
+  Array.isArray(source) ? source : source ? [source] : undefined;
+
+const normalizeDestination = (destination?: string | string[]): string[] =>
+  Array.isArray(destination) ? destination : destination ? [destination] : [];
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const XML_TAG_REGEX = /<[^>]+>/g;
+
+const addXmlPathToJson = (root: Record<string, unknown>, path: string[]): void => {
+  let current = root;
+
+  path.forEach((segment) => {
+    const nextValue = current[segment];
+    if (isRecord(nextValue)) {
+      current = nextValue;
+      return;
+    }
+
+    const nextObject: Record<string, unknown> = {};
+    current[segment] = nextObject;
+    current = nextObject;
+  });
+};
+
+const getXmlElementName = (tag: string): string => {
+  const content = tag.slice(1, -1).trim().replace(/^\//, '').replace(/\/$/, '').trim();
+  const [name = ''] = content.split(/\s+/);
+  const [, localName = name] = name.split(':');
+  return localName;
+};
+
+const parseXmlFieldTree = (xml: string): Record<string, unknown> => {
+  const root: Record<string, unknown> = {};
+  const stack: string[] = [];
+  const sanitizedXml = xml.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const tags = sanitizedXml.match(XML_TAG_REGEX) ?? [];
+
+  for (const tag of tags) {
+    if (tag.startsWith('<!') || tag.startsWith('</')) {
+      if (tag.startsWith('</')) stack.pop();
+      continue;
+    }
+
+    const elementName = getXmlElementName(tag);
+    if (!elementName) continue;
+
+    const currentPath = [...stack, elementName];
+    addXmlPathToJson(root, currentPath);
+
+    if (!tag.endsWith('/>')) stack.push(elementName);
+  }
+
+  return root;
+};
+
+interface MappingValidationConfig {
+  contentType?: ContentType;
+  payload?: unknown;
+}
+
+const getPayloadForSourceValidation = (config: MappingValidationConfig): { payload: unknown; label: string } => {
+  if (config.contentType !== ContentType.XML) {
+    return { payload: config.payload, label: 'payload_json' };
+  }
+
+  if (typeof config.payload !== 'string') {
+    throw new HttpException('payload_xml not found', HttpStatus.BAD_REQUEST);
+  }
+
+  return { payload: parseXmlFieldTree(config.payload), label: 'payload_xml' };
+};
+
+const jsonPathExistsAtAnyLayer = (json: unknown, path: string): boolean => {
+  const segments = path.split('.').filter(Boolean);
+  if (segments.length === 0) return false;
+
+  const hasPath = (value: unknown, remainingSegments: string[]): boolean => {
+    if (remainingSegments.length === 0) {
+      if (Array.isArray(value)) {
+        return value.some((item) => isRecord(item));
+      }
+      return true;
+    }
+
+    if (Array.isArray(value)) {
+      return value.some((item) => hasPath(item, remainingSegments));
+    }
+
+    if (!isRecord(value)) return false;
+
+    const [nextSegment, ...rest] = remainingSegments;
+    if (!Object.prototype.hasOwnProperty.call(value, nextSegment)) return false;
+
+    return hasPath(value[nextSegment], rest);
+  };
+
+  const hasPathAtAnyLayer = (value: unknown): boolean => {
+    if (hasPath(value, segments)) return true;
+
+    if (Array.isArray(value)) {
+      return value.some(hasPathAtAnyLayer);
+    }
+
+    if (!isRecord(value)) return false;
+
+    return Object.values(value).some(hasPathAtAnyLayer);
+  };
+
+  return hasPathAtAnyLayer(json);
+};
+
+const validateMappingSourcesExistInPayload = (payload: unknown, source: string[] | undefined, payloadLabel: string): void => {
+  if (!source?.length) return;
+
+  const missingSources = source.filter((sourcePath) => !jsonPathExistsAtAnyLayer(payload, sourcePath));
+  if (missingSources.length > 0) {
+    throw new HttpException(`Mapping source does not exist in ${payloadLabel}: ${missingSources.join(', ')}`, HttpStatus.BAD_REQUEST);
+  }
+};
+
+const validateMappingDestinationsExistInDataModel = (
+  dataModelJson: Record<string, unknown> | null,
+  destination?: string | string[],
+): void => {
+  const destinations = normalizeDestination(destination);
+  if (destinations.length === 0) return;
+
+  if (dataModelJson === null) {
+    throw new HttpException('Data model JSON not found', HttpStatus.BAD_REQUEST);
+  }
+
+  const missingDestinations = destinations.filter((destinationPath) => !jsonPathExistsAtAnyLayer(dataModelJson, destinationPath));
+  if (missingDestinations.length > 0) {
+    throw new HttpException(
+      `Mapping destination does not exist in data model JSON: ${missingDestinations.join(', ')}`,
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+};
+
+const validateMappingIsUnique = (existingMappings: FieldMapping[], newMapping: FieldMapping): void => {
+  const newDestinations = normalizeDestination(newMapping.destination);
+  const alreadyMappedDestinations = new Set<string>();
+
+  for (const mapping of existingMappings) {
+    if (mappingsHaveSameComposite(mapping, newMapping)) {
+      throw new HttpException('Mapping with the same source and destination already exists', HttpStatus.CONFLICT);
+    }
+
+    normalizeDestination(mapping.destination).forEach((destination) => {
+      if (newDestinations.includes(destination)) alreadyMappedDestinations.add(destination);
+    });
+  }
+
+  if (alreadyMappedDestinations.size > 0) {
+    throw new HttpException(`Mapping destination is already mapped: ${[...alreadyMappedDestinations].join(', ')}`, HttpStatus.CONFLICT);
+  }
+};
+
+const validateMappings = async (mappings: FieldMapping[] | undefined, config: MappingValidationConfig, tenantId: string): Promise<void> => {
+  if (!mappings?.length) return;
+
+  const existingMappings: FieldMapping[] = [];
+  const sourceValidationPayload = getPayloadForSourceValidation(config);
+  const dataModelJson = await handleGetDataModelJson(tenantId);
+
+  for (const mapping of mappings) {
+    const normalizedMapping: FieldMapping = {
+      ...mapping,
+      source: normalizeSource(mapping.source as string | string[] | undefined),
+    };
+
+    validateMappingIsUnique(existingMappings, normalizedMapping);
+    validateMappingSourcesExistInPayload(sourceValidationPayload.payload, normalizedMapping.source, sourceValidationPayload.label);
+    validateMappingDestinationsExistInDataModel(dataModelJson, normalizedMapping.destination);
+
+    existingMappings.push(normalizedMapping);
+  }
+};
 
 export const handlePostConfig = async (config: ConfigInput, tenantId: string): Promise<{ message: string; result: ConfigResponse }> => {
   try {
@@ -57,6 +244,8 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       related_transaction: config.related_transaction,
     };
 
+    await validateMappings(newConfig.mapping, newConfig, tenantId);
+
     const createdConfigId = await createConfig(newConfig);
 
     if (!createdConfigId) {
@@ -87,11 +276,15 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       result: response,
     };
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
     const errorMessage = error as { message: string };
     loggerService.log(`Error: posting config with error message: ${errorMessage.message}`);
     throw new Error('Failed to create configuration');
   }
 };
+
 export const handleFindConfigByID = async (id: string, tenantId: string): Promise<ConfigResponse> => {
   try {
     const configId = parseInt(id);
@@ -166,10 +359,18 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
       throw new Error('Configuration not found');
     }
 
-    const updatedConfig = await updateConfig(id, tenantId, updates);
+    const mergedConfig = { ...existingConfig, ...updates };
+    if (updates.mapping !== undefined || updates.payload !== undefined || updates.contentType !== undefined) {
+      await validateMappings(mergedConfig.mapping, mergedConfig, tenantId);
+    }
+
+    const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.revision);
     loggerService.log(`Successfully updated config ID: ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
+    }
     const errorMessage = error as { message: string };
     loggerService.error(`Error: updating config with error message: ${errorMessage.message}`, 'handleUpdateConfig');
     throw new Error('Failed to update configuration');
@@ -266,7 +467,8 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
       throw new Error('Config not found');
     }
 
-    const normalizedSource = Array.isArray(mappingDto.source) ? mappingDto.source : mappingDto.source ? [mappingDto.source] : undefined;
+    const existingMappings = config.mapping ?? [];
+    const normalizedSource = normalizeSource(mappingDto.source as string | string[] | undefined);
 
     const newMapping: FieldMapping = {
       ...mappingDto,
@@ -275,12 +477,14 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
       type: mappingDto.type,
     };
 
-    const updatedMappings = [...(config.mapping ?? []), newMapping];
+    const updatedMappings = [...existingMappings, newMapping];
+    await validateMappings(updatedMappings, config, tenantId);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.revision);
     loggerService.log(`Successfully added mapping to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding mapping: ${errorMessage.message}`, 'handleAddMapping');
     throw new Error('Failed to add mapping');
@@ -303,11 +507,12 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] });
+    const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings.length > 0 ? updatedMappings : [] }, config.revision);
 
     loggerService.log(`Successfully removed mapping from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing mapping: ${errorMessage.message}`, 'handleRemoveMapping');
     throw new Error('Failed to remove mapping');
@@ -333,11 +538,12 @@ export const handleAddFunction = async (id: number, tenantId: string, functionDt
 
     const updatedFunctions = [...(config.functions ?? []), newFunction];
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions });
+    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions }, config.revision);
 
     loggerService.log(`Successfully added function to config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error adding function: ${errorMessage.message}`, 'handleAddFunction');
     throw new Error('Failed to add function');
@@ -360,10 +566,16 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);
 
-    const updatedConfig = await updateConfig(id, tenantId, { functions: updatedFunctions.length > 0 ? updatedFunctions : [] });
+    const updatedConfig = await updateConfig(
+      id,
+      tenantId,
+      { functions: updatedFunctions.length > 0 ? updatedFunctions : [] },
+      config.revision,
+    );
     loggerService.log(`Successfully removed function from config ${id}`);
     return updatedConfig;
   } catch (error) {
+    if (error instanceof HttpException) throw error;
     const errorMessage = error as { message: string };
     loggerService.error(`Error removing function: ${errorMessage.message}`, 'handleRemoveFunction');
     throw new Error('Failed to remove function');

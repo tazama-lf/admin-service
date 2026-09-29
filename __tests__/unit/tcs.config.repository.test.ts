@@ -24,6 +24,7 @@ import {
 } from '../../src/repositories/configuration/tcs.config.repository';
 import { handlePostExecuteSqlStatement } from '../../src/services/database.logic.service';
 import { ConfigStatus, ContentType } from '@tazama-lf/tcs-lib';
+import { HttpStatus } from '../../src/utils/error';
 
 const mockHandlePostExecuteSqlStatement = handlePostExecuteSqlStatement as jest.MockedFunction<typeof handlePostExecuteSqlStatement>;
 
@@ -379,6 +380,7 @@ describe('TCS Config Repository', () => {
         updated_at: '2026-01-01',
         comments: null,
         related_transaction: null,
+        revision: 2,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -390,6 +392,7 @@ describe('TCS Config Repository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe(1);
+      expect(result?.revision).toBe(2);
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
         expect.objectContaining({
           values: [1, 'tenant-123'],
@@ -668,6 +671,70 @@ describe('TCS Config Repository', () => {
       } as never);
 
       await expect(updateConfig(999, 'tenant-123', { status: ConfigStatus.APPROVED })).rejects.toThrow('Configuration not found');
+    });
+
+    it('should guard update with expected revision when provided', async () => {
+      const mockUpdatedRow = {
+        id: 1,
+        msg_fam: 'pacs',
+        transaction_type: 'pacs.008.001.08',
+        endpoint_path: '/api/pacs008',
+        version: '1.0',
+        content_type: ContentType.JSON,
+        schema: { type: 'object' },
+        payload_xml: null,
+        payload_json: { updated: true },
+        comments: null,
+        mapping: [],
+        functions: [],
+        status: ConfigStatus.APPROVED,
+        publishing_status: 'active',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-02',
+        tenant_id: 'tenant-123',
+        created_by: 'user-123',
+        related_transaction: null,
+        revision: 4,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [mockUpdatedRow],
+        rowCount: 1,
+      } as never);
+
+      const result = await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).toContain('WHERE id = $2 AND tenant_id = $3 AND revision = $4');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123', 3]);
+      expect(result.revision).toBe(4);
+    });
+
+    it('should bump revision without a revision guard when no expected revision is provided', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [{ id: 1, content_type: ContentType.JSON, payload_json: {}, revision: 1 }],
+        rowCount: 1,
+      } as never);
+
+      await updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED });
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(callArg.text).toMatch(/SET .*\brevision = revision \+ 1\b/);
+      expect(callArg.text).not.toContain('AND revision =');
+      expect(callArg.values).toEqual([ConfigStatus.APPROVED, 1, 'tenant-123']);
+    });
+
+    it('should throw HTTP 409 when expected revision is stale', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED }, 3)).rejects.toMatchObject({
+        message: 'Configuration was modified by another request; retry',
+        status: 409,
+      });
     });
 
     it('should handle XML payload update', async () => {
@@ -1078,6 +1145,59 @@ describe('TCS Config Repository', () => {
       expect(callArg.text).toContain('transaction_type = $1');
       expect(callArg.values[0]).toBe('pain.002.001.11');
     });
+
+    it('should handle endpointPath update', async () => {
+      const mockUpdatedRow = {
+        id: 1,
+        msg_fam: 'pain',
+        transaction_type: 'pain.001.001.11',
+        endpoint_path: '/api/pain001-new',
+        version: '1.0',
+        content_type: ContentType.JSON,
+        schema: { type: 'object' },
+        payload_xml: null,
+        payload_json: { data: 'test' },
+        comments: null,
+        mapping: null,
+        functions: null,
+        status: ConfigStatus.IN_PROGRESS,
+        publishing_status: 'inactive',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-02',
+        tenant_id: 'tenant-123',
+        created_by: 'user-123',
+        related_transaction: null,
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [mockUpdatedRow],
+        rowCount: 1,
+      } as never);
+
+      await updateConfig(1, 'tenant-123', {
+        endpointPath: '/api/pain001-new',
+      });
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
+      expect(callArg.text).toContain('endpoint_path = $1');
+      expect(callArg.values[0]).toBe('/api/pain001-new');
+    });
+
+    it('should reject an update that only supplies version', async () => {
+      await expect(updateConfig(1, 'tenant-123', { version: '2.0' })).rejects.toMatchObject({
+        message: 'Configuration version cannot be updated directly',
+        status: HttpStatus.BAD_REQUEST,
+      });
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+    });
+
+    it('should reject an update that mixes version with other fields', async () => {
+      await expect(updateConfig(1, 'tenant-123', { status: ConfigStatus.APPROVED, version: '2.0' })).rejects.toMatchObject({
+        message: 'Configuration version cannot be updated directly',
+        status: HttpStatus.BAD_REQUEST,
+      });
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
+    });
   });
 
   describe('findAllTransactionTypes', () => {
@@ -1217,6 +1337,47 @@ describe('TCS Config Repository', () => {
       } as never);
 
       await expect(getSchemaByTransactionType('pain.001.001.11', '1.0', 'tenant-123')).rejects.toThrow('Configuration not found');
+    });
+  });
+
+  describe('getSchemaByTransactionTypew3', () => {
+    it('should get schema, mapping, and functions', async () => {
+      const mockResult = {
+        schema: { type: 'object' },
+        mapping: [{ field: 'value' }],
+        functions: [{ name: 'func1' }],
+      };
+
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [mockResult],
+        rowCount: 1,
+      } as never);
+
+      const result = await getSchemaByTransactionTypew3('pain.001.001.11', '1.0', 'tenant-123');
+
+      expect(result).toEqual(mockResult);
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('SELECT'),
+          values: ['pain.001.001.11', '1.0', 'tenant-123'],
+        }),
+        'configuration',
+      );
+    });
+
+    it('should throw error when w3 parameters are missing', async () => {
+      await expect(getSchemaByTransactionTypew3('', '1.0', 'tenant-123')).rejects.toThrow(
+        'Transaction type, version, and tenant ID are required',
+      );
+    });
+
+    it('should throw error when w3 configuration is not found', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await expect(getSchemaByTransactionTypew3('pain.001.001.11', '1.0', 'tenant-123')).rejects.toThrow('Configuration not found');
     });
   });
 

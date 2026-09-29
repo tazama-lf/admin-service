@@ -40,6 +40,15 @@ export interface ConfigRow {
   payload_xml?: string;
   payload_json?: Record<string, unknown>;
   related_transaction?: string;
+  revision: number;
+}
+
+/**
+ * A configuration row mapped to its domain shape, including the optimistic-concurrency
+ * revision counter that the database increments on every update.
+ */
+export interface ConfigWithRevision extends Config {
+  revision: number;
 }
 
 export type ConfigInput = Partial<ConfigData>;

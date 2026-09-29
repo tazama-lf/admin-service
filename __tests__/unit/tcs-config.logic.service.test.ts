@@ -11,6 +11,7 @@ jest.mock('../../src', () => ({
 }));
 jest.mock('../../src/services/database.logic.service', () => ({
   handlePostExecuteSqlStatement: jest.fn(),
+  withConfigurationTransaction: jest.fn(async (work: (client?: unknown) => unknown) => await work(undefined)),
 }));
 
 jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
@@ -33,9 +34,14 @@ jest.mock('../../src/repositories/configuration/tcs.config.repository', () => ({
   getSchemaByTransactionTypew3: jest.fn(),
   getRelatedTransactions: jest.fn(),
 }));
+jest.mock('../../src/services/data-model.logic.service', () => ({
+  handleGetDataModelJson: jest.fn(),
+}));
 
 import * as tcsConfigService from '../../src/services/tcs-config.logic.service';
 import * as tcsConfigRepository from '../../src/repositories/configuration/tcs.config.repository';
+import { handleGetDataModelJson } from '../../src/services/data-model.logic.service';
+import { withConfigurationTransaction } from '../../src/services/database.logic.service';
 import { HttpException, HttpStatus } from '../../src/utils/error';
 
 describe('TCS Config Logic Service', () => {
@@ -44,6 +50,17 @@ describe('TCS Config Logic Service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (withConfigurationTransaction as jest.Mock).mockImplementation(async (work: (client?: unknown) => unknown) => await work(undefined));
+    (handleGetDataModelJson as jest.Mock).mockResolvedValue({
+      targetField: 'value',
+      newTarget: 'value',
+      oldTarget: 'value',
+      target1: 'value',
+      target: 'value',
+      transactionDetails: {
+        MsgId: 'message-id',
+      },
+    });
   });
 
   describe('handlePostConfig', () => {
@@ -130,10 +147,13 @@ describe('TCS Config Logic Service', () => {
         endpointPath: '/api/v1/transactions',
         version: '1.0.0',
         schema: { type: 'object' },
+        payload: {
+          field1: 'value',
+        },
         mapping: [
           {
             source: ['field1'],
-            destination: 'target1',
+            destination: 'target',
             type: 'direct',
           },
         ],
@@ -155,6 +175,33 @@ describe('TCS Config Logic Service', () => {
 
       expect(result.result.mapping).toEqual(mockConfig.mapping);
       expect(result.result.functions).toEqual(mockConfig.functions);
+    });
+
+    it('should validate mappings before creating config', async () => {
+      const mockConfig = {
+        msgFam: 'ISO20022',
+        transactionType: 'pacs.008.001.10',
+        endpointPath: '/api/v1/transactions',
+        version: '1.0.0',
+        schema: { type: 'object' },
+        payload: {
+          field1: 'value',
+        },
+        mapping: [
+          {
+            source: ['missingField'],
+            destination: 'target',
+            type: 'direct',
+          },
+        ],
+      };
+
+      await expect(tcsConfigService.handlePostConfig(mockConfig, mockTenantId)).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: missingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.createConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -244,23 +291,26 @@ describe('TCS Config Logic Service', () => {
         description: 'Updated description',
       };
 
-      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1 });
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1, revision: 3 });
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
       const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updateData);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updateData, 3);
       expect(result).toEqual(mockUpdatedConfig);
     });
 
-    it('should throw HTTP 409 when update has a version conflict', async () => {
+    it('should throw HTTP 409 when update has a revision conflict', async () => {
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue({ id: 1, revision: 3 });
       (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
-        new (tcsConfigRepository.ConfigConflictError as any)('Configuration has been modified by another process'),
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
       );
 
-      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' })).rejects.toThrow(
-        'Failed to update configuration',
-      );
+      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' })).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+      });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { msgFam: 'Updated' }, 3);
     });
 
     it('should throw error when config to update is not found', async () => {
@@ -277,6 +327,81 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { msgFam: 'Updated' }, '2026-04-07T10:00:00.000Z')).rejects.toThrow(
         'Failed to update configuration',
       );
+    });
+
+    it('should validate updated mappings against XML payload before updating config', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        contentType: 'application/xml',
+        payload: '<Document><FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts></Document>',
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleUpdateConfig(1, mockTenantId, {
+          mapping: [
+            {
+              source: ['FIToFIPmtSts.GrpHdr.MissingField'],
+              destination: 'transactionDetails.MsgId',
+              type: 'direct',
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_xml: FIToFIPmtSts.GrpHdr.MissingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should revalidate existing mappings when payload changes', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        payload: { field1: 'value' },
+        mapping: [{ source: ['field1'], destination: 'target', type: 'direct' }],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(tcsConfigService.handleUpdateConfig(1, mockTenantId, { payload: { otherField: 'value' } })).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: field1',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should update config when updated mappings are valid', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        version: '1.0.0',
+        payload: {
+          field1: 'value',
+        },
+      };
+      const updates = {
+        mapping: [{ source: ['field1'], destination: 'target', type: 'direct' }],
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        ...updates,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleUpdateConfig(1, mockTenantId, updates);
+
+      expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, updates, mockConfig.revision);
+      expect(result).toEqual(mockUpdatedConfig);
     });
   });
 
@@ -433,7 +558,12 @@ describe('TCS Config Logic Service', () => {
         id: 1,
         msgFam: 'ISO20022',
         mapping: [],
+        payload: {
+          field1: 'value1',
+          field2: 'value2',
+        },
         updatedAt: '2026-04-07T09:59:00.000Z',
+        revision: 4,
       };
 
       const newMapping = {
@@ -452,7 +582,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
       expect(result.mapping?.[0]).toEqual(newMapping);
     });
 
@@ -468,6 +598,10 @@ describe('TCS Config Logic Service', () => {
         id: 1,
         msgFam: 'ISO20022',
         mapping: [existingMapping],
+        payload: {
+          oldField: 'value',
+          newField: 'value',
+        },
         updatedAt: '2026-04-07T09:59:00.000Z',
       };
 
@@ -486,6 +620,334 @@ describe('TCS Config Logic Service', () => {
       (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
 
       const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any);
+    });
+
+    it('should throw HTTP 400 when source does not exist in payload_json', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          FIToFIPmtSts: {
+            GrpHdr: {
+              MsgId: 'message-id',
+            },
+          },
+        },
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.MissingField'],
+          destination: 'transactionDetails.MissingField',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: FIToFIPmtSts.GrpHdr.MissingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should add mapping when source exists at any payload_json layer', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          FIToFIPmtSts: {
+            GrpHdr: {
+              MsgId: 'message-id',
+            },
+          },
+        },
+      };
+
+      const newMapping = {
+        source: ['MsgId'],
+        destination: 'transactionDetails.MsgId',
+        type: 'direct',
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [newMapping],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
+    it('should add mapping when XML source exists in payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: '<?xml version="1.0"?><FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts>',
+      };
+      const newMapping = {
+        source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+        destination: 'transactionDetails.MsgId',
+        type: 'direct',
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [newMapping],
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
+    it('should throw HTTP 400 when XML source does not exist in payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: '<FIToFIPmtSts><GrpHdr><MsgId>message-id</MsgId></GrpHdr></FIToFIPmtSts>',
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.MissingField'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_xml: FIToFIPmtSts.GrpHdr.MissingField',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should throw HTTP 400 when XML config has no payload_xml', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        contentType: 'application/xml',
+        mapping: [],
+        payload: null,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'payload_xml not found',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should add mapping when destination exists at any data model JSON layer', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          MsgId: 'message-id',
+        },
+      };
+      const newMapping = {
+        source: ['MsgId'],
+        destination: 'MsgId',
+        type: 'direct',
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [newMapping],
+      };
+
+      (handleGetDataModelJson as jest.Mock).mockResolvedValue({
+        transactionDetails: {
+          MsgId: 'message-id',
+        },
+      });
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
+
+      expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
+    it('should throw HTTP 400 when destination does not exist in data model JSON', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          MsgId: 'message-id',
+        },
+      };
+
+      (handleGetDataModelJson as jest.Mock).mockResolvedValue({
+        transactionDetails: {
+          CreDtTm: 'created-at',
+        },
+      });
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['MsgId'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping destination does not exist in data model JSON: transactionDetails.MsgId',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(handleGetDataModelJson).toHaveBeenCalledWith(mockTenantId);
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should add mapping when source and destination exist inside arrays', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: [{ account: { Id: 'account-id' } }],
+      };
+      const newMapping = {
+        source: ['Id'],
+        destination: 'Id',
+        type: 'direct',
+      };
+      const mockUpdatedConfig = {
+        ...mockConfig,
+        mapping: [newMapping],
+      };
+
+      (handleGetDataModelJson as jest.Mock).mockResolvedValue({
+        transactionDetails: [{ account: { Id: 'account-id' } }],
+      });
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [newMapping] }, mockConfig.revision);
+      expect(result).toEqual(mockUpdatedConfig);
+    });
+
+    it('should throw HTTP 400 when data model JSON is not found', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          MsgId: 'message-id',
+        },
+      };
+
+      (handleGetDataModelJson as jest.Mock).mockResolvedValue(null);
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['MsgId'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Data model JSON not found',
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should throw HTTP 409 when source and destination composite already exists', async () => {
+      const existingMapping = {
+        source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+        destination: 'transactionDetails.MsgId',
+        type: 'direct',
+      };
+
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [existingMapping],
+        payload: {
+          FIToFIPmtSts: {
+            GrpHdr: {
+              MsgId: 'message-id',
+            },
+          },
+        },
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(tcsConfigService.handleAddMapping(1, mockTenantId, existingMapping)).rejects.toMatchObject({
+        message: 'Mapping with the same source and destination already exists',
+        status: HttpStatus.CONFLICT,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should throw HTTP 409 when destination is already mapped with another source', async () => {
+      const existingMapping = {
+        source: ['FIToFIPmtSts.GrpHdr.MsgId'],
+        destination: 'transactionDetails.MsgId',
+        type: 'direct',
+      };
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [existingMapping],
+        payload: {
+          FIToFIPmtSts: {
+            GrpHdr: {
+              MsgId: 'message-id',
+              CreDtTm: 'created-at',
+            },
+          },
+        },
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, {
+          source: ['FIToFIPmtSts.GrpHdr.CreDtTm'],
+          destination: 'transactionDetails.MsgId',
+          type: 'direct',
+        } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping destination is already mapped: transactionDetails.MsgId',
+        status: HttpStatus.CONFLICT,
+      });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
     });
 
     it('should add mapping when source is undefined', async () => {
@@ -515,6 +977,7 @@ describe('TCS Config Logic Service', () => {
         1,
         mockTenantId,
         expect.objectContaining({ mapping: expect.any(Array) }),
+        mockConfig.revision,
       );
       expect(result).toEqual(mockUpdatedConfig);
     });
@@ -527,23 +990,83 @@ describe('TCS Config Logic Service', () => {
       ).rejects.toThrow('Failed to add mapping');
     });
 
-    it('should throw HTTP 409 when add mapping has a version conflict', async () => {
+    it('should throw HTTP 409 when add mapping has a revision conflict', async () => {
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         mapping: [],
+        payload: {
+          field: 'value',
+        },
+        revision: 5,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
       await expect(
         tcsConfigService.handleAddMapping(1, mockTenantId, { source: ['field'], destination: 'target', type: 'direct' } as any),
-      ).rejects.toThrow('Failed to add mapping');
+      ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
-        mapping: [{ source: ['field'], destination: 'target', type: 'direct' }],
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { mapping: [{ source: ['field'], destination: 'target', type: 'direct' }] },
+        5,
+      );
+    });
+
+    it('should reject a mapping source that terminates at a simple array', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          tags: ['a', 'b'],
+        },
+        revision: 1,
+      };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+
+      await expect(
+        tcsConfigService.handleAddMapping(1, mockTenantId, { source: 'tags', destination: 'target', type: 'direct' } as any),
+      ).rejects.toMatchObject({
+        message: 'Mapping source does not exist in payload_json: tags',
+        status: HttpStatus.BAD_REQUEST,
       });
+
+      expect(tcsConfigRepository.updateConfig).not.toHaveBeenCalled();
+    });
+
+    it('should accept a mapping source that traverses an array of objects', async () => {
+      const mockConfig = {
+        id: 1,
+        msgFam: 'ISO20022',
+        mapping: [],
+        payload: {
+          items: [{ amount: 10 }, { amount: 20 }],
+        },
+        revision: 1,
+      };
+
+      const newMapping = { source: 'items.amount', destination: 'target', type: 'direct' };
+      const mockUpdatedConfig = { ...mockConfig, mapping: [newMapping] };
+
+      (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
+      (tcsConfigRepository.updateConfig as jest.Mock).mockResolvedValue(mockUpdatedConfig);
+
+      const result = await tcsConfigService.handleAddMapping(1, mockTenantId, newMapping as any);
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { mapping: [{ ...newMapping, source: ['items.amount'] }] },
+        1,
+      );
+      expect(result.mapping?.[0]).toEqual(newMapping);
     });
   });
 
@@ -572,7 +1095,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [mappings[1]] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [mappings[1]] }, mockConfig.revision);
       expect(result.mapping?.[0]).toEqual(mappings[1]);
     });
 
@@ -595,20 +1118,23 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 5)).rejects.toThrow('Failed to remove mapping');
     });
 
-    it('should throw HTTP 409 when remove mapping has a version conflict', async () => {
+    it('should throw HTTP 409 when remove mapping has a revision conflict', async () => {
       const mappings = [{ source: ['field1'], destination: 'target1', type: 'direct' }];
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         mapping: mappings,
+        revision: 6,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
-      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 0)).rejects.toThrow('Failed to remove mapping');
+      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 0)).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, 6);
     });
 
     it('should set mapping to empty array when last mapping is removed', async () => {
@@ -629,7 +1155,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, mockConfig.revision);
       expect(result.mapping).toEqual([]);
     });
 
@@ -651,7 +1177,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveMapping(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { mapping: [] }, mockConfig.revision);
       expect(result.mapping).toEqual([]);
     });
   });
@@ -683,7 +1209,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -743,7 +1269,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleAddFunction(1, mockTenantId, newFunction);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [newFunction] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(newFunction);
     });
 
@@ -755,23 +1281,29 @@ describe('TCS Config Logic Service', () => {
       );
     });
 
-    it('should throw HTTP 409 when add function has a version conflict', async () => {
+    it('should throw HTTP 409 when add function has a revision conflict', async () => {
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         functions: [],
+        revision: 7,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
-
-      await expect(tcsConfigService.handleAddFunction(1, mockTenantId, { functionName: 'testFn' })).rejects.toThrow(
-        'Failed to add function',
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
       );
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, {
-        functions: [{ functionName: 'testFn', params: [], tableName: '', columns: [] }],
+      await expect(tcsConfigService.handleAddFunction(1, mockTenantId, { functionName: 'testFn' })).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
       });
+
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(
+        1,
+        mockTenantId,
+        { functions: [{ functionName: 'testFn', params: [], tableName: '', columns: [] }] },
+        7,
+      );
     });
   });
 
@@ -800,7 +1332,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [functions[1]] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [functions[1]] }, mockConfig.revision);
       expect(result.functions?.[0]).toEqual(functions[1]);
     });
 
@@ -828,7 +1360,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, mockConfig.revision);
       expect(result.functions).toEqual([]);
     });
 
@@ -850,7 +1382,7 @@ describe('TCS Config Logic Service', () => {
 
       const result = await tcsConfigService.handleRemoveFunction(1, mockTenantId, 0);
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, mockConfig.revision);
       expect(result.functions).toEqual([]);
     });
 
@@ -867,20 +1399,23 @@ describe('TCS Config Logic Service', () => {
       await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 10)).rejects.toThrow('Failed to remove function');
     });
 
-    it('should throw HTTP 409 when remove function has a version conflict', async () => {
+    it('should throw HTTP 409 when remove function has a revision conflict', async () => {
       const functions = [{ functionName: 'func1', params: [], tableName: '', columns: [] }];
       const mockConfig = {
         id: 1,
         msgFam: 'ISO20022',
         functions,
+        revision: 8,
       };
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
-      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(new (tcsConfigRepository.ConfigConflictError as any)());
+      (tcsConfigRepository.updateConfig as jest.Mock).mockRejectedValue(
+        new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT),
+      );
 
-      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 0)).rejects.toThrow('Failed to remove function');
+      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 0)).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
 
-      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] });
+      expect(tcsConfigRepository.updateConfig).toHaveBeenCalledWith(1, mockTenantId, { functions: [] }, 8);
     });
   });
 

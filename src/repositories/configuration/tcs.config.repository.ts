@@ -2,7 +2,7 @@
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
-import type { ConfigData, ConfigRow } from '../../interface/config.interface';
+import type { ConfigData, ConfigRow, ConfigWithRevision } from '../../interface/config.interface';
 import { validateTableName } from '../../utils/enrichment-utils';
 import { HttpException, HttpStatus } from '../../utils/error';
 
@@ -111,12 +111,12 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
   return result.rows[0].id;
 };
 
-export const findConfigById = async (id: number, tenantId: string): Promise<Config | null> => {
+export const findConfigById = async (id: number, tenantId: string): Promise<ConfigWithRevision | null> => {
   const query = `
     SELECT
       id, msg_fam, transaction_type, endpoint_path, version, content_type,
       schema, mapping, functions, status, tenant_id, created_by, publishing_status,
-      payload_xml, payload_json, created_at, updated_at, comments, related_transaction
+      payload_xml, payload_json, created_at, updated_at, comments, related_transaction, revision
     FROM tcs_config
     WHERE id = $1 AND tenant_id = $2
   `;
@@ -131,11 +131,12 @@ export const findConfigById = async (id: number, tenantId: string): Promise<Conf
     'configuration',
   );
 
-  if (result.rows.length === 0) {
+  if (result.rowCount === 0 || result.rows.length === 0) {
     return null;
   }
 
-  return mapRowToConfig(result.rows[0]);
+  const [row] = result.rows;
+  return { ...mapRowToConfig(row), revision: row.revision };
 };
 
 export const findConfigsByStatus = async (
@@ -245,7 +246,12 @@ export const updateConfig = async (
   id: number,
   tenantId: string,
   updates: Partial<Config> & { relatedTransaction?: string; related_transaction?: string },
-): Promise<Config> => {
+  expectedRevision?: number,
+): Promise<ConfigWithRevision> => {
+  if (updates.version !== undefined) {
+    throw new HttpException('Configuration version cannot be updated directly', HttpStatus.BAD_REQUEST);
+  }
+
   const setClauses: string[] = [];
   const values: Array<string | number | object> = [];
   let paramIndex = 1;
@@ -261,10 +267,6 @@ export const updateConfig = async (
   if (updates.endpointPath !== undefined) {
     setClauses.push(`endpoint_path = $${paramIndex++}`);
     values.push(updates.endpointPath);
-  }
-  if (updates.version !== undefined) {
-    setClauses.push(`version = $${paramIndex++}`);
-    values.push(updates.version);
   }
   if (updates.contentType !== undefined) {
     setClauses.push(`content_type = $${paramIndex++}`);
@@ -318,8 +320,10 @@ export const updateConfig = async (
   }
 
   setClauses.push('updated_at = NOW()');
+  setClauses.push('revision = revision + 1');
 
-  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}`;
+  const revisionClause = expectedRevision === undefined ? '' : ` AND revision = $${paramIndex + 2}`;
+  const whereClause = `WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}${revisionClause}`;
 
   const query = `
     UPDATE tcs_config
@@ -327,10 +331,13 @@ export const updateConfig = async (
     ${whereClause}
     RETURNING id, msg_fam, transaction_type, endpoint_path, version, content_type,
               schema, payload_xml, payload_json, comments, mapping, functions,
-              status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction
+              status, publishing_status, created_at, updated_at, tenant_id, created_by, related_transaction, revision
   `;
 
   values.push(id, tenantId);
+  if (expectedRevision !== undefined) {
+    values.push(expectedRevision);
+  }
 
   interface UpdateConfigRow {
     id: number;
@@ -352,11 +359,15 @@ export const updateConfig = async (
     tenant_id: string;
     created_by: string;
     related_transaction?: string;
+    revision: number;
   }
 
   const result = await handlePostExecuteSqlStatement<UpdateConfigRow>({ text: query, values } satisfies PgQueryConfig, 'configuration');
 
   if (result.rows.length === 0) {
+    if (expectedRevision !== undefined) {
+      throw new HttpException('Configuration was modified by another request; retry', HttpStatus.CONFLICT);
+    }
     throw new Error('Configuration not found');
   }
 
@@ -380,6 +391,7 @@ export const updateConfig = async (
     tenantId: row.tenant_id,
     createdBy: row.created_by,
     relatedTransaction: row.related_transaction,
+    revision: row.revision,
   };
 
   return updatedConfig;

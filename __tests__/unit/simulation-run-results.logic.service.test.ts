@@ -183,6 +183,12 @@ describe('saveRunResult', () => {
     await expect(saveRunResult(mockDto)).rejects.toMatchObject({ status: 500 });
   });
 
+  it('wraps non-Error thrown value in HttpException 500', async () => {
+    (repo.saveRunResultInDb as jest.Mock).mockRejectedValue('unexpected string');
+
+    await expect(saveRunResult(mockDto)).rejects.toMatchObject({ status: 500 });
+  });
+
   it('rethrows HttpException from generation status update', async () => {
     const saveResult = { run_id: 1, result_id: 100, outcome: 'SUCCESS' };
     (repo.saveRunResultInDb as jest.Mock).mockResolvedValue(saveResult);

@@ -334,7 +334,7 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
 export const getConfigsByMsgFamHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
-    const { msgFam } = req.body as { msgFam: string };
+    const { msgFam } = (req.body ?? {}) as { msgFam?: string };
 
     if (!msgFam) {
       reply.code(400).send({ success: false, message: 'msgFam is required in the request body' });

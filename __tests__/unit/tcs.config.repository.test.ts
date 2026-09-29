@@ -1634,14 +1634,11 @@ describe('TCS Config Repository', () => {
       expect(callArg.values[0]).toBe('/api/new-path');
     });
 
-    it('should handle version update', async () => {
+    it('should reject direct version update', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [mockUpdatedRow], rowCount: 1 } as never);
 
-      await updateConfig(1, 'tenant-123', { version: '2.0' });
-
-      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string; values: unknown[] };
-      expect(callArg.text).toContain('version = $1');
-      expect(callArg.values[0]).toBe('2.0');
+      await expect(updateConfig(1, 'tenant-123', { version: '2.0' })).rejects.toThrow('Configuration version cannot be updated directly');
+      expect(mockHandlePostExecuteSqlStatement).not.toHaveBeenCalled();
     });
   });
 

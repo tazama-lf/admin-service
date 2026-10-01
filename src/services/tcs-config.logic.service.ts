@@ -25,7 +25,6 @@ import {
 } from '../repositories/configuration/tcs.config.repository';
 import type { ConfigData, ConfigInput, ConfigResponse } from '../interface/config.interface';
 import { HttpException, HttpStatus } from '../utils/error';
-import { handleGetDataModelJson } from './data-model.logic.service';
 
 const mappingsHaveSameComposite = (mapping: FieldMapping, newMapping: FieldMapping): boolean =>
   JSON.stringify(mapping.source) === JSON.stringify(newMapping.source) &&
@@ -36,142 +35,6 @@ const normalizeSource = (source?: string | string[]): string[] | undefined =>
 
 const normalizeDestination = (destination?: string | string[]): string[] =>
   Array.isArray(destination) ? destination : destination ? [destination] : [];
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const XML_TAG_REGEX = /<[^>]+>/g;
-
-const addXmlPathToJson = (root: Record<string, unknown>, path: string[]): void => {
-  let current = root;
-
-  path.forEach((segment) => {
-    const nextValue = current[segment];
-    if (isRecord(nextValue)) {
-      current = nextValue;
-      return;
-    }
-
-    const nextObject: Record<string, unknown> = {};
-    current[segment] = nextObject;
-    current = nextObject;
-  });
-};
-
-const getXmlElementName = (tag: string): string => {
-  const content = tag.slice(1, -1).trim().replace(/^\//, '').replace(/\/$/, '').trim();
-  const [name = ''] = content.split(/\s+/);
-  const [, localName = name] = name.split(':');
-  return localName;
-};
-
-const parseXmlFieldTree = (xml: string): Record<string, unknown> => {
-  const root: Record<string, unknown> = {};
-  const stack: string[] = [];
-  const sanitizedXml = xml.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
-  const tags = sanitizedXml.match(XML_TAG_REGEX) ?? [];
-
-  for (const tag of tags) {
-    if (tag.startsWith('<!') || tag.startsWith('</')) {
-      if (tag.startsWith('</')) stack.pop();
-      continue;
-    }
-
-    const elementName = getXmlElementName(tag);
-    if (!elementName) continue;
-
-    const currentPath = [...stack, elementName];
-    addXmlPathToJson(root, currentPath);
-
-    if (!tag.endsWith('/>')) stack.push(elementName);
-  }
-
-  return root;
-};
-
-interface MappingValidationConfig {
-  contentType?: ContentType;
-  payload?: unknown;
-}
-
-const getPayloadForSourceValidation = (config: MappingValidationConfig): { payload: unknown; label: string } => {
-  if (config.contentType !== ContentType.XML) {
-    return { payload: config.payload, label: 'payload_json' };
-  }
-
-  if (typeof config.payload !== 'string') {
-    throw new HttpException('payload_xml not found', HttpStatus.BAD_REQUEST);
-  }
-
-  return { payload: parseXmlFieldTree(config.payload), label: 'payload_xml' };
-};
-
-const jsonPathExistsAtAnyLayer = (json: unknown, path: string): boolean => {
-  const segments = path.split('.').filter(Boolean);
-  if (segments.length === 0) return false;
-
-  const hasPath = (value: unknown, remainingSegments: string[]): boolean => {
-    if (remainingSegments.length === 0) {
-      if (Array.isArray(value)) {
-        return value.some((item) => isRecord(item));
-      }
-      return true;
-    }
-
-    if (Array.isArray(value)) {
-      return value.some((item) => hasPath(item, remainingSegments));
-    }
-
-    if (!isRecord(value)) return false;
-
-    const [nextSegment, ...rest] = remainingSegments;
-    if (!Object.prototype.hasOwnProperty.call(value, nextSegment)) return false;
-
-    return hasPath(value[nextSegment], rest);
-  };
-
-  const hasPathAtAnyLayer = (value: unknown): boolean => {
-    if (hasPath(value, segments)) return true;
-
-    if (Array.isArray(value)) {
-      return value.some(hasPathAtAnyLayer);
-    }
-
-    if (!isRecord(value)) return false;
-
-    return Object.values(value).some(hasPathAtAnyLayer);
-  };
-
-  return hasPathAtAnyLayer(json);
-};
-
-const validateMappingSourcesExistInPayload = (payload: unknown, source: string[] | undefined, payloadLabel: string): void => {
-  if (!source?.length) return;
-
-  const missingSources = source.filter((sourcePath) => !jsonPathExistsAtAnyLayer(payload, sourcePath));
-  if (missingSources.length > 0) {
-    throw new HttpException(`Mapping source does not exist in ${payloadLabel}: ${missingSources.join(', ')}`, HttpStatus.BAD_REQUEST);
-  }
-};
-
-const validateMappingDestinationsExistInDataModel = (
-  dataModelJson: Record<string, unknown> | null,
-  destination?: string | string[],
-): void => {
-  const destinations = normalizeDestination(destination);
-  if (destinations.length === 0) return;
-
-  if (dataModelJson === null) {
-    throw new HttpException('Data model JSON not found', HttpStatus.BAD_REQUEST);
-  }
-
-  const missingDestinations = destinations.filter((destinationPath) => !jsonPathExistsAtAnyLayer(dataModelJson, destinationPath));
-  if (missingDestinations.length > 0) {
-    throw new HttpException(
-      `Mapping destination does not exist in data model JSON: ${missingDestinations.join(', ')}`,
-      HttpStatus.BAD_REQUEST,
-    );
-  }
-};
 
 const validateMappingIsUnique = (existingMappings: FieldMapping[], newMapping: FieldMapping): void => {
   const newDestinations = normalizeDestination(newMapping.destination);
@@ -192,12 +55,10 @@ const validateMappingIsUnique = (existingMappings: FieldMapping[], newMapping: F
   }
 };
 
-const validateMappings = async (mappings: FieldMapping[] | undefined, config: MappingValidationConfig, tenantId: string): Promise<void> => {
+const validateMappings = (mappings: FieldMapping[] | undefined): void => {
   if (!mappings?.length) return;
 
   const existingMappings: FieldMapping[] = [];
-  const sourceValidationPayload = getPayloadForSourceValidation(config);
-  const dataModelJson = await handleGetDataModelJson(tenantId);
 
   for (const mapping of mappings) {
     const normalizedMapping: FieldMapping = {
@@ -206,8 +67,6 @@ const validateMappings = async (mappings: FieldMapping[] | undefined, config: Ma
     };
 
     validateMappingIsUnique(existingMappings, normalizedMapping);
-    validateMappingSourcesExistInPayload(sourceValidationPayload.payload, normalizedMapping.source, sourceValidationPayload.label);
-    validateMappingDestinationsExistInDataModel(dataModelJson, normalizedMapping.destination);
 
     existingMappings.push(normalizedMapping);
   }
@@ -243,7 +102,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       relatedTransaction: config.relatedTransaction,
     };
 
-    await validateMappings(newConfig.mapping, newConfig, tenantId);
+    validateMappings(newConfig.mapping);
 
     const createdConfigId = await createConfig(newConfig);
 
@@ -342,8 +201,8 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     }
 
     const mergedConfig = { ...existingConfig, ...updates };
-    if (updates.mapping !== undefined || updates.payload !== undefined || updates.contentType !== undefined) {
-      await validateMappings(mergedConfig.mapping, mergedConfig, tenantId);
+    if (updates.mapping !== undefined) {
+      validateMappings(mergedConfig.mapping);
     }
 
     const updatedConfig = await updateConfig(id, tenantId, updates, existingConfig.revision);
@@ -460,7 +319,7 @@ export const handleAddMapping = async (id: number, tenantId: string, mappingDto:
     };
 
     const updatedMappings = [...existingMappings, newMapping];
-    await validateMappings(updatedMappings, config, tenantId);
+    validateMappings(updatedMappings);
 
     const updatedConfig = await updateConfig(id, tenantId, { mapping: updatedMappings }, config.revision);
     loggerService.log(`Successfully added mapping to config ${id}`);

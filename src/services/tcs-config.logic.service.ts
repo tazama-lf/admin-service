@@ -201,7 +201,7 @@ export const handleUpdateConfig = async (id: number, tenantId: string, updates: 
     }
 
     const mergedConfig = { ...existingConfig, ...updates };
-    if (updates.mapping !== undefined || updates.payload !== undefined || updates.contentType !== undefined) {
+    if (updates.mapping !== undefined) {
       validateMappings(mergedConfig.mapping);
     }
 

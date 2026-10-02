@@ -334,18 +334,26 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
 export const getConfigsByMsgFamHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
-    const { msgFam } = (req.body ?? {}) as { msgFam?: string };
+    const {
+      msgFam,
+      limit = 10,
+      offset = 0,
+      transactionType,
+    } = (req.body ?? {}) as { msgFam?: string; limit?: number; offset?: number; transactionType?: string };
 
     if (!msgFam) {
       reply.code(400).send({ success: false, message: 'msgFam is required in the request body' });
       return;
     }
 
-    const data = await handleGetConfigsByMsgFam(msgFam, tenantId);
+    const result = await handleGetConfigsByMsgFam(msgFam, tenantId, limit, offset, transactionType);
     reply.code(200).send({
       success: true,
-      data,
-      total: data.length,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      pages: Math.ceil(result.total / result.limit),
     });
   } catch (error: unknown) {
     ErrorHandler.sendError(reply, error, 'Failed to get configs by msg_fam');

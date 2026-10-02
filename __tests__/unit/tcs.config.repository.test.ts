@@ -1576,28 +1576,68 @@ describe('TCS Config Repository', () => {
   });
 
   describe('findConfigsByMsgFam', () => {
-    it('should return distinct endpoint paths for a given msg_fam', async () => {
+    it('should return distinct endpoint paths for a given msg_fam with pagination', async () => {
       const mockRows = [{ endpoint_path: '/api/pain001' }, { endpoint_path: '/api/pacs008' }];
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: mockRows, rowCount: 2 } as never);
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 } as never)
+        .mockResolvedValueOnce({ rows: mockRows, rowCount: 2 } as never);
 
-      const result = await findConfigsByMsgFam('ISO20022', 'tenant-123');
+      const result = await findConfigsByMsgFam('ISO20022', 'tenant-123', 10, 0);
 
-      expect(result).toEqual(['/api/pain001', '/api/pacs008']);
-      expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
+      expect(result).toEqual({ data: ['/api/pain001', '/api/pacs008'], total: 2, limit: 10, offset: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          text: expect.stringContaining('SELECT COUNT(DISTINCT endpoint_path)'),
+          values: ['ISO20022', 'tenant-123'],
+        }),
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
           text: expect.stringContaining('SELECT DISTINCT endpoint_path'),
-          values: ['ISO20022', 'tenant-123'],
+          values: ['ISO20022', 'tenant-123', 10, 0],
         }),
         'configuration',
       );
     });
 
     it('should return empty array when no configs match', async () => {
-      mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 } as never)
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
 
-      const result = await findConfigsByMsgFam('unknown', 'tenant-123');
+      const result = await findConfigsByMsgFam('unknown', 'tenant-123', 10, 0);
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ data: [], total: 0, limit: 10, offset: 0 });
+    });
+
+    it('should filter by transactionType when provided', async () => {
+      const mockRows = [{ endpoint_path: '/api/pain001' }];
+      mockHandlePostExecuteSqlStatement
+        .mockResolvedValueOnce({ rows: [{ total: '1' }], rowCount: 1 } as never)
+        .mockResolvedValueOnce({ rows: mockRows, rowCount: 1 } as never);
+
+      const result = await findConfigsByMsgFam('ISO20022', 'tenant-123', 10, 0, 'pain.001');
+
+      expect(result).toEqual({ data: ['/api/pain001'], total: 1, limit: 10, offset: 0 });
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          text: expect.stringContaining('transaction_type ILIKE $3'),
+          values: ['ISO20022', 'tenant-123', '%pain.001%'],
+        }),
+        'configuration',
+      );
+      expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          text: expect.stringContaining('transaction_type ILIKE $3'),
+          values: ['ISO20022', 'tenant-123', '%pain.001%', 10, 0],
+        }),
+        'configuration',
+      );
     });
   });
 

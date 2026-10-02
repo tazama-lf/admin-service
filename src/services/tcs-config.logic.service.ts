@@ -333,13 +333,19 @@ export const handleGetAllConfigs = async (
   }
 };
 
-export const handleGetConfigsByMsgFam = async (msgFam: string, tenantId: string): Promise<string[]> => {
+export const handleGetConfigsByMsgFam = async (
+  msgFam: string,
+  tenantId: string,
+  limit: number,
+  offset: number,
+  transactionType?: string,
+): Promise<{ data: string[]; total: number; limit: number; offset: number }> => {
   try {
     loggerService.log(`Started handling get configs by msg_fam request for tenant: ${tenantId} with msg_fam: ${msgFam}`);
 
-    const result = await findConfigsByMsgFam(msgFam, tenantId);
+    const result = await findConfigsByMsgFam(msgFam, tenantId, limit, offset, transactionType);
 
-    loggerService.log(`Successfully retrieved ${result.length} endpoint paths for msg_fam: ${msgFam}`);
+    loggerService.log(`Successfully retrieved ${result.data.length} endpoint paths out of ${result.total} total for msg_fam: ${msgFam}`);
 
     return result;
   } catch (error) {

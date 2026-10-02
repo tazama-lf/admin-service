@@ -5,6 +5,7 @@ import type { AddMappingDto, AddFunctionDto } from '@tazama-lf/tcs-lib';
 import { configuration, loggerService } from '.';
 import type { ConditionRequest } from './interface/query';
 import type { ITenantRequest } from './interface/ITenantRequest';
+import type { GetConfigsByMsgFamRequestBody } from './interface/config.interface';
 import {
   handleGetConditionsForAccount,
   handleGetConditionsForEntity,
@@ -334,15 +335,20 @@ export const getAllConfigsHandler = async (req: FastifyRequest, reply: FastifyRe
 export const getConfigsByMsgFamHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
-    const {
-      msgFam,
-      limit = 10,
-      offset = 0,
-      transactionType,
-    } = (req.body ?? {}) as { msgFam?: string; limit?: number; offset?: number; transactionType?: string };
+    const { msgFam, limit = 10, offset = 0, transactionType } = (req.body ?? {}) as GetConfigsByMsgFamRequestBody;
 
     if (!msgFam) {
       reply.code(400).send({ success: false, message: 'msgFam is required in the request body' });
+      return;
+    }
+
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      reply.code(400).send({ success: false, message: 'limit must be an integer between 1 and 100' });
+      return;
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
+      reply.code(400).send({ success: false, message: 'offset must be a non-negative integer' });
       return;
     }
 

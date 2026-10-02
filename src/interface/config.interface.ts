@@ -53,3 +53,10 @@ export interface ConfigWithRevision extends Config {
 
 export type ConfigInput = Partial<ConfigData>;
 export type ConfigResponse = Config;
+
+export interface GetConfigsByMsgFamRequestBody {
+  msgFam: string;
+  limit?: number;
+  offset?: number;
+  transactionType?: string;
+}

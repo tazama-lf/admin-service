@@ -192,7 +192,7 @@ describe('TCS Config Repository', () => {
       tenantId: 'tenant-123',
       createdBy: 'user-123',
       publishing_status: 'inactive',
-      relatedTransaction: null,
+      related_transaction: null,
       payload: { data: 'test' },
     };
 
@@ -278,12 +278,12 @@ describe('TCS Config Repository', () => {
       expect(callArg.values).toContain(JSON.stringify(mockConfigData.schema));
     });
 
-    it('should use default status, publishing_status and relatedTransaction when not provided (without id)', async () => {
+    it('should use default status, publishing_status and related_transaction when not provided (without id)', async () => {
       const configWithDefaults = {
         ...mockConfigData,
         status: undefined,
         publishing_status: undefined,
-        relatedTransaction: undefined,
+        related_transaction: undefined,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
@@ -299,12 +299,12 @@ describe('TCS Config Repository', () => {
       expect(callArg.values).toContain(null);
     });
 
-    it('should use default status, publishing_status and relatedTransaction when not provided (with id)', async () => {
+    it('should use default status, publishing_status and related_transaction when not provided (with id)', async () => {
       const configWithDefaults = {
         ...mockConfigData,
         status: undefined,
         publishing_status: undefined,
-        relatedTransaction: undefined,
+        related_transaction: undefined,
       };
 
       mockHandlePostExecuteSqlStatement.mockResolvedValue({

@@ -17,7 +17,7 @@ export interface ConfigData {
   publishing_status?: string;
   payload?: string | object;
   creDtTm?: string;
-  relatedTransaction?: string;
+  related_transaction?: string;
 }
 
 export interface ConfigRow {
@@ -53,3 +53,10 @@ export interface ConfigWithRevision extends Config {
 
 export type ConfigInput = Partial<ConfigData>;
 export type ConfigResponse = Config;
+
+export interface GetConfigsByMsgFamRequestBody {
+  msgFam: string;
+  limit?: number;
+  offset?: number;
+  transactionType?: string;
+}

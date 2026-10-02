@@ -31,7 +31,7 @@ const mapRowToConfig = (row: ConfigRow): Config => {
     comments: row.comments,
     publishing_status: row.publishing_status,
     payload: row.content_type === ContentType.XML ? row.payload_xml : row.payload_json,
-    relatedTransaction: row.related_transaction,
+    related_transaction: row.related_transaction,
   };
 
   return mapped;
@@ -80,7 +80,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
-        config.relatedTransaction ?? null,
+        config.related_transaction ?? null,
         payloadValue,
       ]
     : [
@@ -96,7 +96,7 @@ export const createConfig = async (config: ConfigData, id?: number): Promise<num
         config.tenantId,
         config.createdBy,
         config.publishing_status ?? 'inactive',
-        config.relatedTransaction ?? null,
+        config.related_transaction ?? null,
         payloadValue,
       ];
 
@@ -215,6 +215,65 @@ export const findConfigsByStatus = async (
   );
   return {
     data: dataResult.rows.map(mapRowToConfig),
+    total,
+    limit,
+    offset,
+  };
+};
+
+export const findConfigsByMsgFam = async (
+  msgFam: string,
+  tenantId: string,
+  limit: number,
+  offset: number,
+  transactionType?: string,
+): Promise<{ data: string[]; total: number; limit: number; offset: number }> => {
+  const whereClauses = ['msg_fam = $1', 'tenant_id = $2'];
+  const baseParams: string[] = [msgFam, tenantId];
+
+  if (transactionType) {
+    whereClauses.push(`transaction_type ILIKE $${baseParams.length + 1}`);
+    baseParams.push(`%${transactionType}%`);
+  }
+
+  const whereClause = whereClauses.join(' AND ');
+
+  const countQuery = `
+    SELECT COUNT(DISTINCT endpoint_path) as total
+    FROM tcs_config
+    WHERE ${whereClause}
+  `;
+
+  const countResult = await handlePostExecuteSqlStatement<{ total: string }>(
+    {
+      text: countQuery,
+      values: baseParams,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  const total = parseInt(countResult.rows[0].total, 10);
+
+  const query = `
+    SELECT DISTINCT endpoint_path
+    FROM tcs_config
+    WHERE ${whereClause}
+    ORDER BY endpoint_path ASC
+    LIMIT $${baseParams.length + 1} OFFSET $${baseParams.length + 2}
+  `;
+
+  const values = [...baseParams, limit, offset];
+
+  const result = await handlePostExecuteSqlStatement<{ endpoint_path: string }>(
+    {
+      text: query,
+      values,
+    } satisfies PgQueryConfig,
+    'configuration',
+  );
+
+  return {
+    data: result.rows.map((row) => row.endpoint_path),
     total,
     limit,
     offset,
@@ -369,7 +428,7 @@ export const updateConfig = async (
     updatedAt: row.updated_at,
     tenantId: row.tenant_id,
     createdBy: row.created_by,
-    relatedTransaction: row.related_transaction,
+    related_transaction: row.related_transaction,
     revision: row.revision,
   };
 

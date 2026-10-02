@@ -13,6 +13,7 @@ import {
   createConfigHandler,
   getConfigByIdHandler,
   getAllConfigsHandler,
+  getConfigsByMsgFamHandler,
   updatePublishingStatusHandler,
   writeConfigUpdateHandler,
   createTransactionTypeTableHandler,
@@ -139,6 +140,7 @@ const routePrivilege = {
   postTcsConfig: 'editor',
   getTcsConfig: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigs: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
+  getTcsConfigsByMsgFam: ['editor', 'approver', 'exporter', 'publisher', 'trs_data_engineer_editor', 'trs_data_engineer_approver'],
   getTcsConfigRelatedTransactions: ['editor', 'approver', 'exporter', 'publisher'],
   putTcsConfig: ['editor', 'approver', 'publisher'],
   patchTcsConfigPublishingStatus: ['publisher', 'approver'],
@@ -392,6 +394,10 @@ function Routes(fastify: FastifyInstance): void {
   });
   fastify.post('/v1/admin/tcs/config/:offset/:limit', {
     ...SetOptionsBodyAndParams(getAllConfigsHandler, routePrivilege.getTcsConfigs),
+  });
+
+  fastify.post('/v1/admin/tcs/config/msg-fam', {
+    ...SetOptionsBodyAndParams(getConfigsByMsgFamHandler, routePrivilege.getTcsConfigsByMsgFam),
   });
 
   // ==================== DATA MODEL JSON OPERATIONS ====================

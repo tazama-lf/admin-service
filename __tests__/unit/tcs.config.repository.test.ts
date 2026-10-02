@@ -1577,14 +1577,14 @@ describe('TCS Config Repository', () => {
 
   describe('findConfigsByMsgFam', () => {
     it('should return distinct endpoint paths for a given msg_fam with pagination', async () => {
-      const mockRows = [{ endpoint_path: '/api/pain001' }, { endpoint_path: '/api/pacs008' }];
+      const mockRows = [{ endpoint_path: '/api/pacs008' }, { endpoint_path: '/api/pain001' }];
       mockHandlePostExecuteSqlStatement
         .mockResolvedValueOnce({ rows: [{ total: '2' }], rowCount: 1 } as never)
         .mockResolvedValueOnce({ rows: mockRows, rowCount: 2 } as never);
 
       const result = await findConfigsByMsgFam('ISO20022', 'tenant-123', 10, 0);
 
-      expect(result).toEqual({ data: ['/api/pain001', '/api/pacs008'], total: 2, limit: 10, offset: 0 });
+      expect(result).toEqual({ data: ['/api/pacs008', '/api/pain001'], total: 2, limit: 10, offset: 0 });
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
@@ -1601,6 +1601,8 @@ describe('TCS Config Repository', () => {
         }),
         'configuration',
       );
+      const dataQueryCall = mockHandlePostExecuteSqlStatement.mock.calls[1][0] as { text: string };
+      expect(dataQueryCall.text).toMatch(/ORDER BY endpoint_path ASC/);
     });
 
     it('should return empty array when no configs match', async () => {

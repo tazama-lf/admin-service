@@ -13,6 +13,7 @@ import {
   createConfig,
   findConfigById,
   findConfigsByStatus,
+  findConfigsByMsgFam,
   updateConfig,
   createTransactionTypeTable,
   createTazamaDataModelTable,
@@ -99,7 +100,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       publishing_status: config.publishing_status ?? 'inactive',
       payload: config.payload,
       creDtTm: nowDateTime,
-      relatedTransaction: config.relatedTransaction,
+      related_transaction: config.related_transaction,
     };
 
     validateMappings(newConfig.mapping);
@@ -124,6 +125,7 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
       tenantId: newConfig.tenantId,
       createdBy: newConfig.createdBy,
       publishing_status: (newConfig.publishing_status ?? 'inactive') as 'active' | 'inactive',
+      related_transaction: newConfig.related_transaction,
     };
 
     loggerService.log('New config was saved successfully.');
@@ -187,6 +189,28 @@ export const handleGetAllConfigs = async (
     const errorMessage = error as { message: string };
     loggerService.error(`Error: getting all configs with error message: ${errorMessage.message}`, 'handleGetAllConfigs');
     throw new Error('Failed to retrieve configurations');
+  }
+};
+
+export const handleGetConfigsByMsgFam = async (
+  msgFam: string,
+  tenantId: string,
+  limit: number,
+  offset: number,
+  transactionType?: string,
+): Promise<{ data: string[]; total: number; limit: number; offset: number }> => {
+  try {
+    loggerService.log(`Started handling get configs by msg_fam request for tenant: ${tenantId} with msg_fam: ${msgFam}`);
+
+    const result = await findConfigsByMsgFam(msgFam, tenantId, limit, offset, transactionType);
+
+    loggerService.log(`Successfully retrieved ${result.data.length} endpoint paths out of ${result.total} total for msg_fam: ${msgFam}`);
+
+    return result;
+  } catch (error) {
+    const errorMessage = error as { message: string };
+    loggerService.error(`Error: getting configs by msg_fam with error message: ${errorMessage.message}`, 'handleGetConfigsByMsgFam');
+    throw new Error('Failed to retrieve configurations by msg_fam');
   }
 };
 

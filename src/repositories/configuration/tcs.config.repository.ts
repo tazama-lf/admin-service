@@ -573,6 +573,8 @@ export const getSchemaByTransactionTypew3 = async (
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
   const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);
+  // Keep the index name within Postgres' 63-char identifier limit; if it were truncated it could equal the table name and be skipped
+  const indexName = `${safeTableName.slice(0, 55)}_e2e_idx`;
   const query = `
     CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       document JSONB NOT NULL,
@@ -583,6 +585,7 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
       creditorAccountId TEXT,
       tenantId TEXT
     );
+    CREATE INDEX IF NOT EXISTS "${indexName}" ON "${safeTableName}" (endToEndId, tenantId);
   `;
 
   await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'raw_history');

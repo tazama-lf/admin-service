@@ -1422,6 +1422,31 @@ describe('TCS Config Repository', () => {
       expect(callArg.text).toContain('messageId TEXT');
       expect(callArg.text).toContain('tenantId TEXT');
     });
+
+    it('should create an index on endToEndId and tenantId', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await createTransactionTypeTable('pain.001.001.11');
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain('CREATE INDEX IF NOT EXISTS "pain_001_001_11_e2e_idx" ON "pain_001_001_11" (endToEndId, tenantId)');
+    });
+
+    it('should keep the index name within 63 characters for long table names', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+      const longName = 'a'.repeat(63);
+
+      await createTransactionTypeTable(longName);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toContain(`CREATE INDEX IF NOT EXISTS "${'a'.repeat(55)}_e2e_idx" ON "${longName}"`);
+    });
   });
 
   describe('createTazamaDataModelTable', () => {

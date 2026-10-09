@@ -82,7 +82,11 @@ export const handlePostConfig = async (config: ConfigInput, tenantId: string): P
     const nowDateTime = new Date().toISOString();
 
     if (!config.msgFam || !config.transactionType || !config.endpointPath || !config.version || !config.schema) {
-      throw new Error('Missing required fields: msgFam, transactionType, endpointPath, version, or schema');
+      const requiredFields = ['msgFam', 'transactionType', 'endpointPath', 'version', 'schema'] as const;
+      const missingFields = requiredFields.filter((field) => !config[field]);
+      const message = `Missing required fields: ${missingFields.join(', ')}`;
+      loggerService.warn(message, 'handlePostConfig');
+      throw new HttpException(message, HttpStatus.BAD_REQUEST);
     }
 
     const newConfig: ConfigData = {
@@ -367,7 +371,8 @@ export const handleRemoveMapping = async (id: number, tenantId: string, mappingI
     }
 
     if (!config.mapping || mappingIndex < 0 || mappingIndex >= config.mapping.length) {
-      throw new Error('Invalid mapping index');
+      loggerService.warn(`Invalid mapping index ${mappingIndex} for config ${id}`, 'handleRemoveMapping');
+      throw new HttpException('Invalid mapping index', HttpStatus.BAD_REQUEST);
     }
 
     const updatedMappings = config.mapping.filter((_item, idx) => idx !== mappingIndex);
@@ -426,7 +431,8 @@ export const handleRemoveFunction = async (id: number, tenantId: string, functio
     }
 
     if (!config.functions || functionIndex < 0 || functionIndex >= config.functions.length) {
-      throw new Error('Invalid function index');
+      loggerService.warn(`Invalid function index ${functionIndex} for config ${id}`, 'handleRemoveFunction');
+      throw new HttpException('Invalid function index', HttpStatus.BAD_REQUEST);
     }
 
     const updatedFunctions = config.functions.filter((_item, idx) => idx !== functionIndex);

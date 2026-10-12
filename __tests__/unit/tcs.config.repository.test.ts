@@ -1432,7 +1432,26 @@ describe('TCS Config Repository', () => {
       await createTransactionTypeTable('pain.001.001.11');
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toMatch(/CREATE INDEX IF NOT EXISTS "pain_001_001_11_[0-9a-f]{8}_e2e_idx" ON "pain_001_001_11" \(endToEndId, tenantId\)/);
+      expect(callArg.text).toMatch(
+        /CREATE INDEX IF NOT EXISTS "pain_001_001_11_[0-9a-f]{8}_e2e_idx" ON "pain_001_001_11" \(endToEndId, tenantId\)/,
+      );
+    });
+
+    it('should keep the index name at most 63 characters for a table name at the 63-character cap', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+      const maxName = 'b'.repeat(63);
+
+      await createTransactionTypeTable(maxName);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      const indexName = /CREATE INDEX IF NOT EXISTS "([^"]+)"/.exec(callArg.text)?.[1] ?? '';
+      expect(indexName).toMatch(new RegExp(`^${'b'.repeat(46)}_[0-9a-f]{8}_e2e_idx$`));
+      expect(indexName).toHaveLength(63);
+      expect(indexName).not.toEqual(maxName);
+      expect(callArg.text).toContain(`ON "${maxName}" (endToEndId, tenantId)`);
     });
 
     it('should give long table names sharing a prefix distinct index names within 63 characters', async () => {

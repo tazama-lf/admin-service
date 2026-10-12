@@ -1437,6 +1437,21 @@ describe('TCS Config Repository', () => {
       );
     });
 
+    it('should be idempotent: re-running for the same table issues identical IF NOT EXISTS SQL', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await createTransactionTypeTable('pain.001.001.11');
+      await expect(createTransactionTypeTable('pain.001.001.11')).resolves.toBeUndefined();
+
+      const [first, second] = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls.map(([arg]) => (arg as { text: string }).text);
+      expect(second).toEqual(first);
+      expect(first).toContain('CREATE TABLE IF NOT EXISTS');
+      expect(first).toContain('CREATE INDEX IF NOT EXISTS');
+    });
+
     it('should keep the index name at most 63 characters for a table name at the 63-character cap', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
         rows: [],

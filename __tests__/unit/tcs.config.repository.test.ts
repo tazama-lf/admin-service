@@ -1432,20 +1432,26 @@ describe('TCS Config Repository', () => {
       await createTransactionTypeTable('pain.001.001.11');
 
       const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain('CREATE INDEX IF NOT EXISTS "pain_001_001_11_e2e_idx" ON "pain_001_001_11" (endToEndId, tenantId)');
+      expect(callArg.text).toMatch(/CREATE INDEX IF NOT EXISTS "pain_001_001_11_[0-9a-f]{8}_e2e_idx" ON "pain_001_001_11" \(endToEndId, tenantId\)/);
     });
 
-    it('should keep the index name within 63 characters for long table names', async () => {
+    it('should give long table names sharing a prefix distinct index names within 63 characters', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({
         rows: [],
         rowCount: 0,
       } as never);
-      const longName = 'a'.repeat(63);
+      const prefix = 'a'.repeat(60);
 
-      await createTransactionTypeTable(longName);
+      await createTransactionTypeTable(`${prefix}_x1`);
+      await createTransactionTypeTable(`${prefix}_x2`);
 
-      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
-      expect(callArg.text).toContain(`CREATE INDEX IF NOT EXISTS "${'a'.repeat(55)}_e2e_idx" ON "${longName}"`);
+      const indexNames = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls.map(
+        ([arg]) => /CREATE INDEX IF NOT EXISTS "([^"]+)"/.exec((arg as { text: string }).text)?.[1] ?? '',
+      );
+      expect(indexNames[0]).not.toEqual(indexNames[1]);
+      indexNames.forEach((name) => {
+        expect(name.length).toBeLessThanOrEqual(63);
+      });
     });
   });
 

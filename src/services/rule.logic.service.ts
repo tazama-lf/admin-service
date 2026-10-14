@@ -83,8 +83,8 @@ export const updateRule = async (
 export const findAllRuleIds = async (tenantId: string): Promise<Array<{ ruleId: string; ruleCfg: unknown; tenantId: string }>> =>
   await findAllRuleIdsFromDb(tenantId);
 
-export const findRuleConfiguration = async (ruleId: string, tenantId: string): Promise<unknown> =>
-  await findRuleConfigurationFromDB(ruleId, tenantId);
+export const findRuleConfiguration = async (ruleId: string, ruleCfg: string, tenantId: string): Promise<unknown> =>
+  await findRuleConfigurationFromDB(ruleId, ruleCfg, tenantId);
 
 export const findRuleById = async (id: number, tenantId: string): Promise<RuleEntity | null> => await findRuleByIdFromDB(id, tenantId);
 

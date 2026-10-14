@@ -1399,18 +1399,27 @@ export const getRuleIdsHandler = async (req: FastifyRequest, reply: FastifyReply
 export const getRuleConfigurationHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
   try {
     const { tenantId } = req as ITenantRequest;
-    const { ruleId } = req.params as { ruleId: string };
+    const { ruleId: ruleKey } = req.params as { ruleId: string };
 
-    const configuration: unknown = await findRuleConfiguration(ruleId, tenantId);
+    const separatorIndex = ruleKey.lastIndexOf('@');
+    if (separatorIndex === -1) {
+      ErrorHandler.sendError(reply, { status: 400 }, `Invalid rule configuration key '${ruleKey}'. Expected format '<ruleId>@<ruleCfg>'`);
+      return;
+    }
+    const ruleId = ruleKey.slice(0, separatorIndex);
+    const ruleCfg = ruleKey.slice(separatorIndex + 1);
+
+    const configuration: unknown = await findRuleConfiguration(ruleId, ruleCfg, tenantId);
 
     if (!configuration) {
-      ErrorHandler.sendError(reply, { status: 404 }, `Configuration not found for rule ${ruleId}`);
+      ErrorHandler.sendError(reply, { status: 404 }, `Configuration not found for rule ${ruleId} (cfg ${ruleCfg})`);
       return;
     }
 
     reply.code(200).send({
       success: true,
       ruleId,
+      ruleCfg,
       configuration,
     });
   } catch (error: unknown) {

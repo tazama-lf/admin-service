@@ -100,15 +100,17 @@ describe('TCS Config Logic Service', () => {
       expect(result.result.createdBy).toBe('system');
     });
 
-    it('should throw error when required fields are missing', async () => {
+    it('should throw HTTP 400 naming the missing fields when required fields are missing', async () => {
       const mockConfig = {
         msgFam: 'ISO20022',
         // Missing transactionType, endpointPath, version, and schema
       };
 
-      (tcsConfigRepository.createConfig as jest.Mock).mockRejectedValue(new Error('Missing required fields'));
-
-      await expect(tcsConfigService.handlePostConfig(mockConfig as any, mockTenantId)).rejects.toThrow('Failed to create configuration');
+      await expect(tcsConfigService.handlePostConfig(mockConfig as any, mockTenantId)).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Missing required fields: transactionType, endpointPath, version, schema',
+      });
+      expect(tcsConfigRepository.createConfig).not.toHaveBeenCalled();
     });
 
     it('should throw error when config creation fails', async () => {
@@ -854,7 +856,10 @@ describe('TCS Config Logic Service', () => {
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
 
-      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 5)).rejects.toThrow('Failed to remove mapping');
+      await expect(tcsConfigService.handleRemoveMapping(1, mockTenantId, 5)).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Invalid mapping index',
+      });
     });
 
     it('should throw HTTP 409 when remove mapping has a revision conflict', async () => {
@@ -1135,7 +1140,10 @@ describe('TCS Config Logic Service', () => {
 
       (tcsConfigRepository.findConfigById as jest.Mock).mockResolvedValue(mockConfig);
 
-      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 10)).rejects.toThrow('Failed to remove function');
+      await expect(tcsConfigService.handleRemoveFunction(1, mockTenantId, 10)).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Invalid function index',
+      });
     });
 
     it('should throw HTTP 409 when remove function has a revision conflict', async () => {

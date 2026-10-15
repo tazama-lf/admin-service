@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash } from 'node:crypto';
 import type { PgQueryConfig } from '@tazama-lf/frms-coe-lib';
 import { ConfigStatus, ContentType, type FieldMapping, type FunctionDefinition, type JSONSchema, type Config } from '@tazama-lf/tcs-lib';
 import { handlePostExecuteSqlStatement } from '../../services/database.logic.service';
@@ -573,6 +574,10 @@ export const getSchemaByTransactionTypew3 = async (
 export const createTransactionTypeTable = async (transactionType: string): Promise<void> => {
   const safeTableName = transactionType.replace(/[^a-zA-Z0-9_]/g, '_');
   validateTableName(safeTableName);
+  // Keep the index name within Postgres' 63-char identifier limit and unique per table (hash of the full name),
+  // otherwise a truncated or shared-prefix name would already exist and IF NOT EXISTS would silently skip the index
+  const hash = createHash('sha256').update(safeTableName).digest('hex').slice(0, 8);
+  const indexName = `${safeTableName.slice(0, 46)}_${hash}_e2e_idx`;
   const query = `
     CREATE TABLE IF NOT EXISTS "${safeTableName}" (
       document JSONB NOT NULL,
@@ -583,6 +588,7 @@ export const createTransactionTypeTable = async (transactionType: string): Promi
       creditorAccountId TEXT,
       tenantId TEXT
     );
+    CREATE INDEX IF NOT EXISTS "${indexName}" ON "${safeTableName}" (endToEndId, tenantId);
   `;
 
   await handlePostExecuteSqlStatement({ text: query, values: [] } satisfies PgQueryConfig, 'raw_history');

@@ -1422,6 +1422,71 @@ describe('TCS Config Repository', () => {
       expect(callArg.text).toContain('messageId TEXT');
       expect(callArg.text).toContain('tenantId TEXT');
     });
+
+    it('should create an index on endToEndId and tenantId', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await createTransactionTypeTable('pain.001.001.11');
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      expect(callArg.text).toMatch(
+        /CREATE INDEX IF NOT EXISTS "pain_001_001_11_[0-9a-f]{8}_e2e_idx" ON "pain_001_001_11" \(endToEndId, tenantId\)/,
+      );
+    });
+
+    it('should be idempotent: re-running for the same table issues identical IF NOT EXISTS SQL', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+
+      await createTransactionTypeTable('pain.001.001.11');
+      await expect(createTransactionTypeTable('pain.001.001.11')).resolves.toBeUndefined();
+
+      const [first, second] = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls.map(([arg]) => (arg as { text: string }).text);
+      expect(second).toEqual(first);
+      expect(first).toContain('CREATE TABLE IF NOT EXISTS');
+      expect(first).toContain('CREATE INDEX IF NOT EXISTS');
+    });
+
+    it('should keep the index name at most 63 characters for a table name at the 63-character cap', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+      const maxName = 'b'.repeat(63);
+
+      await createTransactionTypeTable(maxName);
+
+      const callArg = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls[0][0] as { text: string };
+      const indexName = /CREATE INDEX IF NOT EXISTS "([^"]+)"/.exec(callArg.text)?.[1] ?? '';
+      expect(indexName).toMatch(new RegExp(`^${'b'.repeat(46)}_[0-9a-f]{8}_e2e_idx$`));
+      expect(indexName).toHaveLength(63);
+      expect(indexName).not.toEqual(maxName);
+      expect(callArg.text).toContain(`ON "${maxName}" (endToEndId, tenantId)`);
+    });
+
+    it('should give long table names sharing a prefix distinct index names within 63 characters', async () => {
+      mockHandlePostExecuteSqlStatement.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+      } as never);
+      const prefix = 'a'.repeat(60);
+
+      await createTransactionTypeTable(`${prefix}_x1`);
+      await createTransactionTypeTable(`${prefix}_x2`);
+
+      const indexNames = (mockHandlePostExecuteSqlStatement as jest.Mock).mock.calls.map(
+        ([arg]) => /CREATE INDEX IF NOT EXISTS "([^"]+)"/.exec((arg as { text: string }).text)?.[1] ?? '',
+      );
+      expect(indexNames[0]).not.toEqual(indexNames[1]);
+      indexNames.forEach((name) => {
+        expect(name.length).toBeLessThanOrEqual(63);
+      });
+    });
   });
 
   describe('createTazamaDataModelTable', () => {

@@ -181,11 +181,11 @@ describe('Rule Repository', () => {
     it('should return configuration when found', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [{ configuration: { key: 'val' } }], rowCount: 1 });
 
-      const result = await findRuleConfigurationFromDB('1', mockTenantId);
+      const result = await findRuleConfigurationFromDB('1', 'cfg1', mockTenantId);
 
       expect(result).toEqual({ configuration: { key: 'val' } });
       expect(mockHandlePostExecuteSqlStatement).toHaveBeenCalledWith(
-        expect.objectContaining({ values: ['1', mockTenantId] }),
+        expect.objectContaining({ values: ['1', 'cfg1', mockTenantId] }),
         'configuration',
       );
     });
@@ -193,7 +193,7 @@ describe('Rule Repository', () => {
     it('should return null when configuration not found', async () => {
       mockHandlePostExecuteSqlStatement.mockResolvedValue({ rows: [], rowCount: 0 });
 
-      const result = await findRuleConfigurationFromDB('999', mockTenantId);
+      const result = await findRuleConfigurationFromDB('999', 'cfg1', mockTenantId);
 
       expect(result).toBeNull();
     });

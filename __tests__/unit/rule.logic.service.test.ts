@@ -223,16 +223,16 @@ describe('Rule Logic Service', () => {
 
       (ruleRepository.findRuleConfigurationFromDB as jest.Mock).mockResolvedValue(mockConfiguration);
 
-      const result = await ruleLogicService.findRuleConfiguration(mockRuleId, mockTenantId);
+      const result = await ruleLogicService.findRuleConfiguration(mockRuleId, 'cfg1', mockTenantId);
 
-      expect(ruleRepository.findRuleConfigurationFromDB).toHaveBeenCalledWith(mockRuleId, mockTenantId);
+      expect(ruleRepository.findRuleConfigurationFromDB).toHaveBeenCalledWith(mockRuleId, 'cfg1', mockTenantId);
       expect(result).toEqual(mockConfiguration);
     });
 
     it('should return null when configuration is not found', async () => {
       (ruleRepository.findRuleConfigurationFromDB as jest.Mock).mockResolvedValue(null);
 
-      const result = await ruleLogicService.findRuleConfiguration('non-existent', mockTenantId);
+      const result = await ruleLogicService.findRuleConfiguration('non-existent', 'cfg1', mockTenantId);
 
       expect(result).toBeNull();
     });

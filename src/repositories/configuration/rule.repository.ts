@@ -137,16 +137,20 @@ export const updateRuleInDB = async (ruleId: string, tenantId: string, updateDat
   return result.rows.length > 0 ? result.rows[0] : null;
 };
 
-export const findRuleConfigurationFromDB = async (ruleId: string, tenantId: string): Promise<{ configuration: unknown } | null> => {
+export const findRuleConfigurationFromDB = async (
+  ruleId: string,
+  ruleCfg: string,
+  tenantId: string,
+): Promise<{ configuration: unknown } | null> => {
   const query = `
       SELECT configuration
       FROM rule
-      WHERE "ruleid" = $1 AND "tenantid" = $2`;
+      WHERE "ruleid" = $1 AND "rulecfg" = $2 AND "tenantid" = $3`;
 
   const result = await handlePostExecuteSqlStatement(
     {
       text: query,
-      values: [ruleId, tenantId],
+      values: [ruleId, ruleCfg, tenantId],
     } satisfies PgQueryConfig,
     'configuration',
   );
